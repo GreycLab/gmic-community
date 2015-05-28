@@ -1,0 +1,835 @@
+#@gmic
+#
+#  File        : ronounours.gmic
+#                ( G'MIC commands file )
+#
+#  Description : Personal G'MIC filters done by Ronounours and others.
+#
+#  Copyright   : David Tschumperle
+#                ( http://tschumperle.users.greyc.fr/ )
+#
+#  License     : CeCILL v2.0
+#                ( http://www.cecill.info/licences/Licence_CeCILL_V2-en.html )
+#
+#  This software is governed by the CeCILL  license under French law and
+#  abiding by the rules of distribution of free software.  You can  use,
+#  modify and/ or redistribute the software under the terms of the CeCILL
+#  license as circulated by CEA, CNRS and INRIA at the following URL
+#  "http://www.cecill.info".
+#
+#  As a counterpart to the access to the source code and  rights to copy,
+#  modify and redistribute granted by the license, users are provided only
+#  with a limited warranty  and the software's author,  the holder of the
+#  economic rights,  and the successive licensors  have only  limited
+#  liability.
+#
+#  In this respect, the user's attention is drawn to the risks associated
+#  with loading,  using,  modifying and/or developing or reproducing the
+#  software by the user in light of its specific status of free software,
+#  that may mean  that it is complicated to manipulate,  and  that  also
+#  therefore means  that it is reserved for developers  and  experienced
+#  professionals having in-depth computer knowledge. Users are therefore
+#  encouraged to load and test the software's suitability as regards their
+#  requirements in conditions enabling the security of their systems and/or
+#  data to be ensured and,  more generally, to use and operate it in the
+#  same conditions as regards security.
+#
+#  The fact that you are presently reading this means that you have had
+#  knowledge of the CeCILL license and that you accept its terms.
+#
+
+#@gimp _<b>Colors</b>
+#---------------------
+
+# Color Grading v1.5.3
+# Copyright (c) 2012-2014 John Lakkas
+# john_lakkas@yahoo.gr
+# Licence: GNU GPLv3  ( http://www.gnu.org/licenses/ )
+
+# Convert HSV to RGB triplets.
+jl_hsv_to_rgb :
+  ({360*$1}^$2^$3) -hsv2rgb[-1] -u @-1 -rm[-1]
+
+# LEVELS input low-high gamma output low/high
+levels :
+  _inplow={int($1)}
+  _inphigh={int($2)}
+  _gamma=$3
+  _outlow={int($4)}
+  _outhigh={int($5)}
+  _tmp2=""
+
+  -if {$_gamma!=1}
+    _tmp2="-apply_gamma "$_gamma
+    -apply_channels $_tmp2,$6,0
+  -endif
+
+  _curve1="0,"
+  -if {$_inplow>0}
+    _tmp1="0,"
+    _curve1=$_curve1$_tmp1$_outlow","
+  -endif
+  _curve1=$_curve1$_inplow","$_outlow","$_inphigh","$_outhigh
+  -if {$_inphigh<255}
+    _curve1=$_curve1",255,"$_outhigh
+  -endif
+
+  -if {$_curve1'!='"0,0,0,255,255"}
+    _tmp2="-apply_curve "$_curve1
+    -apply_channels $_tmp2,$6,0
+  -endif
+
+gimp_equalize_s :
+  -repeat @# -l[$>] -split_opacity -l[0] -to_rgb
+     -rgb2hsv -sh 1,1 -*[-1] $1 -+[-1] $2 -c[-1] 0,1 -rm[-1] -hsv2rgb
+  -endl -a c -endl -done
+
+#@gimp Color grading : jl_colorgrading, jl_colorgrading_preview
+#@gimp : Note = note("A filter for basic photo editing and color grading.")
+#@gimp : Note = note("<small><b>Note:</b> Saturation channel gamma affects more the less saturated areas. S-curve contrast, affects shadows and highlights equally. When using noise reduction or sharpening tools, zoom in for more accurate view.</small>")
+#@gimp : Sep = separator()
+#@gimp : HDR effect (Tone map) = float(0.,0.0,1)
+#@gimp : Cool / warm = int(0,-50,50)
+#@gimp : Saturation = float(1,0,2)
+#@gimp : Saturation channel gamma = float(1,0.1,3)
+#@gimp : Note = note("<small><b>Note:</b> Saturation channel gamma may introduce artifacts depending on the image.</small>")
+#@gimp : Sep = separator()
+#@gimp : S-curve contrast = int(0,-30,30)
+#@gimp : Shadows = int(0,-50,50)
+#@gimp : Highlights = int(0,-50,50)
+#@gimp : Blacks = int(0,0,50)
+#@gimp : Brightness = int(0,-50,50)
+#@gimp : Contrast = int(0,-50,50)
+#@gimp : Gamma = float(1,0.1,3)
+#@gimp : Sep = separator()
+#@gimp : Clarity = float(0,0.0,2.0)
+#@gimp : Local contrast enhance = float(0,0,3)
+#@gimp : Sep = separator()
+#@gimp : Color grading = bool(0)
+#@gimp : Highlights color intensity = int(70,0,130)
+#@gimp : Highlights hue = int(0,0,360)
+#@gimp : Highlights brightness = int(0,-100,100)
+#@gimp : Midtones color intensity = int(0,0,130)
+#@gimp : Midtones hue = int(0,0,360)
+#@gimp : Midtones brightness = int(0,-100,100)
+#@gimp : Shadows color intensity = int(70,0,130)
+#@gimp : Shadows hue shift = int(180,0,360)
+#@gimp : Shadows brightness = int(0,-100,100)
+#@gimp : Note = note("<small><b>Color grading subsection usage:</b> Use intensity sliders to control the amount of color being applied in the highlights/midtones/shadows, use brightness sliders for bringing up or down highlights/midtones/shadows. Hues here follow rotation axis in color wheel ie: 0 or 360 deg is red, 180 is blue it's complimentary. Shadows hue shift in default position uses always the complimentary color of highlights in the shadows. Default sliders for grading apply red highlights and blue shadows effect.</small>")
+#@gimp : Sep = separator()
+#@gimp : Output saturation = float(1,0,2)
+#@gimp : Output sharpening = float(0,0,10)
+#@gimp : Output chroma nr = float(0,0,20)
+#@gimp : Sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate horizontal","Duplicate vertical")
+#@gimp : Sep = separator(), note = note("<small>Author: <i>John Lakkas</i>.      Latest update: <i>17/03/2015</i>.</small>")
+jl_colorgrading :
+  -if {$1>0.01}
+    -map_tones_fast 5%,$1
+  -endif
+  _ystr=""
+  # COLOR MANIPULATION
+  # COOL / WARM filter
+  -if {$2>0}
+  _mymin={$2}
+  _mymax={255-$2}
+  -apply_channels_old "-apply_curve 0,0,$_mymin,255,255",6,0
+  -apply_channels_old "-apply_curve 0,0,0,255,$_mymax",5,0
+  -endif
+  -if {$2<0}
+  _mymin={-$2}
+  _mymax={255+$2}
+  -apply_channels_old "-apply_curve 0,0,$_mymin,255,255",5,0
+  -apply_channels_old "-apply_curve 0,0,0,255,$_mymax",6,0
+  -endif
+  # HSV SATURATION (linear)
+  -if {$3!=1.0}
+    -gimp_equalize_s $3,0
+  -endif
+  # HSV SATURATION (gamma)
+  -if {$4!=1.0}
+  -apply_channels_old "-apply_gamma $4",12,0
+  -endif
+  # VALUE MANIPULATION
+  # S CURVE
+  -if {$5!=0}
+  _p1={64-$5}
+  _p2={192+$5}
+  _ystr=$_ystr" -apply_curve 1,0,0,64,$_p1,192,$_p2,255,255"
+  -endif
+  # SHADOWS
+  -if {$6!=0}
+  _p3={64-$6}
+  _ystr=$_ystr" -apply_curve 1,0,0,64,$_p3,128,128,192,192,255,255"
+  -endif
+  # HIGHLIGHTS
+  -if {$7!=0}
+  _p4={192+$7}
+  _ystr=$_ystr" -apply_curve 1,0,0,64,64,128,128,192,$_p4,255,255"
+  -endif
+  # BLACKS
+  -if {$8>0}
+  _ystr=$_ystr" -apply_curve 1,$8,0,64,64,255,255"
+  -endif
+  # BRIGHTNESS
+  -if {$9>0}
+  _p5=0
+  _ystr=$_ystr" -apply_curve 0,0,$9,255,255"
+  -endif
+  -if {$9<0}
+  _p5={255+$9}
+  _ystr=$_ystr" -apply_curve 0,0,0,255,$_p5"
+  -endif
+  # CONTRAST
+  -if {$10>0}
+  _p6=$10
+  _p7={255-$10}
+  _ystr=$_ystr" -apply_curve 0,0,0,$_p6,0,$_p7,255,255,255"
+  -endif
+  -if {$10<0}
+  _p6={-$10}
+  _p7={255+$10}
+  _ystr=$_ystr" -apply_curve 0,0,$_p6,255,$_p7"
+  -endif
+  # GAMMA
+  -if {$11!=1.0}
+  _ystr=$_ystr" -apply_gamma $11"
+  -endif
+  # APPLY VALUE PROCESSING
+  -if {$_ystr'!='""}
+  -apply_channels_old $_ystr,13,0
+  -endif
+  # CLARITY (midtones unsharp mask)
+  -if {$12>0}
+  -to_rgb --rgb2hsl -split[-1] c -rm[-2] -rm[-2] -*[-1] 255 -apply_curve[-1] 1,0,0,63,0,127,255,192,0,255,0 --unsharp[0] 5%,$12,0 -cut[-1] 0,255 -cut[-2] 0,255 -reverse[-1,-2] -append[-1,-2] c -blend alpha
+  -endif
+   # LOCAL CONTRAST (unsharp mask)
+  -if {$13>0}
+  -unsharp 1%,$13,0
+  -cut[-1] 0,255
+  -endif
+  # COLOR GRADING STEP
+  -if {$14}
+    -if {$16+$22>360}
+      _shh={($16+$22-360)/360}
+    -else
+      _shh={($16+$22)/360}
+    -endif
+    _shs={$21/100}
+    _shlev={$23}
+    _midh={$19/360}
+    _mids={$18/100}
+    _midlev={$20}
+    _highh={$16/360}
+    _highs={$15/100}
+    _highlev={$17}
+    _satlev={$24}
+    -color_grade $_shh,$_shs,$_shlev,$_midh,$_mids,$_midlev,$_highh,$_highs,$_highlev,$_satlev
+  -endif
+  # HSV SATURATION (linear)
+  -if {$24!=1.0}
+    -gimp_equalize_s $24,0
+  -endif
+  # USM
+  -if {$25>0}
+    -unsharp 0.5,$25
+    -cut 0,255
+  -endif
+  # CHROMA NR
+  -if {$26>0}
+    -apply_channels_old "-denoise_haar $26",5,0
+    -apply_channels_old "-denoise_haar $26",6,0
+  -endif
+
+color_grade :
+#convert_to_levels :
+      # input:
+      # shh, shs, shlev, midh, mids, midlev, highh, highs, highlev, satlev
+
+      _shadownrgb=@{-jl_hsv_to_rgb" "$1,1.0,{$2*0.40}}
+      _midtonesrgb=@{-jl_hsv_to_rgb" "$4,1.0,{$5*0.40}}
+      _highlightsrgb=@{-jl_hsv_to_rgb" "$7,1.0,{$8*0.40}}
+
+      # make:
+      # crsh, mgsh, ybsh, shlev, crmid, mgmid, ybmid, midlev, crhigh, mghigh, ybhigh, highlev, satlev
+
+      _crsh=@{-arg" 1,"$_shadownrgb}
+      _mgsh=@{-arg" 2,"$_shadownrgb}
+      _ybsh=@{-arg" 3,"$_shadownrgb}
+      _shlev=$3
+
+      _crmid=@{-arg" 1,"$_midtonesrgb}
+      _mgmid=@{-arg" 2,"$_midtonesrgb}
+      _ybmid=@{-arg" 3,"$_midtonesrgb}
+      _midlev=$6
+
+      _crhigh=@{-arg" 1,"$_highlightsrgb}
+      _mghigh=@{-arg" 2,"$_highlightsrgb}
+      _ybhigh=@{-arg" 3,"$_highlightsrgb}
+      _highlev=$9
+
+      _satlev=$10
+      _lowinred=0
+      _hiinred=255
+      _lowingreen=0
+      _hiingreen=255
+      _lowinblue=0
+      _hiinblue=255
+
+      _gammared=0.
+      _gammagreen=0.
+      _gammablue=0.
+
+      _lowoutred=0
+      _hioutred=255
+      _lowoutgreen=0
+      _hioutgreen=255
+      _lowoutblue=0
+      _hioutblue=255
+
+      #MIDTONES
+      -if {$_crmid>0.}
+         _gammared={$_gammared+0.4*$_crmid/100.}
+         _gammagreen={$_gammagreen-0.3*$_crmid/100.}
+         _gammablue={$_gammablue-0.3*$_crmid/100.}
+      -endif
+      -if {$_crmid<0.}
+         _gammared={$_gammared+0.3*$_crmid/100.}
+         _gammagreen={$_gammagreen-0.4*$_crmid/100.}
+         _gammablue={$_gammablue-0.4*$_crmid/100.}
+      -endif
+      -if {$_mgmid>0.}
+         _gammared={$_gammared-0.3*$_mgmid/100.}
+         _gammagreen={$_gammagreen+0.4*$_mgmid/100.}
+         _gammablue={$_gammablue-0.3*$_mgmid/100.}
+      -endif
+      -if {$_mgmid<0.}
+         _gammared={$_gammared-0.4*$_mgmid/100.}
+         _gammagreen={$_gammagreen+0.3*$_mgmid/100.}
+         _gammablue={$_gammablue-0.4*$_mgmid/100.}
+      -endif
+      -if {$_ybmid>0.}
+         _gammared={$_gammared-0.3*$_ybmid/100.}
+         _gammagreen={$_gammagreen-0.3*$_ybmid/100.}
+         _gammablue={$_gammablue+0.4*$_ybmid/100.}
+      -endif
+      -if {$_ybmid<0.}
+         _gammared={$_gammared-0.4*$_ybmid/100.}
+         _gammagreen={$_gammagreen-0.4*$_ybmid/100.}
+         _gammablue={$_gammablue+0.3*$_ybmid/100.}
+      -endif
+      _gammared={$_gammared+1.}
+      _gammagreen={$_gammagreen+1.}
+      _gammablue={$_gammablue+1.}
+
+      -if {$_midlev>0.}
+         _gammared={$_gammared+0.4*$_midlev/100.}
+         _gammagreen={$_gammagreen+0.4*$_midlev/100.}
+         _gammablue={$_gammablue+0.4*$_midlev/100.}
+      -endif
+      -if {$_midlev<0.}
+         _gammared={$_gammared+0.3*$_midlev/100.}
+         _gammagreen={$_gammagreen+0.3*$_midlev/100.}
+         _gammablue={$_gammablue+0.3*$_midlev/100.}
+      -endif
+
+
+      #SHADOWS
+      _crsh={$_crsh*0.3}
+      _mgsh={$_mgsh*0.3}
+      _ybsh={$_ybsh*0.3}
+
+      -if {$_crsh>0}
+         _lowingreen={$_lowingreen+$_crsh}
+         _lowinblue={$_lowinblue+$_crsh}
+         _lowoutred={$_lowoutred+$_crsh}
+      -else
+         _lowinred={$_lowinred-$_crsh}
+         _lowoutgreen={$_lowoutgreen-$_crsh}
+         _lowoutblue={$_lowoutblue-$_crsh}
+      -endif
+
+      -if {$_mgsh>0}
+         _lowinred={$_lowinred+$_mgsh}
+         _lowinblue={$_lowinblue+$_mgsh}
+         _lowoutgreen={$_lowoutgreen+$_mgsh}
+      -else
+         _lowingreen={$_lowingreen-$_mgsh}
+         _lowoutred={$_lowoutred-$_mgsh}
+         _lowoutblue={$_lowoutblue-$_mgsh}
+      -endif
+
+      -if {$_ybsh>0}
+         _lowinred={$_lowinred+$_ybsh}
+         _lowingreen={$_lowingreen+$_ybsh}
+         _lowoutblue={$_lowoutblue+$_ybsh}
+      -else
+         _lowinblue={$_lowinblue-$_ybsh}
+         _lowoutred={$_lowoutred-$_ybsh}
+         _lowoutgreen={$_lowoutgreen-$_ybsh}
+      -endif
+
+
+      -if {$_shlev>0}
+         _lowoutred={$_lowoutred+$_shlev}
+         _lowoutgreen={$_lowoutgreen+$_shlev}
+         _lowoutblue={$_lowoutblue+$_shlev}
+      -endif
+      -if {$_shlev<0}
+         _lowinred={$_lowinred-$_shlev}
+         _lowingreen={$_lowingreen-$_shlev}
+         _lowinblue={$_lowinblue-$_shlev}
+      -endif
+
+
+      #HIGHLIGHTS
+      _crhigh={$_crhigh*0.3}
+      _mghigh={$_mghigh*0.3}
+      _ybhigh={$_ybhigh*0.3}
+
+      -if {$_crhigh>0}
+         _hiinred={$_hiinred-$_crhigh}
+         _hioutgreen={$_hioutgreen-$_crhigh}
+         _hioutblue={$_hioutgreen-$_crhigh}
+      -else
+         _hiingreen={$_hiingreen+$_crhigh}
+         _hiinblue={$_hiinblue+$_crhigh}
+         _hioutred={$_hioutred+$_crhigh}
+      -endif
+
+      -if {$_mghigh>0}
+         _hiingreen={$_hiingreen-$_mghigh}
+         _hioutred={$_hioutred-$_mghigh}
+         _hioutblue={$_hioutblue-$_mghigh}
+      -else
+         _hiinred={$_hiinred+$_mghigh}
+         _hiinblue={$_hiinblue+$_mghigh}
+         _hioutgreen={$_hioutgreen+$_mghigh}
+      -endif
+
+      -if {$_ybhigh>0}
+         _hiinblue={$_hiinblue-$_ybhigh}
+         _hioutred={$_hioutred-$_ybhigh}
+         _hioutgreen={$_hioutgreen-$_ybhigh}
+      -else
+         _hiinred={$_hiinred+$_ybhigh}
+         _hiingreen={$_hiingreen+$_ybhigh}
+         _hioutblue={$_hioutblue+$_ybhigh}
+      -endif
+
+      -if {$_highlev>0}
+         _hiinred={$_hiinred-$_highlev}
+         _hiingreen={$_hiingreen-$_highlev}
+         _hiinblue={$_hiinblue-$_highlev}
+      -endif
+      -if {$_highlev<0}
+         _hioutred={$_hioutred+$_highlev}
+         _hioutgreen={$_hioutgreen+$_highlev}
+         _hioutblue={$_hioutblue+$_highlev}
+      -endif
+
+      -levels $_lowinred,$_hiinred,$_gammared,$_lowoutred,$_hioutred,19
+      -levels $_lowingreen,$_hiingreen,$_gammagreen,$_lowoutgreen,$_hioutgreen,20
+      -levels $_lowinblue,$_hiinblue,$_gammablue,$_lowoutblue,$_hioutblue,21
+
+jl_colorgrading_preview :
+  -gimp_split_preview "-jl_colorgrading $*",$-1
+
+#@gimp _<b>Testing</b>
+#---------------------
+
+#@gimp <i>Corvo</i>
+
+#@gimp corvo's painting_5 : gimp_corvo_painting_5, gimp_corvo_painting_5(0)
+#@gimp : note = note("Polygonize settings")
+#@gimp : Amplitude = int(35,0,2000)
+#@gimp : Smoothness = float(10,0,100)
+#@gimp : Minimal area = float(10,0,100)
+#@gimp : Alpha Polygonize = float(0.5,0,1)
+#@gimp : sep = separator()
+#@gimp : Texture = float(50,0,100)
+#@gimp : Plasma= float(0.3,0,1)
+#@gimp : sep = separator()
+#@gimp : note = note("Smooth settings")
+#@gimp : Amplitude = float(50,0,1000)
+#@gimp : Gradient smoothness = float(2,0,10)
+#@gimp : Tensor smoothness = float(5,0,10)
+#@gimp : Alpha Filter= float(1,0,1)
+gimp_corvo_painting_5 :
+--polygonize $1,$2,$3,10,10
+--blend[0,1] alpha,$4
+-texturize_canvas[2] $5,0.5,0.6
+-smooth[2] $7,0.4,0.7,$8,$9
+--plasma[2] 0.7,100,8 -n 0,255
+-blend[3,2] grainmerge,$6
+-bilateral[0,2] 10,7
+-blend[0,2] alpha,$10
+-rm[-1]
+
+#@gimp _
+
+##########################################################
+
+#@gimp <i>Lylejk</i>
+
+#@gimp Lylejk's stencil : gimp_lylejk_stencil, gimp_lylejk_stencil(0)
+#@gimp : Amplitude = int(5,1,10)
+#@gimp : Sharpness = float(10,0,100)
+#@gimp : Radius = float(3,0,10)
+#@gimp : Channel(s) = choice("All","RGBA","RGB","Luminance","Blue/red chrominances","Blue chrominance","Red chrominance","Lightness","ab-components","a-component","b-component","Hue","Saturation","Value","Key","Alpha","ch-components","c-component","h-component","Red","Green","Blue","Alpha")
+#@gimp : sep = separator(), note = note("<small>Authors: <i>Lyle Kroll, David Tschumperl&#233;</i>.      Latest update: <i>12/29/2010</i>.</small>")
+gimp_lylejk_stencil :
+  -apply_channels "-repeat $1 -b $3 -unsharp $3,$2 -c 0,255 -mv[-1] 0 -done",$4,0
+
+#@gimp Blend [shape average] : gimp_blend_shapeaverage, gimp_blend_shapeaverage(0)
+#@gimp : Preserve shading = bool(1)
+#@gimp : Transparency = bool(0)
+#@gimp : Revert layers = bool(0)
+#@gimp : Note = note{"<small><b>Note:</b>
+#@gimp : This filter needs two layers to work properly. Set the <i>Input layers</i> option to handle multiple input layers.
+#@gimp : </small>"}
+#@gimp : sep = separator(), note = note("<small>Author: <i>David Tschumperl&#233;</i>.      Latest update: <i>10/19/2011</i>.</small>")
+gimp_blend_shapeaverage :
+  -if ${3=0} -_gimp_revert_layers -endif
+  -to_rgb
+  -repeat {int(@#/2)}
+    -rv[-2,-1]
+    -if $1 -i[0] [-1] -endif
+    -blend[-2,-1] shapeaverage0
+    -if $1 -*[0,-1] -/[0] 255 -mv[0] @# -endif
+    -if $2 -to_rgba[-1] -replace_color[-1] 0,0,0,0,0,255,0,0,0,0 -endif
+  -mv[-1] 0 -done
+
+#@gimp _
+
+
+##########################################################
+
+#@gimp <i>RL</i>
+
+#@gimp RandomWaves : randomwaves, randomwaves
+#@gimp : Steps Number = int(84,1,1000)
+#@gimp : Probability of impulse (% / step) = float(80.,1.,100.)
+#@gimp : Lessening = float(1.2,0.01,10.)
+#@gimp : Random Initialization = int(42,1,100)
+#@gimp : sep = separator(), note = note("<small>Authors: <i>Jean-Baptiste Rolland, Julien Levillain</i>.      Latest update: <i>03/28/2013</i>.</small>")
+randomwaves:  -check  "isint(${1=84})  &&  ${2=80}>=0  &&  $2<=100  && ${3=1.2}>0. && isint(${4=42})"
+  -srand $4
+  (0,1,0;1,0,1;0,1,0) -/[-1] 2
+  -nm[-1] matconv
+  @{0,w},@{0,h},1,1 -set[-1] 255,{?(100)}%,{?(100)}%
+  [-1]
+  -repeat $1
+    [-1]
+    -if {${2}>=?(100)}
+      -circle[-1] {?(100)}%,{?(100)}%,{?(3)},,255
+    -endif
+    -convolve[-1] [matconv] -div[-1] $3 -sub[-1] [-3]
+    -rm[-3]
+  -done
+  -rm[-2,matconv]
+  -g[-1] -a[-1,-2] c -warp[0] [-1],1 -rm[-1]
+
+#@gimp Plasma Transition : plasma_transition, plasma_transition
+#@gimp : Balance = float(0.5,0,1)
+#@gimp : Scale = int(5,0,50)
+#@gimp : Smoothness = float(1,0,10)
+#@gimp : Random Initialization = int(42,1,100)
+#@gimp : sep = separator(), note = note("<small>Authors: <i>Jean-Baptiste Rolland, Julien Levillain</i>.      Latest update: <i>03/28/2013</i>.</small>")
+plasma_transition: -check "isint(${4=42}) && isint(${2=5}) && ${1=0.5}>=0  && $1<=1 && $2>=0 && ${3=1}>=0"
+  -repeat {int(@#/2.0)}
+    -local[{$>},{$>+1}]
+      -if {@#<2} -return -endif
+      -r @{-max_whds},3
+      100%,100% -srand $4 -plasma[-1] 1,0,$2 -n[-1] 0,1
+      --le[-1] $1 -b[-1] $3
+      -rm[-2]
+      -j[-3] [-2],0,0,0,0,1,[-1]
+      -keep[-3]
+    -endlocal
+  -done
+
+#@gimp _
+
+##########################################################
+
+#@gimp <i>Okyl168</i>
+
+#@gimp Jobs colors : gimp_jobs_colors, gimp_jobs_colors_preview
+#@gimp : Gamma = float(0,-2,2)
+#@gimp : Equalize = bool(0)
+#@gimp : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate horizontal","Duplicate vertical")
+#@gimp : sep = separator(), note = note("<small>Author: <i>Oberon Leung</i>.      Latest update: <i>01/25/2014</i>.</small>")
+gimp_jobs_colors :
+  -n 0,255 -if $2 -equalize 256 -endif
+  -luminance -apply_gamma {10^$1} -n 0,9 -round
+  (22,187,20,36,235,240,245,243,247,209^18,97,147,157,79,110,121,142,170,200^19,158,192,60,67,65,64,64,64,185)
+  -map[^-1] [-1] -rm[-1]
+
+gimp_jobs_colors_preview :
+  -gimp_split_preview "-gimp_jobs_colors $*",$-1
+
+#@gimp _
+
+#@gimp <i>Telperion</i>
+
+# ---------------------------------- v 2.2
+
+# ---------------------------------- v 1.1
+#@gimp Mc_Flou : mc_flou, mc_flou_preview
+#@gimp : Sep = separator()
+#@gimp : Sharp = float(30,10,400)
+#@gimp : Blur = float(6,3,20)
+#@gimp : Blend = float(1,0,1)
+#@gimp : Sep = separator() ,note = note("Base image adjustement:")
+#@gimp : Skip = bool(true)
+#@gimp : Gamma = float(1,0.2,2)
+#@gimp : Value min = int(0,0,127)
+#@gimp : Value max = int(255,128,255)
+#@gimp : Gamma R = float(1,0.2,2)
+#@gimp : Gamma G = float(1,0.2,2)
+#@gimp : Gamma B = float(1,0.2,2)
+#@gimp : Sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate horizontal","Duplicate vertical")
+#@gimp : Sep = separator() ,note = note("Apply a flou effect with edges protection. v.1.1")
+
+mc_flou:
+  # base image value corrections
+  -if {$4==0}
+    -to_rgb
+    -apply_gamma[0] $5
+    -cut[0] $6,$7 -normalize[0] 0,255    # min max val
+    -split[0] c
+    -apply_gamma[0] $8
+    -apply_gamma[1] $9
+    -apply_gamma[2] $10
+    -append[0,1,2] c
+  -endif
+  # -----
+  # flou
+  --gimp_gradient_norm[0] 0,1.5,0,50.38,1,0
+  -sharpen[0] $1 #30
+  -b[1] 0.5
+  -normalize[1] 0,255
+  -equalize[1] 4,0%,98%
+  --append[0,1] c
+  -blur[2] $2 #10
+  -blend[0,2] alpha,$3
+  -remove_opacity[0]
+  -keep[0]
+
+mc_flou_preview:
+  -gimp_split_preview "-mc_flou $*",$-1
+# ------------------------------------------
+
+#@gimp Mc_Pendraw : mc_pendraw, mc_pendraw_preview
+#@gimp : Sep = separator()
+#@gimp : Amplitude = float(8,0,30)
+#@gimp : Blur = float(0.8,0.1,2)
+#@gimp : Sharp = float(450,100,2000)
+#@gimp : Color = int(21,4,256)
+#@gimp : Dithering = float(0.5,0,1)
+#@gimp : Value = float(1,0,1)
+#@gimp : Mode 2 = bool(false)
+#@gimp : Color equal. = bool(false)
+#@gimp : Equal. limit = int(255,100,255)
+#@gimp : Sep = separator()
+#@gimp : Lowers contrast = float(0,0,1)
+#@gimp : Sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate horizontal","Duplicate vertical")
+
+mc_pendraw:
+  -repeat @# -l[$>]
+  -split_opacity
+  -l[0]
+  -to_rgb
+  # contrast mask
+  -if {$10>0}
+      [0]
+      -b[0] 1
+      -negative[0]
+      -luminance[0]
+      -rv[0,1]
+      -blend[0,1] overlay,$10
+  -endif
+  # pendraw
+  --gimp_gradient_norm[0] 0,1.5,0,50.38,1,0
+  [0]
+  -smooth $1,0.2,1,3,3
+  -b $2
+  -sharpen $3
+  [0]
+  -r[0] 20,20,1,3,2
+  -equalize[0] 256,0%,98%
+  -index[3] [0],1,1
+  -rm[0]
+  # --
+  -nm[0] linee
+  -nm[1] orig
+  -nm[2] pen
+  -if {$7==0}
+      -rv[pen,linee]
+      -blend[pen,linee] multiply,1
+  -elif {$7==1}
+      -rv[orig,linee]
+      -blend[orig,linee] multiply,1
+  -endif
+  -normalize[0] 5,250
+  -autoindex[0] $4,$5
+  -rv[0,1]
+  -blend[0,1] value,$6
+  -if {$8==1}
+    -equalize 21,30,$9
+  -endif
+  -endl -a c -endl -done
+
+mc_pendraw_preview:
+  -gimp_split_preview "-mc_pendraw $*",$-1
+
+# ----------------------------------------------------------------------
+
+#@gimp _
+
+#@gimp <i>Ronounours</i>
+
+#@gimp Faded mirror : gimp_faded_mirror, gimp_faded_mirror(1)
+#@gimp : Axis = choice("x-axis","y-axis")
+#@gimp : Fading = float(10,0,100)
+#@gimp : Overlapping = float(10,0,100)
+#@gimp : sep = separator(), note = note("<small>Author: <i>David Tschumperl&#233;</i>.      Latest update: <i>05/29/2013</i>.</small>")
+gimp_faded_mirror :
+  -repeat @# -l[$>]
+    -if {$1==0}  # X-axis
+      100%,1,1,1,"a=1/(1-w*$2%);b=-a*(w-1);a*x+b" -c[-1] 0.01,1 -*[-2] [-1]
+      -r[-1] 100%,[-2] -a c -r {2*w-w*$3%},100%,1,100%,0 --mirror x
+    -else # Y-axis
+      1,100%,1,1,"a=1/(1-h*$2%);b=-a*(h-1);a*y+b" -c[-1] 0.01,1 -r[-1] [-2],100% -*[-2] [-1]
+      -a c -r 100%,{2*h-h*$3%},1,100%,0 --mirror y
+    -endif
+     -+ -s[-1] c,-{s-1} -/[-2,-1]
+  -endl -done
+
+#@gimp Grain [old] : gimp_grain, gimp_grain_preview(0)
+#@gimp : Amplitude = float(40,0,512)
+#@gimp : Tone smoothness = float(5,0,15)
+#@gimp : Grain type = choice("Gaussian","Uniform")
+#@gimp : Channel(s) = choice(2,"All","RGBA","RGB","Luminance","Blue/red chrominances","Blue chrominance","Red chrominance","Lightness","ab-components","a-component","b-component","Hue","Saturation","Value","Key","Green chrominance","ch-components","c-component","h-component","Red","Green","Blue","Alpha")
+#@gimp : sep = separator()
+#@gimp : note = note("<small><b>Shadows:</b></small>")
+#@gimp : Strength = float(0.8,0,1)
+#@gimp : Scale = float(0.5,0,2)
+#@gimp : Channel correlation = float(0.5,0,1)
+#@gimp : sep = separator()
+#@gimp : note = note("<small><b>Mid-tones:</b></small>")
+#@gimp : Strength = float(1,0,1)
+#@gimp : Scale = float(0,0,2)
+#@gimp : Channel correlation = float(0.5,0,1)
+#@gimp : sep = separator()
+#@gimp : note = note("<small><b>Highlights:</b></small>")
+#@gimp : Strength = float(0.6,0,1)
+#@gimp : Scale = float(0.2,0,2)
+#@gimp : Channel correlation = float(0.5,0,1)
+#@gimp : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate horizontal","Duplicate vertical")
+#@gimp : sep = separator(), note = note("<small>Author: <i>David Tschumperl&#233;</i>.      Latest update: <i>11/21/2013</i>.</small>")
+gimp_grain :
+  -repeat @# -l[$>] -apply_channels "-_gimp_grain ${1-13}",$4,0 -endl -done
+
+_gimp_grain :
+  -if {!$1} -return -endif
+  s={s} --luminance
+
+  # Shadows.
+  -if $5
+    100%,100%,1,$s -noise[-1] 1,$3 -b[-1] $6 -*[-1] {(1-$7)/max(abs(im),abs(iM))}
+    100%,100%,1,1 -noise[-1] 1,$3 -b[-1] $6 -*[-1] {$7/max(abs(im),abs(iM))}
+    -+[-2,-1] --t2[1] 0,85 -b[-1] $2 -n[-1] 0,1 -*[-2,-1] -*[-1] $5
+  -endif
+
+  # Midlights.
+  -if $8
+    100%,100%,1,$s -noise[-1] 1,$3 -b[-1] $9 -*[-1] {(1-$10)/max(abs(im),abs(iM))}
+    100%,100%,1,1 -noise[-1] 1,$3 -b[-1] $9 -*[-1] {$10/max(abs(im),abs(iM))}
+    -+[-2,-1] --t2[1] 86,169 -b[-1] $2 -n[-1] 0,1 -*[-2,-1] -*[-1] $8
+  -endif
+
+  # Highlights.
+  -if $11
+    100%,100%,1,$s -noise[-1] 1,$3 -b[-1] $12 -*[-1] {(1-$13)/max(abs(im),abs(iM))}
+    100%,100%,1,1 -noise[-1] 1,$3 -b[-1] $12 -*[-1] {$13/max(abs(im),abs(iM))}
+    -+[-2,-1] --t2[1] 170,256 -b[-1] $2 -n[-1] 0,1 -*[-2,-1] -*[-1] $11
+  -endif
+
+  -rm[1] -+[-3--1] -n[-1] -$1,$1 -+ -c 0,255
+
+gimp_grain_preview :
+  -gimp_split_preview "-gimp_grain $*",$-1
+
+#@gimp Shaded segmentation : dt_segment_shaded,dt_segment_shaded(0)
+#@gimp : Density = float(1,0,3)
+#@gimp : Shading = float(0.7,0,2)
+#@gimp : Smoothness = float(1,0,10)
+#@gimp : sep = separator(), note = note("<small>Author: <i>David Tschumperl&#233;</i>.      Latest update: <i>02/01/2013</i>.</small>")
+dt_segment_shaded :
+  -repeat @# -l[$>]
+    -b $3 -segment_watershed $1,1
+    --g xy,1 -a[-2,-1] c -norm[-1] -neq[-1] 0 -distance[1] 1 -normalize_local[-1] 1000
+    -n[-1] 0,1 -^[-1] {max(1e-5,$2)} -n[-1] 0,255
+    -blend value
+  -endl -done
+
+#@gimp Perspective scale : gimp_perspective_scale, gimp_perspective_scale_preview(1)
+#@gimp : Iterations = int(2,2,10)
+#@gimp : Factor = float(75,0,100)
+#@gimp : X-offset = float(0,-100,100)
+#@gimp : Y-offset = float(0,-100,100)
+#@gimp : Output mode = _choice("Single layer","Multiple layers")
+#@gimp : sep = separator(), note = note("<small>Author: <i>David Tschumperl&#233;</i>.      Latest update: <i>02/08/2013</i>.</small>")
+gimp_perspective_scale :
+  -repeat @# -l[$<] -to_rgba
+    w={w} h={h}
+    f=100 -repeat {$1-1} f={$f*$2%} --r[0] $f%,$f%,1,4,2 -done
+    -repeat {@#-1} -l[{$>+1}]
+      sx={($>+1)*$w*$3%/($1-1)}
+      sy={($>+1)*$h*$4%/($1-1)}
+      -r $w,$h,1,4,0,0,0.5,0.5 -shift[-1] $sx,$sy,0,0,0
+    -endl -done
+    -if {!$5} -repeat {@#-1} -blend[0,1] alpha,1,1 -done -endif
+  -endl -done
+
+gimp_perspective_scale_preview :
+  -gimp_perspective_scale ${1-4},0
+
+#@gimp Auto-adjust orientation : gimp_adjust_orientation, gimp_adjust_orientation(1)
+#@gimp : Threshold = float(5,0,100)
+gimp_adjust_orientation :
+  -repeat @#
+    M={max(w,h)}
+    --gradient_norm[-1] -ge[-1] $1%                      # Compute binary contours.
+    --*[-1] '1+y' -*[-2] '1+x' -a[-2,-1] c               # Extract contours points.
+    -r[-1] {w*h},2,1,1,-1 -sort[-1] +,x -autocrop[-1] 0
+    -/[-1] $M --r[-1] 1,2,1,1,2 -r[-1] [-2] --[-2,-1]    # Estimate main axis.
+    --transpose[-1] -**[-2,-1]
+    -eigen[-1] -rm[-2] -z[-1] 0,0
+    -if {i<0} -*[-1] -1 -endif
+    theta={180*atan2(i(0,1),i)/pi}
+    -rm[-1]
+    -if {w>h} -rotate[-1] {-$theta},1,0,50%,50%
+    -else -rotate[-1] {-$theta+90},1,0,50%,50%
+    -endif
+  -mv[-1] 0 -done
+
+#@gimp Circlism : gimp_circlism, gimp_no_preview
+#@gimp : Min radius = int(2,1,100)
+#@gimp : Max radius = int(10,1,100)
+#@gimp : Smoothness = float(1,0,10)
+#@gimp : Edge linearity = float(0.4,0.01,5)
+#@gimp : Location linearity = float(3,0.01,5)
+#@gimp : Shape = choice(2,"Diamonds","Squares","Circles")
+#@gimp : Transparency = bool(0)
+#@gimp : sep = separator(), note = note("<small>Author: <i>David Tschumperl&#233;</i>.      Latest update: <i>10/16/2011</i>.</small>")
+gimp_circlism :
+  -to_rgb -circlism ${1-6}
+  -if $7 -to_rgba -replace_color 0,0,0,0,0,255,0,0,0,0 -endif
+
+# Local Variables:
+# mode: sh
+# End:
+#
+# (End of G'MIC custom commands)
