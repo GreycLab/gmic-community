@@ -2299,6 +2299,7 @@ const char* gmic::path_rc(const char *const custom_path, const bool return_paren
   const char *_path_rc = 0;
   if (custom_path && cimg::is_directory(custom_path)) _path_rc = custom_path;
   if (!_path_rc) _path_rc = getenv("GMIC_PATH");
+  if (!_path_rc) _path_rc = getenv("GMIC_GIMP_PATH");
   if (!_path_rc) {
 #if cimg_OS!=2
     _path_rc = getenv("HOME");
