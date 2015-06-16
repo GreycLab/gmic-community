@@ -1,0 +1,595 @@
+#@gmic
+
+#  Filename    : jayprich.gmic
+#
+#  Description : Scripts for use with GMIC standalone or plug-in
+#
+#  Source      : http://jaypri.ch/GMIC/jayprich.gmic
+#  PreviouslyAt: http://www.h-ps.demon.co.uk/GMIC/jayprich.gmic
+#
+#  Author      : James Prichard, London UK
+#                jayprich@gmail.com
+#
+#  Licence     : CeCILL v2.0 under French law
+#            see http://www.cecill.info/licences/Licence_CeCILL_V2-en.html
+#
+
+#------------------------------------
+#@gimp <b>Testing</b>
+#@gimp <i>jayprich</i>
+#------------------------------------
+
+#@gimp About : _none_, jpr_about
+#@gimp : note = note{"@jayprich filters for <b>G'MIC</b>\nare proposed to you by James Prichard"}
+#@gimp : note = note{"source code http://www.h-ps.demon.co.uk/GMIC/jayprich.gmic"}
+jpr_about : -gimp_logo "@jayprich filters"
+
+#@gimp jpr_line_edges : jpr_line_edges,jpr_line_edges(1)
+#@gimp : note = note{"combines the results in several orientations, each one blurs one way and looks for points of max gradient at 90 degrees to the blur"}
+#@gimp : note = note{"works best on photographs not line-art"}
+#@gimp : Angles per Quadrant = int(2,1,9)
+#@gimp : Blurring = int(2,2,24)
+#@gimp : Gradient Threshold = float(4,0,30)
+#@gimp : Anti Alias = bool(1)
+#@gimp : updateauthornote = note("<small>update 2013-Jan-22 author @jayprich</small>")
+
+#@gmic jpr_line_edges : Angles,Blurring,AntiAlias
+#@gmic : Similar in concept to a Hough Transform and voting
+#@gmic : here multiple orientations are blurred a little
+#@gmic : this augments line segments along the blur and suppresses
+#@gmic : noise improving edge detection by finding
+#@gmic : max gradient orthogonal to each linear blur
+#@gmic : $ -jpr_line_edges 5,5,1
+jpr_line_edges : -skip ${1=5},${2=5},${3=1}
+-e[^-1] "Find edges in image$? using $1 angles per quadrant with $2 blurring and $3 anti-alias"
+-v -
+-repeat @# -l[$>]
+-norm           # simple convert to grayscale
+-fft            # re. [0] im. [1]
+100%,100%,1,1,x-w/2 # [2] x
+100%,100%,1,1,y-h/2 # [3] y
+-shift[2,3] {-w/2},{-h/2},0,0,2
+100%,100%,1,1   # [4] accumulator
+-repeat {$1} # an even number of angles avoids exact horizontal and allows mirroring
+ac={3*cos(($>+0.5)*pi/$1/2)/sqrt(pi)*$2/w}
+as={3*sin(($>+0.5)*pi/$1/2)/sqrt(pi)*$2/w}
+--*[2] $ac      # make an oriented filter for convolution like blur_linear
+--*[3] $as      # quicker using x and y images in steps than filling one linear formula
+-+[-2,-1]       # filter : D = $ac*dx+$as*dy ; D * exp ( -D*D )
+--sqr[-1]
+-*[-1] -1
+-exp[-1]
+-*[-2,-1]       # fourier filter of derivative operator is ix
+--mirror[-1] x  # angles in the other quadrant are reflections
+-*[-1] -1       # negate because reflection had inverted the sign of D
+[1]x1
+-*[-1] -1       # re = i x im
+[0]x1           # im = re
+-*[-2,-1] [-4]  # filter blur + derivative
+-rm[-4]
+-ifft[-2,-1]
+-rm[-1]         # imaginary component after inverting should be zero
+[1]x1           # process mirror the same way
+-*[-1] -1
+[0]x1
+-*[-2,-1] [-4]
+-rm[-4]
+-ifft[-2,-1]
+-rm[-1]         # [0,1] fft [2,3] xy [4] acc .. [-2] gradient [-1] mirror
+-abs[-2,-1]     # detect lines using max of abs(gradient)
+-max[-2,-1] $3  # de-minimis gradient threshold
+ac={1.45*cos(($>+0.5)*pi/$1/2)} # pixel offset
+as={1.45*sin(($>+0.5)*pi/$1/2)}
+--shift[-2] {-$ac},{-$as} # offsets to align neighbours
+--shift[-3] {$ac},{$as}
+--shift[-3] {$ac},{-$as}  # mirror the offsets for mirrored orientation
+--shift[-4] {-$ac},{$as}
+      # [-6,-4,-3] gradient and neighbours [-5,-2,-1] mirror and neighbours
+-if $4 # anti-alias using heuristic 2*max( 0 , ( i - avg )/( max - min ) - 0.1 ) adaptive weights
+--max[-6,-4,-3]  #           +1
+--min[-7,-5,-4]  #           +1
+--[-2,-1]        # max-min   -1
+-+[-5,-4]        #           -1
+-*[-4] 0.5       # avg
+--[-6,-4]        # i - avg   -1
+-/[-5,-1]        #           -1
+--[-4] 0.1
+-max[-4] 0
+-*[-4] 2
+--[4,-4]         #           -1
+--max[-3,-2,-1]  #           +1
+--min[-4,-3,-2]  #           +1
+--[-2,-1]        # max-min   -1
+-+[-3,-2]        #           -1
+-*[-2] 0.5       # avg
+--[-3,-2]        # i - avg   -1
+-/[-2,-1]        #           -1
+--[-1] 0.1
+-max[-1] 0
+-*[-1] 2
+--[4,-1]         #           -1
+-else   # without anti-alias require local maximum i > .-. && i > .+. neighbours
+-max[-4,-3]
+-gt[-5,-3]
+--[4,-4]
+-max[-2,-1]
+-gt[-2,-1]
+--[4,-1]
+-endif
+-done
+-rm[0,1,2,3]
+-n 0,255
+-endl -done
+-v +
+
+#@gimp jpr_remove_blocks1 : jpr_remove_blocks1,jpr_remove_blocks1(0)
+#@gimp : sep = separator()
+#@gimp : note = note("subtracts square edged blocks with limited-amplitude while masking less-smooth areas of an image\n\nthis can reduce low quality jpeg artifacts in very smooth parts of an image\n1. choose a block size in pixels to fit\n2. set smallest amplitude that catches block noise in smooth areas but masks real edges in the image\n3. fine tune the strength around 70, the amount of estimated block-noise to subtract")
+#@gimp : Spatial block size = float(4,2,25)
+#@gimp : Amplitude = float(3,1,64)
+#@gimp : Strength fine-tune = float(70,20,300)
+#@gimp : updateauthornote = note("<small>update 2012-Nov-30 author @jayprich</small>")
+
+#@gmic jpr_remove_blocks1 : _spatial,_amplitude,_strength
+#@gmic : remove block artefacts from smooth areas
+#@gmic : spatial drives the size of blocks to try and fit
+#@gmic : amplitude set to a minimum to catch only noise blocks
+#@gmic : strength expect 70 but fine tune up or down
+
+# http://www.flickr.com/groups/gmic/discuss/72157632091508116/
+# http://www.flickr.com/photos/jayprich/8229010789
+
+jpr_remove_blocks1 :
+-v -
+-repeat @# -l[$<]
+-keep[0]
+spatial=$1
+amplitude=$2
+strength=$3
+--b[0] {$spatial*1.2} --b[0] {$spatial*0.8} --[1,2] [0]
+-c[1,2] {-$amplitude},{$amplitude}
+--==[1,2] {-$amplitude}
+--==[1,2] {$amplitude} -or[3,4,5,6]
+wh={w},{h}
+-shift[1] 2,2
+-r[1,2] {w/$spatial},{h/$spatial},1,3,2
+-r[1,2] $wh
+-shift[1] -2,-2
+-c[1,2] {-$amplitude/2},{$amplitude/2}
+--==[1,2] {-$amplitude/2}
+--==[1,2] {$amplitude/2} -or[3,4,5,6,7]
+-compose_channels[3] or
+-blur[3] {2*$spatial} -threshold[3] 0.1
+-blur[3] {2*$spatial}
+--[3] 1
+-+[1] [2] -rm[2]
+-*[1] [2] -rm[2]
+-*[1] {0.01*$strength}
+--[0] [1] -rm[1]
+-endl -done
+-v +
+
+#@gimp jpr_shapes_gradient : jpr_shapes_gradient,jpr_shapes_gradient(0)
+#@gimp : note = note("lots of local regressions using shapeaverage suppress noise in the gradients of small areas random areas chosen by watershed")
+#@gimp : Pre Blur = float(4.5,0,15)
+#@gimp : Watershed Threshold = float(0.25,0.05,1)
+#@gimp : Gradient Flatten = float(0.01,0.01,3)
+#@gimp : Gradient Cap = float(7,0.5,15)
+#@gimp : updateauthornote = note("<small>update 2013-Jan-31 author @jayprich</small>")
+
+#@gmic jpr_shapes_gradient :
+#@gmic : lots of local regressions using shapeaverage
+#@gmic : suppress noise in the gradients of small areas
+#@gmic : random areas chosen by watershed
+
+jpr_shapes_gradient:
+# regress smooth gradients on odd shape areas
+-v -
+-repeat @# -l[$<]
+100%,100%,1,1,0.1*(x-w/2)
+# create odd shape mask from image
+--norm[0]
+-b[-1] $1
+-segment_watershed[-1] $2,0
+-gt[-1] 0
+# ensure the smooth gradient is zero on the separating lines
+-*[1] [-1]                 # raw shape gradients
+--blend_shapeaverage[1,-1] # shapeaverage
+--[1,-1]                   # gradient with zero mean
+--sqr[1]           # square
+[-2]x1             # copy shape mask as needs to be top layer
+-blend_shapeaverage[-2,-1] # fine means
+-+[-1] $3          # avoid oversensitivity of small shapes to gradient
+-sqrt[-1]          # root mean square
+-/[1,-1]           # norm
+--blend_shapeaverage[0,-1] # main colours
+-*[0] [-3]         # original x normed
+-blend_shapeaverage[0,-2]
+-c[0] -$4,$4
+-*[0,1]            # gradient component to add
+-+[0,1]
+-c 0,255
+-endl -done
+-v +
+
+#@gimp jpr_gradient_smooth : jpr_gradient_smooth,jpr_gradient_smooth(1)
+#@gimp : note = note("image and its gradient in x y are treated as solid angles and smoothed on the topology of the surface of a sphere\nthis means a loop bright/dark/bright cannot contract through the centre of the sphere")
+#@gimp : Offset Brightness = float(0,-0.9,0.9)
+#@gimp : Smoothing Amount = float(1.5,0.8,2.5)
+#@gimp : updateauthornote = note("<small>update 2013-Feb-03 author @jayprich</small>")
+
+#@gmic jpr_gradient_smooth :
+#@gmic : image and its gradient in x y are treated as solid angles
+#@gmic : and locally smoothed on the surface of a sphere
+#@gmic : which can retain bright/dark/bright sequences
+
+jpr_gradient_smooth:
+-v -
+-repeat @#
+-l[$>]
+-norm                  # one channel brightness
+--g xy,0               # gradients in x and y channels
+-n[0] {$1-1},{$1+1}    # user offsets work like a threshold
+-a c
+-repeat 25
+--norm
+-/[0,1]                # this rescaling keeps the blur on the surface
+-b {w*$2/500}
+-done
+-f atan2(i,abs(i(x,y,0,0))) # abs avoids +/-pi discontinuity
+-channels 1,2
+-endl
+-r 100%,100%,1,3,0,1
+-n 0,255
+-done
+-v +
+
+#@gimp jpr_warpfromthreshold : jpr_warpfromthreshold,jpr_warpfromthreshold(1)
+#@gimp : note = note("a dummy 100x100 grid is warped using smoothed orientation as a map")
+#@gimp : Brightness Threshold = float(170,10,245)
+#@gimp : Simplify Regions = float(2,0,6)
+#@gimp : Blur & Renormalise Loop = int(10,3,50)
+#@gimp : Blur Amount per Step = float(2,1,10)
+#@gimp : updateauthornote = note("<small>update 2013-Feb-03 author @jayprich</small>")
+
+#@gmic jpr_warpfromthreshold :
+#@gmic : test trying to create a patch local warp effect
+
+jpr_warpfromthreshold:
+-v -
+-repeat @#
+-l[$>]
+-norm
+--g xy
+-a[1,2] c
+-ge[0] $1
+-b[0] $2
+-ge[0] 0.5
+-f[0] i!=i(x+1,y)|i!=i(x,y+1)
+-repeat $3
+--norm[1]
+-*[2] [0]
+-a[1,2] c
+-f[1] if(i(x,y,0,2)==0,i,i/i(x,y,0,2))
+-channels[1] 0,1
+-b[1] $4
+-done
+-rm[0]
+-s c
+-n 0,100
+-a c
+100,100,1,3,((x/2)%4)==0|(c==2&((y/2)%4)==0)
+-warp[1] [0]
+-rm[0]
+-n 0,255
+-endl
+-done
+-v +
+
+#@gimp jpr_colourillusion : jpr_colourillusion,jpr_colourillusion(1)
+#@gimp : note = note("recreated from a Java example http://fiji.sc/wiki/ see Spirals Macro")
+#@gimp : Arms = int(2,2,10)
+#@gimp : Scale = float(25,10,50)
+#@gimp : updateauthornote = note("<small>update 2013-Feb-06 author @jayprich</small>")
+
+#@gmic jpr_colourillusion :
+#@gmic : Use -d0 ( or -w -1,-1,0 -d ) to avoid normalisation of colours
+#@gmic : optical illusion involving color spirals
+#@gmic : visual "green arm" and "blue arm" contain the same color
+jpr_colourillusion :
+-v -
+arm={$1*1.5-1}
+{w},{h},1,1,A=10+atan2(x-{w/2},y-{h/2})*$arm/pi;R=sqrt((x-{w/2})^2+(y-{h/2})^2)/$2+A;(int(A+R/$arm)+int(R*6-A/$arm)%2)%3
+(250,200,0^20,200,190^160,100,150)
+-map[-2] [-1]
+-k[-2]
+-v +
+
+#@gimp jpr_coltexindex : jpr_coltexindex,jpr_coltexindex(1)
+#@gimp : note = note{"Index the image using its colour channels plus the local analysis of its luminance channel."}
+#@gimp : note = note{"Inspired by questions on masking for similar textures and how to make poster art from a photo."}
+#@gimp : note = note{"Watch out for JPEG block-artifacts in colour channels"}
+#@gimp : Number of Types = int(5,3,20)
+#@gimp : X1 = float(55,0,100)
+#@gimp : Y1 = float(55,0,100)
+#@gimp : X1 = float(45,0,100)
+#@gimp : Y2 = float(45,0,100)
+#@gimp : Factor (X1,Y1) vs (X2,Y2) = float(1,0,5)
+#@gimp : Display (X,Y) = bool(1)
+#@gimp : sep=separator(),note = note{"<small>Luminance Y</small>"}
+#@gimp : Smoothness = float(0,0,5)
+#@gimp : Black = float(0.05,0,1)
+#@gimp : Midtone = float(0.5,0,1)
+#@gimp : Highlight = float(0.95,0,1)
+#@gimp : sep=separator(),note = note{"<small>Colour &amp; Texture</small>"}
+#@gimp : Colour Smoothing = float(0.5,0,5)
+#@gimp : sep=separator(),note = note{"<small>Locally Average Gradient Norm or Variance from Luminance</small>"}
+#@gimp : Use Gradient Norm = bool(1)
+#@gimp : Local Size = float(2,1,9)
+#@gimp : Weight = float(0.7,0.2,2)
+#@gimp : updateauthornote = note("<small>update 2013-Mar-17 author @jayprich</small>")
+
+#@gmic jpr_coltexindex :
+#@gmic : Enrich colour with local analysis of luminance and index the image.
+#@gmic : $ -jpr_coltexindex
+jpr_coltexindex : -skip ${7=1}
+-e[^-1] "Index colour and texture of image$? with $1 types ($2,$3) v ($4,$5) x $6 and Smoothness $8 Black $9 Mid $10 White $11"
+-v -
+-repeat @#
+-l[$<]
+-rgb2yuv -s c # mix channels and split
+# luminance masks for black white and mid-tones
+--b[-3] $8    # smooth copy used for luminance masks
+--ge[-1] $10  # threshold for mid-tone
+--le[-2] $11  # inverse mask for white
+-ge[-3] $9    # mask for black
+-b[-5,-4] $12 # blur colour channels in-place
+# use either gradient norm or local variance
+-if $13
+-gradient[-6] xy,4
+-a[-7,-6] c
+-norm[-6]
+-b[-6] $14
+-else
+--b[-6] {$14*0.5} # local mean luminance is blur copy
+--[-7,-1]     # subtract from luminance
+-sqr[-6]      # squared difference
+-b[-6] {$14}  # local variance
+-sqrt[-6]
+-endif
+-n[-6] 0,1
+-*[-6] $15    # scale variance by importance
+# add channel for dot product
+---[-6] {@{-6,i(0.01*w*$2,0.01*h*$3)}}
+-*[-1] {@{-1,i(0.01*w*$4,0.01*h*$5)}}
+---[-6] {@{-6,i(0.01*w*$2,0.01*h*$3)}}
+-*[-1] {@{-1,i(0.01*w*$4,0.01*h*$5)}}
+-+[-2,-1]
+---[-5] {@{-5,i(0.01*w*$2,0.01*h*$3)}}
+-*[-1] {@{-1,i(0.01*w*$4,0.01*h*$5)}}
+-+[-2,-1]
+-/[-1] {@{-1,i(0.01*w*$4,0.01*h*$5)}+0.00001}
+-c[-1] 0,1    # chop x1y1 v x2y2 dot product
+-*[-1] $6     # scale with factor
+-a[-7--5,-1] c # combine layers excluding masks
+--[-4] 2
+-*[-4,-1]     # apply white mask
+-+[-3] 2
+-*[-3,-2]     # apply black mask
+--colormap[-2] $1,1,1 # adaptive using k-means clustering
+-index[-3] [-1] # assign pixels to clusters no dithering
+-rm[-1]
+-*[-2] 2
+-+[-2,-1]     # multiplex mid-tones
+-n 0,255      # single layer index to grayscale in RGB
+-to_rgb
+-if $7       # display inner and outer point
+-circle $2%,$3%,1%,1,,64,128,255
+-circle $4%,$5%,1%,1,,255,64,128
+-endif
+-endl
+-done
+-v +
+
+#@gimp jpr_specularbumps : jpr_specularbumps,jpr_specularbumps(1)
+#@gimp : note = note{"Add highlights using brightness gradient."}
+#@gimp : Gradient Illuminate Angle = float(270,0,360)
+#@gimp : Pre Smooth = float(1,0,5)
+#@gimp : Gradient Range = float(13,0,30)
+#@gimp : Illumination Adjust = float(0,-45,45)
+#@gimp : Illumination Offset = float(80,0,90)
+#@gimp : Highlight Size = float(0.1,0,0.25)
+#@gimp : Roughness = float(0.1,0.05,0.35)
+#@gimp : Output Type = choice("black and white","white with alpha","compose to image")
+#@gimp : updateauthornote = note("<small>update 2013-Mar-31 author @jayprich</small>")
+
+#@gmic jpr_specularbumps :
+#@gmic : Specular highlights as if the image has bumps based on luminance.  Ignores and deletes alpha channel.
+#@gmic : $ -jpr_specularbumps
+jpr_specularbumps :
+-e[^-1] "Specular highlights image$? with GradientAngle $1, Pre-Smooth $2, GradientRange $3, AdjustAngle $4, IlluminationOffset $5, HighlightSize $6, Roughness $7, OutputType $8"
+-v -
+t={$1*pi/180}
+a={cos($t)}
+b={sin($t)}
+-repeat @#
+-l[$<]
+-to_rgb
+--b $2
+-l[-1]
+-norm
+-gradient xy
+-a c
+-mix_channels ($a,$b;{-$b},$a)
+-div $3
+-c 0,1
+--norm
+-f[-1] "0.1/(0.1+i)"
+-a c
+--norm
+-div[-2,-1]
+-b 2
+--norm
+-div[-2,-1]
+wh={w},{h},1,3
+({cos((45+$4)*pi/180)*sin($5*pi/180)}^{sin((45+$4)*pi/180)*sin($5*pi/180)}^{cos($5*pi/180)})
+-r $wh
+--
+-norm
+-c $6,{$6+$7}
+-* -1
+-n 0,255
+-endl
+-if {$8==0}
+-rm[-2]
+-else
+-if {$8==1}
+-rm[-2]
+100%,100%,1,3,255
+-mv[-1] -2
+-a[-2,-1] c
+-else
+-blend dodge
+-endif
+-endif
+-endl
+-done
+-v +
+
+#@gimp jpr_phasecongruence : jpr_phasecongruence,jpr_phasecongruence(1)
+#@gimp : note = note{"Edge detect with directional Phase Congruence using proportionality to Local Energy."}
+#@gimp : Start Angle = float(45,0,360)
+#@gimp : Directions = int(1,1,20)
+#@gimp : Energy Threshold = float(50,0,500)
+#@gimp : Local Maxima = bool(1)
+#@gimp : updateauthornote = note("<small>update 2013-Mar-31 author @jayprich</small>")
+
+#@gmic jpr_phasecongruence :
+#@gmic : Edge detection via Phase Congruence method relies on low noise source and uses FFT to compute Local Energy.  This could be extended to apply to each channel in multiple orientations but for now we apply one orientation, ignore colour and delete the alpha channel.
+#@gmic : $ -jpr_phasecongruence
+jpr_phasecongruence :
+-e[^-1] "Phase Congruence image$? with StartAngle $1, Directions $2, Threshold $3, IsLines $4"
+-v -
+-repeat @#
+-l[$<]
+-norm
+100%,100%,1,1,0
+-repeat $2
+[0]x1
+t={($1/180+$</$2)*pi}
+a={cos($t)}
+b={sin($t)}
+-fft[2]
+-mv[3] 2
+100%,100%,1,1,sx=if(x>w/2,x-w,x);sy=if(y>h/2,y-h,y);if(abs($a*sx+$b*sy)>0.7,sign($a*sx+$b*sy),0)
+-*[3] -1
+-*[2,3] [4]
+-rm[4]
+-ifft[2,3]
+-rm[3]
+c={max(abs($a),abs($b))*.8}
+-abs[2]
+-max[2] $3
+-if $4
+a={$a/$c}
+b={$b/$c}
+-f[2] i>i(x+$a,y+$b)&i>i(x-$a,y-$b)
+-endif
+-+[1,2]
+-done
+-rm[0]
+-n 0,255
+-endl
+-done
+-v +
+
+#@gimp jpr_orientedthinning : jpr_orientedthinning,jpr_orientedthinning(1)
+#@gimp : note = note{"Skeleton of a shape against a zero-value (pure-black) background using locally oriented local maxima to find only relevant ridges - not micro ridges from a noisy boundary"}
+#@gimp : Pre Smooth Borders = float(5,0,10)
+#@gimp : Propagate Direction = float(15,3,50)
+#@gimp : Threshold Width = int(1,1,10)
+#@gimp : Preview Orientation = bool(0)
+#@gimp : Distance Metric = choice(max |x| |y| chebyshev,|x|+|y| manhattan,|x y| euclidean)
+#@gimp : updateauthornote = note("<small>update 2013-Apr-14 author @jayprich</small>")
+
+#@gmic jpr_orientedthinning:
+#@gmic : Skeleton of a shape against a zero-value (pure-black) background using locally oriented local maxima to find only relevant ridges - not micro ridges from a noisy boundary.
+#@gmic : $ -jpr_orientedthinning
+jpr_orientedthinning :
+-e[^-1] "Oriented Thinning image$? with Pre-Smooth $1, Propagate Direction $2, Threshold Width $3"
+-repeat @#
+-l[$<]
+-norm
+--b $1             # pre-blur gradient of shape overall and suppress border noise
+-structuretensors[-1] 0 # gradient products x.x x.y and y.y in channels
+-mix_channels[-1] (1,0,-1) # square magnitude double angle ( x.x-y.y , 2x.y )
+# can ignore 2x.y as shift horizontally or vertically depending on quadrant local direction
+-b[-1] $2              # propagate local direction vector, both sides of a line reinforce
+-le[-1] 0
+-if $4 # preview
+ -rm[-2]
+ -* 255
+-else
+(1.1,0^0,1.1)
+-map[-2] [-1]
+-rm[-1]
+-distance[-2] 0,$5  # 0=simple |x|+|y| distance from black pixels
+-max[-2] $3        # apply threshold
+--warp[-2] [-1],1
+-*[-2] -1
+--warp[-3] [-2],1
+-rm[-3]
+-max[-2,-1]
+-gt[-2,-1]
+-* 255
+-endif # preview
+-endl
+-done
+-v +
+
+#@gimp jpr_decimate : jpr_decimate,jpr_decimate(1)
+#@gimp : note = note{"Rescale in linear RGB space by cropping the frequency domain weighted"}
+#@gimp : note = note{"to decrease high frequency akin to Lanczos window on Sinc lobes."}
+#@gimp : note = note{"This filter may corrupt the alpha channel"}
+#@gimp : note = note{"High sharpness just crops frequency and gives bad halo"}
+#@gimp : Downsample Scale = float(0.375,0.1,1)
+#@gimp : Sharpness Factor = float(2,1.5,4)
+#@gimp : updateauthornote = note("<small>update 2013-Jun-24 author @jayprich</small>")
+
+#@gmic jpr_decimate :
+#@gmic : Rescale in linear RGB space by cropping the frequency domain weighted
+#@gmic : to decrease high frequency akin to Lanczos window on Sinc lobes
+#@gmic : This filter discards the alpha channel
+#@gmic : High sharpness just crops frequency and gives bad halo
+#@gmic : $ -jpr_decimate 0.375,2
+jpr_decimate : -skip ${1=0.375},${2=5}
+-e[^-1] "Decimate scale $1 sharpness $2"
+-v -
+-srgb2rgb # work in linear RGB
+-repeat @#
+-l[$<]
+nw={round($1*w/2)}
+nh={round($1*h/2)}
+sc={4*$nw/w*$nh/h}
+mid={round(0.5/$1-0.5)}
+-shift -$mid,-$mid # align middle of target pixel to the GIMP rescale for comparisons
+-fft
+-shift $nw,$nh,0,0,2
+-z 0,0,{2*$nw-1},{2*$nh-1}
+-shift -$nw,-$nh,0,0,2
+-f i*min(1,abs(2*x/w-1)*$2)*min(1,abs(2*y/h-1)*$2) # scale down highest frequencies
+-ifft
+-rm[-1] # discard imaginary plane
+-* $sc # scale the values as energy density increased when reducing the area
+-endl
+-done
+-rgb2srgb
+-v +
+
+#@gimp __
+
+# Local Variables:
+# mode: sh
+# End:
+#
+# (End of G'MIC custom commands)
