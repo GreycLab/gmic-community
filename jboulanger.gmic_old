@@ -47,7 +47,7 @@
 #@gmic : Input a 3D tif as a 3D image
 #@gmic : Note: This is useful for loading several 3D image stack
 tiff3d : -e[^-1] "Load the file $1 as a 3D image"
--v - n=$!
+-v - n=@#
 -i $1 -a[{$n}--1] z
 -v +
 
@@ -55,8 +55,8 @@ tiff3d : -e[^-1] "Load the file $1 as a 3D image"
 #@gmic : Output a 3D tif as a 3D image
 toff3d : -e[^-1] "Save the 3D image as a tiff file"
 -v -
--repeat $!
--o[$>] ${"-filename \"$1\","$>}
+-repeat @#
+-o[$>] @{"-filename \"$1\","$>}
 -done
 -v +
 
@@ -71,10 +71,10 @@ toff3d : -e[^-1] "Save the 3D image as a tiff file"
 #@gmic : $ 100,100,100 -boundingbox3d
 boundingbox3d : -skip ${1=10}
 -e[^-1] "3D Bounding box"
--v - -repeat $! -l[$>]
-  -box3d {0,w},{0,h},{0,d} -primitives3d[-1] 1  -opacity3d[-1] 1
+-v - -repeat @# -l[$>]
+  -box3d @{0,w},@{0,h},@{0,d} -primitives3d[-1] 1  -opacity3d[-1] 1
   -if {$1>0}
-     -plane3d {0,w},{0,h},$1,{round({0,h}/{0,w}*$1)} -primitives3d[-1] 1 -opacity3d[-1] .1
+     -plane3d @{0,w},@{0,h},$1,{round(@{0,h}/@{0,w}*$1)} -primitives3d[-1] 1 -opacity3d[-1] .1
   -endif
   -rm[0] -+3d
 -endl -done -v +
@@ -83,11 +83,11 @@ boundingbox3d : -skip ${1=10}
 #@gmic : Pseudo volumic rendering
 #@gmic : $ 100,100,100 -noise 1 -blur 10,0 -max 0 -resize 100%,100%,100%,3,0 -n 0,100 -f 'if(c==0,z*i(x,y,z,0),if(c==1,i(x,y,z,0)*(100-z),0))' -render_volume
 render_volume: -check "${1=8}>3&${2=5}>2&${3=.1}>0"
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
 -mirror x
---tones {$2+1} -rm[1,2] -r[1--1] 100%,100%,100%,{0,s} -*[1--1] [0] -rm[0]
+--tones {$2+1} -rm[1,2] -r[1--1] 100%,100%,100%,@{0,s} -*[1--1] [0] -rm[0]
 -reverse
--repeat $! i=$< -l[$<]
+-repeat @# i=$< -l[$<]
   -if {im!=iM}
     -pointcloud3d -gaussians3d $1,{$3*($i+1)/$2}
   -else
@@ -103,7 +103,7 @@ render_volume: -check "${1=8}>3&${2=5}>2&${3=.1}>0"
 #@gmic : $ 100,100,100 -noise 1 -blur 10,0 -max 0 -resize 100%,100%,100%,3,0 -n 0,100 -f 'if(c==0,z*i(x,y,z,0),if(c==1,i(x,y,z,0)*(100-z),0))' -display_volume 8,5,.1
 display_volume: -check "${1=8}>3&${2=5}>2&${3=.1}>0"
 -e[^-1] "display_volume with size $1 quality $2 and opactiy $3"
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
   --boundingbox3d 20
   -render_volume[0] $1,$2,$3
   -+3d
@@ -116,7 +116,7 @@ d3d_black : 1 -d3d[0--2] [-1] -rm[-1]
 #@gmic : $ 50,50,50,3 -noise 10 -blur 5 -max 0 -n 0,255 -display_volume 32,5,1 -view3d
 view3d : -skip ${1=25},${2=-120}
 -e[^-1] "Apply 3D view"
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
   -rotate3d 0,0,1,$1 -rotate3d 1,0,0,$2
 -endl -done -v +
 
@@ -125,29 +125,29 @@ view3d : -skip ${1=25},${2=-120}
 #@gmic : $ 100,100,100 -noise 1 -blur 10,0 -max 0 -colordepth 5
 colordepth: -skip ${1=5}
 -e "colordepth coding with lut $1"
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
   -colordepth_volume $1 -s z -+
 -endl -done -v +
 
 #@gmic colordepth_volume
 #@gmic : Make a 3D volume of the same size, color it, resize orignal in color and multiply
 colordepth_volume: -skip ${1=5}
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
   -i [0] -f[-1] 'z/(d-1)*255' -map[-1] $1 -resize[0] 100%,100%,100%,3 -*
 -endl -done -v +
 
 colordepth_scale: -skip ${1=5}
-10,{0,h-10} -f[-1] '(h-y)/(h-1)*255' -map[-1] $1 -frame[-1] 5,5,0,0,0
+10,@{0,h-10} -f[-1] '(h-y)/(h-1)*255' -map[-1] $1 -frame[-1] 5,5,0,0,0
 
 #@gmic make_axis: _xmin,_xmax,_ymin,_ymax
 #@gmic : Display an axis around an image
 #@gmic : $ image.jpg -make_axis 0,1,0,1
 make_axis:
 -e[^-1] "Add axis"
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
   -frame 1,1,0
   100%,24,1,3,255 -axes[-1] $1,$2,{-1},{-1}
-  24,{0,h},1,3,255 -axes[-1] {w},{w},$4,$3 24,24,1,3,255 -a[-1,-2] y
+  24,@{0,h},1,3,255 -axes[-1] {w},{w},$4,$3 24,24,1,3,255 -a[-1,-2] y
   -a[0,1] y -reverse -a[0,1] x
   -frame 12,12,255 100%,5,1,3,255,255,255 -reverse -a y
 -endl -done -v +
@@ -157,9 +157,9 @@ make_axis:
 #@gmic : $ image.jpg -make_axis 0,1,0,1 -xlabel "x-axis"
 xlabel:
 -e[^-1] "Add a x label"
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
   0 -text[-1] "$1",0,0,18,1,255,255,255 -negative[-1] --lt[-1] 90%
-  -image[0] [-2],{{0,w}/2+12-{1,w}/2},{{0,h}-{1,h}},0,0,1,[-1] -k[0]
+  -image[0] [-2],{@{0,w}/2+12-@{1,w}/2},{@{0,h}-@{1,h}},0,0,1,[-1] -k[0]
 -endl -done -v +
 
 #@gmic ylabel: _label
@@ -167,10 +167,10 @@ xlabel:
 #@gmic : $ image.jpg -make_axis 0,1,0,1 -ylabel "y-axis"
 ylabel:
 -e[^-1] "Add a y label"
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
   0 -text[-1] "$1",0,0,18,1,255,255,255 -negative[-1]
   -rotate[-1] -90 --lt[-1] 90%
-  -image[0] [-2],0,{{0,h}/2-12-{1,h/2}},0,0,1,[-1] -k[0]
+  -image[0] [-2],0,{@{0,h}/2-12-@{1,h/2}},0,0,1,[-1] -k[0]
 -endl -done -v +
 
 #@gmic title: _label
@@ -178,9 +178,9 @@ ylabel:
 #@gmic : $ image.jpg -make_axis 0,1,0,1 -title "title"
 title:
 -e[^-1] "Add a title"
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
   0 -text[-1] "$1",0,0,18,1,255,255,255 -negative[-1] --lt[-1] 90%
-  -image[0] [-2],{{0,w}/2-{1,w}/2},0,0,0,1,[-1] -k[0]
+  -image[0] [-2],{@{0,w}/2-@{1,w}/2},0,0,0,1,[-1] -k[0]
 -endl -done -v +
 
 #---------------------------------
@@ -194,23 +194,23 @@ title:
 #@gmic : both being represented az a 3D stack
 quiver2d:
 -e[^-1] "Cumulative sum along z-axis"
--s z -repeat {$!/2} -l[$>,{$>+$!/2}] -quiver[0] [1],10,1,1,1,255 -endl -done -rm[{$!/2}--1] -a z
+-s z -repeat {@#/2} -l[$>,{$>+@#/2}] -quiver[0] [1],10,1,1,1,255 -endl -done -rm[{@#/2}--1] -a z
 
 #@gmic warp2d :
 #@gmic : Warp a 2D image stack using a vector field
 #@gmic : $ movie.cimg  -a z -resize 50%,50% --l[0] --lucas_kanade 5,1 -cumulate[-1] z -frame 30,30,0 -warp2d -endl -frame[0] 30,30,0 -a x
 warp2d:
--s z -repeat {$!/2} -l[$>,{$>+$!/2}] -warp[0] [1],1,1,1 -endl -done -rm[{$!/2}--1] -a z
+-s z -repeat {@#/2} -l[$>,{$>+@#/2}] -warp[0] [1],1,1,1 -endl -done -rm[{@#/2}--1] -a z
 
 #@gmic lucas_kanade: scale,smoothing
 #@gmic : Motion estimation using lucas and kanade approach
 #@gmic : Works on 2D+t image stacks/ has side effect
 #@gmic : [vx vy] = [Ixx Ixy; Ixy Iyy]^-1 [Ixt Iyt]
 #@gmic : $ image.jpg -repeat 20 --shift[-1] 1,0,0,0,2 -done -a z --lucas_kanade 2 -n 0,255 -frame 2 -a x
-#@gmic : $ image.jpg -repeat 20 --shift[-1] 1,1,0,0,2 -done -a z --lucas_kanade 2  -s z -repeat {$!/2} -l[$>,{$>+$!/2}] -quiver[0] [1] -endl -done -rm[{$!/2}--1] -a z
+#@gmic : $ image.jpg -repeat 20 --shift[-1] 1,1,0,0,2 -done -a z --lucas_kanade 2  -s z -repeat {@#/2} -l[$>,{$>+@#/2}] -quiver[0] [1] -endl -done -rm[{@#/2}--1] -a z
 lucas_kanade: -skip ${1=2},${2=1}
 -e[^-1] "Motion estimation with Lucas et Kanade algorithm"
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
 -blur_xy $2 -structuretensors 0 -blur_xy $1,$1,0 # abcdef
 --l -s c -rm[0,-1] -*[1,2] -*[0,2] -reverse -- -endl  # dc-be
 --l[0] -s c -rm[3,5] -*[0,3] -*[1,2] -- -endl # ae-bc
@@ -223,7 +223,7 @@ lucas_kanade: -skip ${1=2},${2=1}
 #@gmic : $ image.jpg -repeat 20 --shift[-1] 1,0,0,0,2 -done -a z -unwarp 10,20
 unwarp: -skip ${3=1}
 -e[^-1] "Unwarp an 2d+t volume"
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
 [0] 100%,100%,100%,2,0
 -repeat $1
   -if {$3==0} s=1 -else  s={($>+1)/$1} -endif  scale={$s*100}%
@@ -242,9 +242,9 @@ unwarp: -skip ${3=1}
 #@gmic : image.jpg  -luminance --shift {?},{?},0,0,2 -estimate_shift[1] [0]
 estimate_shift_core:
 -e[^-1] "Translation estimation with Lucas et Kanade algorithm"
--v - -pass$1 0 -repeat {$!-1} -l[$>,-1]
+-v - -pass$1 0 -repeat {@#-1} -l[$>,-1]
   -blur_xy 1 --gradient[0] xy,0 --[0,1] --sqr[1,2] --*[1,2] [0] -*[1,2] -rm[0]
-  Ixy={0,ia} Ixx={1,ia} Iyy={2,ia} Ixt={3,ia} Iyt={4,ia}
+  Ixy=@{0,ia} Ixx=@{1,ia} Iyy=@{2,ia} Ixt=@{3,ia} Iyt=@{4,ia}
   vx={-($Iyy*$Ixt-$Ixy*$Iyt)/max(1e-6,$Ixx*$Iyy-$Ixy*$Ixy)}
   vy={-($Ixx*$Iyt-$Ixy*$Ixt)/max(1e-6,$Ixx*$Iyy-$Ixy*$Ixy)}
   -rm 1,2,1,1,$vx,$vy
@@ -253,7 +253,7 @@ estimate_shift_core:
 #@gmic multi_resolution_pyramide : _number_of_scales
 #@gmic : Build a multi-resolution pyramid
 multi_resolution_pyramide:
--v - -repeat $! -l[$<]
+-v - -repeat @# -l[$<]
   -repeat {$1-1} --resize[-1] 50%,50%,50%,100%,2 -done -reverse
 -endl -done -v +
 
@@ -261,8 +261,8 @@ multi_resolution_pyramide:
 #@gmic : Shift an image with subpixel translation
 #@gmic : $ image.jpg 1,2,1,1,5,10.1 --shift_subpixel[0] [1]
 shift_subpixel :
--v - -pass$1 0 -repeat {$!-1} -l[$>,-1]
-   {0,w},{0,h},1,2 -f[-1] 'if(c==0,{1,i(0)},{1,i(0,1)})'
+-v - -pass$1 0 -repeat {@#-1} -l[$>,-1]
+   @{0,w},@{0,h},1,2 -f[-1] 'if(c==0,@{1,i(0)},@{1,i(0,1)})'
    -warp[0] [2],1,2,1 -rm[1,2]
 -endl -done -v +
 
@@ -272,8 +272,8 @@ shift_subpixel :
 #@gmic : $ image.jpg -luminance --shift 2,3 -crop 5%,5%,95%,95% -estimate_shift[1] [0],3
 estimate_shift:
 -e[^-1] "Estimate translation between images and image [$1]"
--v - -pass$1 0 -repeat {$!-1} -l[$>,-1]
-  N={round(log2(min({0,w},{0,h}))-2,1,-1)}
+-v - -pass$1 0 -repeat {@#-1} -l[$>,-1]
+  N={round(log2(min(@{0,w},@{0,h}))-2,1,-1)}
   -multi_resolution_pyramide $N
   1,2
   -repeat 3 -repeat $N
@@ -294,9 +294,9 @@ estimate_shift:
 #@gmic : $ image.jpg  -luminance -repeat  10 --shift[-1] {2*?},{2*?},0,0,2 -done -a z --unshift 1 -a x
 unshift: -skip ${1=1}
 -e[^-1] "unshift image stack"
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
   -repeat $1
-    -s z -repeat {$!-1} -l[$>,{$>+1}]
+    -s z -repeat {@#-1} -l[$>,{$>+1}]
       --estimate_shift[1] [0] -*[-1] -1
       -shift_subpixel[1] [-1] -rm[-1]
     -endl -done -a z
@@ -317,11 +317,11 @@ register_lucas_kanade : -skip ${1=10},${2=10}
 #@gmic : $ 100,100,100 -noise 1 -blur 2 --detect_events , -pointscoordinates[-1] -resize[0] 100%,100%,100%,3,1 -n[0] 0,255 -circles[0] [1] -k[0]
 detect_events : -skip ${1=1},${2=1},${3=9}
   -e[^-1] "detect events with scale_xy $1 scale_z $2 and threshold $3"
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
     -blur_xy $1 -blur_z $2 -structuretensors -blur_xy $1 -blur_z $2
     -s z -apply_parallel "-eigen -k[0] -s c -k[2]" -a z
     -sqrt
-    thres={{0,ia}+$3*sqrt({0,iv})}
+    thres={@{0,ia}+$3*sqrt(@{0,iv})}
     --max_patch[0] 8 -threshold[0] $thres -*
   -endl -done -v +
 
@@ -330,8 +330,8 @@ detect_events : -skip ${1=1},${2=1},${3=9}
 #@gmic : $ 100,100 -noise .2,2 -blur 1 -n 0,255 -noise 5 --detect_spots , -pointscoordinates[-1] -resize[0] 100%,100%,1,3,1 -circles[0] [1] -k[0]
 detect_spots : -skip ${1=1},${2=4}
   -e[^-1] "detect events with scale $1 and threshold $2"
-  -v - -repeat $! -l[$>]
-    -blur $1 --blur $1 -- thres={$2*${-mad[0]}}
+  -v - -repeat @# -l[$>]
+    -blur $1 --blur $1 -- thres={$2*@{-mad[0]}}
     --max_patch[0] 3 --threshold[0] $thres -*
   -endl -done -v +
 
@@ -340,18 +340,18 @@ detect_spots : -skip ${1=1},${2=4}
 #@gmic : Overlap RG/R RG/G RG/R+G MOC M1 and M2
 #@gmic : $ 256,256,1,2 -noise 3 -blur 5 -measure_colocalization
 measure_colocalization:
--v - -repeat $! -l[$>]
-  -if {{0,s}==2}
+-v - -repeat @# -l[$>]
+  -if {@{0,s}==2}
    # r,g,r>0,g>0,r.r,g.g,r.g,(r>0).(g>0)
    -s c --gt 0 --sqr[0,1] --*[0] [1] --*[2] [3] --or[2] [3]
-   O1={{7,is}/{2,is}}
-   O2={{7,is}/{3,is}}
-   O={{7,is}/{8,is}}
+   O1={@{7,+}/@{2,+}}
+   O2={@{7,+}/@{3,+}}
+   O={@{7,+}/@{8,+}}
    # r,g,(r>0).g,(g>0).r,r.r,g.g,r.g,(r>0).(g>0)
    -*[2] [1] -*[3] [0]
-   MOC={{6,is}/sqrt({4,is}*{5,is})}
-   M1={{3,is}/{0,is}}
-   M2={{2,is}/{1,is}}
+   MOC={@{6,+}/sqrt(@{4,+}*@{5,+})}
+   M1={@{3,+}/@{0,+}}
+   M2={@{2,+}/@{1,+}}
    -rm  1,6,1,1,$O1,$O2,$O,$MOC,$M1,$M2
   -else
    -echo "needs images with two channels"
@@ -364,21 +364,21 @@ measure_colocalization:
 #@gmic : in each channels versus the number of objects
 #@gmic : $ 256,256,1,2 -noise 3 -blur 5 -gt 0 -measure_object_colocalization
 measure_object_colocalization:
--v - -repeat $! -l[$>]
-  -if {{0,s}==2}
+-v - -repeat @# -l[$>]
+  -if {@{0,s}==2}
     -gt 0 -s c -label_fg .1
-    n1=0 -repeat {0,iM}
+    n1=0 -repeat @{0,iM}
       --eq[0] {$>+1} -*[-1] [1]
-      -if  {iM>0} n1={$n1+1} -endif
+      -if  {@{-1,iM}>0} n1={$n1+1} -endif
       -rm[-1]
     -done
-    n1={0,100*$n1/iM}
-    n2=0 -repeat {1,iM}
+    n1={100*$n1/@{0,iM}}
+    n2=0 -repeat @{1,iM}
     --eq[1] {$>+1} -*[-1] [0]
-      -if  {iM>0} n2={$n2+1} -endif
+      -if  {@{-1,iM}>0} n2={$n2+1} -endif
       -rm[-1]
     -done
-    n2={1,100*$n2/iM}
+    n2={100*$n2/@{1,iM}}
     -rm
     1,2,1,1,$n1,$n2
   -else
@@ -392,7 +392,7 @@ measure_object_colocalization:
 #@gmic : http://en.wikipedia.org/wiki/Image_moment
 #@gmic : $ image.jpg --local_moments 1
 local_moments : -skip ${1=1}
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
 -norm
 -if {d==1}
   --mul[0] 'x'   --mul[0] 'y'   --mul[0] 'x*x'
@@ -419,16 +419,16 @@ local_moments : -skip ${1=1}
 #@gmic : Anisotropic diffusion using local moment tensors
 #@gmic : $ image.jpg --noise 10 --smooth_moments[-1] 1,10,1 -print_psnr
 smooth_moments: -check "${1=1}>0&${2=100}>0&${3=1}>0"
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
   --local_moments[-1] $1 -smooth[0] [1],$2,$3,0 -k[0]
 -endl -done -v +
 
 #@gmic pointscoordinates
-#@gmic : Return the list of points in the image as 3xN or 2xN columns vector
+#@gmic : Return the list of points in the image as 3*N columns vector
 #@gmic : $ 100,100 -noise .1,2 --pointscoordinates
 pointscoordinates :
   -e[^-1] "return the list of points in the image"
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
     -if {d>1}
       -if {iM>0} -pointcloud3d -s3d -k[2] -split y,{h/3} -a x -else 0 -endif
     -else
@@ -442,29 +442,30 @@ pointscoordinates :
 #@gmic : $ 512,512,1,3 10,7 -noise[-1] 1 -n[-1] 0,512 -circles[0] [1] -k[0]
 circles: -skip ${2=3}
 -e[^-1] "Draw circles on the image."
--v -  -pass$1 0 -repeat {$!-1} -l[$>,-1]
-    -if {{0,d}>1} # 3D case
-    -if {1,h<4} -r[1] 100%,{5+{0,s}},1,1,0 -l[1] -s y -f[3] $2 -f[4] 1 -f[5--1] 255 -a y -endl -endif
-    -repeat {1,w}
-      x={1,i($>,0)} y={1,i($>,1)} z={1,i($>,2)} r={1,i($>,3)} o={1,i($>,4)} i=$>
-      -repeat {0,s}
-        -if {$z>=0&$z<{0,d}}
-          -sh[0] $z,$z,$> -ellipse[-1] $x,$y,$r,$r,0,$o,0xFFFFFF,{1,i($i,5+$>)}
+-v -  -pass$1 0 -repeat {@#-1} -l[$>,-1]
+    -if {@{0,d}>1} # 3D case
+    -if {@{1,h}<4} -r[1] 100%,{5+@{0,s}},1,1,0 -l[1] -s y -f[3] $2 -f[4] 1 -f[5--1] 255 -a y -endl -endif
+    -repeat @{1,w}
+      x=@{1,i($>,0)} y=@{1,i($>,1)} z=@{1,i($>,2)} r=@{1,i($>,3)} o=@{1,i($>,4)} i=$>
+      -repeat @{0,s}
+        -if {$z>=0&$z<@{0,d}}
+          -sh[0] $z,$z,$> -ellipse[-1] $x,$y,$r,$r,0,$o,0xFFFFFF,@{1,i($i,5+$>)}
           -rm[-1]
 	-endif
       -done
       -done
     -else # 2D case
-      -if {1,h<3} -r[1] 100%,{4+{0,s}},1,1,0 -l[1] -s y -f[2] $2 -f[3] 1 -f[4--1] 255 -a y -endl -endif
-    -repeat {1,w}
-      x={1,i($>,0)} y={1,i($>,1)} r={1,i($>,2)} o={1,i($>,3)} i=$> col={1,i($>,4)}
-      -repeat {0,s}
-        -sh[0] 0,0,$> -ellipse[-1] $x,$y,$r,$r,0,$o,0xFFFFFF,{1,i($i,{4+$>})}
+      -if {@{1,h}<3} -r[1] 100%,{4+@{0,s}},1,1,0 -l[1] -s y -f[2] $2 -f[3] 1 -f[4--1] 255 -a y -endl -endif
+    -repeat @{1,w}
+      x=@{1,i($>,0)} y=@{1,i($>,1)} r=@{1,i($>,2)} o=@{1,i($>,3)} i=$> col=@{1,i($>,4)}
+      -repeat @{0,s}
+        -sh[0] 0,0,$> -ellipse[-1] $x,$y,$r,$r,0,$o,0xFFFFFF,@{1,i($i,{4+$>})}
         -rm[-1]
       -done
      -done
     -endif
--endl -done -rm[-1] -v +
+   -rm[-1]
+-endl -done -v +
 
 #@gmic labels: [image]
 #@gmic : Draw labels on the image
@@ -474,29 +475,29 @@ circles: -skip ${2=3}
 #@gmic : $ 512,512,1,3 10,2 -noise[-1] 1 -n[-1] 0,512 -labels[0] [1]
 labels:
 -e[^-1] "Draw labels on the image."
--v -  -pass$1 0 -repeat {$!-1} -l[$>,-1]
-    -if {{0,d}>1} # 3D case
-    -if {1,h<4}
-      -r[1] 100%,{6+{0,s}},1,1,0
+-v -  -pass$1 0 -repeat {@#-1} -l[$>,-1]
+    -if {@{0,d}>1} # 3D case
+    -if {@{1,h}<4}
+      -r[1] 100%,{6+@{0,s}},1,1,0
       -l[1] -s y -f[3] 'x' -f[4] 13 -f[5] 1 -f[6--1] 255 -a y -endl
     -endif
-    -repeat {1,w}
-      x={1,i($>,0)} y={1,i($>,1)} z={1,i($>,2)} r={1,i($>,3)} f={1,i($>,4)} o={1,i($>,5)} i=$>
-      -repeat {0,s}
-        -if {$z>=0&$z<{0,d}}
-          -sh[0] $z,$z,$> -text[-1] $r,$x,$y,$f,$o,{1,i($i,6+$>)}
+    -repeat @{1,w}
+      x=@{1,i($>,0)} y=@{1,i($>,1)} z=@{1,i($>,2)} r=@{1,i($>,3)} f=@{1,i($>,4)} o=@{1,i($>,5)} i=$>
+      -repeat @{0,s}
+        -if {$z>=0&$z<@{0,d}}
+          -sh[0] $z,$z,$> -text[-1] $r,$x,$y,$f,$o,@{1,i($i,6+$>)}
           -rm[-1]
 	-endif
       -done
       -done
     -else # 2D case
-      -if {1,h<3}
-        -r[1] 100%,{5+{0,s}},1,1,0 -l[1] -s y -f[2] 'x' -f[3] 13 -f[4] 1 -f[5--1] 255 -a y -endl
+      -if {@{1,h}<3}
+        -r[1] 100%,{5+@{0,s}},1,1,0 -l[1] -s y -f[2] 'x' -f[3] 13 -f[4] 1 -f[5--1] 255 -a y -endl
       -endif
-      -repeat {1,w}
-        x={1,i($>,0)} y={1,i($>,1)} r={1,i($>,2)} f={1,i($>,3)} o={1,i($>,4)} i=$>
-	-repeat {0,s}
-          -sh[0] 0,0,$> -text[-1] $r,$x,$y,$f,$o,{1,i($i,5+$>)}
+      -repeat @{1,w}
+        x=@{1,i($>,0)} y=@{1,i($>,1)} r=@{1,i($>,2)} f=@{1,i($>,3)} o=@{1,i($>,4)} i=$>
+	-repeat @{0,s}
+          -sh[0] 0,0,$> -text[-1] $r,$x,$y,$f,$o,@{1,i($i,5+$>)}
           -rm[-1]
         -done
       -done
@@ -504,34 +505,26 @@ labels:
    -rm[-1]
 -endl -done -v +
 
-#@gmic : croparound : [x,y,dx,dy] || [x,y,z,dx,dy,dz]
-#@gmic : Draw circles on an image
-#@gmic : $ 512,512,1,3 10,7 -noise[-1] 1 -n[-1] 0,512 -circles[0] [1] -k[0]
-croparound: -skip ${2=3},${3=3},${4=3}
-  -e[^-1] "Crop image at coordinates "
-  -v - -pass$1 0 -repeat {@#-1} -l[$>,-1]
-    -if {@{0,d}>1} # 3D case
-      -if {@{1,h}<6}
-        -r[1] 100%,6,1,1,0
-        -l[1] -s y -f[3] $2 -f[4] $3 -f[5] $4 -a y -endl
-       -endif
-      -repeat @{1,w}
-        x=@{1,i($>,0)} y=@{1,i($>,1)} z=@{1,i($>,2)} dx=@{1,i($>,3)} dy=@{1,i($>,4)} dz=@{1,i($>,5)} i=$>
-        --crop[0] {$x-$dx},{$y-$dy},{$z-$dz},{$x+$dx},{$y+$dy},{$z+$dz}
-        -done
-    -else # 2D case
-      -if {@{1,h}<4} -r[1] 100%,4,1,1,0 -l[1] -s y -f[2] $2 -f[3] $3 -a y -endl -endif
-      -repeat @{1,w}
-        x=@{1,i($>,0)} y=@{1,i($>,1)} dx=@{1,i($>,2)} dy=@{1,i($>,3)} i=$>
-        --crop[0] {$x-$dx},{$y-$dy},{$x+$dx},{$y+$dy}
-     -done
+#@gmic croparound : _size_xy,_size_z
+#@gmic : Crop image [0] around coordinates given by image [1]
+#@gmic : $ image.jpg 100%,100% -f[-1] 0 -noise[-1] .1,2  --pointscoordinates[-1] --croparound[0,-1] 5 -append_tiles[3--1] ,  -rm[-2] -dilate[1] 5 -*[1] 128 -blend[0,1] add
+croparound :  -skip ${1=10},${2=10}
+  -e[^-1] "crop image [0] around "@{1,w}" coordinates given by image [1]"
+  -v -
+  -repeat {@{1,w}}
+    -if {@{0,d}>1}
+      x=@{1,i($>,0)} y=@{1,i($>,1)} z=@{1,i($>,2)}
+      --crop[0] {$x-$1},{$y-$1},{$z-$2},{$x+$1},{$y+$1},{$z+$2}
+    -else
+      x=@{1,i($>,0)} y=@{1,i($>,1)}
+      --crop[0] {$x-$1},{$y-$1},{$x+$1},{$y+$1}
     -endif
-  -endl -done -rm[0,1] -v +
+  -done -rm[0,1] -v +
 
 #@gmic random_walks : width,height,length,number,speed
 #@gmic : Generate random walks tracks (list of coordinates x,y,t as a Nx3 image.)
-#@gmic : $ 100,100,20 -random_walks 100,100,20,5,1 -circles[0] [1] -k[0] -blur_xy 1 -s z -max
-#@gmic : $ 100,100,20 -random_walks 100,100,20,10,1 -circles[0] [1] -k[0] -blur 1 -n 0,255 -display_volume 8,10,1 -rotate3d 0,0,1,25 -rotate3d 1,0,0,-120 -snapshot3d 600,1,0,0,0 -autocrop
+#@gmic : $ 100,100,20  -random_walks 100,100,20,5,1 -circles[0] [1] -k[0] -blur_xy 1 -s z -max
+#@gmic : $ 100,100,20  -random_walks 100,100,20,10,1 -circles[0] [1] -k[0] -blur 1 -n 0,255 -display_volume 8,10,1 -rotate3d 0,0,1,25 -rotate3d 1,0,0,-120 -snapshot3d 600,1,0,0,0 -autocrop
 random_walks :
 number=$4 width=$1 height=$2 length=$3 speed=$5
 $number,3
@@ -561,7 +554,7 @@ movavg : -check "$1>=1"
 -e[^-1] "moving average with size "$1 -v -
 n={$1-1}
 -repeat $n
-  -repeat {{$!}-1} --+[{$>},{$>+1}] -*[-1] .5 -rm[$>] -mv[-1] $> -done
+  -repeat {{@#}-1} --+[{$>},{$>+1}] -*[-1] .5 -rm[$>] -mv[-1] $> -done
   -reverse
 -done
 -if {$n%2!=0} -reverse -endif
@@ -570,14 +563,14 @@ n={$1-1}
 #@gmic zmean
 #@gmic : average along z-axis
 zmean :
--v - -repeat $! -l[$>]
-n={0,d} -s z -+ -/ $n
+-v - -repeat @# -l[$>]
+n=@{0,d} -s z -+ -/ $n
 -endl -done -v +
 
 #@gmic zstd
 #@gmic : standard deviation along z-axis
 zstd :
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
 --zmean -sqr[-1]
 -l[0] -sqr -zmean -endl
 -- -sqrt
@@ -586,18 +579,18 @@ zstd :
 #@gmic zmax
 #@gmic : maximum along z-axis
 zmax :
--v - -repeat $! -l[$>] -s z -max -endl -done -v +
+-v - -repeat @# -l[$>] -s z -max -endl -done -v +
 
 #@gmic zmin
 #@gmic : maximum along z-axis
 zmin :
--v - -repeat $! -l[$>]  -s z -min -endl -done -v +
+-v - -repeat @# -l[$>]  -s z -min -endl -done -v +
 
 #@gmic kymoline:
 #@gmic : interactively select a line and extract a line profile
 kymoline:
 --select 1
-x1={i(0,0)} y1={i(0,1)} x2={i(0,3)} y2={i(0,4)}
+x1=@{-1,i(0,0)} y1=@{-1,i(0,1)} x2=@{-1,i(0,3)} y2=@{-1,i(0,4)}
 d={sqrt(($x2-$x1)^2+($y2-$y1)^2)}
 u={($x2-$x1)/$d} v={($y2-$y1)/$d}
 -rm[-1]
@@ -608,7 +601,7 @@ u={($x2-$x1)/$d} v={($y2-$y1)/$d}
 #@gmic : Shift a image so that the fft has it center in the middle
 #@gmic : $ image.jpg -fftshift
 fftshift :
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
     -shift {-int(w/2)},{-int(h/2)},{-int(d/2)},0,2
   -endl -done -v +
 
@@ -617,8 +610,8 @@ fftshift :
 #@gmic : $ image.jpg -whiten_frequency
 whiten_frequency : -check "${1=.25}>=0"
 -e[^-1] "Whiten the frequency with parameter "$1
--v - -repeat $! -l[$>]
-#E={0,sqrt(iv)}
+-v - -repeat @# -l[$>]
+#E=@{0,sqrt(iv)}
 -fft --a c -norm[-1] -pow[-1] $1 -max[-1] 1e-12 -/[-1] {ia} -/[0-1] [2] -rm[2] -ifft -k[0]
 #-* {$E/sqrt(iv)}
 -endl -done -v +
@@ -628,8 +621,8 @@ whiten_frequency : -check "${1=.25}>=0"
 #@gmic : Default values: 'nb_iter=8', 'acceleration=1' and 'kernel_type=1'.
 #@gmic : $ image.jpg --blur 1 --deblur_goldmeinel2[-1] 1
 deblur_goldmeinel2 : -check "$1>=0 && ${2=8}>=0 && ${3=1}>=0" -skip ${4=1} -skip ${5=1}
-  -e[^-1] "Deblur image$? using Gold-Meinel algorithm, with sigma $1, $2 iterations, acceleration $3 and "${-arg\ 1+!$4,"",quasi-}"gaussian kernel."
-  -v - -repeat $! -l[$>]
+  -e[^-1] "Deblur image$? using Gold-Meinel algorithm, with sigma $1, $2 iterations, acceleration $3 and "@{-arg\ 1+!$4,"",quasi-}"gaussian kernel."
+  -v - -repeat @# -l[$>]
     [0] -r[-1] 200%,200%,200%,100%,5 -repeat $2
       --b[-1] $1,1,$4 -r[-1] 50%,50%,50% --/[0,-1] -rm[-2] -^[-1] $3 -r[-1] 200%,200%,200%,100%,5 -*[-1,-2] # u *= f / Hu
 
@@ -642,8 +635,8 @@ deblur_goldmeinel2 : -check "$1>=0 && ${2=8}>=0 && ${3=1}>=0" -skip ${4=1} -skip
 #@gmic : Default values: 'nb_iter=50' and 'kernel_type=1'.
 #@gmic : $ image.jpg --blur 1 --deblur_richardsonlucy2[-1] 1
 deblur_richardsonlucy2 : -check "$1>=0 && ${2=50}>=0" -skip ${3=1} -skip ${4=1}
-  -e[^-1] "Deblur image$? using Richardson-Lucy algorithm, with sigma $1, $2 iterations and "${-arg\ 1+!$3,"",quasi-}"gaussian kernel."
-    -v - -repeat $! -l[$>]
+  -e[^-1] "Deblur image$? using Richardson-Lucy algorithm, with sigma $1, $2 iterations and "@{-arg\ 1+!$3,"",quasi-}"gaussian kernel."
+    -v - -repeat @# -l[$>]
     [0] -r[-1] 200%,200%,200%,100%,5 -repeat $2
     --b[-1] $1,1,{$3!=0} -r[-1] 50%,50%,50%,100%,5 --/[0,-1] -rm[-2] -r[-1] 200%,200%,200%,100%,5 -b[-1] $1,1,{$3!=0}  -*[-1,-2] # u *= H ( f / Hu )
     -done -rm[0]
@@ -654,8 +647,8 @@ deblur_richardsonlucy2 : -check "$1>=0 && ${2=50}>=0" -skip ${3=1} -skip ${4=1}
 #@gmic : $ image.jpg 100%,100% -gaussian[-1] 20,1,45 --correlate_fft[0] [1]
 correlate_fft :
   -e[^-1] "Correlate image with image [$1]"
-  -v - -pass$1 0 -repeat {$!-1} -l[$>,-1]
-    w2={int({0,w}/2)} h2={int({0,h}/2)} d2={int({0,d}/2)}
+  -v - -pass$1 0 -repeat {@#-1} -l[$>,-1]
+    w2={int(@{0,w}/2)} h2={int(@{0,h}/2)} d2={int(@{0,d}/2)}
     -r[1] [0],[0],[0],1,0,0,0.5,0.5,0.5,0.5  -shift[1] -$w2,-$h2,-$d2,0,2
     -fft[0] -fft[2] -*[3] -1
     --*[-4] [-1] --*[-4] [-3] -+[-2,-1]
@@ -666,11 +659,11 @@ correlate_fft :
 #@gmic deconvolve_richardsonlucy : filter,nb_iter>=1, acceletation>=0
 #@gmic : Deconvolve images using the first one as a blur operator (PSF)
 #@gmic : $ image.jpg 16,16 -gaussian[-1] 2,1,45 --convolve_fft[0] [1] -deconvolve_richardsonlucy[-1] [1],100
-deconvolve_richardsonlucy : -check ${-is_image_arg\ $1}" && ${2=5}>=1"
+deconvolve_richardsonlucy : -check @{-is_image_arg\ $1}" && ${2=5}>=1"
  -e[^-1] "Deblur image using Richardson-Lucy algorithm with filter [$1]."
  -v - -pass$1 0
- -repeat {$!-1} -l[$>,-1]
-   -r[1] {0,w},{0,h},{0,d},100%,0,0,.5,.5,.5 -normalize_sum[1] [0]
+ -repeat {@#-1} -l[$>,-1]
+   -r[1] @{0,w},@{0,h},@{0,d},100%,0,0,.5,.5,.5 -normalize_sum[1] [0]
    -repeat $2
      --convolve_fft[-1] [1] -max[-1] 1e-6 --/[0] [-1] -rm[-2]
      -correlate_fft[-1] [1] -*[-1,-2]   # u *= H ( f / Hu )
@@ -681,11 +674,11 @@ deconvolve_richardsonlucy : -check ${-is_image_arg\ $1}" && ${2=5}>=1"
 #@gmic : Deblur and zoom selected images using Gold-Meinel algorithm
 #@gmic : Default values: 'nb_iter=8', 'acceleration=1' and 'kernel_type=1'.
 #@gmic : $ image.jpg 100%,100% -gaussian[-1] 5,1,45 --convolve_fft[0] [1] --deconvolve_goldmeinel[-1] [2],5
-deconvolve_goldmeinel : -check ${-is_image_arg\ $1}" && ${2=5}>=1 && ${3=1}>=1"
+deconvolve_goldmeinel : -check @{-is_image_arg\ $1}" && ${2=5}>=1 && ${3=1}>=1"
  -e[^-1] "Deblur image using Gold-Meinel algorithm with filter $1, $2 iterationsand acceleration $3."
  -v - -pass$1 0
-  -repeat {$!-1} -l[$>,-1]
-    -r[1] {0,w},{0,h},{0,d},100%,0,0,.5,.5,.5 -normalize_sum[1] [0]
+  -repeat {@#-1} -l[$>,-1]
+    -r[1] @{0,w},@{0,h},@{0,d},100%,0,0,.5,.5,.5 -normalize_sum[1] [0]
     -repeat $2
       --convolve_fft[-1] [1] -max[-1] 1e-6 --/[0] [-1] -rm[-2]
       -^[-1] $3 -*[-1,-2] # u *= (f / Hu)^$3
@@ -697,7 +690,7 @@ deconvolve_goldmeinel : -check ${-is_image_arg\ $1}" && ${2=5}>=1 && ${3=1}>=1"
 blend_sharpness:
   -e[^-1] "Blend images according to their sharpness"
   -v -
-    N=$! --gradient_norm
+    N=@# --gradient_norm
     --+[$N--1] -max[$N--1] .01 -/[$N--2] [-1] -rm[-1] -a[$N--1] z -d[-1] -s[-1] z
     -a[0-{$N-1}] x -a[1--1] x -* -s x,$N -+
   -v +
@@ -707,9 +700,9 @@ blend_sharpness:
 #@gmic : $ image.jpg --laplacian -reconstruct_laplacian[-1] ,
 reconstruct_laplacian: -skip ${1=0}
   -e[^-1] "Reconstruct an image from its laplacian"
-    -v - -repeat $! -l[$>]
-    -s c -repeat $! -l[$>]
-      -fft a={0,i(0,0)} b={1,i(0,0)}
+    -v - -repeat @# -l[$>]
+    -s c -repeat @# -l[$>]
+      -fft a=@{0,i(0,0)} b=@{1,i(0,0)}
       100%,100%,1,1,'-(4-2*cos(2*x*pi/w)-2*cos(2*y*pi/h))'
       -=[-1] 1 -+[-1] $1
       -/[0,1] [-1] -k[0,1] -=[0] $a -=[1] $b -ifft -k[0]
@@ -721,7 +714,7 @@ reconstruct_laplacian: -skip ${1=0}
 #@gmic : $ image.jpg  --local_variance
 local_variance: -skip ${1=2},${2=0}
   -e[^-1] "Estimate local variance with scale "$1" and robustness "$2
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
     -if {$2==0}
       --blur $1,1,1 -- -sqr -blur $1,1,1
     -else
@@ -734,7 +727,7 @@ local_variance: -skip ${1=2},${2=0}
 #@gmic : $ image.jpg  --local_variance
 local_noise_variance: -skip ${1=2},${2=0}
   -e[^-1] "Estimate local variance with scale "$1" and robustness "$2
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
     -laplacian -if {d==1} -* {1/sqrt(20)} -else -* {1/sqrt(42)} -endif -local_variance $1,$2
   -endl -done -v +
 
@@ -743,7 +736,7 @@ local_noise_variance: -skip ${1=2},${2=0}
 #@gmic : $ image.jpg  --normalize_local_variance
 normalize_local_variance: -skip ${1=50},${2=2},${3=25},${4=1}
   -e[^-1] "Normalize local variance with amplitude $1, scale $2, threshold $3 (x$4 times)."
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
   -repeat $4
    --local_variance $2 -sqrt[-1] -max[-1] $3 # compute local standard deviation
    --blur[0] $2,1,1 ---[0,-1] -/[-1] [1] -*[-1] $1 -+[-2,-1] -k[-1] # x = <x> + alpha * (x-<x>)/<x'x>
@@ -756,8 +749,8 @@ normalize_local_variance: -skip ${1=50},${2=2},${3=25},${4=1}
 #@gmic : $ image.jpg --noise 10 --local_wiener[-1] 1 -print_psnr
 local_wiener : -skip ${1=2}
   -e[^-1] "Local Wiener filtering"
-  -v - -repeat $! -l[$>]
-    sigma=${-noise_std}
+  -v - -repeat @# -l[$>]
+    sigma=@{-noise_std}
     --blur $1 # mean
     --local_variance[0] $1 ---[-1] {$sigma*$sigma} -reverse[-1,-2] -/[-1,-2] # variance
     ---[0,1] # img-mean
@@ -769,7 +762,7 @@ local_wiener : -skip ${1=2}
 #@gmic : $ image.jpg -periodize
 periodize :
 -e[^-1] "periodize"
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
 -if {w>1} --mirror x -a x -endif
 -if {h>1} --mirror y -a y -endif
 -if {d>1} --mirror z -a z -endif
@@ -780,7 +773,7 @@ periodize :
 #@gmic : $ image.jpg -tape
 tape :
   -e[^-1] "apply a Hann tapering window"
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
     -if {w>1} -f 'i*sin(pi*x/(w-1))^2' -endif
     -if {h>1} -f 'i*sin(pi*y/(h-1))^2' -endif
     -if {d>1} -f 'i*sin(pi*z/(d-1))^2' -endif
@@ -791,40 +784,25 @@ tape :
 #@gmic : $ image.jpg -powerspectrum
 powerspectrum :
   -e[^-1] "Compute power spectrum"
-  -v - -repeat $! -l[$>] -display_fft -k[0] -endl -done -v +
+  -v - -repeat @# -l[$>] -display_fft -k[0] -endl -done -v +
 
-#@gmic fouriermix : [image],_cut_of_frequency
+#@gmic fouriermix : _cut_of_frequency
 #@gmic :  Mix two images using their respectives low and high frequencies
 #@gmic : $ image1.jpg image2.jpg  --fouriermix .5
-fouriermix : -skip ${2=10%}
+fouriermix : -skip ${1=50%}
   -e[^-1] "fourier mix images."
-  -v - -pass$1 0 -repeat {@#-1} -l[$>,-1]
   -fft[0] -fft[2] -fftshift
-    # make a mask
-    100%,100% -circle[-1] 50%,50%,$2,1,1 -blur[-1] 1,1,1 -n[-1] 0,1 -d
-    -*[0,1] [-1] -negative[-1] -*[2,3] [-1] -rm[-1] -+[0,2] -+[1,2] -fftshift
-    -ifft
-  -endl -done -rm[-1] -v +
-
-#@gmic blend_fft: [image]
-#@gmic : blend images using strongest frequencies
-blend_fft : -skip ${2=2}
-  -v - -pass$1 0
-  --l[-1]
-    -tape -powerspectrum -blur 1 --blur 2 --
-    -max '{ia+$2*sqrt(iv)}' -circle 50%,50%,20,1,@{0,im} -n 0,1 -d
-    -fftshift
-  -endl -fft[-2] -*[-2,-3] [-1] -negative[-1]
-  -repeat {@#-3} -l[$>,-1,-2,-3]
-    -fft[0] -*[0,1] [-1] -+[0] [2] -+[1] [3] -ifft[0,1] -rm[1]
-  -endl -done -rm[-1,-2,-3] -v +
+  # make a mask
+  100%,100% -circle[-1] 50%,50%,$1,1,1 -blur[-1] 1,1,1 -n[-1] 0,1 -d
+  -*[0,1] [-1] -negative[-1] -*[2,3] [-1] -rm[-1] -+[0,2] -+[1,2] -fftshift
+  -ifft  -k[0]
 
 #@gmic denoise_fft : _threshold
 #@gmic : Illustrate the thresholding of Fourier coefficients
 #@gmic : $ 256,256 -f '128+128*sin(x+y)' --noise 50 --denoise_fft[-1] 70%
 denoise_fft : -skip ${1=1}
   -e[^-1] "Threshold Fourier coefficients with threshold "$1"."
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
     --l[-1] -tape -powerspectrum -threshold $1 -fftshift -endl
     -fft[0] -*[0] [-1] -*[1] [-1] -rm[-1] -ifft -k[0]
     -n 0,255
@@ -835,12 +813,12 @@ denoise_fft : -skip ${1=1}
 #@gmic : $ image.jpg -f '.5*i*(1+.25*sin(x))' --unstrip
 unstrip : -skip ${1=25},${2=20},${3=4}
   -e[^-1] "Remove stripes"
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
   # create a mask
     --l[-1]
      -tape -powerspectrum -norm -detect_spots 1,$3 -dilate_circ $2 -gt 0
      -n 0,1 -negative -circle 50%,50%,$2,1,1
-     -if {im<.9} # check if some spots have been detected
+     -if {@{-1,im}<.9} # check if some spots have been detected
        active=1 -blur $1 -n 0,1 -fftshift -if {iM==0} -f 1 -endif
      -else
        active=0
@@ -858,7 +836,7 @@ unstrip : -skip ${1=25},${2=20},${3=4}
 #@gmic : $ image.jpg -autocorrelate
 autocorrelate :
   -e[^-1] "Compute autocorrelation"
-  -v - -repeat $! -l[$>] -fft -sqr -+ -sqrt -ifft -k[0] -fftshift -endl -done -v +
+  -v - -repeat @# -l[$>] -fft -sqr -+ -sqrt -ifft -k[0] -fftshift -endl -done -v +
 
 #@gmic spotify : _scale>0,_nb_iter>0,
 #@gmic : Make everything look like a spot
@@ -867,11 +845,11 @@ autocorrelate :
 #@gmic : $ image.jpg --spotify 1,20 -norm[-1] -gt[-1] 5% -blur 1 -*
 spotify : -check "${1=1}>0 && ${2=1}>0"
 -e[^-1] "Spotify with scale $1 with $2 iterations"
--v - -repeat $! -l[$>]
-  -if {0,im!=iM}
-    s={0,ia}
+-v - -repeat @# -l[$>]
+  -if {@{0,m}!=@{0,M}}
+    s=@{0,a}
     -repeat $2
-      -b $1 --b {2*$1} -- -max 0 -* '{0,$s/ia}'
+      -b $1 --b {2*$1} -- -max 0 -* '{$s/@{0,a}}'
     -done
   -endif
 -endl -done -v +
@@ -881,8 +859,8 @@ spotify : -check "${1=1}>0 && ${2=1}>0"
 #@gmic : $ image.jpg --f '10*x/w' -mapblur
 mapblur: -check "${1=10}>0"
 -e[^-1] "Blur images using a blur map (works using pairs of images)."
--v - -repeat {$!/2} -l[{2*$>},{2*$>+1}]
-  smin={1,im} smax={1,iM}
+-v - -repeat {@#/2} -l[{2*$>},{2*$>+1}]
+  smin=@{1,im} smax=@{1,iM}
   -l[0] -repeat $1 --blur[0] {$smin+$>*($smax-$smin)/($1)} -done -rm[0] -a z -endl
   -l[1] -tones $1 -gt 0 -blur 1 -a z -endl
   -* -s z -+
@@ -898,9 +876,9 @@ mapblur: -check "${1=10}>0"
 #@gmic : $ vessel.png --negative -vesselness[-1] 3
 vesselness : -skip ${1=1},${2=1},${3=1},${4=1}
 -e[^-1] "Tubeness with scale $1."
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
   -blur $1
-  -s c -repeat $! -l[$>]
+  -s c -repeat @# -l[$>]
     # Hessian eigen values sorted by absolute value
     -hessian -a c -eigen -k[0] --sign -abs[-2] -sort[-2] +,c -* --norm -a c
     -if {d>1}
@@ -917,7 +895,7 @@ vesselness : -skip ${1=1},${2=1},${3=1},${4=1}
 #@gmic : $ 100,100,100 -noise 1 -blur 1 --bgsubstract 10
 bgsubstract:  -check "${1=5}>0"
   -e[^-1] "Temporal background substraction with length $1."
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
     1,1,$1 -f[-1] 1 --erode[0] [1] --[0] [-1] -rm[1,-1]
   -endl -done -v +
 
@@ -927,12 +905,12 @@ bgsubstract:  -check "${1=5}>0"
 #@gmic : $ image.jpg --schizo 100,-50 --schizo[0] -50,100 -max 0
 schizo : -skip ${1=100},${2=-50},${3=5},${4=.75}
   -e[^-1] "Schizo filter smoothing with // $1 and T $2 and $3 iterations."
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
   [0]
   -repeat $3
    -l[-1]
-     --iee -*[-1] {$1/(0.0001+max(abs(im),abs(iM)))}
-     --inn[0] -*[-1] {$2/(0.0001+max(abs(im),abs(iM)))}
+     --iee -*[-1] {$1/(0.0001+max(abs(@{-1,m}),abs(@{-1,M})))}
+     --inn[0] -*[-1] {$2/(0.0001+max(abs(@{-1,m}),abs(@{-1,M})))}
      -+
    -endl
    -*[-1] $4  --*[0] {1-$4} -+[-1,-2]
@@ -943,7 +921,7 @@ schizo : -skip ${1=100},${2=-50},${3=5},${4=.75}
 #@gmic : improve scanned document
 #@gmic : $ image.jpg -scandoc
 scandoc: -skip ${1=3},${2=100},${3=10%},${4=90%}
-  -v - -repeat $! -l[$>] -split_opacity -l[0]
+  -v - -repeat @# -l[$>] -split_opacity -l[0]
     -median $1 --blur $2 -- -min 0
     -s c -n 0,1 -a c -c $3,$4 -n 0,255
   -endl -a c -endl -done -v +
@@ -953,11 +931,11 @@ scandoc: -skip ${1=3},${2=100},${3=10%},${4=90%}
 #@gmic : $ image.jpg 3,1,1,1,1 -diagonal[-1] -noise[-1] .1 --warp_affine[0] [1]
 warp_affine :
   -e[^-1] "Warp image using affine transform defined by 3x3 image ["$1"]"
-  -v - -pass$1 0 -repeat {$!-1} -l[$>,-1]
-    params=({1,i(0,0)},{1,i(1,0)},{1,i(2,0)};\
-           {1,i(0,1)},{1,i(1,1)},{1,i(2,1)};\
-           {1,i(0,2)},{1,i(1,2)},{1,i(2,2)})
-    {0,w},{0,h},1,1,1 --f[-1] x --f[-1] y -a[-3--1] c
+  -v - -pass$1 0 -repeat {@#-1} -l[$>,-1]
+    params=(@{1,i(0,0)},@{1,i(1,0)},@{1,i(2,0)};\
+           @{1,i(0,1)},@{1,i(1,1)},@{1,i(2,1)};\
+           @{1,i(0,2)},@{1,i(1,2)},@{1,i(2,2)})
+    @{0,w},@{0,h},1,1,1 --f[-1] x --f[-1] y -a[-3--1] c
     -mix_channels[-1] $params
     -channels[-1] 1,2
     -warp[0] [-1],0,2,0 -rm[-1]
@@ -968,7 +946,7 @@ warp_affine :
 #@gmic : $  (1,1,1,1;1,2,1,2;1,1,2,2) (-1,1,0;-2,0,1) -mmul[1] [0] -solve_least_square[0] [1]
 solve_least_square:
   -e[^-1] "Solves least square"
-  -v - -pass$1 0 -repeat {$!-1} -l[$>,-1]
+  -v - -pass$1 0 -repeat {@#-1} -l[$>,-1]
     --transpose --mmul[0,2] --mmul[0,3]
     -k[-1,-2] -invert[0] -mmul -transpose
   -endl -done -v +
@@ -980,44 +958,44 @@ calibrate_affine_transform :
 -e[] "- Use mouse button 2 to remove points in the list"
 -e[] "- Press Space to re-init the list of points"
 -e[] "- Close the window to finish\n"
--v - -pass$1 0 -repeat {$!-1} -l[$>,-1] -reverse
+-v - -pass$1 0 -repeat {@#-1} -l[$>,-1] -reverse
  0 0 (1,0,0;0,1,0;0,0,1) Z=0
   -do
-    x1={*1,x} y1={*1,y}
-    x2={*2,x} y2={*2,y}
+    x1=@{!1,x} y1=@{!1,y}
+    x2=@{!2,x} y2=@{!2,y}
     -if {$x1>=0}
-      -if {{*1,b}&1} # if button 1 on window 1: add pts
-        (1;{$x1/{*1,w}*{0,w}};{$y1/{*1,h}*{0,h}})
-	-if {2,h>1} -a[2,-1] x -else -rm[2] -mv[-1] 2 -endif
+      -if {@{!1,b}&1} # if button 1 on window 1: add pts
+        (1;{$x1/@{!1,w}*@{0,w}};{$y1/@{!1,h}*@{0,h}})
+	-if {@{2,h}>1} -a[2,-1] x -else -rm[2] -mv[-1] 2 -endif
       -else
-        -if {{*1,b}&2} # if button 2 on window 1: rm pts
-	  -if {2,w>1} -columns[2] 0,{2,w-2} -else -rm[2] 0 -mv[-1] 2 -endif
+        -if {@{!1,b}&2} # if button 2 on window 1: rm pts
+	  -if {@{2,w}>1} -columns[2] 0,@{2,w-2} -else -rm[2] 0 -mv[-1] 2 -endif
         -endif
       -endif
     -endif
     -if {$x2>=0}
-      -if {{*2,b}&1}  # if button 1 on window 2: add pts
-        (1;{$x2/{*2,w}*{1,w}};{$y2/{*2,h}*{1,h}})
-	-if {3,h>1} -a[3,-1] x -else -rm[3] -mv[-1] 3 -endif
+      -if {@{!2,b}&1}  # if button 1 on window 2: add pts
+        (1;{$x2/@{!2,w}*@{1,w}};{$y2/@{!2,h}*@{1,h}})
+	-if {@{3,h}>1} -a[3,-1] x -else -rm[3] -mv[-1] 3 -endif
       -else
-        -if {@{*2,b}&2} # if button 2 on window 2: rm pts
-          -if {3,w>1} -columns[3] 0,{3,w-2} -else -rm[3] 0 -mv[-1] 3 -endif
+        -if {@{!2,b}&2} # if button 2 on window 2: rm pts
+          -if {@{3,w}>1} -columns[3] 0,@{3,w-2} -else -rm[3] 0 -mv[-1] 3 -endif
         -endif
       -endif
     -endif
     # if space bar is pressed : reinitialize
-    -if {@{*0,SPACE}" || "@{*1,SPACE}" || "@{*2,SPACE}} -rm[2,3,4] 0 0 (1,0,0;0,1,0;0,0,1) -endif
-    -if {*1,o} Z={max(0,min({0,d}-1,$Z+{*1,o}))} -wait -1 -endif
-    -if {*2,o} Z={max(0,min({0,d}-1,$Z+{*2,o}))} -wait -1 -endif
-    -if {*3,o} Z={max(0,min({0,d}-1,$Z+{*3,o}))} -wait -1 -endif
+    -if {@{!0,SPACE}" || "@{!1,SPACE}" || "@{!2,SPACE}} -rm[2,3,4] 0 0 (1,0,0;0,1,0;0,0,1) -endif
+    -if @{!1,o} Z={max(0,min(@{0,d}-1,$Z+@{!1,o}))} -wait -1 -endif
+    -if @{!2,o} Z={max(0,min(@{0,d}-1,$Z+@{!2,o}))} -wait -1 -endif
+    -if @{!3,o} Z={max(0,min(@{0,d}-1,$Z+@{!3,o}))} -wait -1 -endif
     # number of paired points
-    N={min({2,w},{3,w})}
+    N={min(@{2,w},@{3,w})}
     # if each list has at least one pts
-    -if {{2,h}>1" && "{3,h}>1}
+    -if {@{2,h}>1" && "@{3,h}>1}
       -if {$N<=3} # translation
         -rm[4] --l[2,3]
           -rows 1,2 -columns 0,{$N-1} -- -s x -+ -/ $N
-    	  (1,0,0;{-i(0,0)},1,0;{-i(0,1)},0,1) -rm[-2]
+    	  (1,0,0;{-@{-1,i(0,0)}},1,0;{-@{-1,i(0,1)}},0,1) -rm[-2]
         -endl
       -else # affine
         -rm[4] --l[2,3] -columns 0,{$N-1} -solve_least_square[0] [1] -rm[1] -endl
@@ -1025,32 +1003,32 @@ calibrate_affine_transform :
     -endif
     # Display first image
     --l[0,2]
-      -if {{0,d}>1} -slices[0] $Z -endif
+      -if {@{0,d}>1} -slices[0] $Z -endif
       -r[0] 200%,200%,1,1,5
       -r[0] 100%,100%,1,3,0 -grid[0] 10%,10%,0,0,.3,0xCCCCCCCC,255,128,32
-      -if {1,h>1} -rows[1] 1,2  -*[1] 2
-      1,5,1,1,2,1,255,0,0 -r[-1] {0,w},100%,1,1,1  -circles[0] [1]
-      -labels[0] [1] -endif -w1[0] -1,-1,-1,-1,"First image (n="{1,w}")" -rm
+      -if {@{1,h}>1} -rows[1] 1,2  -*[1] 2
+      1,5,1,1,2,1,255,0,0 -r[-1] @{0,w},100%,1,1,1  -circles[0] [1]
+      -labels[0] [1] -endif -w1[0] -1,-1,-1,-1,"First image (n="@{1,w}")" -rm
     -endl
     # Display second image
     --l[1,3]
-      -if {{0,d}>1} -slices[0] $Z -endif
+      -if {@{0,d}>1} -slices[0] $Z -endif
       -r[0] 200%,200%,1,1,5
       -r[0] 100%,100%,1,3,0  -shift[0] 0,0,0,1 -grid[0] 10%,10%,0,0,.3,0xCCCCCCCC,255,128,32
-      -if {1,h>1} -rows[1] 1,2 -*[1] 2
-      1,5,1,1,2,1,255,0,0 -r[-1] {0,w},100%,1,1,1  -circles[0] [1]
-      -labels[0] [1] -endif -w2[0] -1,-1,-1,-1,"Second image (n="{1,w}")" -rm
+      -if {@{1,h}>1} -rows[1] 1,2 -*[1] 2
+      1,5,1,1,2,1,255,0,0 -r[-1] @{0,w},100%,1,1,1  -circles[0] [1]
+      -labels[0] [1] -endif -w2[0] -1,-1,-1,-1,"Second image (n="@{1,w}")" -rm
     -endl
     # warp image 1 and display merge
     --l[0,1,4]
-      -if {{0,d}>1} -slices[0,1] $Z -endif
+      -if {@{0,d}>1} -slices[0,1] $Z -endif
       -warp_affine[1] [2] -rm[2] -a c
       -r[0] 200%,200%,1,100%,5
       -grid[0] 10%,10%,0,0,.3,0xCCCCCCCC,255,128,32
       -w3 -1,-1,-1,-1,"merge "$N" Z="$Z -rm
     -endl
   -wait
-  -while {{*1}" && "!{*1,Q}" && "!{*1,ESC}" && "{*2}}
+  -while {@{!1}" && "!@{!1,Q}" && "!@{!1,ESC}" && "@{!2}}
   -w1[] 0 -w2[] 0 -w3[] 0
   -k[-1]
 -endl -done -v +
@@ -1061,7 +1039,7 @@ calibrate_affine_transform :
 #@gmic : $ 100,100,10 -noise 1 -blur 1 --vobs
 vobs : -check "${1=1}>0 && ${2=3}>0"
   -e[^-1] "Motion quantity with scale $1"
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
     -gradient -a[0,1] c -norm[0] -abs[1] -*[1] [0] -sqr[0] -blur $1,1,1 -reverse -max[1] 5% -/
   -endl -done -v +
 
@@ -1069,10 +1047,10 @@ vobs : -check "${1=1}>0 && ${2=3}>0"
 #@gmic : Display local diffusion coefficient
 #@gmic : $ 200,100 -noise .7,2 -blur 2,1,1 -repeat 20 --l[-1] --laplacian -*[-1] .05 -+ -endl -done  -a z -display_vobs
 display_vobs :
-  --vobs 1 A={round(im,0.001)} B={round(iM,0.001)} -*[-1] '{128/max(im,iM)}' -+[-1] 128  -map[-1] 5
+  --vobs 1 A={round(@{-1,im},0.001)} B={round(@{-1,iM},0.001)} -*[-1] '{128/max(im,iM)}' -+[-1] 128  -map[-1] 5
   -resize[0] 100%,100%,100%,3,1 -apply_gamma[0] 1.5 -n[0] 0,255
   -l[0] -s z -frame 5,12,64 -shift 0,5,0,0,2 -text "Original sequence",5,0,13,1,255 -a z -endl
-  -l[1] -s z -repeat $! -l[$>] 1,100% -f[-1] 'h-y' -n 0,255  -map[-1] 5 -resize[-1] 5,{0,h},1,3,5 -frame[-1] 3,0,64  -resize[-1] 100%,{0,h},1,3,5 -a x
+  -l[1] -s z -repeat @# -l[$>] 1,100% -f[-1] 'h-y' -n 0,255  -map[-1] 5 -resize[-1] 5,@{0,h},1,3,5 -frame[-1] 3,0,64  -resize[-1] 100%,@{0,h},1,3,5 -a x
   -frame 5,12,64 -shift 0,5,0,0,2
   -text "Vobs ["$A":"$B"]",5,0,13,1,255 -endl -done -a z -endl
   -a x
@@ -1082,8 +1060,8 @@ display_vobs :
 #@gmic : $ image.jpg -luminance -display_pseudocolor
 display_pseudocolor : -skip ${1=5}
   -e[^-1] "Display an indexed image in pseudocolors using map "$1
-  -v - -repeat $! -l[$>]
-    A={round(im,0.0001)} B={round(iM,0.0001)}
+  -v - -repeat @# -l[$>]
+    A={round(@{-1,im},0.0001)} B={round(@{-1,iM},0.0001)}
     -n[-1] 0,255 -map[-1] $1
     -rectangle {w-50-5},{h/4-5},{w-5},{h-h/4+5},.5,0,0,0
     -add_colorbar[-1] {w-50},{h/4},{w-40},{h-h/4},$A,$B,6,255
@@ -1092,7 +1070,7 @@ display_pseudocolor : -skip ${1=5}
 #@gmic display_colordepth : _dz
 display_colordepth :
   -e[^-1] "display the 3D image with a depth color coded."
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
     H={d*$1} -colordepth , -a z -min {ia+10*sqrt(iv)} -n 0,255 -s z
     -rectangle {w-50-5},{h/4-5},{w-5},{h-h/4+5},.5,0,0,0
     -add_colorbar[-1] {w-50},{h/4},{w-40},{h-h/4},0,$H,6,255
@@ -1102,9 +1080,9 @@ display_colordepth :
 #@gmic : Map a grascale image to a RGB with maw in red and min in blue
 #@gmic : This help to check if images are saturated
 map_hilo:
--v - -repeat $! -l[$>]
-  -round m={0,im} -- $m
-  1,1,1,3,0,0,{0,iM} {0,iM-1},1,1,3,'x+1' 1,1,1,3,{0,iM},0,0 -a[1,2,3] x
+-v - -repeat @# -l[$>]
+  -round m=@{0,im} -- $m
+  1,1,1,3,0,0,@{0,iM} {@{0,iM}-1},1,1,3,'x+1' 1,1,1,3,@{0,iM},0,0 -a[1,2,3] x
   -map[0] [1]
   -+ $m -rm[1]
 -endl -done -v +
@@ -1114,7 +1092,7 @@ map_hilo:
 #@gmic : $ image.jpg -luminance -map 5 -add_colorbar {w-40},20,{w-30},{h-20},0,255,6,255,5
 add_colorbar : -skip ${5=0},${6=255},${7=6},${8=255},${9=""},${10=5}
   -e[^-1] "Add a colorbar"
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
     {$3-$1},{$4-$2} -l[-1] -f 'h-y' -n 0,255 -map $10 -endl
     -frame[1] 1,1,$8 -image[0] [1],$1,$2,0,0,1 -k[0]
     -repeat $7
@@ -1128,16 +1106,16 @@ add_colorbar : -skip ${5=0},${6=255},${7=6},${8=255},${9=""},${10=5}
 #@gmic : $ 100,100 -noise .7,2 -blur 2,1,1 -repeat 20 --l[-1] --laplacian -*[-1] .05 -+ -endl -done  -a z -local_diffusion_coefficient 2,.5
 local_diffusion_coefficient : -check "${1=2}>0 && ${2=.5}>=0"
 -e[^-1] "Local diffusion coefficient estimation using scale $1 and threshold $2"
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
    --l[0] -s z -laplacian -a z -endl           # Ixx+Iyy
    --l[0] -s z -gradient_norm -a z -sqr -endl  # ||Ix+Iy||^2
    -gradient[0] z,1                            # It
    -l[0,1] # try to compute It/Ixx+Iyy as stably as possible
-     R={1,ia+$2*sqrt(iv)}
+     R={@{1,ia}+$2*sqrt(@{1,v})}
      -a c -f 'b=i(x,y,z,0);a=i(x,y,z,1);if(abs(a)>abs(b),b/a,if(abs(b)>$R,1/(b/a),0))'
      -channels 0
    -endl
-   -*[0] [1] -blur $1,1,1 -max[1] {1,ia+$2*sqrt(iv)}  -/
+   -*[0] [1] -blur $1,1,1 -max[1] {@{1,ia}+$2*sqrt(@{1,v})}  -/
    -channels 0
 -v + -endl -done
 
@@ -1154,11 +1132,11 @@ ldc_residuals :
 #@gmic : Display local diffusion coefficient
 #@gmic : $ 200,100 -noise .7,2 -blur 2,1,1 -repeat 20 --l[-1] --laplacian -*[-1] .05 -+ -endl -done  -a z -display_ldc
 display_ldc :
---ldc 2,3 A={round(im,0.001)} B={round(iM,0.001)} -*[-1] '{128/max(im,iM)}' -+[-1] 128  -map[-1] 5
+--ldc 2,3 A={round(@{-1,im},0.001)} B={round(@{-1,iM},0.001)} -*[-1] '{128/max(im,iM)}' -+[-1] 128  -map[-1] 5
 -resize[0] 100%,100%,100%,3,1 -apply_gamma[0] 1.5 -n[0] 0,255
 -l[0] -s z -frame 5,12,64 -shift 0,5,0,0,2 -text "Original sequence",5,0,13,1,255 -a z -endl
--l[1] -s z -repeat $! -l[$>] 1,100% -f[-1] 'h-y' -n 0,255  -map[-1] 5 -resize[-1] 5,{0,h},1,3,5 -frame[-1] 3,0,64  -resize[-1]
-       100%,{0,h},1,3,5 -a x
+-l[1] -s z -repeat @# -l[$>] 1,100% -f[-1] 'h-y' -n 0,255  -map[-1] 5 -resize[-1] 5,@{0,h},1,3,5 -frame[-1] 3,0,64  -resize[-1]
+       100%,@{0,h},1,3,5 -a x
 -frame 5,12,64 -shift 0,5,0,0,2
 -text "Local diffusion coefficient ["$A":"$B"]",5,0,13,1,255 -endl -done -a z -endl
 -a x
@@ -1169,15 +1147,15 @@ display_ldc :
 print_psnr : -skip ${1=255}
 -e[^-1] "Compute PSNR with image 0 and print it on the other images."
 -v - --psnr $1
--repeat {$!-2} -text_outline[{$>+1}] "PSNR:"{round(i(0,$>+1),.01)}"dB",5,5,30,1 -done
+-repeat {@#-2} -text_outline[{$>+1}] "PSNR:"{round(@{-1,i(0,$>+1)},.01)}"dB",5,5,30,1 -done
 -rm[-1] -v +
 
 #@gmic noise_std
 #@gmic : Estimate the noise variance
-#@gmic : $ image.jpg -noise 10 sigma={round(${-noise_std},.1)} -text_outline "Noise std:"$sigma,5,5,30,1
+#@gmic : $ image.jpg -noise 10 sigma={round(@{-noise_std},.1)} -text_outline "Noise std:"$sigma,5,5,30,1
 noise_std :
 -e[^-1] "Compute noise std."
--v - --laplacian -if {{0,d}==1}  -u {${-mad[-1]}/sqrt(20.0)} -else -u {${-mad[-1]}/sqrt(42.0)} -endif -rm[-1]
+-v - --laplacian -if {@{0,d}==1}  -u {@{-mad[-1]}/sqrt(20.0)} -else -u {@{-mad[-1]}/sqrt(42.0)} -endif -rm[-1]
 -v +
 
 #@gmic pca
@@ -1185,12 +1163,12 @@ noise_std :
 #@gmic : $ image2.jpg --l -split_tiles 64,64 -y y -a x -pca -k[-1] -s x -r 8,8,1,1,-1 -n 0,255 -frame 1,1,255 -append_tiles , -r[-1] 400%,400% -frame 0,20 -title dictionary -endl
 pca :
 -e[^-1] "Principal component analysis"
--v - -repeat $! -l[$>]
-  n={w} -- 'ia' --transpose[-1] -**[-2,-1] -/ $n -eigen
+-v - -repeat @# -l[$>]
+  n=@{-1,w} -- 'ia' --transpose[-1] -**[-2,-1] -/ $n -eigen
 -endl -done -v +
 
 spca: -skip ${2=20}
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
   -repeat $2
     p={sqrt(h)}
     --l --pca -k[0,-1]  -reverse -transpose[0] --** -threshold[-1] $1,1 -rm[1] -transpose[0] -** -endl
@@ -1204,8 +1182,8 @@ spca: -skip ${2=20}
 #@gmic : http://en.wikipedia.org/wiki/Karhunen%E2%80%93Lo%C3%A8ve_theorem
 #@gmic : $ image2.jpg --noise 10 --denoise_karmuen_loeve[-1] 8 -print_psnr
 denoise_karmuen_loeve:
-  -v - -repeat $! -l[$>]
-    -split_tiles 64,64 oW={0,w} oH={0,h} oS={0,s}
+  -v - -repeat @# -l[$>]
+    -split_tiles 64,64 oW=@{0,w} oH=@{0,h} oS=@{0,s}
     -y y -a x --pca -k[0,-1] -reverse -crop[0] 0,$1
     -transpose[0] --** -rm[1] -transpose[0] -** -s x
     -resize $oW,$oH,1,$oS,-1 -append_tiles ,
@@ -1216,13 +1194,13 @@ denoise_karmuen_loeve:
 #@gmic : $ image.jpg --noise 10 --denoise_patch_dict[1] , -print_psnr
 denoise_patch_dict: -skip ${1=8},${2=8},${3=1.1},${4=1.1}
 -e[^-1] "Denoising using a dictionnary of "$1"x"$1" patches with "$2" shifts, threshold $3x(noise std) for components and $4x(std) for coefficients."
--v - -repeat $! -l[$>]
-  Sigma=${-noise_std[0]} # measure the noise level
+-v - -repeat @# -l[$>]
+  Sigma=@{-noise_std[0]} # measure the noise level
   # mirror to prevent side effect
   --crop 0,0,$1,100% -mirror[-1] x -reverse --crop[-1] {w-$1-1},0,100%,100% -mirror[-1] x -a x
   --crop 0,0,100%,$1 -mirror[-1] y -reverse --crop[-1] 0,{h-$1-1},100%,100% -mirror[-1] y -a y
   # resize the image to get integer nb of tiles (using mirrored version)
-  oW={0,w} oH={0,h} oS={0,s} nW={$1*round($oW/$1,1,1)} nH={$1*round($oH/$1,1,1)}
+  oW=@{0,w} oH=@{0,h} oS=@{0,s} nW={$1*round($oW/$1,1,1)} nH={$1*round($oH/$1,1,1)}
   --crop {2*$oW-$nW},0,100%,100% -mirror[-1] x -a x
   --crop 0,{2*$oH-$nH},100%,100% -mirror[-1] y -a y
   NtileX={round($nW/$1)}  NtileY={round($nH/$1)}
@@ -1231,12 +1209,12 @@ denoise_patch_dict: -skip ${1=8},${2=8},${3=1.1},${4=1.1}
     -repeat $2
       -if {$2>1} dx={round(?(0,$1))} dy={round(?(0,$1))} -else dx=0 dy=0 -endif
       --shift[0] $dx,$dy,0,0,2
-      -split_tiles[-1] $NtileX,$NtileY pW={1,w} pH={1,h} # split the image
+      -split_tiles[-1] $NtileX,$NtileY pW=@{1,w} pH=@{1,h} # split the image
     -done -rm[0]
-    -y y -a x n={w} -- 'ia' --transpose[-1] -**[-2,-1] -/ $n -eigen # PCA
+    -y y -a x n=@{-1,w} -- 'ia' --transpose[-1] -**[-2,-1] -/ $n -eigen # PCA
     # select components based on noise level
     -l[-2] -unroll x -sqrt -gt {$3*$Sigma} -f 'abs(i(x+1)-i(x))'
-    T={C} 4 -f[-1] $T T={i(0)} -endl
+    T=@{-1,C} 4 -f[-1] $T T=@{-1,i(0)} -endl
     -if {$T==0} T=100% -endif -k[-1] -columns 0,$T
   -endl
   # denoise the image using the dictionnary
@@ -1246,7 +1224,7 @@ denoise_patch_dict: -skip ${1=8},${2=8},${3=1.1},${4=1.1}
     -l[1,-1]
       -l[1] -split_tiles $NtileX,$NtileY -unroll y -a x -endl
       -transpose[0] --**                # project on the dictionnary
-      t=${-mad[-1]}                     # estimate variance of coefficients
+      t=@{-mad[-1]}                     # estimate variance of coefficients
       -f[-1] 'if(abs(i)<$4*$t,0,i)'     # threshold the coefficients
       -rm[1] -transpose[0] --** -rm[-2] # project back
     -endl
@@ -1262,7 +1240,7 @@ denoise_patch_dict: -skip ${1=8},${2=8},${3=1.1},${4=1.1}
 -endl -done -v +
 
 std_noise :
-  -v - --laplacian[-1] -u {${-mad[-1]}/sqrt(if(d==1,20,42))} -rm[-1] -v +
+  -v - --laplacian[-1] -u {@{-mad[-1]}/sqrt(if(d==1,20,42))} -rm[-1] -v +
 
 #@gmic iuwt : _nlevels>2,_spline>1
 #@gmic : Compute the "isotropic undecimated wavelet transform" using
@@ -1272,7 +1250,7 @@ std_noise :
 #@gmic : $ image.jpg -iuwt 3,1 -+
 iuwt: -skip ${1=3},${2=3}
   -e[^-1] "Compute isotropic undecimated wavelet transform"
-  -v - -repeat $! -l[$<]
+  -v - -repeat @# -l[$<]
   # Compute the Spline filter by succesive convolutions
   50
   -l[-1]
@@ -1297,11 +1275,11 @@ iuwt: -skip ${1=3},${2=3}
 #@gmic : Compute noise at each level of the iuwt
 #@gmic : $ image.jpg -iuwt_std 10,10
 iuwt_std:
- -v - -repeat $! -l[$>]
-   sigma=${-noise_std}
+ -v - -repeat @# -l[$>]
+   sigma=@{-noise_std}
    -if 1 # experimental measure
      -f 1 -noise $sigma -iuwt $1,$2
-     -repeat $! -l[$>]
+     -repeat @# -l[$>]
         x={sqrt(iv)} -rm 1 -f $x
      -endl -done -a x
    -else -rm # try a theoritical formula (failed)
@@ -1312,7 +1290,7 @@ iuwt_std:
    -k[-1] -autocrop 0 -/ {ia*w}
    -endl
    -sqr
-   alpha={is} -rm
+   alpha=@{-1,+} -rm
    $1,1,1,1,'$sigma*sqrt((1+$alpha)*$alpha^(w-x-1))'
    -endif
  -endl -done -v +
@@ -1323,12 +1301,12 @@ iuwt_std:
 #@gmic : $ image.jpg --noise 10 --denoise_iuwt[-1] , -print_psnr
 denoise_iuwt: -check "${1=1.4}>0&&${2=4}>1&&${3=1}>0"
   -e[^-1] "Denoise using the isotropic undecimated B"$3" spline wavelet transform"
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
     # Compute noise std at each level
     --iuwt_std[0] $2,$3 -reverse
     # compute the wavelet coefficient and threshold them
     -iuwt[-1] $2,$3
-    -repeat {$!-2} -threshold[{$>+2}] {0,$1*i($>+1)},1 -done
+    -repeat {@#-2} -threshold[{$>+2}] {$1*@{0,i($>+1)}},1 -done
     # reconstruct
     -+[1--1]
     -rm[0]
@@ -1336,13 +1314,13 @@ denoise_iuwt: -check "${1=1.4}>0&&${2=4}>1&&${3=1}>0"
 
 #@gmic noise_poisson_gaussian : gain,offset,noise_std
 camera_noise:
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
  -noise 0,3 -* $1 -+ $2 -noise $3
 -endl -done -v +
 
 #@gmic analyze_camera_noise :
 analyze_camera_noise:
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
  --local_noise_variance $1 -blur[0] $1 -y -a c
  -display_parametric 800,600,.0,1,1,0,signal,noise
 -endl -done -v +
@@ -1367,21 +1345,21 @@ contour2d: -skip ${1=.1}
 #@gmic : $ 256,128 -text "GMIC",40,10,100,1,255 -blur 1 -noise 20 --segment_snake , -contour2d[-1] , -resize[-1] 100%,100%,1,3,0 -n 0,255 -blend add
 segment_snake: -skip ${1=100},${2=1},${3=.1},${4=.1},${5=10},${6=0}
 -e[^-1] "Segment the image using active contours without edges using $1 iterations and time step $2, smoothness $3 and initialize with threshold of $4."
--v - -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
   -if {s>1} -luminance -endif
   --blur $5 -gt[-1] {ia+$4*sqrt(iv)}                                # initialization
   -l[-1] --distance 0 -negative[0] -distance[0] 0 -*[0] -1 -+ -endl # levelset
   -repeat $1
     # compute mean and variance of the two regions (original version is with mean only)
     # the molified step function is given by a blur of the sharp step function
-    --lt[-1] 0 -blur[-1] 1 --*[0,-1] swx={ia} sw={-2,ia} M1={$swx/$sw}
-    -sqr[-1] swx2={ia}  S1={max(1e-3,$swx2/$sw^2-$M1^2)} -rm[-1,-2]
-    --gt[-1] 0 -blur[-1] 1 --*[0,-1] swx={ia} sw={-2,ia} M2={$swx/$sw}
-    -sqr[-1] swx2={ia}  S2={max(1e-3,$swx2/$sw^2-$M2^2)} -rm[-1,-2]
+    --lt[-1] 0 -blur[-1] 1 --*[0,-1] swx=@{-1,ia} sw=@{-2,ia} M1={$swx/$sw}
+    -sqr[-1] swx2=@{-1,ia}  S1={max(1e-3,$swx2/$sw^2-$M1^2)} -rm[-1,-2]
+    --gt[-1] 0 -blur[-1] 1 --*[0,-1] swx=@{-1,ia} sw=@{-2,ia} M2={$swx/$sw}
+    -sqr[-1] swx2=@{-1,ia}  S2={max(1e-3,$swx2/$sw^2-$M2^2)} -rm[-1,-2]
     --iee[-1]                                                     # regularization
     --f[0] '(1.0/$3)*(((i(x,y)-$M1)^2)/$S1-((i(x,y)-$M2)^2)/$S2)' # data term
     -+[-2,-1]
-    -*[-1] {$2/(0.0001+max(abs(im),abs(iM)))}           # adaptive time step
+    -*[-1] {$2/(0.0001+max(abs(@{-1,m}),abs(@{-1,M})))}           # adaptive time step
     -+[-2,-1]
     -if {$6==1} # if display
     --l -gt[1] 0 -contour2d[1] , -n 0,1 -a c -text $>,0,0,13,1,{iM} -w -wait 10  -rm -endl
@@ -1397,8 +1375,8 @@ segment_snake: -skip ${1=100},${2=1},${3=.1},${4=.1},${5=10},${6=0}
 #@gmic : $ 256,256 -noise .05,2 -blur 10,1,1 -min 80% -noise 5% --segment_cells 2,10% -contour2d[-1] , -resize[-1] 100%,100%,1,3,0 -n 0,255 -blend add
 segment_cells: -skip ${1=3},${2=10},${3=1},${4=3}
   -e[^-1] "Cell segmentation using difference of Gaussians and watershed"
-  -v - -repeat $! -l[$>]
-    -blur $1 --blur $2 -- --gt {ia+$3*${-mad}} -area_fg 0 -gt $4 --distance[1] 0
+  -v - -repeat @# -l[$>]
+    -blur $1 --blur $2 -- --gt {ia+$3*@{-mad}} -area_fg 0 -gt $4 --distance[1] 0
     -max_patch[0] {round($4,1,1)} -*[0] [1] -label[0] 0 -watershed[0] [2] -rm[-1] -*
   -endl -done -v +
 
@@ -1417,8 +1395,8 @@ _challenge:
 #@gmic : $ 64,64 -periodic_dots 3,6,.1 -repeat 34 -i [0] -done -append_tiles
 periodic_dots : -skip ${1=6},${2=4},${3=.5}
 -e[^-1] "Generate a periodic dot pattern with "$1" angles, scale "$2", and orientation "$3"."
--v - -repeat $! -l[$>]
- -s c -repeat $! -l[$>]
+-v - -repeat @# -l[$>]
+ -s c -repeat @# -l[$>]
  --resize {max(w,h)},{max(w,h)},100%,100%,0
  -l[-1]
  -f 0
@@ -1441,7 +1419,7 @@ periodic_dots : -skip ${1=6},${2=4},${3=.5}
 #@gmic : http://www.dna.caltech.edu/courses/cs191/paperscs191/turing.pdf
 #@gmic : http://eprints.maths.ox.ac.uk/430/1/102.pdf
 turing_pattern: -skip ${1=2000},${2=.1},${3=0.899},${4=-0.91},${5=2},${6=.1},${7=.5},${8=0}
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
     -r 100%,100%,100%,2 -f 0 -noise 1 -blur 1 -n 0,1
     -repeat $1
       -progress {$>/$1*100}
@@ -1470,10 +1448,10 @@ rays :
 #@gmic : $ 400,300 -fractional_brownian_motion
 fractional_brownian_motion : -skip ${1=.5},${2=1} -check "$1>=0&&$1<=1" -check "$2>0"
   -e[^-1] "Generate pseudo fractional brownian motion"
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
     -f 0 -noise 1
     -fft -fftshift
-    -if {{0,d}==1}
+    -if {@{0,d}==1}
       -f 'rx=x-w/2;ry=y-h/2;i*($2+sqrt(rx*rx+ry*ry))^(-2*$1-1)'
     -else
       -f 'rx=x-w/2;ry=y-h/2;rz=z-d/2;i*($2+sqrt(rx*rx+ry*ry+rz*rz))^(-2*$1-1)'
@@ -1487,7 +1465,7 @@ fractional_brownian_motion : -skip ${1=.5},${2=1} -check "$1>=0&&$1<=1" -check "
 #@gmic : $ 64,64 -repeat 3 --clouds {10+20*$>}% -done -rm[0]
 clouds : -skip ${1=50%},${2=1},${3=.5},${4=1}
   -e[^-1] "Generate a cloud"
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
     -channels 0
     -fractional_brownian_motion $3,$4 -negative -min $1 -negative -resize 100%,100%,1,4
     -n 0,255 -s c -n[0-2] 190,255  -n[3] 0,255 -a c
@@ -1498,7 +1476,7 @@ clouds : -skip ${1=50%},${2=1},${3=.5},${4=1}
 #@gmic : $ 400,300,1,3 -clearbluesky --clouds 50% -blend alpha
 clearbluesky :
   -e[^-1] "Generate a blue sky"
-  -v - -repeat $! -l[$>]
+  -v - -repeat @# -l[$>]
     1,2,1,3 -f[-1] '63,70,120,144,190,215' -resize[-1] [0],5 -k[-1]
   -endl -done -v +
 
@@ -1542,7 +1520,7 @@ wavelength_color:
   G=0
   B=0
 -endif
--repeat $! -l[$>]
+-repeat @# -l[$>]
 -mix_channels ($R;$G;$B)
 -endl -done
 
@@ -1768,8 +1746,8 @@ jeje_spotify_preview:
 #@gimp : sep = separator(), note = note(<b>Note:</b>Adjust the 3D view first and then enable render to compute the volume rendering.)
 #@gimp : sep = separator(), note = note("<small>Author : <i>J&#233;r&#244;me Boulanger</i>. Latest update: <i>2013/05/29</i>.</small>")
 jeje_render3d:
-  W={0,w}
-  1,2,1,4 -f[-1] $9,$13,$10,$14,$11,$15,$12,$16 -resize[-1] {0,w},{0,h},1,4,5
+  W=@{0,w}
+  1,2,1,4 -f[-1] $9,$13,$10,$14,$11,$15,$12,$16 -resize[-1] @{0,w},@{0,h},1,4,5
   -blend alpha
   -i $1 -a[1--1] z
   -l[-1]

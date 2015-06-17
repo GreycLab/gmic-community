@@ -52,24 +52,24 @@ Smoothness=$6
 Threads=$7
 Overlap=$8
 #Handle multiple layers
--repeat $! -l[$>]
+-repeat @# -l[$>]
 #Enter loop and smooth first image
 -repeat $Iterations
 	#Calculate width and height
-	IWidth={0,round(w/($<+1))}
-	IHeight={0,round(h/($<+1))}
+	IWidth={round(@{0,w}/(@{<,-1}+1))}
+	IHeight={round(@{0,h}/(@{<,-1}+1))}
 	#Resize previously processed image. Not done on first repeat loop since there is no such image yet.
-	-if {$>!=0}
+	-if {@{>,-1}!=0}
 		#Resize [image_w],[image_h],[image_d],[image_s],_interpolation,_boundary,_ax,_ay,_az,_ac
 		-r[-1] $IWidth,$IHeight,1,3,5,1
 	-endif
 	#Resize and make a copy
 	--r[0] $IWidth,$IHeight,1,3,5,1 #Image 1 and on loop 2 image 2 / -1 and -2
 	#Smoothing
-	-gimp_anisotropic_smoothing[-1] {430/$Iterations*($<+1)},0.4,0.5,0.6,2,0.8,30,2,0,0,1,0,$Threads,$Overlap,0
-	-gimp_anisotropic_smoothing[-1] {600/$Iterations*($<+1)},0.4,1,0.6,4,0.8,15,5,0,1,1,0,$Threads,$Overlap,0
+	-gimp_anisotropic_smoothing[-1] {430/$Iterations*(@{<,-1}+1)},0.4,0.5,0.6,2,0.8,30,2,0,0,1,0,$Threads,$Overlap,0
+	-gimp_anisotropic_smoothing[-1] {600/$Iterations*(@{<,-1}+1)},0.4,1,0.6,4,0.8,15,5,0,1,1,0,$Threads,$Overlap,0
 	#Combine images	if not first round
-	-if {$>!=0}
+	-if {@{>,-1}!=0}
 		#Something wrong with this boolean. It does not work.
 #		-if {_mode{$MergingOption+1}'!='{'"edges"'}}
 		-if {$3'!='42}
@@ -469,7 +469,7 @@ pSmoothness={10*$pAbstraction}
 #y=y0+(x-x0)(y1-y0)/(x1-x0)
 #Smoothness Y goes to 10 from 0 when abstraction X goes to 1 from 10
 eSmoothness={10+($pAbstraction-1)*(1-10)/(10-1)}
-ePrimaryRadius={0,($pAbstraction/5)*($pAbstraction/5)*sqrt(h)}
+ePrimaryRadius={($pAbstraction/5)*($pAbstraction/5)*sqrt(@{0,h})}
 eSecondaryRadius={$EllipseRatio/100*$ePrimaryRadius}
 cAbstraction={2+($pAbstraction-1)*(10-2)/(10-1)}
 #CubeSize={$ePrimaryRadius*$cAbstraction/30}
@@ -750,7 +750,7 @@ CutLow=$11
 -apply_gamma $Gamma
 #Check if image has pixelvalues over 255
 #Correct only for gamma if not
--if {0,iM>256}
+-if {@{0,M}>256}
 	-if $Equalize
 		--equalize 65535
 		-blend alpha,{$Equalize/2}
@@ -795,11 +795,11 @@ CutLow=$11
 	#Cut 0,255 for Gimp
 	-cut 0,255
 	-if {$ProcessTo==1}
-			--display_histogram {0,w},{0,h},255,0,254,0
+			--display_histogram @{0,w},@{0,h},255,0,254,0
 			-blend lighten,0.7
 	-endif
 	-if {$ProcessTo==2}
-			--display_histogram {0,w},{0,h},255,0,254,0,log(1+i)-1
+			--display_histogram @{0,w},@{0,h},255,0,254,0,log(1+i)-1
 			-blend lighten,0.7
 	-endif
 -endif
@@ -870,7 +870,7 @@ Levels=$1
 #there fore Li=L-i*D
 -repeat {$Levels-1}
 	#Multiply D level with loop index+1
-	--mul[2] {$>+1}
+	--mul[2] {@{>,0}+1}
 	#Subtract i*D from L
 	--sub[1] [-1]
 	-remove[-2]
@@ -881,7 +881,7 @@ Levels=$1
 #Ligter levels are created by subtracting L repeatedly from D
 -repeat {$Levels-1}
 	#Multiply L with loop index + 1
-	--mul[1] {$>+1}
+	--mul[1] {@{>,0}+1}
 	#Subtract i*L from D
 	--sub[2] [-1]
 	-remove[-2]
@@ -914,12 +914,12 @@ Levels=$1
 reduce_overlap :
 Levels=$1
 -repeat {$Levels-1}
-	-sub[{2+$>}] [{3+$>}]
-	-cut[{2+$>}] 0,255
+	-sub[{2+@{>,-1}}] [{3+@{>,-1}}]
+	-cut[{2+@{>,-1}}] 0,255
 -done
 -repeat {$Levels-1}
-	-sub[{-$Levels+$>}] [{-$Levels+$>+1}]
-	-cut[{-$Levels+$>}] 0,255
+	-sub[{-$Levels+@{>,-1}}] [{-$Levels+@{>,-1}+1}]
+	-cut[{-$Levels+@{>,-1}}] 0,255
 -done
 #subtract brights and lights from midtones
 -sub[1] [{-$Levels-1}]
@@ -958,18 +958,18 @@ KeepText=$5
 	-reduce_overlap $Levels
 -endif
 
--repeat {$!-1}
+-repeat {@#-1}
 	#add 1 to alpha  and cut 0,225 to avoid cutting of colour channels
 	#no idea why this is necessary, it yields correct results
 	#Ma and ma are already 0 and even though 1 is added the output is still
 	#0 for transparent areas of the mask.
-	-add[{$>+1}] 1
-	-cut[$>] 0,255
+	-add[{@{>,-1}+1}] 1
+	-cut[@{>,-1}] 0,255
 -done
 
 #Combine with original
 -if $AlphaOutput
--repeat {$!-1}
+-repeat {@#-1}
 	--append[0,1] c
 	-remove[1]
 -done
@@ -1070,7 +1070,7 @@ Sub_Exposure_Bias :
 #Sub, Pyramid blurring
 Sub_BlurPyramid :
 #Calculate size
-size={0,min(w,h)}
+size={min(@{0,w},@{0,h})}
 levels={round(log($size)/log(5))}
 Deviation=1
 
@@ -1084,7 +1084,7 @@ Deviation=1
 #Scale up and blend
 blndalpha=0.5
 -repeat {$levels-1}
-	index={-($<+1)} #Image index to blend, start at next step of pyramid and progress to smaller iteratins
+	index={-1*(@{<,0}+1)} #Image index to blend, start at next step of pyramid and progress to smaller iteratins
 	-resize[$index] [0],5,1
 	-blend[0,$index] alpha,$blndalpha,0
 	blndalpha={$blndalpha/2} #Reduce opacity of blending by factor of 2 on each iteration
@@ -1170,7 +1170,7 @@ PostGamma=$12 #Gamma correction
 OptimizedResult=$13
 
 -if $OptimizedResult
-	OriginalWidth={0,w}
+	OriginalWidth=@{0,w}
 	#Resize to 1024 width (all in case a bottom layer is included
 	-resize2dx 1024
 	-gimp_selective_smoothing[-1] 5,0.5,5,1,0,0,24,0
@@ -1217,12 +1217,12 @@ OptimizedResult=$13
 -normalize[-1] 0,255
 --diffusiontensors[0] $Sharpness,$Anisotropy,0.6,1.1,0 #Create diffusion tensor field from original.
 -rotation3d 0,0,1,{$fi} #It seems this creates a new image "a rotation matrix" Subtract 45 because this gives sharp image at 0 degrees.
--mix_channels[-2] ({[0-2]};{[3-5]};{[6-8]}) #Channel mixer is used here with the rotation matrix
+-mix_channels[-2] (@{-1,0-2};@{-1,3-5};@{-1,6-8}) #Channel mixer is used here with the rotation matrix
 -rm[-1] #remove rotation matrix
 #Scale matrix, this was changed to static and
 #parameter used for diffusion tensor anisotropy
--mul[-1] {$SmScale/max(abs(iM),abs(im))}
--noise[-1] {$SmAccuracy*max(abs(iM),abs(im))}
+-mul[-1] {$SmScale/max(abs(@{-1,M}),abs(@{-1,m}))}
+-noise[-1] {$SmAccuracy*max(abs(@{-1,M}),abs(@{-1,m}))}
 -reverse[-1,-2]
 -smooth[-1] [-2],$Amplitude
 -keep[-1]
@@ -1251,8 +1251,8 @@ gimp_SmoothSketch_preview :
 sub_thumbnailabstraction :
 #To RGB
 -to_rgb[0]
-IWidth={0,w}
-IHeight={0,w}
+IWidth=@{0,w}
+IHeight=@{0,w}
 #FInd out which is larger and scale accordingly
 -if {$IWidth>=$IHeight}
 	ScaleByWidth=1
@@ -1287,8 +1287,8 @@ IHeight={0,w}
 -keep[-1]
 
 sub_colors_and_lines :
-image_width={0,w}
-image_height={0,h}
+image_width=@{0,w}
+image_height=@{0,h}
 -resize2dx 1024
 -luminance[0]
 -normalize 0,255
@@ -1326,12 +1326,12 @@ method=$1
 #@gimp : sep = separator(), note = note("<small> Author: Arto Huotari Latest update : <i>2012/10/07</i>.</small>")
 
 gimp_blockism:
-XSize={int($1/100*w)}
+XSize={int($1/100*@{-1,w})}
 -if {$XSize==0} XSize=1 -endif
 Ratio=$2
 Variance={int($3*$XSize)}
 Randomness=-1,1
-Repeats={int($4/100*max(w,h))}
+Repeats={int($4/100*max(@{-1,w},@{-1,h}))}
 Opacity=$5
 FlipTol=$6
 ReverseFlip=$7
@@ -1348,7 +1348,7 @@ MaxYSize={int($MaxXSize*$Ratio)}
 	-split[0] c
 -endif
 #Render blocks
--repeat $!
+-repeat @#
 	#Take copy of the last image in the stack for grey value checking
 	[-1]
 	-repeat $Repeats
@@ -1358,7 +1358,7 @@ MaxYSize={int($MaxXSize*$Ratio)}
 		#If the value is below threshold then invert width and length
 		#note that quick uses only Red channel to flip
 		-if {$ReverseFlip==0}
-			-if {i($X,$Y,0,0)>$FlipTol}
+			-if {@{-1,($X,$Y,0,0)}>$FlipTol}
 				#Calculcate block size. Interpolate linearly with random value
 				#Linear interpolation is
 				#y=ya+(yb-ya)(x-xa)/(xb-xa)
@@ -1370,17 +1370,17 @@ MaxYSize={int($MaxXSize*$Ratio)}
 				BW={int(abs($XSize+($MaxXSize-$XSize)*(?($Randomness))))}
 				BH={int(abs($YSize+($MaxYSize-$YSize)*(?($Randomness))))}
 			-endif
-			-if {i($X,$Y,0,0)<=$FlipTol}
+			-if {@{-1,($X,$Y,0,0)}<=$FlipTol}
 				BH={int(abs($XSize+($MaxXSize-$XSize)*(?($Randomness))))}
 				BW={int(abs($YSize+($MaxYSize-$YSize)*(?($Randomness))))}
 			-endif
 		-endif
 		-if {$ReverseFlip==1}
-			-if {i($X,$Y,0,0)<$FlipTol}
+			-if {@{-1,($X,$Y,0,0)}<$FlipTol}
 				BW={int(abs($XSize+($MaxXSize-$XSize)*(?($Randomness))))}
 				BH={int(abs($YSize+($MaxYSize-$YSize)*(?($Randomness))))}
 			-endif
-			-if {i($X,$Y,0,0)>=$FlipTol}
+			-if {@{-1,($X,$Y,0,0)}>=$FlipTol}
 				BH={int(abs($XSize+($MaxXSize-$XSize)*(?($Randomness))))}
 				BW={int(abs($YSize+($MaxYSize-$YSize)*(?($Randomness))))}
 			-endif
@@ -1391,7 +1391,7 @@ MaxYSize={int($MaxXSize*$Ratio)}
 		x1={int($x0+$BW)}
 		y1={int($y0+$BH)}
 		#Draw a rectangle with the gray of the block center value  of the L, A or B channel
-		-rectangle[-2] $x0,$y0,$x1,$y1,$Opacity,{i($X,$Y,0,0)},{i($X,$Y,0,1)},{i($X,$Y,0,2)},{i($X,$Y,0,3)}
+		-rectangle[-2] $x0,$y0,$x1,$y1,$Opacity,@{-1,($X,$Y,0,0)},@{-1,($X,$Y,0,1)},@{-1,($X,$Y,0,2)},@{-1,($X,$Y,0,3)
 	-done
 	-remove[-1]
 	-mv[-1] 0
@@ -1556,7 +1556,7 @@ P20=$21
 -if {$Choice==15} P1={25/255} P3={35/255} P5={40/255} -endif
 
 
-   -repeat $!
+   -repeat @#
     -l[-1] -split_opacity -rv -to_rgb[-1] -s[-1] c          # Isolate opacity
     -*[-3] $P1 -b[-3] $P2%                                    # Red contrast + smoothness
     -*[-2] $P3 -b[-2] $P4%                                    # Green contrast + smoothness
@@ -1821,7 +1821,7 @@ angle=$1
 	#200,200,1,2 200x200x1 px only two channels
 	-rotation3d 0,0,1,$angle #It seems this creates a new image "a rotation matrix"
 	-z[-1] 0,0,1,1 #This crops the rotation matrix, I do not know why
-	-mix_channels[-2] ({[0-1]};{[2-3]}) #Channel mixer is used here with the rotation matrix
+	-mix_channels[-2] (@{-1,0-1};@{-1,2-3}) #Channel mixer is used here with the rotation matrix
 	-rm[-1] #remove rotation matrix
 #End rotation code
 #Quiver takes only two channels in. It will give an error othervise
@@ -2000,10 +2000,10 @@ IsGood=0
 
 		#The actual flood is done by this
 		#-ellipse {100*$X/w}%,{100*$Y/h}%,{1},{1},{0},1,255,0,255
-		-flood[0] {100*$X/w}%,{100*$Y/h}%,0,$Tolerance,0,1,{0,i($X,$Y,0,0)},{0,i($X,$Y,0,1)},{0,i($X,$Y,0,2)},{0,i($X,$Y,0,3)} #Img0
+		-flood[0] {100*$X/w}%,{100*$Y/h}%,0,$Tolerance,0,1,@{0,($X,$Y,0,0)},@{0,($X,$Y,0,1)},@{0,($X,$Y,0,2)},@{0,($X,$Y,0,3)} #Img0
 
 		#Select the color that was flooded + others pixels of same color
-		--gimp_select_color[0] 0,1,0,{0,i($X,$Y,0,0)},{0,i($X,$Y,0,1)},{0,i($X,$Y,0,2)},{0,i($X,$Y,0,3)},0,0 #image2
+		--gimp_select_color[0] 0,1,0,@{0,($X,$Y,0,0)},@{0,($X,$Y,0,1)},@{0,($X,$Y,0,2)},@{0,($X,$Y,0,3)},0,0 #image2
 
 		-if {$ActivateCubism==1}
 			#Treat color with Cubism
@@ -2033,7 +2033,7 @@ IsGood=0
 				X=$Xnew
 				Y=$Ynew
 				#Check the alpha of new coord. If above threshold increase delta
-				-if {1,i($X,$Y,0,3)>$StepThreshold}
+				-if {@{1,($X,$Y,0,3)}>$StepThreshold}
 					#Increase delta if no suitable pixel could be found on previous step
 					#Delta is smaller of the previous
 					#Base step size + do while loop number #or# one tenth of maximum image dimension
@@ -2042,7 +2042,7 @@ IsGood=0
 
 				#Check the alpha of new coord,
 				#if below threshold exit do-while and flood
-				-if {1,i($X,$Y,0,3)<$StepThreshold}
+				-if {@{1,($X,$Y,0,3)}<$StepThreshold}
 					IsGood=10
 				-endif
 					#make sure that loop will be eventuall exited, run a max of 100 do-while loops
