@@ -424,7 +424,7 @@ smooth_moments: -check "${1=1}>0&${2=100}>0&${3=1}>0"
 -endl -done -v +
 
 #@gmic pointscoordinates
-#@gmic : Return the list of points in the image as 3*N columns vector
+#@gmic : Return the list of points in the image as 3xN or 2xN columns vector
 #@gmic : $ 100,100 -noise .1,2 --pointscoordinates
 pointscoordinates :
   -e[^-1] "return the list of points in the image"
@@ -444,7 +444,10 @@ circles: -skip ${2=3}
 -e[^-1] "Draw circles on the image."
 -v -  -pass$1 0 -repeat {@#-1} -l[$>,-1]
     -if {@{0,d}>1} # 3D case
-    -if {@{1,h}<4} -r[1] 100%,{5+@{0,s}},1,1,0 -l[1] -s y -f[3] $2 -f[4] 1 -f[5--1] 255 -a y -endl -endif
+    -if {@{1,h}<4}
+      -r[1] 100%,{5+@{0,s}},1,1,0
+      -l[1] -s y -f[3] $2 -f[4] 1 -f[5--1] 255 -a y -endl
+    -endif
     -repeat @{1,w}
       x=@{1,i($>,0)} y=@{1,i($>,1)} z=@{1,i($>,2)} r=@{1,i($>,3)} o=@{1,i($>,4)} i=$>
       -repeat @{0,s}
@@ -464,8 +467,7 @@ circles: -skip ${2=3}
       -done
      -done
     -endif
-   -rm[-1]
--endl -done -v +
+-endl -done -rm[-1] -v +
 
 #@gmic labels: [image]
 #@gmic : Draw labels on the image
@@ -505,26 +507,34 @@ labels:
    -rm[-1]
 -endl -done -v +
 
-#@gmic croparound : _size_xy,_size_z
-#@gmic : Crop image [0] around coordinates given by image [1]
-#@gmic : $ image.jpg 100%,100% -f[-1] 0 -noise[-1] .1,2  --pointscoordinates[-1] --croparound[0,-1] 5 -append_tiles[3--1] ,  -rm[-2] -dilate[1] 5 -*[1] 128 -blend[0,1] add
-croparound :  -skip ${1=10},${2=10}
-  -e[^-1] "crop image [0] around "@{1,w}" coordinates given by image [1]"
-  -v -
-  -repeat {@{1,w}}
-    -if {@{0,d}>1}
-      x=@{1,i($>,0)} y=@{1,i($>,1)} z=@{1,i($>,2)}
-      --crop[0] {$x-$1},{$y-$1},{$z-$2},{$x+$1},{$y+$1},{$z+$2}
-    -else
-      x=@{1,i($>,0)} y=@{1,i($>,1)}
-      --crop[0] {$x-$1},{$y-$1},{$x+$1},{$y+$1}
+#@gmic : croparound : [x,y,dx,dy] || [x,y,z,dx,dy,dz]
+#@gmic : Draw circles on an image
+#@gmic : $ 512,512,1,3 10,7 -noise[-1] 1 -n[-1] 0,512 -circles[0] [1] -k[0]
+croparound: -skip ${2=3},${3=3},${4=3}
+  -e[^-1] "Crop image at coordinates "
+  -v - -pass$1 0 -repeat {@#-1} -l[$>,-1]
+    -if {@{0,d}>1} # 3D case
+      -if {@{1,h}<6}
+        -r[1] 100%,6,1,1,0
+        -l[1] -s y -f[3] $2 -f[4] $3 -f[5] $4 -a y -endl
+       -endif
+      -repeat @{1,w}
+        x=@{1,i($>,0)} y=@{1,i($>,1)} z=@{1,i($>,2)} dx=@{1,i($>,3)} dy=@{1,i($>,4)} dz=@{1,i($>,5)} i=$>
+        --crop[0] {$x-$dx},{$y-$dy},{$z-$dz},{$x+$dx},{$y+$dy},{$z+$dz}
+        -done
+    -else # 2D case
+      -if {@{1,h}<4} -r[1] 100%,4,1,1,0 -l[1] -s y -f[2] $2 -f[3] $3 -a y -endl -endif
+      -repeat @{1,w}
+        x=@{1,i($>,0)} y=@{1,i($>,1)} dx=@{1,i($>,2)} dy=@{1,i($>,3)} i=$>
+        --crop[0] {$x-$dx},{$y-$dy},{$x+$dx},{$y+$dy}
+     -done
     -endif
-  -done -rm[0,1] -v +
+  -endl -done -rm[0,1] -v +
 
 #@gmic random_walks : width,height,length,number,speed
 #@gmic : Generate random walks tracks (list of coordinates x,y,t as a Nx3 image.)
-#@gmic : $ 100,100,20  -random_walks 100,100,20,5,1 -circles[0] [1] -k[0] -blur_xy 1 -s z -max
-#@gmic : $ 100,100,20  -random_walks 100,100,20,10,1 -circles[0] [1] -k[0] -blur 1 -n 0,255 -display_volume 8,10,1 -rotate3d 0,0,1,25 -rotate3d 1,0,0,-120 -snapshot3d 600,1,0,0,0 -autocrop
+#@gmic : $ 100,100,20 -random_walks 100,100,20,5,1 -circles[0] [1] -k[0] -blur_xy 1 -s z -max
+#@gmic : $ 100,100,20 -random_walks 100,100,20,10,1 -circles[0] [1] -k[0] -blur 1 -n 0,255 -display_volume 8,10,1 -rotate3d 0,0,1,25 -rotate3d 1,0,0,-120 -snapshot3d 600,1,0,0,0 -autocrop
 random_walks :
 number=$4 width=$1 height=$2 length=$3 speed=$5
 $number,3
@@ -551,14 +561,13 @@ $number,3
 #@gmic : moving average of image list with a box filter of size _size
 #@gmic : $ 11 -f 'x>w/2' --l[-1] -s x -movavg 9 -a x -endl  --blur[0] 1.2 -a c -display_graph
 movavg : -check "$1>=1"
--e[^-1] "moving average with size "$1 -v -
-n={$1-1}
--repeat $n
-  -repeat {{@#}-1} --+[{$>},{$>+1}] -*[-1] .5 -rm[$>] -mv[-1] $> -done
-  -reverse
--done
--if {$n%2!=0} -reverse -endif
--v +
+  -e[^-1] "moving average with size "$1 -v -
+  n={$1-1}
+  -repeat $n
+    -repeat {{@#}-1} --+[{$>},{$>+1}] -*[-1] .5 -rm[$>] -mv[-1] $> -done
+    -reverse
+  -done
+  -if {$n%2!=0} -reverse -endif -v +
 
 #@gmic zmean
 #@gmic : average along z-axis
@@ -786,16 +795,31 @@ powerspectrum :
   -e[^-1] "Compute power spectrum"
   -v - -repeat @# -l[$>] -display_fft -k[0] -endl -done -v +
 
-#@gmic fouriermix : _cut_of_frequency
+#@gmic fouriermix : [image],_cut_of_frequency
 #@gmic :  Mix two images using their respectives low and high frequencies
 #@gmic : $ image1.jpg image2.jpg  --fouriermix .5
-fouriermix : -skip ${1=50%}
+fouriermix : -skip ${2=10%}
   -e[^-1] "fourier mix images."
+  -v - -pass$1 0 -repeat {@#-1} -l[$>,-1]
   -fft[0] -fft[2] -fftshift
-  # make a mask
-  100%,100% -circle[-1] 50%,50%,$1,1,1 -blur[-1] 1,1,1 -n[-1] 0,1 -d
-  -*[0,1] [-1] -negative[-1] -*[2,3] [-1] -rm[-1] -+[0,2] -+[1,2] -fftshift
-  -ifft  -k[0]
+    # make a mask
+    100%,100% -circle[-1] 50%,50%,$2,1,1 -blur[-1] 1,1,1 -n[-1] 0,1 -d
+    -*[0,1] [-1] -negative[-1] -*[2,3] [-1] -rm[-1] -+[0,2] -+[1,2] -fftshift
+    -ifft
+  -endl -done -rm[-1] -v +
+
+#@gmic blend_fft: [image]
+#@gmic : blend images using strongest frequencies
+blend_fft : -skip ${2=2}
+  -v - -pass$1 0
+  --l[-1]
+    -tape -powerspectrum -blur 1 --blur 2 --
+    -max '{ia+$2*sqrt(iv)}' -circle 50%,50%,20,1,@{0,im} -n 0,1 -d
+    -fftshift
+  -endl -fft[-2] -*[-2,-3] [-1] -negative[-1]
+  -repeat {@#-3} -l[$>,-1,-2,-3]
+    -fft[0] -*[0,1] [-1] -+[0] [2] -+[1] [3] -ifft[0,1] -rm[1]
+  -endl -done -rm[-1,-2,-3] -v +
 
 #@gmic denoise_fft : _threshold
 #@gmic : Illustrate the thresholding of Fourier coefficients
