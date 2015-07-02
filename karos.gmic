@@ -189,17 +189,18 @@ karo_label : -check "$1>=0" -skip ${2=0} -skip ${3=0}
 	-endif
   -endl -done -v +
 
-#@gmic karo_threshold : _method={ triangle | yen | otsu | _otsu },_delclass>0,_smooth>0
+#@gmic karo_threshold : _method={ triangle | yen | otsu | _otsu | bgt },_delclass>0,_smooth>0
 #@gmic : Calculate threshold (from ImageJ) in range [0,255], evtl. normalization necessary.
 #@gmic : For each method user function _karo_"_method" is called!
 #@gmic : If _delclass > 0 delete cluster _delclass-1. blur_x histogram with amplitude _smooth.
 #@gmic : If _smooth > 0 blur_x histogram with amplitude _smooth.
 #@gmic : $ image.jpg -luminance -karo_method[-1]
-karo_threshold : -skip ${1="triangle"} -skip "${2=0} ${3=0}"
+karo_threshold : -skip ${1="triangle"} -skip ${2=0} -skip ${3=0}
   -e[^-1] "Calculate "$1" thresholded mask from images$? with histogram in range [0,255] and binsize 1."
   -v -
   meth=$1
-  -if {$meth'=='otsu} -otsu 256 -else -repeat $!
+  -if {$1'=='otsu} -otsu 256 
+  -else -repeat $!
     -l[$>]
 	  --histogram[-1] 256,0,255
 	  -if {$2>0} -=[-1] 0,{$2-1} -endif
@@ -283,6 +284,16 @@ _karo__otsu : -skip "${1=0} ${2=1}" -v -
     -done -rm[-1]
 	res={$threshold*$2+$1} -u $res
   -endl -done -v +
+
+#gmic _karo_bgt : _minval,_bins
+#gmic : Autothreshold using SD from whole image starting from the mode of the histogram (image range 0,255)
+_karo_bgt: -skip "${1=0} ${2=1}" -v - fact=1.5
+  -l[-1]
+    hft=${-hist_feature\ -2} mn=${-arg\ 5,$hft} mx=${-arg\ 6,$hft} sd=${-arg\ 4,$hft} md=${-arg\ 1,$hft}
+    -if {($mx-$md)<=($md-$mn)} res={$md-$fact*$sd}
+    -else res={$md+$fact*$sd} -endif
+	-u {$res*$2+$1} -rm
+  -endl -v +
 
 #	#@gmic karo_mx : _moment=-2 (-2=all="mode,m0,m1,m2,min,max,med",-1=mode,0=sum,1=mean,2=SD,3=min,4=max,5=med),_width=0,_zero=0
 #	#@gmic : Estimation of features from a histogram evtl. lin smoothed with box _width
