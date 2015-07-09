@@ -691,7 +691,7 @@ mc_pendraw_preview:
 
 #@gimp Output crochet patterns : gimp_to_crochet, _none_
 #@gimp : Output directory = _folder("")
-#@gimp : Output filename = _text("crochet.txt")
+#@gimp : Output HTML file = _text("model.html")
 #@gimp : sep = separator()
 #@gimp : Maximum image size = int(480,0,1024)
 #@gimp : Maximum number of image colors = int(16,2,64)
@@ -703,25 +703,44 @@ mc_pendraw_preview:
 #@gimp : sep = separator(), note = note("<small>Author: <i>David Tschumperl&#233;</i>.      Latest update: <i>07/09/2015</i>.</small>")
 gimp_to_crochet :
   -to_rgb -repeat $! nm=${-gimp_layer_name[$>]} --l[$>]
-    -if $5 -transpose -endif
     -if {max(w,h)>$3} -rr2d $3,$3,0 -endif
     --colormap 0
-    -if {w>$4} -r[-1] $4,1,1,3,2 -endif
-    -index[0] [1]
+    -if {w>$4} -r[-1] $4,1,1,3,1 -endif
+    -round[1] -index[0] [1]
 
     output="Image name: "$nm"\nImage size: "{0,w}"x"{0,h}"\n\nNumber of colors: "{w}"\n"
 
+    output="<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\"\n\
+            \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n\
+            <html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\">\n\
+            <head>\n\
+            </head>\n\
+            <body>\n\
+            <h2>"$nm" ("{0,w}x{0,h}")</h2><table cellpadding=\"20\"><tr><td>\n<table cellpadding=\"4\">\n"
+
     # Output colors.
-    -repeat {w} output=${output}"  Color ""#"$>": ("${-at\ $>}")\n" -done
-    output=${output}"\n"
+    -repeat {w}
+      color=${-at\ $>}
+      R={arg(1,$color)} G={arg(2,$color)} B={arg(3,$color)}
+      ({'${-dec2hex\ {$R*65536+$G*256+$B}}'}) --[-1] {'0'} -r[-1] 6,1,1,1,0,0,1,0 -+[-1] {'0'}
+      -f[-1] if(i>={'a'}&&i<={'z'},i+{'A'}-{'a'},i)
+      hcolor={t} -rm[-1]
+      output=${output}"<tr><td>Colour "$>"</td><td><div style=\"width:64px;height:24px;background-color:""#"$hcolor";border:1px solid ""#000;\"></div></td><td><tt>""#"$hcolor"</tt></td></tr>\n"
+    -done
+
+    # Output image for page.
+    0 -nm[-1] "$2" image_name={b}.png -rm[-1]
+    --map[0] [1] -r2dy[-1] 200,1 -frame[-1] 1,1,0 -o[-1] "$1/"$image_name -rm[-1]
+    output=${output}"</table></td><td valign=\"top\"><img src=\""$image_name"\" /></td></tr></table>\n"
 
     # Output geometry.
+    -if $5 -transpose label="Column" -else label="Row" -endif
     --l[0]
       -s y
       -repeat $! -l[$>]
-        output=${output}"Row ""#"$>":"
+        output=${output}"<p><b>"$label" "{1+$>}":</b>\n"
         -compress_rle 0,0 -rows 6,100%
-        i=0 -do
+        i=0 n=0 -do
           val={i[$i]} i={$i+1}
           -if {$val>=0} occ=1
           -else
@@ -729,14 +748,17 @@ gimp_to_crochet :
             val={i[$i]}
             -if {$val<0} val=0 -else i={$i+1} -endif
           -endif
-          output=${output}" | "$occ" x ""#"$val
+          output=${output}"<tt>colour:"$val"</tt> "$occ
+          -if {$i<h} output=${output}", " -endif
+          n={$n+1}
+          -if {!($n%8)} output=${output}"<br/>\n" -endif
         -while {$i<h}
         output=${output}"\n"
       -endl -done
       -rm
     -endl
 
-    output=${output}"\nEnd of file.\n"
+    output=${output}"\n</body>"
     ({'$output'}) -o[-1] raw:"$1/$2",uchar
     -rm
   -endl -done
