@@ -689,6 +689,58 @@ mc_pendraw_preview:
 
 #@gimp <i>Ronounours</i>
 
+#@gimp Output crochet patterns : gimp_to_crochet, _none_
+#@gimp : Output directory = _folder("")
+#@gimp : Output filename = _text("crochet.txt")
+#@gimp : sep = separator()
+#@gimp : Maximum image size = int(480,0,1024)
+#@gimp : Maximum number of image colors = int(16,2,64)
+#@gimp : Orientation = _choice("Horizontal scanlines","Vertical scanlines")
+#@gimp : sep = separator()
+#@gimp : note = note{"<small><b>Note:</b> This filter describes the geometry of an image and output a text file.
+#@gimp : Don't use this filter on large images or images with a lot of colors. It would take forever!
+#@gimp : </small>"}
+#@gimp : sep = separator(), note = note("<small>Author: <i>David Tschumperl&#233;</i>.      Latest update: <i>07/09/2015</i>.</small>")
+gimp_to_crochet :
+  -to_rgb -repeat $! nm=${-gimp_layer_name[$>]} --l[$>]
+    -if $5 -transpose -endif
+    -if {max(w,h)>$3} -rr2d $3,$3,0 -endif
+    --colormap 0
+    -if {w>$4} -r[-1] $4,1,1,3,2 -endif
+    -index[0] [1]
+
+    output="Image name: "$nm"\nImage size: "{0,w}"x"{0,h}"\n\nNumber of colors: "{w}"\n"
+
+    # Output colors.
+    -repeat {w} output=${output}"  Color ""#"$>": ("${-at\ $>}")\n" -done
+    output=${output}"\n"
+
+    # Output geometry.
+    --l[0]
+      -s y
+      -repeat $! -l[$>]
+        output=${output}"Row ""#"$>":"
+        -compress_rle 0,0 -rows 6,100%
+        i=0 -do
+          val={i[$i]} i={$i+1}
+          -if {$val>=0} occ=1
+          -else
+            occ={-$val}
+            val={i[$i]}
+            -if {$val<0} val=0 -else i={$i+1} -endif
+          -endif
+          output=${output}" | "$occ" x ""#"$val
+        -while {$i<h}
+        output=${output}"\n"
+      -endl -done
+      -rm
+    -endl
+
+    output=${output}"\nEnd of file.\n"
+    ({'$output'}) -o[-1] raw:"$1/$2",uchar
+    -rm
+  -endl -done
+
 #@gimp Faded mirror : gimp_faded_mirror, gimp_faded_mirror(1)
 #@gimp : Axis = choice("x-axis","y-axis")
 #@gimp : Fading = float(10,0,100)
