@@ -695,7 +695,7 @@ mc_pendraw_preview:
 #@gimp : sep = separator()
 #@gimp : Maximum image size = int(512,0,1024)
 #@gimp : Maximum number of image colors = int(12,2,64)
-#@gimp : Orientation = _choice("Horizontal scanlines","Vertical scanlines")
+#@gimp : Orientation = _choice("Top left -> bottom right [rows]","Top left -> bottom right [columns]","Bottom left -> top right [rows]","Bottom left -> top right [columns]")
 #@gimp : sep = separator()
 #@gimp : note = note{"<small><b>Note:</b> This filter describes the geometry of an image and output a text file.
 #@gimp : Don't use this filter on large images or images with a lot of colors. It would take forever!
@@ -723,7 +723,7 @@ gimp_to_crochet :
       ({'${-dec2hex\ {$R*65536+$G*256+$B}}'}) --[-1] {'0'} -r[-1] 6,1,1,1,0,0,1,0 -+[-1] {'0'}
       -f[-1] if(i>={'a'}&&i<={'z'},i+{'A'}-{'a'},i)
       hcolor={t} -rm[-1]
-      ({'"<tr><td>Colour "$>"</td><td><div style=\"width:64px;height:24px;background-color:""#"$hcolor";border:1px solid ""#000;\"></div></td><td><tt>""#"$hcolor"</tt></td></tr>\n"'})
+      ({'"<tr><td>Colour "$>"</td><td><div style=\"width:64px;height:24px;background-color:""#"$hcolor";color:""#"$hcolor";border:1px solid ""#000;\">&hearts;&hearts;&hearts;&hearts;&hearts;&hearts;</div></td><td><tt>""#"$hcolor"</tt></td></tr>\n"'})
     -done
 
     # Format input image for HTML page.
@@ -733,12 +733,29 @@ gimp_to_crochet :
     -rm[1]
 
     # Output geometry.
-    -if $5 -transpose[0] label="Column" -else label="Row" -endif
+    -if {$5==0}
+      ordering="Top left to bottom right"
+      label="Row"
+    -elif {$5==1}
+      ordering="Top left to bottom right"
+      -transpose[0]
+      label="Column"
+    -elif {$5==2}
+      ordering="Bottom left to top right"
+      -mirror[0] y
+      label="Row"
+    -elif {$5==3}
+      ordering="Bottom left to top right"
+      -mirror[0] y -transpose[0]
+      label="Column"
+    -endif
+    ({'"<p>** Ordering is "$ordering" ("$label" by "$label") **</p>\n"'})
+
     --l[0]
       -s y
       -repeat $! -l[$>]
+        im={im} -compress_rle 0,0 -rows 6,100%
         ({'"<p><b>"$label" "{1+$>}":</b>\n"'})
-        -compress_rle[0] 0,0 -rows[0] 6,100%
         i=0 n=0 -do
           val={0,i[$i]} i={$i+1}
           -if {$val>=0} occ=1
@@ -747,7 +764,8 @@ gimp_to_crochet :
             val={0,i[$i]}
             -if {$val<0} val=0 -else i={$i+1} -endif
           -endif
-          ({'"<tt>colour:"$val"</tt> "$occ'})
+          val={$val+$im}
+          ({'"colour:<b>"$val"</b> "$occ'})
           -if {0,$i<h} ({'", "'}) -endif
           n={$n+1}
           -if {!($n%8)} ({'"<br/>\n"'}) -endif
