@@ -695,8 +695,8 @@ mc_pendraw_preview:
 #@gimp : sep = separator()
 #@gimp : Maximum image size = int(512,0,1024)
 #@gimp : Maximum number of image colors = _int(12,2,64)
-#@gimp : Direction = choice(3,"Top left -> bottom right","Bottom left -> top right","Top right -> bottom left","Bottom right -> top left")
-#@gimp : Method = choice("Row by row","Column by column")
+#@gimp : Starting point = choice(1,"Top left","Top right","Bottom left","Bottom right")
+#@gimp : Loop method = choice("Row by row","Column by column")
 #@gimp : sep = separator()
 #@gimp : Preview progress (%) = float(100,0,100)
 #@gimp : sep = separator(), note = note("<small>Author: <i>David Tschumperl&#233;</i>.      Latest update: <i>07/09/2015</i>.</small>")
@@ -707,6 +707,7 @@ gimp_to_crochet :
     -if {w>$4} -rm[-1] --colormap $4,1 -endif
     -round[1] -index[0] [1]
 
+    # Header and title.
     0 -nm[-1] $nm image_basename={b} -rm[-1]
     ({'"<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\"\n\
         \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n\
@@ -728,12 +729,22 @@ gimp_to_crochet :
     -done
 
     # Render input image for HTML page.
-    ordering=${"-skip 0 s0=\"Top left -> bottom right\" s1=\"Bottom left -> top right\" s2=\"Top right -> bottom left\" s3=\"Bottom right -> top left\" -u $s$5"}
-    label=${"-skip 0 s0=Row s1=Column -u $s$6"}
+    starting=${"-arg {1+$5},\"Top left\",\"Top right\",\"Bottom left\",\"Bottom right\""}
+    label=${"-arg {1+$6},Row,Column"}
+    -if $6 dir0="T &#8594; B" dir1="B &#8594; T" -else dir0="L &#8594; R" dir1="R &#8594; L" -endif
+    dir={arg(1+2*$5+$6,0,0,1,0,0,1,1,1)}
 
     0 -nm[-1] "$2" image_name={b}.png -rm[-1]
-    --map[0] [1] -rr2d[-1] 200,200,1,1
-    --gimp_to_crochet_preview[-1] ${1-6},50
+    --map[0] [1]
+
+    --_gimp_crochet[-1] $5,$6
+    -to_rgba[-1] 100%,100%,1,1,'if(y*w+x>=wh/2,0,1)' -*[-2,-1]
+    -rr2d[-1] 200,200,1,1 -drgba[-1]
+    100%,100%,1,1,1 -arrow3d[-1] 0,0,0,{w/2},{h/2},0,2%,15%,7% -col3d[-1] 0.5 -j3d[-2] [-1],25%,25%,0,1,2,0,0 -rm[-1]
+    -*[-2,-1]
+    -_gimp_crochet[-1] $5,$6
+    -rr2d[-2] 200,200,1,1
+
     -to_rgba[-2,-1] -frame[-2,-1] 1,1,0,0,0,255 -frame[-2,-1] 0,20,0,0,0,0
     -t[-2] "Result",0,0,16,1,0,0,0,255
     -t[-1] "Ordering overview",0,0,16,1,0,0,0,255
@@ -741,18 +752,21 @@ gimp_to_crochet :
     -if {w>h} -a[-2,-1] y -else -a[-2,-1] x -endif
     -o[-1] "$1/"$image_name -rm[-1]
     ({'"</table></td><td valign=\"top\"><img src=\""$image_name"\" /><br/>\
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>Ordering:</b> "$ordering", "$label" by "$label"\
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>Starting point:</b> "$starting"<br/>\
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>Orientation:</b> "$label" by "$label"\
         </td></tr></table>\n"'})
     -rm[1]
 
     # Output geometry.
     ({'"<table cellspacing=\"0\" cellpadding=\"4\" border=\"1\">\n"'})
+
     -_gimp_crochet[0] $5,$6
     --l[0]
       -s y
       -repeat $! -l[$>]
+        -if {$>%2} -mirror[-1] x -endif
         im={im} -compress_rle 0,0 -rows 6,100%
-        ({'"<tr><td valign=\"top\"><b>"$label" "{1+$>}":</b></td><td>\n"'})
+        ({'"<tr><td valign=\"top\"><b>"$label" "{1+$>}"</b></td><td>"${dir$dir}"</td><td>\n"'})
         i=0 n=0 -do
           val={0,i[$i]} i={$i+1}
           -if {$val>=0} occ=1
@@ -769,6 +783,7 @@ gimp_to_crochet :
         -while {0,$i<h}
         ({'"</td></tr>\n"'})
         -rm[0] -a x
+        dir={!$dir}
       -endl -done
       -a x
     -endl
