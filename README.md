@@ -3,6 +3,8 @@
 #### An Open-Source Full-Featured Framework for Image Processing
 ##### http://gmic.eu
 
+-----------------------
+
 **G'MIC** is an open-source full-featured framework for **[image processing](https://en.wikipedia.org/wiki/Image_processing)**. It provides several different **[user interfaces](https://en.wikipedia.org/wiki/User_interface)** to convert/manipulate/filter/visualize **generic image datasets**, ranging from _1d scalar signals_ to _3d+t sequences of multi-spectral volumetric images_, including of course _2d color images_.
 These interfaces are:
 
@@ -26,9 +28,13 @@ These interfaces are:
 
 <a href="http://gmic.eu/img/gmic_libgmic.jpg">![interface_libgmic](http://gmic.eu/img/gmic_libgmic_thumb.jpg)</a>
 
+-----------------------
+
 Other open-source projects are known to use some of the <b><font color="#000066">G'MIC</font></b> features:
 
 - **[EKD](http://ekd.tuxfamily.org)**, a free software dedicated to post-production processing for videos and images.
 - **[Krita](https://www.krita.org)**, a free digital painting and illustration application. **Krita** has its own **G'MIC** plug-in.
 - **[Photoflow](http://aferrero2707.github.io/PhotoFlow/)**, a fully non-destructive photo retouching program.
 - **[Veejay](http://veejayhq.net/)**, a visual instrument and realtime video sampler.
+
+-----------------------
