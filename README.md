@@ -1,4 +1,5 @@
 <a href="http://gmic.eu">![Logo](http://gmic.eu/img/logo4.jpg)</a>
+<h3><font color="#AAAAAA">An Open and Full-Featured Framework for Image Processing</font></h3>
 <h4>http://gmic.eu</h4>
 
 <font color="#000066">G'MIC</font></b> is an open and full-featured framework for <b><a href="https://en.wikipedia.org/wiki/Image_processing">image processing</a></b>. It provides several different <b><a href="https://en.wikipedia.org/wiki/User_interface">user interfaces</a></b> to convert/manipulate/filter/visualize <b>generic image datasets</b>, ranging from _1d scalar signals_ to _3d+t sequences of multi-spectral volumetric images_, including _2d color images_.
