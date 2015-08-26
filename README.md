@@ -1,7 +1,7 @@
 <a href="http://gmic.eu">![Logo](http://gmic.eu/img/logo4.jpg)</a>
 
-### An Open-Source Full-Featured Framework for Image Processing
-#### http://gmic.eu
+#### An Open-Source Full-Featured Framework for Image Processing
+##### http://gmic.eu
 
 In a Nutshell
 -------------
