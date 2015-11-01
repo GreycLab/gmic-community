@@ -43,10 +43,9 @@
 #@gimp : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2013/02/09</i>.</small>")
 gcd_aurora : -skip ${1=6},${2=1},${3=0}
   -repeat $! -l[$>]
-    -to_rgb[0]
-    --deriche[0] $1%,2,y -deriche[-1] $2%,0,x
+    -to_rgb --deriche $1%,2,y -deriche[-1] $2%,0,x
     -c[-1] 0,255 -n[-1] 0,255
-    -if $3 -blend[0,1] average -else -keep[-1] -endif
+    -if $3 -blend average -else -k[-1] -endif
   -endl -done
 
 #@gimp _<b>Black &amp; white</b>
@@ -475,6 +474,60 @@ gcd_fgmask : -skip ${1=0}
     -shrink_xy 20 -- 1
   -endl -done
 
+#@gimp DCCI 2x Resize: gcd_dcci_upscale, gcd_dcci_upscale(0)
+#@gimp : note = note("<i>Directional Cubic Convolution Interpolation</i>"), sep = separator()
+#@gimp : Threshold = float(1.15,1,1.5)
+#@gimp : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2015/11/01</i>.</small>")
+#@gimp : note = note{"\n<small><b>Note: </b>
+#@gimp : This filter re-implements the scaling algorithm described at :
+#@gimp : </small>"}
+#@gimp : note = link("wikipedia.org","https://en.wikipedia.org/wiki/Directional_Cubic_Convolution_Interpolation")
+#@gimp : note = note("<small>The algorithm is intended for enlarging images while avoiding</small>")
+#@gimp : note = note("<small>artifacts, e.g. staircase artifacts.</small>")
+#@gimp : note = note("\n<small>Increasing the threshold reduces smoothing.</small>")
+#@gimp : note = note("<small>Warning: highly experimental...</small>")
+gcd_dcci_upscale : -skip ${1=1.15}
+  -repeat $! -l[$>]
+    a={-1/16} b={9/16}
+    # d1, d2 (sum of diagonal absolute gradients)
+    (0,-1;1,0) --convolve[0] [1] -mirror[1] x --convolve[0] [1] -rm[1] -abs[^0]
+    3,3,1,1,1 -convolve[-3,-2] [-1] -rm.
+
+    # calc all possible interpolated output [diagonal]
+    ($a,$b,$b,$a) -diagonal. --convolve[0] [-1] -mirror[-2] x --convolve[0] [-2] -rm[-3]
+    --+[1,2] 1 -/[-2,-1] # edge comparison mask (1 + d1) / (1 + d2)
+    -_gcd_dcci_smooth[-5,-4] [-3],[-2] -_gcd_dcci_mask[-4--1] $1
+
+    # d1, d2 (sum of h/v absolute gradients)
+    --g[0,1] xy,-1 -abs[-4--1]
+    (1,1;1,1) -convolve[-5] [-1] -rm.
+    (0,1,0;1,1,1;0,1,0) -convolve[-3] [-1] -rm.
+    (0,1,0;1,1,1;0,1,0;0,0,0) -convolve[-4] [-1] -rm.
+    (0,1,1;0,1,1;0,0,0) -convolve[-2] [-1] -rm.
+    -+[-3,-1] -+[-3,-1]
+
+    # calc all possible interpolated output [h/v]
+    ($a;$b;$b;$a) --convolve[0] [-1] -rm[-2] (0,$a,$b,$b,$a) --convolve[1] [-1] -rm[-2]
+    --+[2,3] 1 -/[-2,-1] # edge comparison mask (1 + d1) / (1 + d2)
+    -_gcd_dcci_smooth[-5,-4] [-3],[-2] -_gcd_dcci_mask[-4--1] $1
+
+    # d1, d2 (sum of h/v absolute gradients)
+    --g[0,1] xy,-1 -abs[-4--1]
+    (0,1,0,0;1,1,1,0;0,1,0,0) -convolve[-5] [-1] -rm.
+    (0,0,0;1,1,0;1,1,0) -convolve[-3] [-1] -rm.
+    (1,1;1,1;0,0) -convolve[-4] [-1] -rm.
+    (0,1,0;1,1,1;0,1,0) -convolve[-2] [-1] -rm.
+    -+[-3,-1] -+[-3,-1]
+
+    # calc all possible interpolated output [h/v]
+    (0;$a;$b;$b;$a) --convolve[1] [-1] -rm[-2] ($a,$b,$b,$a) --convolve[0] [-1] -rm[-2]
+    --+[3,4] 1 -/[-2,-1] # edge comparison mask (1 + d1) / (1 + d2)
+    -_gcd_dcci_smooth[-5,-4] [-3],[-2] -_gcd_dcci_mask[-4--1] $1
+
+    # resize and distribute pixels
+    -r2dx 200%,4 -shift[1] 1,1 -shift[2] 0,1 -shift[3] 1 -+ -c 0,255
+  -endl -done
+
 #@gimp Depth Blur : gcd_depth_blur, gcd_depth_blur(1)
 #@gimp : note = note("<u>Selectively blur based on estimated depth</u>")
 #@gimp : note = note("<small>Amount of blur applied is relative to luminance of the depth map</small>")
@@ -537,7 +590,7 @@ gcd_detail :
 gcd_spectral :
   -repeat $! -l[$>]
     -to_rgb -gcd_srgb2luma -- 128
-    --max 0 --min[0] 0 -abs[-1] -abs[0] -negative[0] -a c -n 0,255
+    --max 0 --min[0] 0 -abs[^-2] -negative[0] -a c -n 0,255
   -endl -done
 
 #@gimp Recolor : gcd_recol, gcd_recol(1)
