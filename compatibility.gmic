@@ -748,6 +748,63 @@ apply_channels_old : -skip ${3=0}
 _apply_channels_old :
   ${1--1} -k[0]
 
+#@gmic solidify
+#@gmic : Replace transparent regions of a RGBA image by morphologically interpolated color.
+#@gmic : $ image.jpg --luminance -ge. 120 -*. 255 -append c --solidify -display_rgba
+solidify :
+  -e[^-1] "Replace transparent regions of RGBA image$? by morphologically interpolated colors."
+  -v - -repeat $! -l[$>] nm={0,n} -to_a
+    [-1] -split_opacity.. ->=.. 50% -*. [-2]
+    -replace_color. 0,0,0,0,0,0,-1,-1,-1,-1 -to_rgb. -d
+    -do
+      --dilate. 3
+      -replace_color.. 0,0,-1,-1,-1,1000,1000,1000
+      -erode.. 3
+      -replace_color.. 0,0,1000,1000,1000,-1,-1,-1
+      -+[-2,-1] -/. 2
+      -d
+      -j. [-3],0,0,0,0,1,[-2]
+    -while {im<0}
+    -k.
+  -nm $nm -endl -done -v +
+
+#@gmic solidify_linear : _sigma>=1,_dsigma>=1,0<=_precision<=1
+#@gmic : Replace transparent regions of a RGBA image by linearly interpolated color.
+#@gmic : Default values: 'sigma=1.5', 'dsigma=1' and 'precision=0.5'.
+#@gmic : $ image.jpg --luminance -ge. 120 -*. 255 -append c --solidify_linear , -display_rgba
+solidify_linear : -check "${1=1.5}>=1 && ${2=1}>=1 && ${3=0.5}>=0 && $3<=1"
+  -e[^-1] "Replace transparent regions of RGBA image$? by linearly interpolated colors, with sigma $1, dsigma $2 and precision $3."
+  -v - -repeat $! -l[$>]
+    -split_opacity
+    -if {$!>1}
+      ->=. 50% -*.. [-1]
+      sigma=$1 -do
+        N={v=round(3*$sigma);min(33,max(3,v+1-(v%2)))}
+        $N,$N -=. 1,50%,50% -distance. 1 -*. {-1/$sigma^2} -exp. -normalize_sum.
+        --convolve[-3,-2] [-1] -rm...
+        -max. 1e-5 -/[-2,-1]
+        --dilate.. {v=round((1/3-$N/6)*$3+$N/2);max(3,v+1-(v%2))}
+        --... [-1] -*.. [-3] -rm...
+        --[-3,-2]
+        sigma*=2
+      -while {!im}
+     -rm.
+   -endif
+ -endl -done -v +
+
+#@gmic solidify_watershed
+#@gmic : Replace transparent regions of RGBA image by color propagation.
+#@gmic : $ image.jpg --luminance -ge. 120 -*. 255 -append c --solidify_watershed -display_rgba
+solidify_watershed :
+  -e[^-1] "Replace transparent regions of RGBA image$? by color propagation."
+  -v - -repeat $! -l[$>]
+    -split_opacity
+    -if {$!>1}
+      -+[0] 1 ->=[1] 50% -*[0] [1] -distance[1] 1 -*[1] -1
+      -watershed[0] [1] -rm[1]
+    -endif
+  -endl -done -v +
+
 # Local Variables:
 # mode: sh
 # End:
