@@ -5,7 +5,7 @@
 
 -----------------------
 
-**G'MIC** is a full-featured open-source framework for **[image processing](https://en.wikipedia.org/wiki/Image_processing)**. It provides several different **[user interfaces](https://en.wikipedia.org/wiki/User_interface)** to convert/manipulate/filter/visualize **generic image datasets**, ranging from _1d scalar signals_ to _3d+t sequences of multi-spectral volumetric images_, including of course _2d color images_.
+**G'MIC** is a full-featured open-source framework for **[image processing](https://en.wikipedia.org/wiki/Image_processing)**. It provides several different **[user interfaces](https://en.wikipedia.org/wiki/User_interface)** to convert/manipulate/filter/visualize **generic image datasets**, ranging from _1d scalar signals_ to _3d+t sequences of multi-spectral volumetric images_, thus including _2d color images_.
 These interfaces are:
 
 - **1** - A command-line interface **[gmic](http://gmic.eu/tutorial/basics.shtml)**, to use the **G'MIC** features from a shell. In this setting, **G'MIC** may be seen as a serious (and friendly) competitor of the [ImageMagick](http://www.imagemagick.org) or [GraphicsMagick](http://www.graphicsmagick.org) software suites.
@@ -33,6 +33,7 @@ These interfaces are:
 Other open-source projects are known to use some of the <b><font color="#000066">G'MIC</font></b> features:
 
 - **[EKD](http://ekd.tuxfamily.org)**, a free software dedicated to post-production processing for videos and images.
+- **[Flowblade](https://github.com/jliljebl/flowblade)**, a multitrack non-linear video editor for Linux released under GPL 3 license.
 - **[Krita](https://www.krita.org)**, a free digital painting and illustration application. **Krita** has its own **G'MIC** plug-in.
 - **[Photoflow](http://aferrero2707.github.io/PhotoFlow/)**, a fully non-destructive photo retouching program.
 - **[Veejay](http://veejayhq.net/)**, a visual instrument and realtime video sampler.
