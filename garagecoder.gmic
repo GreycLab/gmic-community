@@ -629,6 +629,55 @@ gcd_srotate : -skip ${1=0},${2=50},${3=50},${4=1},${5=1},${6=6},${7=0.6},${8=0}
     -endl -a c
   -endl -done
 
+#@gimp Specific saturation: gcd_hio_saturation, gcd_hio_saturation_preview(1)
+#@gimp : note = note("<i>Adjust saturation of Input hue or all Opposing hues</i>"), sep = separator()
+#@gimp : Input = float(1,0,2)
+#@gimp : Opposing = float(1,0,2)
+#@gimp : Hue = int(39,0,360)
+#@gimp : level = float(0,-0.5,0.5)
+#@gimp : Sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate horizontal","Duplicate vertical")
+#@gimp : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2016/01/04</i>.</small>")
+#@gimp : note = note("\n<small><b><u>Tips</u></b></small>")
+#@gimp : note = note("<small>To see the current hue, set level to maximum.</small>")
+#@gimp : note = note("<small>The hue must be present in the image before it can be changed.</small>")
+#@gimp : note = note("<small>\nSaturate/desaturate one hue by setting hue slider then tweak input.</small>")
+#@gimp : note = note("<small>Preserve the selected hue by using opposing slider.</small>")
+gcd_hio_saturation : -skip ${1=1},${2=1},${3=39},${4=1}
+  -repeat $! -l[$>]
+    -split_opacity -to_rgb[0] --gcd_srgb2luma[0]
+    -sh[0] 0 -sh[0] 1 -sh[0] 2,2
+    ({$3%360}^1^1) -hsv2rgb. -max. 0 -*. $4 --. {ia}
+    -+[-4] {[0]} -+[-3] {[1]} -+[-2] {[2]}
+    -rm[-4--1] -gcd_hue_chroma[0] $3,$1,$2
+    -gcd_srgb2jpeg[0] -j[0] [-1] -rm. -gcd_jpeg2srgb[0] -a c -c 0,255
+  -endl -done
+
+gcd_hio_saturation_preview :
+  -gimp_split_preview "-gcd_hio_saturation $*",$-1
+
+gcd_hue_chroma : -skip ${1=0},${2=1},${3=1}
+  -if {$2==1" && "$3==1} -return -endif
+  -repeat $! -l[$>]
+    # get channels/ratio for hue
+    h={($1%360)/60} x={1-abs($h%2-1)} y={if($x>0,1/$x,0)} h={int($h)+1}
+    p={arg($h,0,1,1,2,2,0)} s={arg($h,1,0,2,1,0,2)} z={arg($h,2,2,0,0,1,1)}
+
+    # get current hue level [Ih]
+    [0] -sh. $p -sh.. $s --*.. $x --*.. $y
+    --le.. [-3] -j[-4] [-3],0,0,0,0,1,[-1]
+    -eq. 0 -j[-5] [-2],0,0,0,0,1,[-1]
+    -rm[-5--1] -sh. $z -f. 0 -rm.
+
+    # set chroma of hues [0] [Ih] [I0min] [P] [Pn]
+    --compose_channels[0] min --channels.. $p [-1] --eq. 0 -+[-2,-1]
+    -if {$3!=1}
+      --/[-3,-1] --. 1 -r. 100%,100%,1,3 -*. [-5] -+[0] [-1]
+      --compose_channels[0] min --[0] [-1] -*[0] $3 -+[0,-1] --[0,-1]
+    -endif
+    -if {$2!=1} --.. [-3] -*.. $2 -+[-3,-2] -/[-2,-1] --. 1 -*[-2,-1] -+
+    -else -k[0] -endif
+  -endl -done
+
 #@gimp Split Objects : gcd_splitobj, gcd_splitobj_preview(1)
 #@gimp : note = note("<u>Extract objects from an image to a new layer</u>")
 #@gimp : note = note("<small>1. Create a new transparent layer, mark background red and objects green</small>")
@@ -643,7 +692,7 @@ gcd_srotate : -skip ${1=0},${2=50},${3=50},${4=1},${5=1},${6=6},${7=0.6},${8=0}
 #@gimp : Blur Alpha = int(0,0,20)
 #@gimp : Opacity = int(40,0,100)
 #@gimp : Inpainting = choice(0,"Off","Low","Normal","High","Ultra")
-#@gimp : is_preview = const(0)
+#@gimp : Is preview = const(0)
 #@gimp : sep = separator(), note = note("<b>Note :</b> This filter needs two layers to work properly.")
 #@gimp : note = note("<small>Author : <i>Garagecoder</i>.   Latest update: <i>2015/09/28</i>.</small>")
 gcd_splitobj : -skip ${1=50},${2=3},${3=3},${4=0},${5=0},${6=0},${7=40},${8=0},${9=0}
