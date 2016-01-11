@@ -1,0 +1,469 @@
+#@gmic
+#
+#  File        : souphead.gmic
+#                ( G'MIC commands file )
+#
+#  Description : Personal G'MIC filters done by Souphead.
+#
+#  Copyright   : Souphead
+#                (wolfie1 (at) frontier (dot) com)
+#
+#  License     : CeCILL v2.0
+#                ( http://www.cecill.info/licences/Licence_CeCILL_V2-en.html )
+#
+#  This software is governed by the CeCILL  license under French law and
+#  abiding by the rules of distribution of free software.  You can  use,
+#  modify and/ or redistribute the software under the terms of the CeCILL
+#  license as circulated by CEA, CNRS and INRIA at the following URL
+#  "http://www.cecill.info".
+#
+#  As a counterpart to the access to the source code and  rights to copy,
+#  modify and redistribute granted by the license, users are provided only
+#  with a limited warranty  and the software's author,  the holder of the
+#  economic rights,  and the successive licensors  have only  limited
+#  liability.
+#
+#  In this respect, the user's attention is drawn to the risks associated
+#  with loading,  using,  modifying and/or developing or reproducing the
+#  software by the user in light of its specific status of free software,
+#  that may mean  that it is complicated to manipulate,  and  that  also
+#  therefore means  that it is reserved for developers  and  experienced
+#  professionals having in-depth computer knowledge. Users are therefore
+#  encouraged to load and test the software's suitability as regards their
+#  requirements in conditions enabling the security of their systems and/or
+#  data to be ensured and,  more generally, to use and operate it in the
+#  same conditions as regards security.
+#
+#  The fact that you are presently reading this means that you have had
+#  knowledge of the CeCILL license and that you accept its terms.
+#
+
+#@gimp _<b>Deformations</b>
+
+#@gimp Continuous droste : souphead_droste10, souphead_droste10_preview(1)
+#@gimp : Inner radius = float(25,1,100)
+#@gimp : Outer radius = float(100,1,100)
+#@gimp : Periodicity = float(1,-6,6)
+#@gimp : Strands = int(1,-6,6)
+#@gimp : Zoom = int(1,1,100)
+#@gimp : Rotate = int(0,-360,360)
+#@gimp : X-shift = int(0,-100,100)
+#@gimp : Y-shift = int(0,-100,100)
+#@gimp : Center X-shift = int(0,-100,100)
+#@gimp : Center Y-shift = int(0,-100,100)
+#@gimp : Starting level = int(1,1,20)
+#@gimp : Number of levels = int(10,1,20)
+#@gimp : Level frequency = int(1,1,10)
+#@gimp : Show both poles = bool(0)
+#@gimp : Pole rotation = int(90,-180,180)
+#@gimp : Pole long = int(0,-100,100)
+#@gimp : Pole lat = int(0,-100,100)
+#@gimp : Tile poles = bool(0)
+#@gimp : Hyper droste = bool(0)
+#@gimp : Fractal points = int(1,1,10)
+#@gimp : Auto-set periodicity = bool(0)
+#@gimp : No transparency = bool(0)
+#@gimp : External transparency = bool(0)
+#@gimp : Mirror effect = bool(0)
+#@gimp : Untwist = bool(0)
+#@gimp : Do not flatten transparency = bool(0)
+#@gimp : Show grid = bool(0)
+#@gimp : Show frame = bool(0)
+#@gimp : sep = separator(), note = note("<small>This filter is a conversion of the Mathmap script originally proposed here:</small>")
+#@gimp : link = link("Droste effect for Mathmap.","https://www.flickr.com/groups/88221799@N00/discuss/72157601071820707/")
+#@gimp : sep = separator(), note = note("<small>Author : <i>Souphead</i>.      Latest update : <i>01/10/2016</i>.</small>")
+souphead_droste10 :
+  -_souphead_droste10 ${1-26},0,$28
+
+souphead_droste10_preview :
+  -_souphead_droste10 ${1--1}
+
+_souphead_droste10 :
+  -repeat $! -l[$>]
+    -to_a       # Add an alpha channel if not there
+    --f. 0      # Create blank image of same size
+    -sh. 0      # Work with just 1 channel to save time
+    -f. "
+init(InnerRadius = $1;
+     OuterRadius = $2;
+     Periodicity = $3;
+     Strands = $4;
+     Zoom = $5;
+     Rotate = $6;
+     XShift = $7;
+     YShift = $8;
+     XCenterShift = $9;
+     YCenterShift = $10;
+     StartingLevel = $11;
+     NumberOfLevels = $12;
+     LevelFrequency = $13;
+     ShowBothPoles = $14;
+     PoleRotation = $15;
+     PoleLong = $16;
+     PoleLat = $17;
+     TilePoles = $18;
+     HyperDroste = $19;
+     FractalPoints = $20;
+     AutoSetPeriodicity = $21;
+     NoTransparency = $22;
+     ExternalTransparency = $23;
+     MirrorEffect = $24;
+     Untwist = $25;
+     DoNotFlattenTransparency = $26;
+     ShowGrid = $27;
+     ShowFrame = $28;
+
+     r1 = InnerRadius/100;
+     r2 = OuterRadius/100;
+     p1 = Periodicity;
+     p2 = Strands;
+     xCenterShift = XCenterShift/100;
+     yCenterShift = YCenterShift/100;
+
+     W = (w-1)/2;
+     H = (h-1)/2;
+
+     xShift = (XShift*w/W)/100;
+     yShift = (YShift*h/H)/100;
+
+     tileBasedOnTransparency=!(NoTransparency);
+     transparentPointsIn=!(ExternalTransparency);
+     levelsToLookOut=StartingLevel;
+     levelToShow=LevelFrequency;
+     retwist=!(Untwist);
+
+     if (AutoSetPeriodicity,p1=p2/2*(1+sqrt(1-(log(r2/r1)/pi)^2)));
+
+     if (p1>0,rotate=-(pi/180)*Rotate,rotate=(pi/180)*Rotate);
+
+     zoom=(Zoom+InnerRadius-1)/100;
+
+     epsilon=0.01;
+
+     if(retwist,xbounds0=-r2;xbounds1=r2;ybounds0=-r2;ybounds1=r2,ybounds0=0;ybounds1=2.1*pi;xbounds0=-log(r2/r1);xbounds1=-xbounds0);
+
+     minDimension=min(w,h);
+
+     xymiddle=0.5*(xbounds0+xbounds1);
+     xymiddlei=0.5*(ybounds0+ybounds1);
+
+     xyrangex=xbounds1-xbounds0;
+     xyrangey=ybounds1-ybounds0;
+
+     aspectRatio=w/h;
+
+     xyrangex=xyrangey*aspectRatio;
+
+     xbounds0=xymiddle-0.5*xyrangex;
+     xbounds1=xymiddle+0.5*xyrangex;
+
+     pLat = (PoleLat*w/W)/100;
+     pLon = (PoleLong*w/W)/100;
+
+     alpha=atan(p2/p1*log(r2/r1)/(2*pi));
+     f=cos(alpha);
+     beta=f*cos(alpha);
+     betai=f*sin(alpha);
+
+     if(p2>0,angle=2*pi*p1,angle=-2*pi*p1);
+
+     if(MirrorEffect,angle=angle/Strands);
+
+);
+
+     X=x-((w-1)/2);
+     Y=((h-1)/2)-y;
+
+     z=xbounds0+(xbounds1-xbounds0)*(X+w/2)/w;
+     zi=ybounds0+(ybounds1-ybounds0)*(Y+h/2)/h;
+
+     if(retwist,
+
+        zinitial=z;
+        zinitiali=zi;
+
+        z=z-xShift;
+        zi=zi-yShift;
+
+        expo=cos(rotate);
+        expoi=sin(rotate);
+        zmid=(z-xymiddle)/zoom;
+        zmidi=(zi-xymiddlei)/zoom;
+        zx=(zmid*expo+zmidi*expoi);
+        zy=(zmidi*expo-zmid*expoi);
+        z=xymiddle+zx;
+        zi=xymiddlei+zy,
+
+        zinitial=r1*exp(z)*cos(zi);
+        zinitiali=r1*exp(z)*sin(zi);
+
+        expo=cos(rotate)*zoom;
+        expoi=sin(rotate)*zoom;
+
+        zx=zinitial*expo-zinitiali*expoi;
+        zy=zinitial*expoi+zinitiali*expo;
+
+        zinitial=zx;
+        zinitiali=zy
+     );
+
+     if(ShowBothPoles,
+        theta=(pi/180)*PoleRotation;
+        xx=z;
+        yy=zi;
+        div=0.5*(1+xx^2+yy^2+((1-xx^2-yy^2)*cos(theta))-(2*xx*sin(theta)));
+        xx=xx*cos(theta)+(0.5*(1-xx^2-yy^2)*sin(theta));
+        z=xx/div;
+        zi=yy/div,
+
+        if(HyperDroste,
+           zx=sin(z)*cosh(zi);
+           zy=cos(z)*sinh(zi);
+           z=zx;
+           zi=zy
+        );
+
+        if(TilePoles,
+           p=sqrt(z*z + zi*zi)^FractalPoints;
+           frac=FractalPoints*atan2(zi,z);
+           z=p*cos(frac);
+           zi=p*sin(frac);
+
+           z=2*z;
+           zi=2*zi;
+           p=cos(2*z)+cosh(2*zi);
+           zx=sin(2*z)/p;
+           zy=sinh(2*zi)/p;
+           z=zx;
+           zi=zy
+        );
+     );
+
+     z=z+pLat;
+     zi=zi+pLon;
+
+     if(retwist,
+        za=z/r1;
+        zb=zi/r1;
+        zx=0.5*log(za*za+zb*zb);
+        zy=atan2(zb,za);
+        z2=zx;
+        z2i=zy,
+
+        z2=z;
+        z2i=zi
+     );
+
+     p=beta*beta+betai*betai;
+     z=p1*(z2*beta+z2i*betai)/p;
+     zi=p1*(z2i*beta-z2*betai)/p;
+
+     rotatedscaledlogz=z;
+     rotatedscaledlogzi=zi;
+
+     logz=z2;
+     logzi=z2i;
+
+     zx=r1*exp(z)*cos(zi);
+     zy=r1*exp(z)*sin(zi);
+     z=zx;
+     zi=zy;
+
+     if(tileBasedOnTransparency && levelsToLookOut>0,
+        if(!transparentPointsIn,
+           ratio=r2/r1*cos(angle);
+           ratioi=r2/r1*sin(angle),
+
+           ratio=r1/r2*cos(angle);
+           ratioi=-r1/r2*sin(angle)
+        );
+
+        p=sqrt(ratio*ratio+ratioi*ratioi)^levelsToLookOut;
+        q=atan(ratioi/ratio);
+        rp=p*cos(levelsToLookOut*q);
+        rpi=p*sin(levelsToLookOut*q);
+        zx=z*rp-zi*rpi;
+        zy=z*rpi+zi*rp;
+        z=zx;
+        zi=zy;
+     );
+
+     colorSoFarR=0;
+     colorSoFarG=0;
+     colorSoFarB=0;
+     colorSoFarA=0;
+
+     alphaRemaining=1;
+     ix=minDimension/2*(z+xCenterShift);
+     iy=minDimension/2*(zi+yCenterShift);
+
+     realx=ix+((w-1)/2);
+     realy=((h-1)/2)-iy;
+
+     ColorOutR=i(#0,realx,realy,0,0,1)/255;
+     ColorOutG=i(#0,realx,realy,0,1,1)/255;
+     ColorOutB=i(#0,realx,realy,0,2,1)/255;
+     ColorOutA=i(#0,realx,realy,0,3,1)/255;
+
+     colorSoFarR=colorSoFarR+(ColorOutR*ColorOutA*alphaRemaining);
+     colorSoFarG=colorSoFarG+(ColorOutG*ColorOutA*alphaRemaining);
+     colorSoFarB=colorSoFarB+(ColorOutB*ColorOutA*alphaRemaining);
+     colorSoFarA=colorSoFarA+(ColorOutA*ColorOutA*alphaRemaining);
+
+     alphaRemaining=alphaRemaining*(1-ColorOutA);
+
+     sign=0;
+
+     if(tileBasedOnTransparency,
+        if(transparentPointsIn && alphaRemaining>epsilon,sign=-1);
+        if(!transparentPointsIn && alphaRemaining>epsilon,sign=1),
+
+        radius=sqrt(z*z+zi*zi);
+        if(radius<r1,sign=-1);
+        if(radius>r2,sign=1)
+     );
+
+     if(sign<0,
+        ratio=r2/r1*cos(angle);
+        ratioi=r2/r1*sin(angle)
+     );
+
+     if(sign>0,
+        ratio=r1/r2*cos(angle);
+        ratioi=-r1/r2*sin(angle)
+     );
+
+     if(levelToShow>1,
+        lograt=levelToShow*0.5*log(ratio*ratio+ratioi*ratioi);
+        lograti=levelToShow*atan2(ratioi,ratio);
+        ratio=exp(lograt)*cos(lograti);
+        ratioi=exp(lograt)*sin(lograti)
+     );
+
+     iteration=StartingLevel;
+     maxiteration=NumberOfLevels+StartingLevel-1;
+
+     whiledo(sign!=0 && iteration<maxiteration,
+        zx=z*ratio-zi*ratioi;
+        zy=z*ratioi+zi*ratio;
+        z2=zx;
+        z2i=zy;
+        z=z2;
+        zi=z2i;
+
+        rotatedscaledlogzi=rotatedscaledlogzi-sign*angle;
+
+        ix=minDimension/2*(z+xCenterShift);
+        iy=minDimension/2*(zi+yCenterShift);
+
+        realx=ix+((w-1)/2);
+        realy=((h-1)/2)-iy;
+
+        sign=0;
+
+        ColorOutR=i(#0,realx,realy,0,0,1)/255;
+        ColorOutG=i(#0,realx,realy,0,1,1)/255;
+        ColorOutB=i(#0,realx,realy,0,2,1)/255;
+        ColorOutA=i(#0,realx,realy,0,3,1)/255;
+
+        if(tileBasedOnTransparency,
+
+           colorSoFarR=colorSoFarR+(ColorOutR*ColorOutA*alphaRemaining);
+           colorSoFarG=colorSoFarG+(ColorOutG*ColorOutA*alphaRemaining);
+           colorSoFarB=colorSoFarB+(ColorOutB*ColorOutA*alphaRemaining);
+           colorSoFarA=colorSoFarA+(ColorOutA*ColorOutA*alphaRemaining);
+
+           alphaRemaining=alphaRemaining*(1-ColorOutA);
+
+           if(transparentPointsIn && alphaRemaining>epsilon,sign=-1);
+           if(!transparentPointsIn && alphaRemaining>epsilon,sign=1),
+
+           radius=sqrt(z*z+zi*zi);
+
+           if(radius<r1,sign=-1);
+           if(radius>r2,sign=1)
+        );
+
+        iteration=iteration+1;
+     );
+
+     ColorOutR=colorSoFarR;
+     ColorOutG=colorSoFarG;
+     ColorOutB=colorSoFarB;
+     ColorOutA=colorSoFarA;
+
+     if(ShowGrid,
+        gridzx=(logz+10*log(r2/r1))%log(r2/r1);
+        gridzy=(logzi+10*2*pi)%(2*pi);
+        if(gridzx<epsilon || gridzx>(log(r2/r1)-epsilon) || gridzy<epsilon || gridzy>(2*pi-epsilon),
+           ColorOutR=0;
+           ColorOutG=1;
+           ColorOutB=0;
+           ColorOutA=1;
+        );
+
+        gridzx=(rotatedscaledlogz+10*log(r2/r1))%log(r2/r1);
+        gridzy=(rotatedscaledlogzi+10*2*pi)%(2*pi);
+        if(gridzx<epsilon || gridzx>(log(r2/r1)-epsilon) || gridzy<epsilon || gridzy>(2*pi-epsilon),
+           ColorOutR=0;
+           ColorOutG=0;
+           ColorOutB=1;
+           ColorOutA=1;
+        );
+     );
+
+     if(ShowFrame,
+        gridzx=zinitial;
+        gridzy=zinitiali;
+        if(gridzx<(aspectRatio*r2) && gridzx>-(aspectRatio*r2) && gridzy<r2 && gridzy>-r2,
+           dx=min((aspectRatio*r2)-gridzx,gridzx+(aspectRatio*r2));
+           dy=min(r2-gridzy,gridzy+r2);
+           if(dx<(4*epsilon) || dy<(4*epsilon),
+              ColorOutR=1;
+              ColorOutG=1;
+              ColorOutB=1;
+              ColorOutA=1
+           );
+           if(dx<(2*epsilon) || dy<(2*epsilon),
+              ColorOutR=0;
+              ColorOutG=0;
+              ColorOutB=0;
+              ColorOutA=1
+           ),
+           ColorOutR=0.75*ColorOutR;
+           ColorOutG=0.75*ColorOutG;
+           ColorOutB=0.75*ColorOutB;
+           ColorOutA=1
+        );
+     );
+
+     if(!DoNotFlattenTransparency,ColorOutA=1);
+
+     i(#1,x,y,0,1)=ColorOutG*255;
+     i(#1,x,y,0,2)=ColorOutB*255;
+     i(#1,x,y,0,3)=ColorOutA*255;
+
+ColorOutR*255"
+    -k..  # Only second to last image should be kept
+  -endl -done
+
+
+#@gimp _<b>Testing</b>
+
+#@gimp <i>Souphead</i>
+
+#@gimp My filter : gimp_souphead_filter, gimp_souphead_filter_preview
+#@gimp : Sigma = float(0,0,20)
+gimp_souphead_filter :
+  -b $1
+
+gimp_souphead_filter_preview :
+  -gimp_souphead_filter $1
+  -text_outline "Preview only",5,5,24,2,1,255,128,255
+
+
+# Local Variables:
+# mode: sh
+# End:
+#
+# (End of G'MIC custom commands)
