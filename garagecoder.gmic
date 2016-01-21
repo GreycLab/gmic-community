@@ -258,6 +258,65 @@ gcd_hsv_select :
     -c[-1] 0,255
   -endl -done
 
+#@gimp Specific saturation: gcd_hio_levels, gcd_hio_levels_preview(1)
+#@gimp : note = note("\n<i>Hue Levels</i>"), sep = separator()
+#@gimp : Input = float(1,0,2)
+#@gimp : Opposing = float(1,0,2)
+#@gimp : Hue = int(39,0,360)
+#@gimp : Level = float(0,-0.5,0.5)
+#@gimp : note = note("\n<i>Luma Levels</i>"), sep = separator()
+#@gimp : Gamma = float(1,0.2,1.8)
+#@gimp : Contrast = float(1,0.2,1.8)
+#@gimp : sRGB conversion = bool(0)
+#@gimp : Sep = separator(), Preview = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate horizontal","Duplicate vertical")
+#@gimp : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2016/01/21</i>.</small>")
+gcd_hio_levels : -skip ${1=1},${2=1},${3=39},${4=0},${5=1},${6=1},${7=0}
+  -repeat $! -l[$>]
+    -split_opacity -to_rgb[0] --gcd_srgb2luma[0]
+    -if {$4!=0}
+      -sh[0] 0 -sh[0] 1 -sh[0] 2,2
+      ({$3%360}^1^1) -hsv2rgb. -max. 0 -*. $4 --. {ia}
+      -+[-4] {[0]} -+[-3] {[1]} -+[-2] {[2]} -rm[-4--1] -max[0] 0
+    -endif
+    -gcd_hue_chroma[0] $3,$1,$2
+    -gcd_srgb2jpeg[0] -j[0] [-1] -rm.
+    -max[0] 0 -sh[0] 0 srgb={($5!=1" || "$6!=1)" && "$7}
+    -if $srgb -srgb2rgb. -endif
+    -gcd_gamma. $5
+    -if {$6!=1}
+      m={iM/2} --. $m --sign. -abs..
+      -gcd_gamma.. $6,1,$m -*[-2,-1] -+. $m
+    -endif
+    -if $srgb -rgb2srgb. -endif
+    -rm. -gcd_jpeg2srgb[0] -a c -c 0,255
+  -endl -done
+
+gcd_hio_levels_preview :
+  -gimp_split_preview "-gcd_hio_levels $*",$-1
+
+gcd_hue_chroma : -skip ${1=0},${2=1},${3=1}
+  -if {$2==1" && "$3==1} -return -endif
+  -repeat $! -l[$>]
+    # get channels/ratio for hue
+    h={($1%360)/60} x={1-abs($h%2-1)} y={if($x>0,1/$x,0)} h={int($h)+1}
+    p={arg($h,0,1,1,2,2,0)} s={arg($h,1,0,2,1,0,2)} z={arg($h,2,2,0,0,1,1)}
+
+    # get current hue level [Ih]
+    [0] -sh. $p -sh.. $s --*.. $x
+    --le. [-2] -j[-3] [-2],0,0,0,0,1,[-1] -rm..
+    -eq. 0 --*.. $y -j[-4] [-1],0,0,0,0,1,[-2]
+    -rm[-4--1] -sh. $z -f. 0 -rm.
+
+    # set chroma of hues [0] [Ih] [P] [I0min] [Pn]
+    -sh. $p --compose_channels[0] min --eq.. 0 -+. [-3]
+    -if {$3!=1}
+      --/[-2,-1] --. 1 -r. 100%,100%,1,3 -*. [-5] -+[0] [-1]
+      --compose_channels[0] min --[0] [-1] -*[0] $3 -+[0,-1] --[0,-1]
+    -endif
+    -if {$2!=1} ---[-3,-2] -*. $2 -+[-3,-1] -/[-2,-1] --. 1 -*[-3,-1] -rm. -+
+    -else -k[0] -endif
+  -endl -done
+
 #@gimp _<b>Degradations</b>
 
 #@gimp CRT Sub-pixels : gimp_gcd_crt, gimp_gcd_crt(2)
@@ -627,65 +686,6 @@ gcd_srotate : -skip ${1=0},${2=50},${3=50},${4=1},${5=1},${6=6},${7=0.6},${8=0}
         -inpaint[0] [-1],$ps,{$ps*$6},$7,{9-$5*2},{$ps*1.2},0,0.08 -rm[-1]
       -endif
     -endl -a c
-  -endl -done
-
-#@gimp Specific saturation: gcd_hio_levels, gcd_hio_levels_preview(1)
-#@gimp : note = note("\n<i>Hue Levels</i>"), sep = separator()
-#@gimp : Input = float(1,0,2)
-#@gimp : Opposing = float(1,0,2)
-#@gimp : Hue = int(39,0,360)
-#@gimp : Level = float(0,-0.5,0.5)
-#@gimp : note = note("\n<i>Luma Levels</i>"), sep = separator()
-#@gimp : Gamma = float(1,0.2,1.8)
-#@gimp : Contrast = float(1,0.2,1.8)
-#@gimp : sRGB conversion = bool(0)
-#@gimp : Sep = separator(), Preview = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate horizontal","Duplicate vertical")
-#@gimp : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2016/01/20</i>.</small>")
-gcd_hio_levels : -skip ${1=1},${2=1},${3=39},${4=0},${5=1},${6=1},${7=0}
-  -repeat $! -l[$>]
-    -split_opacity -to_rgb[0] --gcd_srgb2luma[0]
-    -if {$4!=0}
-      -sh[0] 0 -sh[0] 1 -sh[0] 2,2
-      ({$3%360}^1^1) -hsv2rgb. -max. 0 -*. $4 --. {ia}
-      -+[-4] {[0]} -+[-3] {[1]} -+[-2] {[2]} -rm[-4--1] -max[0] 0
-    -endif
-    -gcd_hue_chroma[0] $3,$1,$2
-    -gcd_srgb2jpeg[0] -j[0] [-1] -rm.
-    -max[0] 0 -sh[0] 0
-    -if {$7} -srgb2rgb. -endif
-    -gcd_gamma. $5
-    -if {$6!=1}
-      m={iM/2} --. $m --sign. -abs..
-      -gcd_gamma.. $6,1,$m -*[-2,-1] -+. $m
-    -endif
-    -if {$7} -rgb2srgb. -endif
-    -rm. -gcd_jpeg2srgb[0] -a c -c 0,255
-  -endl -done
-
-gcd_hio_levels_preview :
-  -gimp_split_preview "-gcd_hio_levels $*",$-1
-
-gcd_hue_chroma : -skip ${1=0},${2=1},${3=1}
-  -if {$2==1" && "$3==1} -return -endif
-  -repeat $! -l[$>]
-    # get channels/ratio for hue
-    h={($1%360)/60} x={1-abs($h%2-1)} y={if($x>0,1/$x,0)} h={int($h)+1}
-    p={arg($h,0,1,1,2,2,0)} s={arg($h,1,0,2,1,0,2)} z={arg($h,2,2,0,0,1,1)}
-
-    # get current hue level [Ih]
-    [0] -sh. $p -sh.. $s --*.. $x
-    --le. [-2] -j[-3] [-2],0,0,0,0,1,[-1] -rm..
-    -eq. 0 --*.. $y -j[-4] [-1],0,0,0,0,1,[-2]
-    -rm[-4--1] -sh. $z -f. 0 -rm.
-
-    # set chroma of hues [0] [Ih] [P] [I0min] [Pn]
-    -sh. $p --compose_channels[0] min --eq.. 0 -+. [-3]
-    -if {$3!=1}
-      --/[-2,-1] --. 1 -r. 100%,100%,1,3 -*. [-5] -+[0] [-1]
-      --compose_channels[0] min --[0] [-1] -*[0] $3 -+[0,-1] --[0,-1]
-    -endif
-    -if {$2!=1} ---[-3,-2] -*. $2 -+[-3,-1] -/[-2,-1] --. 1 -*[-3,-1] -rm. -+
-    -else -k[0] -endif
   -endl -done
 
 #@gimp Split Objects : gcd_splitobj, gcd_splitobj_preview(1)
