@@ -602,6 +602,51 @@ gcd_spectral :
     --max 0 --min[0] 0 -abs[^-2] -negative[0] -a c -n 0,255
   -endl -done
 
+#@gimp Layer Manipulation: gcd_layers, gcd_layers_preview(1)
+#@gimp : note = note("\n<i>Transform</i>"), sep = separator()
+#@gimp : Scale = float(100,1,200)
+#@gimp : Angle = int(0,-90,90)
+#@gimp : Reduce Only (requires two layers) = bool(1)
+#@gimp : note = note("\n<i>Position</i>"), sep = separator()
+#@gimp : CentreX = float(0,-50,50)
+#@gimp : CentreY = float(0,-50,50)
+#@gimp : note = note("\n<i>Edges</i>"), sep = separator()
+#@gimp : Erode = float(0,0,50)
+#@gimp : Smooth = int(0,0,25)
+#@gimp : Gaussian (instead of curvature) = bool(0)
+#@gimp : note = note("\n<i>Layer</i>"), sep = separator()
+#@gimp : Opacity = float(1,0,1)
+#@gimp : Mode = choice{"Normal","Add","Burn","Darken","Difference",
+#@gimp : "Divide","Dodge","Grain extract","Grain merge","Hard light","Hue","Lighten",
+#@gimp : "Multiply","Overlay","Saturation","Soft light","Screen","Subtract","Value"}
+#@gimp : Flip = choice("None","Horizontal","Vertical","Both")
+#@gimp : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2016/01/22</i>.</small>")
+#@gimp : note = note("\n<small><b>Note:</b> preview is low quality for speed</small>")
+gcd_layers : -skip ${1=100},${2=0},${3=1},${4=50},${5=50},${6=0},${7=0},${8=0},${9=1},${10=1},${11=0},${12=0}
+  one={$!<2} -l${-arg\ 1+$one,[0-1],.}
+    -if {$3" && "!$one" && "$1>100} -r2dx. {w/$1%},{if($-1,2,6)} -c 0,255 -endif # ** SCALE
+    w={w} h={h} -to_a[0] -i[0] $w,$h,1,{0,s}
+    -l[1]
+      -if {$11} -mirror ${-arg\ $11,x,y,xy} -endif # FLIP
+      -if {!$3" || "$one" || "$1<100} -r2dx {w*$1%},{if($-1,2,6)} -c 0,255 -endif # ** SCALE
+      -if {$2} -rotate $2,{2-($-1)} -c 0,255 -endif # ** ROTATE
+      -if {$6" || "$7} # ** ERODE/SMOOTH
+        -sh 100% --gt. 1 -expand_xy. 1,0 -distance. 0 -gt. {1+$6}% -shrink_xy. 1
+        -*. [-2] -if {!$8" && "$7} -pde_flow. $7,30,iee,0 -max. 0 -endif -min[-2,-1] -rm.
+      -endif
+      -if {$8" && "$7} -sh 100% -b. {$7/10}% -rm. -endif
+    -endl
+    -j[0] [1],{($w-{1,w})/2+($w*$4%)},{($h-{1,h})/2+($h*$5%)} -rm[1] # ** POSITION
+    mode=${-arg\ 1+$10,alpha,add,burn,darken,difference,\
+    divide,dodge,grainextract,grainmerge,hardlight,hue,lighten,\
+    multiply,overlay,saturation,softlight,screen,subtract,value}
+    -if {$-1} -if {$!>1} -rv -blend $mode,$9 -else -sh 100% -*. $9 -rm. -endif
+    -else -nm[0] mode($mode),opacity({$9*100}) -endif # ** OPACITY
+  -endl
+
+gcd_layers_preview :
+  -gcd_layers $*,1
+
 #@gimp Recolor : gcd_recol, gcd_recol(1)
 #@gimp : note = note("<i>Apply colors to a black and white image</i>"), sep = separator()
 #@gimp : Min Hue drift = int(-14,-45,0)
@@ -716,11 +761,12 @@ gcd_srotate : -skip ${1=0},${2=50},${3=50},${4=1},${5=1},${6=6},${7=0.6},${8=0}
 #@gimp : Inpainting = choice(0,"Off","Low","Normal","High","Ultra")
 #@gimp : Is preview = const(0)
 #@gimp : sep = separator(), note = note("<b>Note :</b> This filter needs two layers to work properly.")
-#@gimp : note = note("<small>Author : <i>Garagecoder</i>.   Latest update: <i>2015/09/28</i>.</small>")
+#@gimp : note = note("<small>Author : <i>Garagecoder</i>.   Latest update: <i>2016/01/22</i>.</small>")
 gcd_splitobj : -skip ${1=50},${2=3},${3=3},${4=0},${5=0},${6=0},${7=40},${8=0},${9=0}
+  -if {$!<2} -return -endif
   -repeat {int($!/2)} -l[$>,{$>+1}]
-    -to_rgba [-1]
-    -s[1] c,-3 -ge[2] $1% -luminance[1]
+    -if {w!={0,w}" || "h!={0,h}} -continue -endif
+    -to_rgba [-1] -s[1] c,-3 -ge[2] $1% -luminance[1]
     -meancurvature_flow[1] $2 -median[1] $3 -*[1,2]
     -channels[0] 0,1 -s[0] c -gt[0,1] 50% -*[{$4!=0}] 2 -+[0,1]
     -gradient_norm[1] -*[1] -1 -watershed[0] [1] --[0] 1 -rm[1]
