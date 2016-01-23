@@ -75,6 +75,15 @@ karos_about :
 #@gmic pseudo_c : Pseudo coloring of greyscale image
 pseudo_c : -v - {iM},1,1,3,u(255) -round[-1] -map[-2] [-1] -rm[-1] -v +
 
+#@gmic sincos : _w(512), _h(512)
+#@gmic : testimage
+#@gmic : Ex: -sincos , --shift. 50%,0,0,0,2 --shift.. 0,50%,0,0,2 -a c
+sincos :
+  -skip "${1=512},${2=512}" -v - -l[]
+  $1,$2,1,1,'init(a=pi*w;b=pi*h);sin(a/(x+1))*cos(b/(y+1))' 
+  --f. 'sign(i)' -eq. 1 --neq. 1 -*[1] [-3] -*. [-3] -n[-1,-2] 0,255 
+  -f. 'if(i==255,0,i)' -or[-1,-2] -rm.. -nm. sincos -endl -v +
+
 #@gmic karo_luminance : _type = [itur1990 | itur1990-2 | gmic | gmic-2]
 #@gmic : Compute luminance of selected RGB images according
 #@gmic :   itur1990 | itur1990-2 sqr/sqrt | gmic -luminance | sqr/sqrt gmic -luminance.
@@ -160,7 +169,7 @@ karo_doo : -skip ${1=5},${2=7},${3=2},${4=1},${5=0},${6=0}
 
 #@gmic karo_label_sort :
 #@gmic : Rearrange a label image (the selected image) according to the region size
-#@gmic : $ 400,400 -rand 0,1 -b 3 -ge 50% -label 0,1 -karo_label_sort -threshold
+#@gmic : $ 400,400 -rand 0,1 -b 3 -ge 50% -label 0,1 -karo_label_sort -threshold 50%
 #@gmic : Author : <i>KaRo and David Tsch.</i>. Latest update : <i>2013/04/07</i>.
 karo_label_sort :
 -e[^-1] "Sort labelled image [1] by region size."
@@ -195,7 +204,7 @@ karo_label : -check "$1>=0" -skip ${2=0} -skip ${3=0}
 #@gmic : If _delclass > 0 delete cluster _delclass-1. blur_x histogram with amplitude _smooth.
 #@gmic : If _smooth > 0 blur_x histogram with amplitude _smooth.
 #@gmic : No histogram processing for otsu, rats and intera!
-#@gmic : $ image.jpg -luminance -karo_method[-1]
+#@gmic : $ image.jpg -luminance -karo_threshold[-1] ,
 karo_threshold : -skip ${1="triangle"} -skip ${2=0} -skip ${3=0}
   -e[^-1] "Calculate "$1" thresholded mask from images$? with histogram in range [0,255] and binsize 1."
   -v -
@@ -379,7 +388,7 @@ karo_rats :
 #@gmic : _min0 value of class 0
 #@gmic : _stepw value of class width (bin size)
 #@gmic : Def. val.: 'nth=25%', '_zero=0', '_min0=0', '_stepw=1'
-#@gmic : $ image.jpg -luminance -histogram 256,0,255 -hist_percentile , -e ${}
+#@gmic : $ image.jpg -luminance --dh ,,256,0,255 -histogram.. 256,0,255 -hist_percentile.. , -rm.. t=${} -text $t,40,5,23,1,128
 hist_percentile :
   -check "${1=25%}>0"
   -skip ${2=0},${3=0},${4=1}
@@ -413,7 +422,7 @@ hist_percentile :
 #@gmic : _stepw value of class width (bin size)
 #@gmic : Def. val.: '_moment=-2', 'nth=1', '_zero=0', '_min0=0', '_stepw=1'
 #@gmic : Updated 140314 (smoothing replaced by nth selection)
-#@gmic : $ image.jpg -luminance -histogram 256,0,255 -hist_feature , -e ${} -plot[-1]
+#@gmic : $ image.jpg -luminance --histogram 256,0,255 -dh.. ,,256,0,255 -hist_feature , -repeat 7 t={_arg($>+1${})} -text $t,40,{$>*25+5},23,1,128 -done -rm.
 hist_feature :
   -check "${1=-2}>=-2&&$1<=5&&isint($1)&&isint(${2=1})&&$2>0"
   -skip ${3=0},${4=0},${5=1}
@@ -555,7 +564,7 @@ karo_rndbit0 :
 #@gmic :   (512 byte header, col[22-24] x row[25-27] byte image)
 #@gmic : with _bit0 != 0 bit level 1 is extracted as binary mask
 #@gmic :   and bit level 1 in the gray image is randomized with -karo_rndbit0
-#@gmic : $ -karo_dtpread Images/Beispiele/tra005.cel,1
+#@gmic : Ex.: -karo_dtpread Images/Beispiele/tra005.cel,1
 karo_dtpread : -check $1 -check "${2=0}>=0"
   -e[^-1] "Read dtp image file from $1." -v -
   -i raw:$1,uchar
@@ -569,8 +578,9 @@ karo_dtpread : -check $1 -check "${2=0}>=0"
   -endif
   -v +
 
-#@gmic _kr_ch2ch : return alpha channel mode from $1 in status
-#@gmic $ -v - -repeat 51 -_kr_ch2ach $> -echo_stdout $>,${} -done
+#@gmic _kr_ch2ch : number
+#@gmic : return alpha channel mode from number in status
+#@gmic : Ex. -v - -repeat 51 -_kr_ch2ach $> -v + -echo_stdout $>,${} -done
 _kr_ch2ch :
 -if {isval("$1")} -if {isint("$1")}
 -u ${-arg\ 1+$1,all,rgba,rgba_r,rgba_g,rgba_b,rgba_a,rgb,rgb_r,rgb_g,rgb_b,\
@@ -692,7 +702,7 @@ gimp_karo_oc_diff_preview :
 #@gimp : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical")
 #@gimp : note = link("http://pinkhq.com/")
 gimp_pink :
-  -skip ${1=11},${2=0},${3=0},${4=5},${5=0}
+  -skip ${1=11},${2=0},${3=0},${4=5},${5=0} -v -
   -if   {$1==0}  -apply_channels "-b $3 -pink heightminima,{($2+1)*4},$4 -pink wshedtopo,{($2+1)*4}",$5,0
   -elif {$1==1}  -apply_channels "-b $3 -pink heightmaxima,{($2+1)*4},$4 -pink wshedtopo,{($2+1)*4},i",$5,0
   -elif {$1==2}  -apply_channels "-b $3 -pink minima,{($2+1)*4}",$5,0
@@ -716,7 +726,7 @@ gimp_pink :
   -elif {$1==18} -apply_channels "-b $3 -pink erosballnum,$4",$5,0
   -elif {$1==19} -apply_channels "-b $3 -pink lintophat,$4",$5,0
   -else          -apply_channels "-b $3 -pink heightminima,{($2+1)*4},$4 -pink wshedtopo,{($2+1)*4}",$5,0
-  -endif
+  -endif -v +
 
 gimp_pink_preview :
   -gimp_split_preview "-gimp_pink ${1-5}",$6
