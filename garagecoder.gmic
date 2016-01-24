@@ -358,6 +358,26 @@ gimp_gcd_crt : -skip ${1=1.8},${2=1.8},${3=0},${4=0}
 
 #@gimp _<b>Repair</b>
 
+#@gimp Deinterlace2x: gcd_deinterlace2x, gcd_deinterlace2x(0)
+#@gimp : note = note("<i>Blend 2x frames for 4:2:0 YUV</i>"), sep = separator()
+#@gimp : Balance = int(64,1,255)
+#@gimp : 2x Type = choice("DCCI2x","Fast Blend")
+#@gimp : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2015/01/23</i>.</small>")
+#@gimp : note = note("\n<small><b>Note:</b> preview can be incorrect if moved</small>")
+gcd_deinterlace2x : -skip ${1=63.75},${2=0}
+  -repeat $! -l[$>]
+    w={w} h={h} d={d} hh={int($h/2)} -rgb2yuv -s c
+    -l[0] --shift 0,-1 -r $w,$hh,$d,1,4 -endl
+    -l[-2,-1] -r $w,2,$d,$hh,-1 --shift 0,0,0,-1 -r $w,2,$d,50%,4 -r $w,$hh,$d,1,-1 -endl
+    -a[0,2,3] c -a[^0] c -yuv2rgb
+    -if {!$2} -scale_dcci2x ,,1 -r 50%,100%,1,3,4 -else
+      a={2/3} b={-1/12} ($b,$a,$b;$b,$a,$b) --convolve[^-1] [-1] -rm...
+      -r 100%,200%,1,3,4 -shift[-2,-1] 0,1 -+[-3,-1] -+[-3,-1]
+    -endif
+    -c 0,255 -shift. 0,1 --- --norm. a={-192^-.5/$1} ($a,$a,$a;$a,0,$a;$a,$a,$a)
+    -convolve.. [-1] -rm. -max. -1 -+. 1 -*[-2,-1] --[0,-1] -rm.
+  -endl -done
+
 #@gimp Despeckle: gcd_despeckle, gcd_despeckle(3)
 #@gimp : note = note("<i>Remove small dots and specks</i>"), sep = separator()
 #@gimp : Tolerance = int(20,0,50)
