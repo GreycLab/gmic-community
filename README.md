@@ -8,7 +8,7 @@
 **G'MIC** is a full-featured open-source framework for **[image processing](https://en.wikipedia.org/wiki/Image_processing)**. It provides several different **[user interfaces](https://en.wikipedia.org/wiki/User_interface)** to convert/manipulate/filter/visualize **generic image datasets**, ranging from _1d scalar signals_ to _3d+t sequences of multi-spectral volumetric images_, thus including _2d color images_.
 These interfaces are:
 
-- **1** - A command-line interface **[gmic](http://gmic.eu/tutorial/basics.shtml)**, to use the **G'MIC** features from a shell. In this setting, **G'MIC** may be seen as a serious (and friendly) competitor of the [ImageMagick](http://www.imagemagick.org) or [GraphicsMagick](http://www.graphicsmagick.org) software suites.
+- **1** - A command-line interface **[gmic](http://gmic.eu/tutorial/basics.shtml)**, to use the **G'MIC** features from a shell. In this setting, **G'MIC** may be seen as a friendly companion to the [ImageMagick](http://www.imagemagick.org) or [GraphicsMagick](http://www.graphicsmagick.org) software suites.
 
 <a href="http://gmic.eu/img/gmic_cli.jpg">![cli_interface](http://gmic.eu/img/gmic_cli_thumb.jpg)<a>
 
