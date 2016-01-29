@@ -198,7 +198,7 @@ karo_label : -check "$1>=0" -skip ${2=0} -skip ${3=0}
 	-endif
   -endl -done -v +
 
-#@gmic karo_threshold : _method={ triangle | yen | otsu | _otsu | bgt | intera | rats },_delclass>0,_smooth>0
+#@gmic karo_threshold : _method={ triangle | yen | otsu | _otsu | bgt | intera | rats | fixnnn},_delclass>0,_smooth>0
 #@gmic : Calculate threshold (from ImageJ) in range [0,255], evtl. normalization necessary.
 #@gmic : For each method user function _karo_"_method" is called!
 #@gmic : If _delclass > 0 delete cluster _delclass-1. blur_x histogram with amplitude _smooth.
@@ -208,21 +208,30 @@ karo_label : -check "$1>=0" -skip ${2=0} -skip ${3=0}
 karo_threshold : -skip ${1="triangle"} -skip ${2=0} -skip ${3=0}
   -e[^-1] "Calculate "$1" thresholded mask from images$? with histogram in range [0,255] and binsize 1."
   -v -
-  meth=$1
-  -if {$1'=='otsu} -otsu 256
-  -elif {$1'=='rats} -karo_rats ,
-  -elif {$1'=='intera} -threshold
+  -if ${-strcontains\ $1,fix} meth=fix
+  -else meth=$1 -endif
+  -if {$meth'=='otsu} -otsu 256 
+  -elif {$meth'=='rats} -karo_rats ,
+  -elif {$meth'=='intera} -threshold
   -else -repeat $!
     -l[$>]
-	  --histogram[-1] 256,0,255
-	  -if {$2>0} -=[-1] 0,{$2-1} -endif
-	  -if {$3!=0} tot={is} -/[-1] $tot -blur_x[-1] $3 -/[-1] {is} -*[-1] $tot -round[-1] -endif
-	  --_karo_$1[-1] 0,1 -rm[-1] th=${}
+	  -if ${-strcmp\ $meth,fix} -_karo_fix ,,$1 
+	  -else --histogram[-1] 256,0,255
+	    -if {$2>0} -=[-1] 0,{$2-1} -endif
+	    -if {$3!=0} tot={is} -/[-1] $tot -blur_x[-1] $3 -/[-1] {is} -*[-1] $tot -round[-1] -endif
+	    --_karo_$meth[-1] 0,1 -rm[-1] 
+	  -endif
+	  th=${}
 	  -threshold[0] $th
 # Concatenate results for image list
       -if {$>==0} sres=$th -else sres=$sres,$th -endif
     -endl -done -u $sres -endif
   -v +
+#@gmic _karo_fix : 0,1,fixnnn	
+#@gmic : fix threshold nnn returned in status
+_karo_fix :
+  -skip "${1=0} ${2=1} ${3=fix005}"
+  -u ${-strreplace\ $3,fix,\ }
 
 #@gmic _karo_triangle : _minval,_bins
 #@gmic : Calculate triangle threshold (from ImageJ auto thresholder)
