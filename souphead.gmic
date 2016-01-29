@@ -606,6 +606,134 @@ outR"
 -rm[-1]
 -endl -done
 
+#@gimp moon2panorama : moon2panorama, moon2panorama_preview(1)
+#@gimp : Center help = bool(0)
+#@gimp : Center X = float(0,-20,20)
+#@gimp : Center Y = float(0,-20,20)
+#@gimp : Span = float(360,0,1450)
+#@gimp : Shift X = float(0,-200,200)
+#@gimp : Shift Y = float(0,-200,200)
+#@gimp : sep = separator()
+#@gimp : Antialiasing = bool(1)
+#@gimp : Edge Behavior X = choice("Blank","Wrap","Reflect","Rotate")
+#@gimp : Edge Behavior Y = choice("Blank","Wrap","Reflect","Rotate")
+#@gimp : sep = separator()
+#@gimp : note = note("<small>This filter is a conversion of the Mathmap script originally written by Edgar Bonet</small>")
+#@gimp : link = link("Edgar Bonet.","http://http://edgar-bonet.org/")
+#@gimp : note = note("<small>Converts partial cylindrical layout to panorama layout</small>")
+
+moon2panorama_preview :
+  -moon2panorama ${1--1}
+
+moon2panorama :
+  -repeat $! -l[$>]
+  --f. 0
+  -sh. 0 
+  -f. "
+init(
+center_help=$1;
+center_x=$2;
+center_y=$3;
+span=$4;
+shift_x=$5;
+shift_y=$6;
+Antialias = $7;
+XEdgeType = $8;
+YEdgeType = $9;
+
+AR=w/h;
+if (AR>1, W=2;H=2/AR,H=2;W=2/AR);
+
+minXY=min(W/2,H/2);
+);
+
+if (AR>1,
+
+    X=(2*x/(w-1))-1;
+    Y=(1-(2*y/(h-1)))/AR,
+
+    X=((2*x/(w-1))-1)/AR;
+    Y=1-(2*y/(h-1))
+);
+
+scaled=X/W*span;
+scaledi=(Y/(1+9*center_help))/W*span;
+
+shifted=(scaled-shift_x)*pi/180;
+shiftedi=(scaledi-shift_y)*pi/180;
+
+reshifted=shiftedi;
+reshiftedi=-shifted;
+
+remapped=-exp(reshifted)*sin(reshiftedi);
+remappedi=exp(reshifted)*cos(reshiftedi);
+
+centered=(remapped*0.8+center_x/100)*minXY;
+centeredi=(remappedi*0.8+center_y/100)*minXY;
+
+if (center_help && abs(2*Y/H)<0.01,
+ 
+    outR=255;
+    outG=255;
+    outB=0;
+    outA=255,
+        
+    if (AR>1,
+
+       realx=(centered+1)*(w-1)/2; 
+       realy=(1-AR*centeredi)*(h-1)/2,
+
+       realx=(AR*centered+1)*(w-1)/2; 
+       realy=(1-centeredi)*(h-1)/2
+    ); 
+
+    if(realx<0 || realx>=w,
+       if(XEdgeType==1,
+          realx=realx%w;
+          if(realx<0,realx=w+realx)
+       );
+       if(XEdgeType==2,
+          realx=abs(realx%w);
+          if(realx<w/2,realx=w-realx,realx=abs(realx-w))
+       );
+       if(XEdgeType==3,
+          realx=abs(realx%w);
+          realy=h-realy;
+          if(realx<w/2,realx=w-realx,realx=abs(realx-w))
+       );
+    );
+
+    if(realy<0 || realy>=h,
+       if(YEdgeType==1,
+          realy=realy%h;
+          if(realy<0,realy=h+realy)
+       );
+       if(YEdgeType==2,
+          realy=abs(realy%h);
+          if(realy<h/2,realy=h-realy,realy=abs(realy-h))
+       );
+       if(YEdgeType==3,
+          realy=abs(realy%h);
+          realx=w-realx;
+          if(realy<h/2,realy=h-realy,realy=abs(realy-h))
+       );
+    );
+
+    outR=i(#0,realx,realy,0,0,Antialias);
+    outG=i(#0,realx,realy,0,1,Antialias);
+    outB=i(#0,realx,realy,0,2,Antialias);
+    outA=i(#0,realx,realy,0,3,Antialias);
+
+);  
+
+i(#1,x,y,0,1)=outG;
+i(#1,x,y,0,2)=outB;
+i(#1,x,y,0,3)=outA;
+
+outR"
+-k..
+-endl -done
+
 # Local Variables:
 # mode: sh
 # End:
