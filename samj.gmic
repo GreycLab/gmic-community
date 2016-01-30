@@ -44,7 +44,7 @@
 #@gimp : note = note(<b>Filtres :</b>)
 #@gimp : note = note("Les filtres contenus dans ce r\303\251pertoire sont majoritairement traduits en fran\303\247ais et/ou en cours de d\303\251veloppement.")
 #@gimp : note = note("The filters included in this directory are mostly translated into French and/or experimental.")
-#@gimp : note = note("Version 2016/01/29 GMIC 1.6.9 pre")
+#@gimp : note = note("Version 2016/01/30 GMIC 1.6.9 pre")
 
 samj_about :
 -text_outline "Bonjour!",{{min({w},{h})}/20},{{min({w},{h})}/20},{{min({w},{h})}/5},1,255,255,255,255
@@ -63,6 +63,131 @@ samj_rien_arrays_and_tiles :
 	-Je_passe_l_hiver_en_Floride[-1]
 
 #@gimp <b>Arrays &amp; tiles</b>
+
+
+
+
+
+#################################################
+##                                             ##
+##             samj_Bulles_Colorees            ##
+##                                             ##
+#################################################
+
+#### -samj_Bulles_Colorees 64,64,64,255,8,-255,255,2.5,0.4,1,20,2,0,0,0,0,255
+
+#@gimp samj_Bulles_Colorees  : samj_Bulles_Colorees, samj_Bulles_Colorees(1)
+#@gimp : note = note("samj_Bulles_Colorees")
+#@gimp : sep = separator(), note = note("<span foreground="orangered"><b>Limite</b></span>")
+#@gimp : Couleur Limite= color(64,64,64,255)
+#@gimp : sep = separator(), note = note("<span foreground="orangered"><b>Resolution</b></span>")
+#@gimp : Resolution = int(8,1,32)
+#@gimp : sep = separator(), note = note("<span foreground="Bulles"><b>Bulles</b></span>")
+#@gimp : Variation L = int(0,-255,255)
+#@gimp : Variation H = int(0,-255,255)
+#@gimp : Grossissement A = float(3,1,9)
+#@gimp : Grossissement B = float(0,-3,3)
+#@gimp : Angle = bool(0)
+#@gimp : Angle Variation = float(0,0,180)
+#@gimp : sep = separator(), note = note("<span foreground="Rendu"><b>Limite</b></span>")
+#@gimp : Rendu = choice(0,"A","Inverser","A + Inverser")
+#@gimp : Flou / Blur Contours = float(0,0,5)
+#@gimp : sep = separator(), note = note("<span foreground="orangered"><b>Fond</b></span>")
+#@gimp : Couleur Fond / Background Color = color(0,0,0,255)
+#@gimp : sep = separator(), note = note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2016/01/30</i>.</small>")
+
+samj_Bulles_Colorees :
+
+Couleur_Limite_r=$1
+Couleur_Limite_v=$2
+Couleur_Limite_b=$3
+Couleur_Limite_a=$4
+Resolution=$5
+Variation_L=$6
+Variation_H=$7
+Grossissement_A=$8
+Grossissement_B=$9
+Angle_Validation=$10
+Angle_Variation=$11
+Rendu=$12
+Flou_Contours=$13
+Couleur_Fond_r=$14
+Couleur_Fond_v=$15
+Couleur_Fond_b=$16
+Couleur_Fond_a=$17
+
+Largeur_Origine={w}
+Hauteur_Origine={h}
+
+couleur_pixel=0
+rouge_pixel=0
+vert_pixel=0
+bleu_pixel=0
+alpha_pixel=$Couleur_Limite_a
+Moyenne_couleur=0
+Coeff_bulle=0
+Angle_Origine=$Angle_Variation
+
+KL=0
+KH=0
+Hauteur=$Resolution
+Largeur=$Resolution
+
+
+$Largeur_Origine,$Hauteur_Origine,1,4
+-fill_color[-1] $Couleur_Fond_r,$Couleur_Fond_v,$Couleur_Fond_b,$Couleur_Fond_a
+
+
+
+-repeat {$Largeur_Origine/{$Resolution+$Resolution}}
+	-repeat {$Hauteur_Origine/{$Resolution+$Resolution}}
+		couleur_pixel=${-at[0]\ {$Largeur},{$Hauteur}}
+		rouge_pixel=${-arg\ 1,$couleur_pixel}
+		vert_pixel=${-arg\ 2,$couleur_pixel}
+		bleu_pixel=${-arg\ 3,$couleur_pixel}
+		Moyenne_couleur={{$rouge_pixel+$vert_pixel+$bleu_pixel}/$Grossissement_A}
+
+		KL={$Grossissement_B+{{$Moyenne_couleur+$Variation_L}/512}}
+		KH={$Grossissement_B+{{$Moyenne_couleur+$Variation_H}/512}}
+		
+		-if {$Angle_Validation==0}
+			Angle_Variation=$Angle_Origine
+		-else
+			Angle_Variation={$Angle_Origine+{{$rouge_pixel+$vert_pixel+$bleu_pixel}/{255*3}*180}}
+		-endif
+
+		-if {$Rendu==0}
+			-if {{{$rouge_pixel-$Couleur_Limite_r}>=0}&&{{$vert_pixel-$Couleur_Limite_v}>=0}&&{{$bleu_pixel-$Couleur_Limite_b}>=0}}
+				-ellipse[-1] $Largeur,$Hauteur,{$Resolution*$KL},{$Resolution*$KH},$Angle_Variation,1,$rouge_pixel,$vert_pixel,$bleu_pixel,$alpha_pixel
+			-endif
+		-elif {$Rendu==1}
+			-if {{{$rouge_pixel-$Couleur_Limite_r}<0}&&{{$vert_pixel-$Couleur_Limite_v}<0}&&{{$bleu_pixel-$Couleur_Limite_b}<0}}
+				-ellipse[-1] $Largeur,$Hauteur,{$Resolution*$KL},{$Resolution*$KH},$Angle_Variation,1,$rouge_pixel,$vert_pixel,$bleu_pixel,$alpha_pixel
+			-endif
+		-elif {$Rendu==2}
+			-if {{{$rouge_pixel-$Couleur_Limite_r}>=0}&&{{$vert_pixel-$Couleur_Limite_v}>=0}&&{{$bleu_pixel-$Couleur_Limite_b}>=0}}
+				-ellipse[-1] $Largeur,$Hauteur,{$Resolution*$KL},{$Resolution*$KH},$Angle_Variation,1,$rouge_pixel,$vert_pixel,$bleu_pixel,$alpha_pixel
+			-endif
+			-if {{{$rouge_pixel-$Couleur_Limite_r}<0}&&{{$vert_pixel-$Couleur_Limite_v}<0}&&{{$bleu_pixel-$Couleur_Limite_b}<0}}
+				-ellipse[-1] $Largeur,$Hauteur,{$Resolution*$KL},{$Resolution*$KH},$Angle_Variation,1,$rouge_pixel,$vert_pixel,$bleu_pixel,$alpha_pixel
+			-endif
+		-endif
+		Hauteur={$Hauteur+$Resolution+$Resolution}
+	-done
+	Largeur={$Largeur+$Resolution+$Resolution}
+	Hauteur=$Resolution
+-done
+
+-rm[0]
+
+-if {$Flou_Contours>0} -blur[-1] $Flou_Contours,0 -endif
+
+#################################################
+##                                             ##
+##            FIN samj_Bulles_Colorees         ##
+##                                             ##
+#################################################
+
 
 
 
@@ -103,6 +228,7 @@ samj_test_H :
 #################################################
 
 #### -samj_Ellipses_Colorees 50,50,50,255,12,8,2,0,0,0,0,255
+# 20160131 erreur Couleur_Fond_x
 
 #@gimp samj_Ellipses_Colorees  : samj_Ellipses_Colorees, samj_Ellipses_Colorees(1)
 #@gimp : note = note("samj_Ellipses_Colorees")
@@ -116,7 +242,7 @@ samj_test_H :
 #@gimp : Flou / Blur Contours = float(0,0,5)
 #@gimp : sep = separator(), note = note("<span foreground="orangered"><b>Fond</b></span>")
 #@gimp : Couleur Fond / Background Color = color(0,0,0,255)
-#@gimp : sep = separator(), note = note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2016/01/24</i>.</small>")
+#@gimp : sep = separator(), note = note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2016/01/31</i>.</small>")
 
 samj_Ellipses_Colorees :
 
@@ -128,8 +254,10 @@ Rayon_L=$5
 Rayon_H=$6
 Rendu=$7
 Flou_Contours=$8
-#@gimp : Couleur Fond / Background Color = color(0,0,0,255)
-
+Couleur_Fond_r=$9
+Couleur_Fond_v=$10
+Couleur_Fond_b=$11
+Couleur_Fond_a=$12
 
 Largeur_Origine={w}
 Hauteur_Origine={h}
