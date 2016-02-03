@@ -45,7 +45,7 @@
 #@gimp : note = link("https://github.com/dtschump/gmic-community/blob/master/samj.gmic","https://github.com/dtschump/gmic-community/blob/master/samj.gmic")
 #@gimp : note = note("Les filtres contenus dans ce r\303\251pertoire sont majoritairement traduits en fran\303\247ais et/ou en cours de d\303\251veloppement.")
 #@gimp : note = note("The filters included in this directory are mostly translated into French and/or experimental.")
-#@gimp : note = note("Version 2016/02/02 GMIC 1.6.9 pre")
+#@gimp : note = note("Version 2016/02/03 GMIC 1.6.9 pre")
 
 samj_about :
 -text_outline "Bonjour!",{{min({w},{h})}/20},{{min({w},{h})}/20},{{min({w},{h})}/5},1,255,255,255,255
@@ -3091,6 +3091,119 @@ samj_rien_contours :
 #@gimp _
 #@gimp <b>Contours</b>
 
+
+
+
+
+#################################################
+##                                             ##
+##     samj_Scintillements_Colores_Contours    ##
+##                                             ##
+#################################################
+
+#### -samj_Scintillements_Colores_Contours 3,10,6,8,8,0.5,400,18,0,70,0,0,0,0,255
+
+#@gimp samj_Scintillements_Colores_Contours  : samj_Scintillements_Colores_Contours, samj_Scintillements_Colores_Contours(1)
+#@gimp : note = note("samj_Scintillements_Colores_Contours")
+#@gimp : sep = separator(), note = note("<span foreground="orangered"><b>Limites via Isophote</b></span>")
+#@gimp : Flou = int(0,0,10)
+#@gimp : Isophotes = int(8,6,16)
+#@gimp : Dilate = int(0,0,10)
+#@gimp : sep = separator(), note = note("<span foreground="orangered"><b>Scintillement</b></span>")
+#@gimp : Resolution L = int(8,1,32)
+#@gimp : Resolution H = int(8,1,32)
+#@gimp : Dimension Variation = float(1,0.3,3)
+#@gimp : Variation Couleur = int(768,1,768)
+#@gimp : Scintillement = int(12,3,24)
+#@gimp : Angle Decalage = float(0,0,120)
+#@gimp : Variation Aleatoire = int(0,0,100)
+#@gimp : sep = separator(), note = note("<span foreground="Rendu"><b>Flou</b></span>")
+#@gimp : Flou / Blur Contours = float(0,0,5)
+#@gimp : sep = separator(), note = note("<span foreground="orangered"><b>Fond</b></span>")
+#@gimp : Couleur Fond / Background Color = color(0,0,0,255)
+#@gimp : sep = separator(), note = note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2016/02/03</i>.</small>")
+
+samj_Scintillements_Colores_Contours :
+
+Val_Flou=$1
+Val_Isophotes=$2
+Val_Dilate=$3
+Resolution_L=$4
+Resolution_H=$5
+Dimension_Variation=$6
+Variation_Couleur=$7
+Scintillement=$8
+Angle_Decalage=$9
+Variation_Aleatoire=$10
+Flou_Contours=$11
+Couleur_Fond_r=$12
+Couleur_Fond_v=$13
+Couleur_Fond_b=$14
+Couleur_Fond_a=$15
+
+Largeur_Origine={w}
+Hauteur_Origine={h}
+
+couleur_pixel=0
+rouge_pixel=0
+vert_pixel=0
+bleu_pixel=0
+alpha_pixel=0
+Hauteur=$Resolution_H
+Largeur=$Resolution_L
+Rayon_Scintillement_Origine={{$Resolution_H+$Resolution_L}*$Dimension_Variation}
+Rayon_Scintillement=0
+Angle_Variation={360/$Scintillement}
+Angle_Variation_En_Cours=0
+Coeff_Variation_Aleatoire=0
+
+-blur[-1] $Val_Flou
+-to_rgba[-1]
+-isophotes[-1] $Val_Isophotes 
+-dilate_circ[-1] $Val_Dilate
+
+$Largeur_Origine,$Hauteur_Origine,1,4
+-fill_color[-1] $Couleur_Fond_r,$Couleur_Fond_v,$Couleur_Fond_b,$Couleur_Fond_a
+
+-repeat {$Largeur_Origine/{$Resolution_L+$Resolution_L}}
+	-repeat {$Hauteur_Origine/{$Resolution_H+$Resolution_H}}
+		couleur_pixel=${-at[-2]\ {$Largeur},{$Hauteur}}
+		rouge_pixel=${-arg\ 1,$couleur_pixel}
+		vert_pixel=${-arg\ 2,$couleur_pixel}
+		bleu_pixel=${-arg\ 3,$couleur_pixel}
+		alpha_pixel=${-arg\ 4,$couleur_pixel}
+		Moyenne_couleur={1+{{$rouge_pixel+$vert_pixel+$bleu_pixel}/$Variation_Couleur}}
+		Rayon_Scintillement={$Rayon_Scintillement_Origine*$Moyenne_couleur}
+		Angle_Variation_En_Cours=0
+
+		-if {$alpha_pixel>1}
+			-repeat $Scintillement
+				Angle_Variation_En_Cours={$Angle_Variation_En_Cours+$Angle_Variation+$Angle_Decalage}
+				-if {$Variation_Aleatoire==0}
+					-line[-1] $Largeur,$Hauteur,{$Largeur+{$Rayon_Scintillement*{cos({pi/180*$Angle_Variation_En_Cours})}}},{$Hauteur+{$Rayon_Scintillement*{sin({pi/180*$Angle_Variation_En_Cours})}}},1,$rouge_pixel,$vert_pixel,$bleu_pixel,$alpha_pixel
+				-else
+					Coeff_Variation_Aleatoire={1+{{round(u)*$Variation_Aleatoire}/100}}
+					-line[-1] $Largeur,$Hauteur,{$Largeur+{$Rayon_Scintillement*$Coeff_Variation_Aleatoire*{cos({pi/180*$Angle_Variation_En_Cours*$Coeff_Variation_Aleatoire})}}},{$Hauteur+{$Rayon_Scintillement*$Coeff_Variation_Aleatoire*{sin({pi/180*$Angle_Variation_En_Cours*$Coeff_Variation_Aleatoire})}}},1,$rouge_pixel,$vert_pixel,$bleu_pixel,$alpha_pixel
+				-endif
+			-done
+		-endif
+		Hauteur={$Hauteur+$Resolution_H+$Resolution_H}
+	-done
+	Largeur={$Largeur+$Resolution_L+$Resolution_L}
+	Hauteur=$Resolution_H
+-done
+
+-rm[-2]
+
+-if {$Flou_Contours>0} -blur[-1] $Flou_Contours,0 -endif
+
+
+
+#################################################
+##                                             ##
+##  FIN samj_Scintillements_Colores_Contours   ##
+##                                             ##
+#################################################
 
 
 
@@ -14234,6 +14347,7 @@ Precision=$7
 ##                                             ##
 #################################################
 
+#### -samj_Scintillements_Colores_en 72,55,35,255,16,8,1.09091,384,12,0,45,2,0,0,0,0,255,0 
 
 #@gimp Color Rays  : samj_Scintillements_Colores_en, samj_Scintillements_Colores_en(1)
 #@gimp : note = note("Color Rays")
