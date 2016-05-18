@@ -12,7 +12,7 @@ These interfaces are:
 
 <a href="http://gmic.eu/img/gmic_cli.jpg">![cli_interface](http://gmic.eu/img/gmic_cli_thumb.jpg)<a>
 
-- **2** - A plug-in **[gmic_gimp](http://gmic.eu/gimp.shtml)**, to bring **G'MIC** capabilities to the image retouching software [GIMP](http://www.gimp.org). More than **400 filters** are already available, sorted by category (_Artistic, Black &amp; white, Colors, Contours, Deformations, Degradations, Details, Film emulation, Frames, Layers, Light &amp; shadows, Patterns, Rendering, Repair, Sequences_, etc.).
+- **2** - A plug-in **[gmic_gimp](http://gmic.eu/gimp.shtml)**, to bring **G'MIC** capabilities to the image retouching software [GIMP](http://www.gimp.org). More than **450 filters** are already available, sorted by category (_Artistic, Black &amp; white, Colors, Contours, Deformations, Degradations, Details, Film emulation, Frames, Layers, Light &amp; shadows, Patterns, Rendering, Repair, Sequences_, etc.).
 
 <a href="http://gmic.eu/img/gmic_gimp.jpg">![gimp_interface](http://gmic.eu/img/gmic_gimp_thumb.jpg)</a>
 
