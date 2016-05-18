@@ -283,7 +283,7 @@ gimp_tk_retouch :
       -reverse[0,1] -gimp_compose_softlight[0,1] {$3/5}
       -gimp_unsharp[-2] 0,$6,30,$7,0.00,1.00,0.5,1,0,7,0
       -split[-2] c  -reverse[-1,-2] -compose_multiply[-1,-2] -append[-4,-3,-2,-1] c
-      -compose_alpha[0,1]
+      -blend[0,1] alpha
     -endif
   -endl -done
 
@@ -1581,26 +1581,26 @@ gimp_tk_autodepth :
 
  --channels[0] 1 -t2[-1] $gtr%,100%
  -gimp_morpho[-1] 2,2,0,0,0,1,0 -n[-1] 0,$gpos
- -tk_gimp_replace_color[-1] 1,0,0,0,0,255,0,0,0,0  -compose_alpha[-1,-2]
+ -tk_gimp_replace_color[-1] 1,0,0,0,0,255,0,0,0,0  -blend[-1,-2] alpha
 
  --channels[0] 0 -t2[-1] $rtr%,100%
  -gimp_morpho[-1] 2,2,0,0,0,1,0 -n[-1] 0,$rpos
- -tk_gimp_replace_color[-1] 1,0,0,0,0,255,0,0,0,0 -compose_alpha[-1,-2]
+ -tk_gimp_replace_color[-1] 1,0,0,0,0,255,0,0,0,0 -blend[-1,-2] alpha
 
  --channels[0] 2 -t2[-1] $blutr%,100%  -n[-1] 0,$blupos
  -gimp_morpho[-1] 2,2,0,0,0,1,0
  -tk_gimp_replace_color[-1] 1,0,0,0,0,255,0,0,0,0
  -to_rgba[-1] --gimp_linear_gradient[-1] 0,0,0,255,255,255,255,255,0,90,0,100
  -s[-2] c -rv[-1,-2] -compose_multiply[-1,-2] -to_gray[-1] -a[-4,-3,-2,-1] c
- -compose_alpha[-1,-2]
+ -blend[-1,-2] alpha
 
  --channels[0] 0 --luminance[0] -compose_average[-1,-2] -t2[-1] 80%,95%
  -gimp_morpho[-1] 2,2,0,0,0,1,0 -n[-1] 0,$whpos
- -tk_gimp_replace_color[-1] 1,0,0,0,0,255,0,0,0,0 -compose_alpha[-1,-2]
+ -tk_gimp_replace_color[-1] 1,0,0,0,0,255,0,0,0,0 -blend[-1,-2] alpha
 
  --channels[0] 0 --luminance[0] -compose_average[-1,-2] -t2[-1] 5%,20%
  -gimp_morpho[-1] 2,2,0,0,0,1,0 -n[-1] 0,$blpos
- -tk_gimp_replace_color[-1] 1,0,0,0,0,255,0,0,0,0 -compose_alpha[-1,-2]
+ -tk_gimp_replace_color[-1] 1,0,0,0,0,255,0,0,0,0 -blend[-1,-2] alpha
 
  #depth from lateral inhibition
 
@@ -2670,6 +2670,42 @@ gimp_dodgeburn_preview :
  -gimp_split_preview "-gimp_dodgeburn ${1--2}",$-1
 
 #*************END OF FILTER**************
+
+gimp_split_freq :
+  -repeat $!
+    --b[-1] $1 --[-2] [-1] -/[-2] 2 -+[-2] 128 -rv[-2,-1]
+  -mv[-2,-1] 0 -done
+
+gimp_compose_freq :
+  -repeat {int($!/2)}
+    --[-1] 128 -*[-1] 2 -+[-2,-1] -c[-1] 0,255
+  -mv[-1] 0 -done
+
+compose_alpha :
+  -e[^-1] "Compose image$? two-by-two, using alpha blending."
+  -v - -repeat {int($!/2)} -l[$>,{$>+1}]
+    -r[-1] [-2],[-2],[-2],100%,0,0,0.5,0.5
+    -to_colormode[-2] {a1=!({-2,s}%2);a2=!(s%2);max({-2,s}-a1,s-a2)+a1}
+    -to_colormode[-1] {a=max({-2,s},s);a+(a%2)}
+    -if {-2,s==2" || "s==4} # Background has alpha.
+      -_compose_alpha[-2] -_compose_alpha[-1]
+      -sh[-1] {s-1},{s-1} --*[-3,-1] -rm[-2] -+[-3,-2] --[-2,-1]
+      -sh[-1] 0,{s-2} -sh[-2] {-2,s-1},{-2,s-1}
+      -max[-1] 1e-10 -/[-2] [-1] -*[-1] 255 -rm[-2,-1]
+    -else                        # Background has no alpha.
+      -sh[-1] 0,{s-2} -sh[-2] {-2,s-1},{-2,s-1} --[-2] [-4] -*[-2,-1] -/[-1] 255 -rm[-1] -+[-2,-1]
+    -endif
+  -endl -done -c 0,255 -v +
+
+_compose_alpha :
+  -sh[-1] 0,{s-2} -sh[-2] {-2,s-1},{-2,s-1} -max[-1] 1e-10 -/[-1] 255 -*[-2,-1] -rm[-1]
+
+gimp_compose_alpha :
+  -if ${2=0} -_gimp_revert_layers -endif
+  -repeat {int($!/2)}
+    -to_rgba[-1] -sh[-1] 3,3 -*[-1] $1 -rm[-1]
+    -blend[-2,-1] alpha
+  -mv[-1] 0 -done
 
 #*******END OF DIRECTORY*****************
 #@gimp _
