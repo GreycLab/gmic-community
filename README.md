@@ -39,3 +39,5 @@ Other open-source projects are known to use some of the <b><font color="#000066"
 - **[Veejay](http://veejayhq.net/)**, a visual instrument and realtime video sampler.
 
 -----------------------
+
+<a href="http://gmic.eu">![Logo](http://gmic.eu/img/logos2.jpg)</a>
