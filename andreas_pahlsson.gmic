@@ -1,0 +1,92 @@
+#
+# Pahlsson_descreen - script to clean up raster screen artifacts from high resolution scans.
+#
+# MODUS OPERANDI
+# TL;DR: Find dominant frequencies and filter them out.
+#
+# * Separate to CMYK-channels. Makes sense for printed materials but was acrually introduced to
+#   minimize RAM usage on very large images.
+# * FFT each channel, keep real part.
+# * DOG for peak detection.
+# * Create mask based on peaks with blur.
+# * iFFT and recombine.
+
+# Channels and images are named for easier management and debugging.
+
+#@gimp _<b>Repair</b>
+
+#@gimp Descreen : gimp_pahlsson_descreen, gimp_pahlsson_descreen_preview(0)
+#@gimp : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate horizontal","Duplicate vertical")
+#@gimp : sep = separator(), note = note("<small>Author: <i>Andreas P&#229;hlsson</i>.      Latest update: <i>06/27/2016</i>.</small>")
+gimp_pahlsson_descreen : -skip $*
+  -pahlsson_descreen
+
+gimp_pahlsson_descreen_preview :
+  -gimp_split_preview "-gimp_pahlsson_descreen 0",$-1
+
+pahlsson_descreen :
+  -repeat $! -l[$>] -split_opacity -l[0] -to_rgb
+    -rgb2cmyk
+    -split c
+    -name[-4] C
+    -pahlsson_descreen_channel[-4]
+    -name[-3] M
+    -pahlsson_descreen_channel[-3]
+    -name[-2] Y
+    -pahlsson_descreen_channel[-2]
+    -name[-1] K
+    -pahlsson_descreen_channel[-1]
+    -append c
+    -cmyk2rgb
+  -endl -a c -endl -done
+
+pahlsson_descreen_channel :
+ # Keep the basename around for debuggin purposes
+ basename={0,b}
+ -name[0] original
+ # Get original dimensions.
+ crop1=0,0,{original,w-1},{original,h-1},0
+ crop2=0,{original,h},100%,100%,0
+ -float2fft8[original]
+ -name[original] fft
+ # Clone the image to split in real/imaginary parts for later recombination.
+ -i [fft]
+ -name[-2] real
+ -name[-1] imaginary
+ -crop[real] $crop1
+ -crop[imaginary] $crop2
+#DEBUG -o[real] debug_real_${basename}.png
+ # Build a mask.
+ -i [real]
+ -name[-1] mask
+ # Peak detection with DOG. Maybe not the best way. Does work though.
+ -dog[mask] 0.5%,0.8%
+ -normalize[mask] 0,255
+ -threshold[mask] 64
+## Second peak detection to clean up the peaks
+# -dog[mask] 0.5%,0.8%
+# -normalize[mask] 0,255
+# -threshold[mask] 64
+ -normalize[mask] 0,255
+ -negative[mask]
+ -normalize[mask] 0,255
+ # Make sure the center is not masked.
+ -ellipse[mask] 50%,50%,7%,7%,255,255,255,255
+ # Make a blur mask. Not entirely sure why this is a good thing.
+ -i [mask]
+ -name[-1] blurmask
+ -blur[blurmask] 1.6%
+ -normalize[blurmask] 0,255
+ -mul[mask,blurmask]
+ -div[mask] 256
+#DEBUG -o[mask] debug_mask_${basename}.png
+ # Apply the mask to the real part.
+ -mul[mask,real]
+ -div[real] 256 # Compensate for multiplication
+#DEBUG -o[real] debug_real_with_mask_${basename}.png
+ # Recombine real with mask and imaginary part.
+ -append[real] [imaginary],y
+ -name[real] fft
+ -remove[imaginary]
+ # Inverse the FFT
+ -fft82float[fft]
