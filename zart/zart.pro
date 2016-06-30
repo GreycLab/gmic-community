@@ -7,6 +7,7 @@ CONFIG += link_pkgconfig
 PKGCONFIG += opencv fftw3 zlib
 LIBS += -lfftw3_threads
 DEFINES += cimg_use_fftw3 cimg_use_zlib
+GMIC_PATH = ../src/
 
 unix {
    VERSION = $$system(grep \"define.ZART_VERSION \" include/Common.h | sed -e \"s/.*VERSION //\")
@@ -36,17 +37,17 @@ openmp {
 }
 
 # compile our own version of gmic, with the same cimg_* flags as zart
-#LIBS += ../../gmic/src/libgmic.a
-SOURCES += ../../gmic/src/gmic.cpp
+#LIBS += $$GMIC_PATH/libgmic.a
+SOURCES += $$GMIC_PATH/gmic.cpp
 DEFINES += gmic_build gmic_is_parallel cimg_use_abort
 
-INCLUDEPATH	+= $$PWD $$PWD/include $$PWD/../../gmic/src/
+INCLUDEPATH += $$PWD $$PWD/include $$PWD/$$GMIC_PATH/
 
 DEPENDPATH += $$PWD/include
 
-HEADERS	+= ../../gmic/src/gmic.h \
-    ../../gmic/src/gmic_stdlib.h \
-    ../../gmic/src/CImg.h \
+HEADERS	+= $$GMIC_PATH/gmic.h \
+    $$GMIC_PATH/gmic_stdlib.h \
+    $$GMIC_PATH/CImg.h \
     include/ImageView.h \
     include/MainWindow.h \
     include/FilterThread.h \
