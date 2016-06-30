@@ -36,17 +36,17 @@ openmp {
 }
 
 # compile our own version of gmic, with the same cimg_* flags as zart
-#LIBS += ../src/libgmic.a
-SOURCES += ../src/gmic.cpp
+#LIBS += ../../gmic/src/libgmic.a
+SOURCES += ../../gmic/src/gmic.cpp
 DEFINES += gmic_build gmic_is_parallel cimg_use_abort
 
-INCLUDEPATH	+= $$PWD $$PWD/include $$PWD/../src/
+INCLUDEPATH	+= $$PWD $$PWD/include $$PWD/../../gmic/src/
 
 DEPENDPATH += $$PWD/include
 
-HEADERS	+= ../src/gmic.h \
-    ../src/gmic_stdlib.h \
-    ../src/CImg.h \
+HEADERS	+= ../../gmic/src/gmic.h \
+    ../../gmic/src/gmic_stdlib.h \
+    ../../gmic/src/CImg.h \
     include/ImageView.h \
     include/MainWindow.h \
     include/FilterThread.h \
