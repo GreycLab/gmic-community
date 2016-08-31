@@ -3,8 +3,8 @@
 # Description: G'MIC custom command file
 # Defines a set of image filters for use with the G'MIC program/plugin
 #
-# Author: garagecoder
-# Date: 4th December 2012
+# Author: Andy Kelday
+# Date: 31st August 2016
 # Contact: garagecoder@gmail.com
 #
 # This software is governed by the CeCILL  license under French law and
@@ -960,6 +960,44 @@ gcd_stereo_vid_preview : -skip "${1=}","${2=}"
 
 gcd_add0 :
   ({'"$1"'}) -if {w<$2} {$2-w},1,1,1,48 -rv[-2,-1] -a[-2,-1] x -endif -u {t} -rm[-1]
+
+#@gimp Temperature Balance: gcd_temp_balance, gcd_temp_balance(1)
+#@gimp : note = note("<i>Auto-detect lighting and adjust color temperature</i>"), sep = separator()
+#@gimp : Saturation = float(0,-1,1)
+#@gimp : Level = float(0,-1,1)
+#@gimp : Color = float(1,0,2)
+#@gimp : Lighting = choice("Automatic","Automatic [Scan All Hues]","Standard [No Scan]")
+#@gimp : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2016/08/30</i>.</small>")
+gcd_temp_balance : -skip ${1=0},${2=0},${3=1},${4=0}
+  -repeat $! -l[$>]
+    -split_opacity -to_rgb[0] --gcd_srgb2luma[0]
+    -if {$4<2}
+      m={if($4,360,90)} $m,1,1,1 --r[0] 32,32,100%,100%,2
+      -repeat $m --gcd_hue_level. $> -=... {ia},$> -rm. -done
+      -rm. h={xM} -rm.
+    -else h=39 -endif
+    -if {$2!=0}
+      --l[0] -sh[0] 0 -sh[0] 1 -sh[0] 2
+        ({$h%360}^1^1) -hsv2rgb. -max. 0 -*. $2 --. {ia}
+        -+[-4] {@0} -+[-3] {@1} -+[-2] {@2} -rm[-4--1] -max[0] 0
+      -endl
+      --compose_channels[0] max -n. 0,1
+      -j[0] [-2],0,0,0,0,1,[-1] -rm[-2,-1]
+    -endif
+    -gcd_hue_chroma[0] $h,{($1+1)*$3},$3
+    -gcd_srgb2jpeg[0] -j[0] [-1] -rm.
+    -gcd_jpeg2srgb[0] -round 1 -a c -c 0,255
+  -endl -done
+
+gcd_hue_level : -skip ${1=0}
+  -repeat $! -l[$>]
+    h={($1%360)/60} x={1-abs($h%2-1)} y={if($x>0,1/$x,0)} h={int($h)+1}
+    p={arg($h,0,1,1,2,2,0)} s={arg($h,1,0,2,1,0,2)} z={arg($h,2,2,0,0,1,1)}
+    -sh. $p -sh.. $s --*.. $x
+    --le. [-2] -j[-3] [-2],0,0,0,0,1,[-1] -rm..
+    -eq. 0 --*.. $y -j[-4] [-1],0,0,0,0,1,[-2]
+    -rm[-4--1] -sh. $z -f. 0 -rm.
+  -endl -done
 
 #@gimp Tone enhance : gcd_tone_enhance, gcd_tone_enhance(1)
 #@gimp : Note = note("<u>Sharpen or adjust shadows and highlights</u>")
