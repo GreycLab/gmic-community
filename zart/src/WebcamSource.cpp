@@ -63,11 +63,8 @@ namespace {
 class QSizeCompare {
 public:
   bool operator()(const QSize & a, const QSize & b) {
-    if (a.width() < b.width())
-      return true;
-    if (a.width() == b.width())
-      return a.height() < b.height();
-    return false;
+    return ( (a.width() < b.width())
+             || ((a.width() == b.width()) && (a.height() < b.height())));
   }
 };
 }
