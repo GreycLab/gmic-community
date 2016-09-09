@@ -1926,10 +1926,548 @@ local_similarity_mask_preview:
 
 #@gimp Iain Fergusson
 
-#@gimp iain_git_test: iain_git_test,iain_git_test
+#@gimp minimum_chroma_demosaic : iain_minimum_chroma_demosaic,iain_minimum_chroma_demosaic(0)
+#@gimp : Starting pattern = choice(0,"Red-Green","Blue-Green","Green-Red","Green-Blue")
+#@gimp : Moire size  = choice (2,"Small","Medium","Large","Extra Large")
+#@gimp : Detials = choice(0,"Less detial but better colour edges","More detial but degraded colour edges")
 
-iain_git_test:
--text gittest,0,0,50,1,255
+iain_minimum_chroma_demosaic:
+-rgb2bayer $1,1
+	cropwidth={w}
+	cropheight={h}
+	-resize {w+16},{h+16},{d},{s},0,0,0.5,0.5
+--l
+
+-if {$3==0}
+--iain_horizontal_interpolate[0] $1,1
+-iain_vertical_interpolate[0] $1,1
+-elif {$3==1}
+--iain_tuned_horizontal[0] $1
+-iain_tuned_vertical[0] $1
+-endif
+
+-l[0]
+-rgb2yuv
+-split c
+-fill[0] .5
+-append c
+-yuv2rgb
+-endl
+-l[1]
+-rgb2yuv
+-split c
+-fill[0] .5
+-append c
+-yuv2rgb
+-endl
+-append z
+
+levels={$2+1}
+size={3^$levels}
+
+cropwidth2={w}
+cropheight2={h}
+
+
+-resize {w+($size-w%$size)},{h+($size-h%$size)},{d},{s},0,1
+
+-repeat $levels # number of pyramid levels. 
+-l[-1]
+--resize[0] 33.33333%,33.33333%,{d},{s},2
+--iain_resize_x3[-1]
+-sub[0,-1] 
+-endl
+-done
+
+-repeat {$!-1} -l[{$<}]
+
+-split z
+--abs
+
+-gt[-1] [-2]
+-rm[-2]
+--eq[-1] 0
+-mul[0,2]
+-mul[1,2]
+-add
+
+
+-endl -done
+
+
+
+
+-l[-1]
+-split z
+-k[1]
+-endl
+
+-repeat {$!-1}
+
+-iain_resize_x3[-1]
+
+-add[-1,-2]
+-done
+ -crop 0,0,{$cropwidth2-1},{$cropheight2-1}
+-c 0,255
+-endl
+
+-iain_chroma_guide $1,1
+
+-crop 8,8,{$cropwidth+7},{$cropheight+7}
+
+
+
+
+
+
+iain_chroma_guide:
+
+-to_rgb
+
+-rgb2bayer[0] $1,1
+
+		--l[0,1]
+
+			-split[-1] c
+			-split[0] c
+			-name[0] red -name[1] green -name[2] blue
+			-name[-3] redblur -name[-2] greenblur -name[-1] blueblur
+
+			
+			--sub[greenblur] [redblur]
+		--sub[greenblur] [blueblur]
+
+		-name[-1] bluemul -name[-2] redmul
+		-remove[redblur,greenblur,blueblur]
+		-add[red] [redmul]
+		-add[blue] [bluemul]
+		-keep[red,green,blue]
+		-append c
+		-rgb2bayer $1,1
+		-split c
+		
+		-add
+		
+		-endl
+-rm[1]
+
+
+--to_rgb[1]
+	-rgb2bayer[-1] $1,1
+
+	-split[0] c
+	-split[-1] c
+	-sub[0] [4]
+	-sub[2] [6]
+
+
+	-append[0,1,2] c
+	-add[0] 128
+	-rgb2bayer[0] $1,1
+	-split[0] c
+
+	-rm[1,-1,-2,-3]
+	
+	--l[0,2]
+	-reverse
+	-iain_guided_fillgrid
+	-endl
+	-rm[0]
+	--l[0,1]
+	-reverse
+	-iain_guided_fillgrid
+	-endl
+	-rm[0]
+	-reverse[0,1]
+	
+	
+	-sub[0,2] 128
+	-add[0] [1]
+	-add[2] [1]
+		-append c
+-c 0,255
+
+
+
+
+iain_resize_x3:
+
+
+-resize[0] {(w*3)-2},{(h*3)-2},{d},{s},5,0
+-resize[0] {w+2},{h+2},{d},{s},0,1,0.5,0.5
+
+
+
+iain_vertical_interpolate:
+
+-rgb2bayer[0] $1,1
+
+
+--l[0]
+-channels 1
+(-0.1;0;0.6;1;0.6;0;-0.1)
+-convolve[0] [-1]
+-rm[-1]
+-endl
+
+-c 0,255
+
+
+--to_rgb[1]
+	-rgb2bayer[-1] $1,1
+
+	-split[0] c
+	-split[-1] c
+	-sub[0] [4]
+	-sub[2] [6]
+
+
+	-append[0,1,2] c
+	-add[0] 128
+	-rgb2bayer[0] $1,1
+	-split[0] c
+
+	-rm[1,-1,-2,-3]
+	
+	--l[0,2]
+	-reverse
+	-iain_guided_fillgrid
+	-endl
+	-rm[0]
+	--l[0,1]
+	-reverse
+	-iain_guided_fillgrid
+	-endl
+	-rm[0]
+	-reverse[0,1]
+	
+	
+	-sub[0,2] 128
+	-add[0] [1]
+	-add[2] [1]
+		-append c
+-c 0,255
+
+
+
+iain_horizontal_interpolate:
+
+-rgb2bayer[0] $1,1
+
+
+--l[0]
+-channels 1
+(-0.1,0,0.6,1,0.6,0,-0.1)
+-convolve[0] [-1]
+-rm[-1]
+-endl
+
+-c 0,255
+
+
+--to_rgb[1]
+	-rgb2bayer[-1] $1,1
+
+	-split[0] c
+	-split[-1] c
+	-sub[0] [4]
+	-sub[2] [6]
+
+
+	-append[0,1,2] c
+	-add[0] 128
+	-rgb2bayer[0] $1,1
+	-split[0] c
+
+	-rm[1,-1,-2,-3]
+	
+	--l[0,2]
+	-reverse
+	-iain_guided_fillgrid
+	-endl
+	-rm[0]
+	--l[0,1]
+	-reverse
+	-iain_guided_fillgrid
+	-endl
+	-rm[0]
+	-reverse[0,1]
+	
+	
+	-sub[0,2] 128
+	-add[0] [1]
+	-add[2] [1]
+		-append c
+-c 0,255
+
+
+
+
+
+iain_guided_fillgrid:
+-channels 0
+# [0] guide [1] grid
+
+-l[0] ## find  orientation
+
+		(1,0;0,-1)
+		--convolve[0] [1]
+		-rm[1]
+		(0,1;-1,0)
+		--convolve[0] [2]
+		-rm[2]
+		-l[-1,-2]
+		-abs
+		-blur 1
+			--max
+			-eq[0] [-1]
+			-keep[0]
+			-mul 255
+		-endl
+	-endl
+
+--l[2]
+--l[0]
+	(0,0,0.5;0,1,0;0.5,0,0)
+	-convolve[0] [1]
+	-remove[1]
+	-endl
+	-l[0]
+	(0.5,0,0;0,1,0;0,0,0.5)
+	-convolve[0] [1]
+	-remove[1]
+	-endl
+-endl
+
+-move[1] 5
+-append[-1,-2] c
+-blend[-1,-2] alpha,1,0
+
+-rm[1]
+-l[0] ## find  orientation
+
+		(1,-1)
+		--convolve[0] [1]
+		-rm[1]
+		(1;-1)
+		--convolve[0] [2]
+		-rm[2]
+		-l[-1,-2]
+		-abs
+		-blur 1
+			--max
+			-eq[0] [-1]
+			-keep[0]
+			-mul 255
+		-endl
+	-endl
+--l[2]
+--l[0]
+	(0.5;1;0.5)
+	-convolve[0] [1]
+	-remove[1]
+	-endl
+	-l[0]
+	(0.5,1,0.5)
+	-convolve[0] [1]
+	-remove[1]
+	-endl
+-endl
+
+-move[1] 5
+-append[-1,-2] c
+-blend[-1,-2] alpha,1,0
+-k[-1]
+
+
+iain_tuned_horizontal:
+-remove_opacity
+-l[0]
+--fill[0] 1
+-rgb2bayer[1] $1,1
+--l[0]
+-split c
+-add
+## (-0.25,0.5,0.5,0.5,-0.25)
+
+(-0.025,0.1,-0.225,0.4,0.5,0.4,-0.225,0.1,-0.025)
+
+
+## (-0.05,0.2,-0.20,0.3,0.5,0.3,-0.20,0.2,-0.05)
+-convolve[0] [1]
+-rm[1]
+-endl
+
+--l[1,2]
+-shift[0] 1,0,0,0,2
+-mul
+-endl
+-add[-1] [0]
+-channels[-1] 1
+
+-k[0,-1]
+-to_rgb
+-iain_luma_guide $1,1,0
+-endl
+
+iain_tuned_vertical:
+-remove_opacity
+-l[0]
+--fill[0] 1
+-rgb2bayer[1] $1,1
+--l[0]
+-split c
+-add
+## (-0.25,0.5,0.5,0.5,-0.25)
+
+(-0.025;0.1;-0.225;0.4;0.5;0.4;-0.225;0.1;-0.025)
+
+
+## (-0.05,0.2,-0.20,0.3,0.5,0.3,-0.20,0.2,-0.05)
+-convolve[0] [1]
+-rm[1]
+-endl
+
+--l[1,2]
+-shift[0] 1,0,0,0,2
+-mul
+-endl
+-add[-1] [0]
+-channels[-1] 1
+
+-k[0,-1]
+-to_rgb
+-iain_luma_guide $1,1,0
+-endl
+
+
+iain_luma_guide:
+-remove_opacity
+-if $3
+-mul {1/255}
+-pow 2.2
+-mul 255
+-endif
+-repeat $2
+--l
+
+--split[1] c
+-add[-1,-2,-3] 
+-mul[-1] .33333333333333333
+
+-rm[1]
+
+-sub[0] [1]
+
+-add[0] 255
+-rgb2bayer[0] $1,1
+-reverse
+
+-split[1] c
+
+
+--iain_guided_diagonal_interpolation[0,1]
+--iain_guided_diagonal_interpolation[0,3]
+-rm[1,3]
+-reverse[1,2]
+--iain_guided_straight_interpolation[0,1]
+--iain_guided_straight_interpolation[0,2]
+--iain_guided_straight_interpolation[0,3]
+-rm[1,2,3]
+-sub[1,2,3] 255
+-append[1,2,3] c
+-to_rgb
+-add
+-c 0,255
+-endl
+-rm[1]
+-done
+-keep[1]
+-if $3
+-mul {1/255}
+-pow {1/2.2}
+-mul 255
+-endif
+
+
+iain_guided_diagonal_interpolation:
+--l[0] ## find green orientation
+
+		(1,0;0,-1)
+		--convolve[0] [1]
+		-rm[1]
+		(0,1;-1,0)
+		--convolve[0] [2]
+		-rm[2]
+		-l[-1,-2]
+		-abs
+		-blur 1.5
+			--min
+			-eq[0] [-1]
+			-keep[0]
+			
+		-endl
+		-rm[-2]
+-endl
+	-l[1]
+	--l[0]
+	(0,0,0.5;0,1,0;0.5,0,0)
+	-convolve[0] [1]
+	-remove[1]
+	-endl
+	-l[0]
+	(0.5,0,0;0,1,0;0,0,0.5)
+	-convolve[0] [1]
+	-remove[1]
+	-endl
+-endl
+-rm[0]
+
+--eq[-1] 0 
+-mul[0,2]
+-mul[1,2]
+-add
+
+iain_guided_straight_interpolation :
+--l[0] ## find green orientation
+
+		(1,-1)
+		--convolve[0] [1]
+		-rm[1]
+		(1;-1)
+		--convolve[0] [2]
+		-rm[2]
+		-l[-1,-2]
+		-abs
+		-blur 1.5
+			--min
+			-eq[0] [-1]
+			-keep[0]
+			
+		-endl
+		-rm[-2]
+		-endl
+
+
+-l[1]
+--l[0]
+	(0.5;1;0.5)
+	-convolve[0] [1]
+	-remove[1]
+	-endl
+	-l[0]
+	(0.5,1,0.5)
+	-convolve[0] [1]
+	-remove[1]
+	-endl
+
+-endl
+	--eq[-1] 0 
+-mul[1,3]
+-mul[2,3]
+-add[1,2]	
+-keep[1]
 
 #@gimp ms_nlmeans_c_noise2: ms_nlmeans_c_noise2_p,ms_nlmeans_c_noise2_p_preview(0)
 #@gimp : note = note("<b>Noise Reduction</b>")
