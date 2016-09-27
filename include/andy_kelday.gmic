@@ -690,29 +690,27 @@ gcd_fgmask : -skip ${1=0}
 #@gimp Upscale [box]: gcd_upscale_box, gcd_upscale_box_preview(0)
 #@gimp : note = note("<i>Box average upscale</i>"), sep = separator()
 #@gimp : Upscale factor = choice("2x","4x"), sep = separator()
-#@gimp : CbCr median = bool(0), sep = separator()
-#@gimp : note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2016/09/22</i>.</small>")
+#@gimp : CbCr median = bool(0)
+#@gimp : Sharpen = bool(0), sep = separator()
+#@gimp : note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2016/09/27</i>.</small>")
 #@gimp : note = note("\n<small>Soft upscale with sharpening, may cause edge artifacts.</small>")
-gcd_upscale_box : -skip ${1=0},${2=0}
+gcd_upscale_box : -skip ${1=0},${2=0},${3=0}
   -if $2 -ac "-median 5,20",ycbcr_cbcr -endif
-  -if $1 -gcd_scale_box4x -else -gcd_scale_box2x -endif -c 0,255
+  -gcd_scale_box2x $1,$3 -c 0,255
 
 gcd_upscale_box_preview :
   -if $1 -z 37.5%,37.5%,62.5%,62.5% -else -z 25%,25%,75%,75% -endif
   -gcd_upscale_box $*
 
-gcd_scale_box2x :
+gcd_scale_box2x : -skip ${1=0},${2=0}
   -repeat $! -l[$>]
-    --r 200%,200% -median. 3 -boxfilter. 3
-    --r. ..,2 --[0,-1] -r.. . [0] -boxfilter[0] 3
-    -*[0] 9 --[0,-1] -/.. 5 -+
-  -endl -done
-
-gcd_scale_box4x :
-  -repeat $! -l[$>]
-    --r 400%,400% -median. 5 -boxfilter. 5
-    --r. ..,2 --[0,-1] -r.. . [0] -boxfilter[0] 7
-    -*[0] 49 --[0,-1] -/.. 33 -+
+    -if {$1>0} (400,5,7,49,33) -else (200,3,3,9,5) -endif
+    --r.. {@0}%,{@0}% -median. {1,@1} -boxfilter. {1,@1}
+    --r. [0],2 --[0,-1] -r[0] .
+    -if $2
+      [0] -boxfilter[0] {1,@2} -*[0] {1,@3}
+      --[0,-1] -/[0] {1,@4} -rm.. -+
+    -else -boxfilter[0] {1,@2} -rm.. -+ -endif
   -endl -done
 
 #@gimp Depth Blur : gcd_depth_blur, gcd_depth_blur(1)
