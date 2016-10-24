@@ -223,31 +223,35 @@ lucas_kanade: -skip ${1=2},${2=1}
      -/[1,2] [0]  -rm[0] -a c
   -endl -done -v +
 
-#@gmic unwarp2d : _iteration,_smoothness,is_multi_scale,field
-#@gmic : Unwarp a 2D+T volume using a motion estimation
+#@gmic unwarp2d : iteration,scales,smoothness,keep_field
+#@gmic : Unwarp a 2D+T volume
 #@gmic :
 #@gmic : $ image.jpg -repeat 20 --shift[-1] 1,0,0,0,2 -done -a z -unwarp 10,20
 unwarp2d: -skip ${1=5},${2=5},${3=1},${4=0}
-  -e[^-1] "Unwarp an 2d+t volume"
+  -e[^-1] "Unwarp a 2D+t volume with $1 iterations,
+           $2 scales and smoothing $3"
   -v - -repeat $! -l[$>]
   # [1] warped [2] field
   [0] 100%,100%,100%,2,0
   -repeat $1
+    k=$>
+    -repeat $2
     # compute scale
-    -if {$3==0} s=1 -else  s={($>+1)/$1} -endif  scale={$s*100}%
-    -echo_stdout $s" "$scale" "{1/$s}" "{$2*$s}
+    -if {$>==($2-1)} s=1 -else  s={($>+1)/$2} -endif scale={$s*100}%
+    -echo_stdout $k" "$>" "$s" "$scale" "{1/$s}" "{$3*$s}
     # compute displacement field
     --l[1]
       -norm
-      -r $scale,$scale,100%,1,2
-      -lucas_kanade {max(.75,$2*$s)}
+      -r $scale,$scale,100%,1
+      -lucas_kanade {max(.75,$3*$s)}
       -* {1/$s} -cumulate z
     -endl
     # scale & update the displacement field
     -r[-1] [-2],5 -+[-1,-2]
     # warp the original image
     --warp2d[0] [2] -rm[1] -reverse[-1,-2]
-  -done -if {$4==0} -rm[0,2] -else -rm[0,1] -endif
+    -done -done
+  -if {$4==0} -rm[0,2] -else -rm[0,1] -endif
   -endl -done -v +
 
 #@gmic estimate_shift_core [image]
