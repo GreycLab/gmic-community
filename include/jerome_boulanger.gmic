@@ -196,11 +196,16 @@ quiver2d:
 -e[^-1] "Cumulative sum along z-axis"
 -s z -repeat {$!/2} -l[$>,{$>+$!/2}] -quiver[0] [1],10,1,1,1,255 -endl -done -rm[{$!/2}--1] -a z
 
-#@gmic warp2d :
+#@gmic warp2d : [field]
 #@gmic : Warp a 2D image stack using a vector field
 #@gmic : $ movie.cimg  -a z -resize 50%,50% --l[0] --lucas_kanade 5,1 -cumulate[-1] z -frame 30,30,0 -warp2d -endl -frame[0] 30,30,0 -a x
 warp2d:
--s z -repeat {$!/2} -l[$>,{$>+$!/2}] -warp[0] [1],1,1,1 -endl -done -rm[{$!/2}--1] -a z
+  -e[^-1] "Warp a 3d stack using a displacement field"
+  -v - -pass$1 0 -repeat {$!-1} -l[$>,-1]
+    -s z -repeat {$!/2} -l[$>,{$>+$!/2}]
+      -warp[0] [1],1,1,1
+    -endl -done -rm[{$!/2}--1] -a z
+  -endl -done -v +
 
 #@gmic lucas_kanade: scale,smoothing
 #@gmic : Motion estimation using lucas and kanade approach
@@ -209,33 +214,41 @@ warp2d:
 #@gmic : $ image.jpg -repeat 20 --shift[-1] 1,0,0,0,2 -done -a z --lucas_kanade 2 -n 0,255 -frame 2 -a x
 #@gmic : $ image.jpg -repeat 20 --shift[-1] 1,1,0,0,2 -done -a z --lucas_kanade 2  -s z -repeat {$!/2} -l[$>,{$>+$!/2}] -quiver[0] [1] -endl -done -rm[{$!/2}--1] -a z
 lucas_kanade: -skip ${1=2},${2=1}
--e[^-1] "Motion estimation with Lucas et Kanade algorithm"
--v - -repeat $! -l[$>]
--blur_xy $2 -structuretensors 0 -blur_xy $1,$1,0 # abcdef
---l -s c -rm[0,-1] -*[1,2] -*[0,2] -reverse -- -endl  # dc-be
---l[0] -s c -rm[3,5] -*[0,3] -*[1,2] -- -endl # ae-bc
--l[0] -s c -rm[2,4,5] -*[0,2] -sqr[1] -- -endl # ad-b2
--/[1,2] [0]  -rm[0] -a c
--endl -done -v +
+  -e[^-1] "Motion estimation with Lucas et Kanade algorithm"
+  -v - -repeat $! -l[$>]
+     -blur_xy $2 -structuretensors 0 -blur_xy $1,$1,0 # abcdef
+     --l -s c -rm[0,-1] -*[1,2] -*[0,2] -reverse -- -endl  # dc-be
+     --l[0] -s c -rm[3,5] -*[0,3] -*[1,2] -- -endl # ae-bc
+     -l[0] -s c -rm[2,4,5] -*[0,2] -sqr[1] -- -endl # ad-b2
+     -/[1,2] [0]  -rm[0] -a c
+  -endl -done -v +
 
-#@gmic unwarp : _iteration,_smoothness,is_multi_scale
+#@gmic unwarp2d : _iteration,_smoothness,is_multi_scale,field
 #@gmic : Unwarp a 2D+T volume using a motion estimation
+#@gmic :
 #@gmic : $ image.jpg -repeat 20 --shift[-1] 1,0,0,0,2 -done -a z -unwarp 10,20
-unwarp: -skip ${3=1}
--e[^-1] "Unwarp an 2d+t volume"
--v - -repeat $! -l[$>]
-[0] 100%,100%,100%,2,0
--repeat $1
-  -if {$3==0} s=1 -else  s={($>+1)/$1} -endif  scale={$s*100}%
-  #-echo_stdout $s" "$scale" "{1/$s}" "{$2*$s}
-  --l[1]
-    -luminance -r $scale,$scale,100%,1,2 -lucas_kanade {max(.75,$2*$s)}
-    -* {1/$s} -cumulate z
-  -endl
-  -r[-1] [-2],5  -+[-1,-2]
-  --l[0,-1] -warp2d -endl -rm[1] -reverse[-1,-2]
--done -rm[0,2]
--endl -done -v +
+unwarp2d: -skip ${1=5},${2=5},${3=1},${4=0}
+  -e[^-1] "Unwarp an 2d+t volume"
+  -v - -repeat $! -l[$>]
+  # [1] warped [2] field
+  [0] 100%,100%,100%,2,0
+  -repeat $1
+    # compute scale
+    -if {$3==0} s=1 -else  s={($>+1)/$1} -endif  scale={$s*100}%
+    -echo_stdout $s" "$scale" "{1/$s}" "{$2*$s}
+    # compute displacement field
+    --l[1]
+      -norm
+      -r $scale,$scale,100%,1,2
+      -lucas_kanade {max(.75,$2*$s)}
+      -* {1/$s} -cumulate z
+    -endl
+    # scale & update the displacement field
+    -r[-1] [-2],5 -+[-1,-2]
+    # warp the original image
+    --warp2d[0] [2] -rm[1] -reverse[-1,-2]
+  -done -if {$4==0} -rm[0,2] -else -rm[0,1] -endif
+  -endl -done -v +
 
 #@gmic estimate_shift_core [image]
 #@gmic : Estimate a translation with a reference images with sub-pixel accuray
