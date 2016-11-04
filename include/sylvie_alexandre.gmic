@@ -4253,7 +4253,8 @@ samj_rien_patterns :
 ##                                             ##
 #################################################
 
-# ajout dilate_circ
+# ajouts dilate_circ, edges
+# -samj_Contours_Gros_Pixels 1,8,4,20,20,16,1.1,0,1,15,1,0,0,1
 
 #@gimp samj_Contours_Gros_Pixels : samj_Contours_Gros_Pixels, samj_Contours_Gros_Pixels(1)
 #@gimp : note = note("Contours GrosPixels")
@@ -4265,7 +4266,19 @@ samj_rien_patterns :
 #@gimp : Quantize Levels = int(16,1,256)
 #@gimp : Couleur = float(1.1,0.8,4)
 #@gimp : Alpha = bool(0)
-#@gimp : sep = separator(), note = note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2016/11/03</i>.</small>")
+#@gimp : sep = separator(), note = note("<span foreground="orangered"><b>Edges</b></span>")
+#@gimp : VALIDATION EDGES = bool(0)
+#@gimp : Threshold = float(15,0.5,50)
+#@gimp : Colorization = bool(0)
+#@gimp : Alpha Colorization = bool(0)
+#@gimp : Colorization Mode = choice{0,"Add","Alpha","And","Average","Blue","Burn","Darken","Difference",
+#@gimp : "Divide","Dodge","Edges","Exclusion","Freeze","Grain extract","Grain merge","Green","Hard light",
+#@gimp : "Hard mix","Hue","Interpolation","Lighten","Lightness","Linear burn","Linear light","Luminance",
+#@gimp : "Multiply","Negation","Or","Overlay","Pin light","Red","Reflect","Saturation",
+#@gimp : "Shape Average","Shape Average0","Soft burn","Soft dodge","Soft light","Screen","Stamp","Subtract","Value",
+#@gimp : "Vivid light","Xor"}
+#@gimp : Colorization Opacity = float(1,0,1)
+#@gimp : sep = separator(), note = note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2016/11/04</i>.</small>")
 
 samj_Contours_Gros_Pixels :
 
@@ -4277,6 +4290,12 @@ Gros_Pixels_Y=$5
 Quantize_Levels=$6
 Couleur=$7
 Transparence=$8
+Valider_Edges=$9
+Threshold_Edges=$10
+Colorisation=$11
+Alpha_Colorisation=$12
+Mode_blend=$13
+Opacity_blend=$14
 
 	-to_rgb[-1]
 	-blur[-1] $Flou
@@ -4284,15 +4303,35 @@ Transparence=$8
 	-if {$Dilatation>0}
 		-dilate_circ[-1] $Dilatation
 	-endif
+	-if {$Valider_Edges==1}
+		-if {$Colorisation==1}
+			--Je_passe_l_hiver_en_Floride[-1]
+			-pow[-2] $Couleur
+			-dilate_circ[-2] $Dilatation
+		-endif
+	-endif
+
 
 	# Partie code filtre Tetris
-	wh={w},{h},1,{s} -r $Gros_Pixels_X%,$Gros_Pixels_Y%,10%,100%,2 -n 0,255 -quantize $Quantize_Levels,1,0 -r $wh 
+	wh={w},{h},1,{s} -r $Gros_Pixels_X%,$Gros_Pixels_Y%,10%,100%,2 -n[-1] 0,255 -quantize[-1] $Quantize_Levels,1,0 -r $wh 
 
 	-pow[-1] $Couleur
 	-if {$Transparence==1}
 		-to_rgba[-1]
 	-else
 		-to_rgb[-1]
+	-endif
+	-if {$Valider_Edges==1}
+		-edges[-1] $Threshold_Edges%
+		-n[-1] 0,255
+		-to_rgb[-1]
+		-if {$Colorisation==1}
+			-n[-2] 0,255
+			-if {$Alpha_Colorisation==0}
+				-to_rgb[-2]
+			-endif
+			-gimp_blend_1651[-2,-1] $Mode_blend,2,$Opacity_blend,0 # add
+		-endif
 	-endif
 
 #################################################
