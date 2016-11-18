@@ -121,8 +121,6 @@ int main(int argc, char **argv) {
   options.output_format = E_FORMAT_FLOAT;
 
   // And here is the actual call to the G'MIC library!
-  // In this example, it will get the input buffer we created, divide only the red channel by 2
-  // and then display the result.
   gmic_call("-v 0 -apply_channels \"-div 2\",rgba_r -polaroid 5,30 -rotate 20 -drop_shadow , -drgba -display",
             &nofImages, &images[0], &options);
 
