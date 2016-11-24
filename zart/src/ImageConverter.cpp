@@ -54,55 +54,51 @@
 IplImage * ImageConverter::_image = 0;
 
 void ImageConverter::convert(const IplImage * in, QImage * out)
-{  
+{
   if (!in || !out) return;
   assert(in->depth== IPL_DEPTH_8U);
-  assert(in->nChannels == 3);
-  const unsigned int w3 = 3 * in->width;
-  const unsigned int qiOffset = (w3%4)?(4-(w3%4)):0;
-  const unsigned int iplOffset = in->widthStep - w3;
-  unsigned char * src = reinterpret_cast<unsigned char *>(in->imageData);
-  unsigned char * dst = reinterpret_cast<unsigned char *>(out->scanLine(0));
-  unsigned char * endSrc;
-  unsigned int line = in->height;
-  while (line--) {
-    endSrc = src + w3;
-    while (src != endSrc) {
-      dst[0] = src[2];
-      dst[1] = src[1];
-      dst[2] = src[0];
-      src += 3;
-      dst += 3;
-    }
-    dst += qiOffset;
-    src += iplOffset;
+  assert(in->nChannels == 3 || in->nChannels == 1);
+  if (out->format() != QImage::Format_RGB888)  {
+    *out = out->convertToFormat(QImage::Format_RGB888);
   }
-  return;
+  if ( out->width() != in->width || out->height() != in->height ) {
+    *out = out->scaled(in->width,in->height);
+  }
+  IplImage * tmp = cvCreateImage(cvSize(in->width,in->height),in->depth,in->nChannels);
+  cvCvtColor(in,tmp,(in->nChannels == 1)?CV_GRAY2RGB:CV_BGR2RGB);
+  const unsigned int w3 = 3 * tmp->width;
+  unsigned char * src = reinterpret_cast<unsigned char *>(tmp->imageData);
+  if ( out->bytesPerLine() == tmp->widthStep ) {
+    memcpy(out->scanLine(0),src,out->byteCount());
+  } else {
+    for ( int line = 0; line < tmp->height; ++line ) {
+      unsigned char * dst = reinterpret_cast<unsigned char *>(out->scanLine(line));
+      memcpy(dst,src,w3);
+      src += tmp->widthStep;
+    }
+  }
+  cvReleaseImage(&tmp);
 }
 
 void ImageConverter::convert(const QImage & in, IplImage **out)
 {
   if (!out) return;
   *out = cvCreateImage(cvSize(in.width(),in.height()),IPL_DEPTH_8U,3);
+  assert(in.format()  == QImage::Format_RGB888);
   const unsigned int w3 = 3 * in.width();
-  const unsigned int qiOffset = (w3%4)?(4-(w3%4)):0;
-  const unsigned int iplOffset = (*out)->widthStep - w3;
-  unsigned char * dst = reinterpret_cast<unsigned char *>((*out)->imageData);
   const unsigned char * src = reinterpret_cast<const unsigned char *>(in.scanLine(0));
-  const unsigned char * endSrc;
-  unsigned int line = in.height();
-  while (line--) {
-    endSrc = src + w3;
-    while (src != endSrc) {
-      dst[0] = src[2];
-      dst[1] = src[1];
-      dst[2] = src[0];
-      dst += 3;
-      src += 3;
+  unsigned char * dst = reinterpret_cast<unsigned char *>((*out)->imageData);
+  const ssize_t step = (*out)->widthStep;
+  if ( in.bytesPerLine() == step ) {
+    memcpy(dst,src,in.byteCount());
+  } else {
+    for ( int line = 0; line < in.height(); ++line ) {
+      src = reinterpret_cast<const unsigned char *>(in.scanLine(line));
+      memcpy(dst,src,w3);
+      dst += step;
     }
-    src += qiOffset;
-    dst += iplOffset;
   }
+  cvCvtColor(*out,*out,CV_BGR2RGB);
 }
 
 void ImageConverter::convert(const cimg_library::CImg<float> & in, QImage * out)
