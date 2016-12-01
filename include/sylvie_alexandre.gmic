@@ -40,7 +40,7 @@
 #@gimp : note = link("https://github.com/dtschump/gmic-community","https://github.com/dtschump/gmic-community")
 #@gimp : note = note("Les filtres contenus dans ce r\303\251pertoire sont majoritairement traduits en fran\303\247ais et/ou en cours de d\303\251veloppement.")
 #@gimp : note = note("The filters included in this directory are mostly translated into French and/or experimental.")
-#@gimp : note = note("Version 2016/11/30 GMIC 1.7.9")
+#@gimp : note = note("Version 2016/12/01 GMIC 1.7.9")
 
 samj_about :
 
@@ -4915,6 +4915,134 @@ samj_rien_lights_and_shadows :
 
 #@gimp _
 #@gimp <b>Lights &amp; shadows</b>
+
+
+
+
+
+#################################################
+##                                             ##
+##             samj_Ombre_Portee_B             ##
+##                                             ##
+#################################################
+
+#@gimp samj_Ombre_Portee_B  : samj_Ombre_Portee_B , samj_Ombre_Portee_B (1)
+#@gimp : sep = separator(), note = note("<span foreground="orangered"><b>Avant plan</b></span>")
+#@gimp : Resolution = int(16,4,64)
+#@gimp : Limite d\303\251tails = int(128,1,255)
+#@gimp : Supprimer Noir = bool(0)
+#@gimp : Contour = bool(1)
+#@gimp : Variation Contour = int(16,-127,127)
+#@gimp : Clair Fonc\303\251 = float(1,0,2)
+#@gimp : Pr\303\251cision Blanc = float(0,0,1)
+#@gimp : Pr\303\251cision Noir = float(0,0,1)
+#@gimp : sep = separator(), note = note("<span foreground="orangered"><b>Ombre</b></span>")
+#@gimp : Couleur Ombre = color(127,127,127,255)
+#@gimp : Dilate = int(2,0,16)
+#@gimp : Flou/Blur = float(2,0,10)
+#@gimp : D\303\251calage Ombre= int(2,0,7)
+#@gimp : Rendu = int(2,1,7)
+#@gimp : sep = separator(), note = note("<span foreground="orangered"><b>Fond</b></span>")
+#@gimp : Couleur Fond = color(255,255,255,255)
+#@gimp : sep = separator(), note = note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2016/12/01</i>.</small>")
+
+samj_Ombre_Portee_B :
+
+Resolution=$1
+Limite=$2
+Supprimer_Noir=$3
+Contour=$4
+Variation_Contour=$5
+Clair_Fonce=$6
+Precision_Blanc=$7
+Precision_Noir=$8
+R_a=$9
+V_a=$10
+B_a=$11
+A_a=$12
+Dilatation=$13
+Flou=$14
+VA=$15
+Type_Rendu=$16
+R_b=$17
+V_b=$18
+B_b=$19
+A_b=$20
+
+Largeur_A={round({{w}/$Resolution})}
+Hauteur_A={round({{h}/$Resolution})}
+OrigineH=0
+OrigineV={-$Resolution}
+couleur_pixel=0
+rouge_pixel=0
+vert_pixel=0
+bleu_pixel=0
+alpha_pixel=0
+
+	-to_rgba[-1]
+	-resize[-1] $Largeur_A,$Hauteur_A
+	-resize[-1] {$Largeur_A*$Resolution},{$Hauteur_A*$Resolution}
+	-luminance[-1]
+	-to_rgba[-1]
+	-n[-1] 0,255
+	-c[-1] 0,$Limite
+	-n[-1] 0,255
+	-c[-1] {255-$Limite},255
+	-n[-1] 0,255
+	-replace_color[-1] 100,$Precision_Blanc,255,255,255,255,0,0,0,0  # blanc vers transparence
+	-if {$Supprimer_Noir==1}
+		-replace_color[-1] 100,$Precision_Noir,0,0,0,255,0,0,0,0  # noir vers transparence
+	-endif
+	-mul[-1] $Clair_Fonce
+	{$Largeur_A*$Resolution},{$Hauteur_A*$Resolution},1,4
+	-reverse[-1,-2]
+	-repeat $Hauteur_A
+		OrigineH=0
+		OrigineV={$OrigineV+$Resolution}
+		-repeat $Largeur_A
+			couleur_pixel={I($OrigineH,$OrigineV)}
+			rouge_pixel={arg(1,$couleur_pixel)}
+			vert_pixel={arg(2,$couleur_pixel)}
+			bleu_pixel={arg(3,$couleur_pixel)}
+			alpha_pixel={arg(4,$couleur_pixel)}
+			-if {$alpha_pixel>0}
+				-rectangle[-2] $OrigineH,$OrigineV,{$OrigineH+$Resolution},{$OrigineV+$Resolution},1,$R_a,$V_a,$B_a,$A_a
+				-if {$Contour==1}
+					-rectangle[-1] $OrigineH,$OrigineV,{$OrigineH+$Resolution-1},{$OrigineV+$Resolution-1},1,0xFFFFFFFF,{{$rouge_pixel/2}+$Variation_Contour},{{$vert_pixel/2}+$Variation_Contour},{{$bleu_pixel/2}+$Variation_Contour},255
+				-endif
+			-endif
+			OrigineH={$OrigineH+$Resolution}
+		-done
+	-done
+	-dilate[-2] $Dilatation
+	-blur[-2] $Flou
+	-if {$Type_Rendu==1}
+		-shift[-2] 0,0,0,0,0	
+	-elif {$Type_Rendu==2}
+		-shift[-2] $VA,0,0,0,0	
+	-elif {$Type_Rendu==3}
+		-shift[-2] 0,$VA,0,0,0	
+	-elif {$Type_Rendu==4}
+		-shift[-2] $VA,$VA,0,0,0	
+	-elif {$Type_Rendu==5}
+		-shift[-2] {-$VA},0,0,0,0	
+	-elif {$Type_Rendu==6}
+		-shift[-2] 0,{-$VA},0,0,0	
+	-elif {$Type_Rendu==7}
+		-shift[-2] {-$VA},{-$VA},0,0,0
+	-endif
+	-crop[-2] 0,0,{{w}-1},{{h}-1}
+	-blend[-1,-2] alpha
+	{$Largeur_A*$Resolution},{$Hauteur_A*$Resolution},1,4
+	-fill_color[-1] $R_b,$V_b,$B_b,$A_b
+	-reverse[-1,-2]
+	-blend[-1,-2] alpha
+
+#################################################
+##                                             ##
+##           FIN samj_Ombre_Portee_B           ##
+##                                             ##
+#################################################
 
 
 
