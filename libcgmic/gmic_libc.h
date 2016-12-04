@@ -46,22 +46,21 @@
 
 #ifndef _GMIC_LIBC_H_
 #define _GMIC_LIBC_H_
+
+#if !defined(_MSC_VER) || (_MSC_VER >= 1900)
 #include <stdbool.h>
+#endif
 
 #if defined(WIN32) || defined(_WIN32)
-#ifdef gmic_build
-#define GMIC_DLLINTERFACE extern "C" __declspec(dllexport)
-#else // #ifdef gmic_build
-#define GMIC_DLLINTERFACE __declspec(dllimport)
-#endif // #ifdef gmic_build
-#define GMIC_CALLCONV __stdcall
+	#ifdef gmic_build
+		#define GMIC_DLLINTERFACE __declspec(dllexport)
+	#else // #ifdef gmic_build
+		#define GMIC_DLLINTERFACE __declspec(dllimport)
+	#endif // #ifdef gmic_build
+	#define GMIC_CALLCONV __stdcall
 #else // #if defined(WIN32) || defined(_WIN32)
-#ifdef gmic_build
-#define GMIC_DLLINTERFACE extern "C"
-#else // #ifdef gmic_build
-#define GMIC_DLLINTERFACE
-#endif // #ifdef gmic_build
-#define GMIC_CALLCONV
+	#define GMIC_DLLINTERFACE
+	#define GMIC_CALLCONV
 #endif // #if defined(WIN32) || defined(_WIN32)
 
 #define MAX_IMAGE_NAME_LENGTH 255
@@ -80,7 +79,7 @@ typedef struct {
   bool is_interleaved;
   EPixelFormat format;
   char name[MAX_IMAGE_NAME_LENGTH + 1];
-} gmic_bridge_image;
+} gmic_interface_image;
 
 typedef struct {
   const char* custom_commands;
@@ -91,10 +90,19 @@ typedef struct {
   EPixelFormat output_format;
   bool no_inplace_processing;
   char* error_message_buffer;
-} gmic_bridge_options;
+} gmic_interface_options;
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
 GMIC_DLLINTERFACE int GMIC_CALLCONV gmic_delete_external(float* p);
-GMIC_DLLINTERFACE int GMIC_CALLCONV gmic_call(const char* _cmd, unsigned int* _nofImages, gmic_bridge_image* _images,
-                                              gmic_bridge_options* _options);
+GMIC_DLLINTERFACE int GMIC_CALLCONV gmic_call(const char* _cmd, unsigned int* _nofImages, gmic_interface_image* _images, gmic_interface_options* _options);
+GMIC_DLLINTERFACE const char* GMIC_CALLCONV gmic_get_stdlib();
+
+#ifdef __cplusplus
+} //#ifdef  __cplusplus
+#endif
 
 #endif // #ifndef _GMIC_LIBC_H

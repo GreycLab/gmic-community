@@ -48,8 +48,8 @@ GMIC_DLLINTERFACE int GMIC_CALLCONV gmic_delete_external(float* p) {
   return 0;
 }
 
-GMIC_DLLINTERFACE int GMIC_CALLCONV gmic_call(const char* _cmd, unsigned int* _nofImages, gmic_bridge_image* _images,
-                                              gmic_bridge_options* _options) {
+GMIC_DLLINTERFACE int GMIC_CALLCONV gmic_call(const char* _cmd, unsigned int* _nofImages, gmic_interface_image* _images,
+                                              gmic_interface_options* _options) {
   int err = 0;
   bool no_inplace = _options?_options->no_inplace_processing:false;
   int nofImages = 0;
@@ -142,4 +142,10 @@ GMIC_DLLINTERFACE int GMIC_CALLCONV gmic_call(const char* _cmd, unsigned int* _n
   images.assign(0U);
   images_names.assign(0U);
   return err;
+}
+
+GMIC_DLLINTERFACE const char* GMIC_CALLCONV gmic_get_stdlib() {
+  gmic_image<char> lib = gmic::decompress_stdlib();
+  lib._is_shared = true;
+  return lib.data();
 }
