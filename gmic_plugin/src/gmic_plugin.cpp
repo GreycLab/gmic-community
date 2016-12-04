@@ -110,8 +110,8 @@
 using namespace reduxfx;
 
 #ifdef OFX_PLUGIN
-#include "gmic.h"
-#include "gmic_stdlib.h"
+#include "gmic_stdlib_gmic.h"
+#include <sstream>
 #include <stdlib.h> 
 string get_gmic_rc_path()
 {
@@ -143,10 +143,15 @@ public:
 		string effectContent = loadStringFromFile(get_gmic_rc_path() + "gmic_ofx.gmic");
 		if (effectContent == "") effectContent = loadStringFromFile(get_gmic_rc_path() + "gmic_stdlib.gmic");
 		if (effectContent == "") {
+			stringstream s;
+			s << gmic_stdlib_gmic;
+			effectContent = s.str();
+		}
+/*		if (effectContent == "") {
 			const char* lib = gmic_get_stdlib();
 			effectContent = string(lib);
 			gmic_delete_external((float*)lib);
-		}
+		} */
 		gmic_parse_multi(effectContent, &pluginData, &pluginContent);
 	};
 };
