@@ -298,8 +298,11 @@ int pluginSetup(GlobalData* globalDataP, ContextData* contextDataP)
 	for (int i = 0; i < effectData.notes.size(); i++)
 		if (effectData.notes[i] >= 32 && effectData.notes[i] < 128) d += effectData.notes[i];
 */
-	strReplace(d, "\n", "\\n");
-	d = strRemoveXmlTags(d, false);
+	d = strRemoveXmlTags(d, true);
+	d = strToAscii(d);
+	strReplace(d, "<", "(");
+	strReplace(d, ">", ")");
+//	strReplace(d, "\n", "\\n");
 	globalDataP->pluginInfo.description = d;
 
 	return 0;
@@ -400,8 +403,9 @@ int pluginProcess(SequenceData* sequenceDataP, GlobalData* globalDataP, ContextD
 	}
 
 	string cmd = mySequenceDataP->command;
-
-	// if (cmd == "") 
+#ifdef OFX_PLUGIN
+	if (cmd == "") 
+#endif
 	{
 		pluginParamChange(0, sequenceDataP, globalDataP, contextDataP);
 		cmd = mySequenceDataP->command;
@@ -497,14 +501,12 @@ void getPluginInfo(int pluginIndex, PluginInfo& pluginInfo)
 	pluginInfo.category = pluginGlobalData.pluginData[pluginIndex].category;
 	
 	string d = pluginGlobalData.pluginData[pluginIndex].notes;
-
-	strReplace(d, "\n", "\\n");
+	//strReplace(d, "\n", "\\n");
+	d = strRemoveXmlTags(d, true);
+	d = strToAscii(d);
 	strReplace(d, "<", "(");
 	strReplace(d, ">", ")");
-
 	pluginInfo.description = d;
-	
-
 	pluginInfo.major_version = MAJOR_VERSION;
 	pluginInfo.minor_version = MINOR_VERSION;
 }
