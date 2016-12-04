@@ -148,7 +148,7 @@ public:
             stringstream s;
             s << lib;
 			gmic_delete_external((float*)lib);
-            gmic_parse_multi(s.str(), &pluginData, &pluginContent);
+			effectContent = s.str();
 		}
 		gmic_parse_multi(effectContent, &pluginData, &pluginContent);
 	};
