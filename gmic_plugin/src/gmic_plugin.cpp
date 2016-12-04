@@ -49,7 +49,7 @@
 
 
 // name and description for the plugin
-#define PLUGIN_DESCRIPTION	"OpenFX wrapper for the G'MIC framework (http://www.gmic.eu).\nWritten by Tobias Fleischer (http://www.reduxfx.com).";
+#define PLUGIN_DESCRIPTION	"Wrapper for the G'MIC framework (http://www.gmic.eu).\nWritten by Tobias Fleischer (http://www.reduxfx.com).";
 
 #ifdef OFX_PLUGIN
 #define PLUGIN_NAME	        "GMIC"
