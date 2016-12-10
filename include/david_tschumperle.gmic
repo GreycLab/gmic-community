@@ -748,6 +748,99 @@ _gimp_filter_sources : -skip ${1=0}
   -rm
   ({'{/$file_hotchocolate}'})
 
+
+#@gimp New Colorize [auto-fill lineart] : gimp_autofill_lineart_new, gimp_autofill_lineart_new_preview(0)
+#@gimp : note = note{"<small><b>Global geometry parameters:</b></small>"}
+#@gimp : Contour detection (%) = float(90,0,100)
+#@gimp : Contour erosion = int(-1,-1,10)
+#@gimp : Minimal color area = float(5,0,100)
+#@gimp : sep = separator()
+#@gimp : note = note{"<small><b>Connection parameters:</b></small>"}
+#@gimp : End point rate (%) = float(75,0,100)
+#@gimp : End point connectivity = int(2,1,8)
+#@gimp : Spline max length (px) = float(60,0,256)
+#@gimp : Segment max length (px) = float(20,0,256)
+#@gimp : Spline max angle (deg.) = float(120,0,180)
+#@gimp : Allow self intersections = bool(0)
+#@gimp : sep = separator()
+#@gimp : Preview type = choice(2,"Estimated geometry","Colored regions","Colored lineart")
+#@gimp : sep = separator(), note = note("<small>Authors: <i>David Tschumperl&#233;</i>, <i>S&#233;bastien Fourey</i> and <i>David Revoy</i>.      Latest update: <i>12/10/2016</i>.</small>")
+gimp_autofill_lineart_new :
+  -_gimp_autofill_lineart_new $*,-1
+
+gimp_autofill_lineart_new_preview :
+  -_gimp_autofill_lineart_new $*
+
+_gimp_autofill_lineart_new :
+  -repeat $! -l[$>]
+    nm=${-gimp_layer_name} --l
+
+      # Constrain input image to be a single-channel lineart.
+      is_alpha={s==2||s==4}
+      -if $is_alpha -sh 100% is_alpha={iM-im>64} -rm. -endif
+      -if $is_alpha -channels 100%
+      -else -norm -negate -endif
+
+      # Threshold to reduce to binary lineart.
+      -gt {min(99.9,100-$1)}% -area_fg 0,1 -ge 8  # Remove small glitches
+
+      # Erode strokes (from stroke width estimation if automatic).
+      erode_size=$2
+      -if {$2<0}
+        --label_fg 0 --distance.. 0 {-2,iM}
+        -f... ">if (i, j = i - 1; i[#-1,j] = max(i[#-1,j],i(#-2)));i"
+        stroke_width={2*ic}
+        erode_size={round($stroke_width/5)}
+        -rm[-3--1]
+      -endif
+      -if $erode_size -erode {2*$erode_size} -area_fg 0,1 -ge 8 -endif
+
+      # Retrieve closed binary shape.
+      _keep_keypoints={$-1==0}
+      --close_binary ${4-9}
+
+      -if {$-1==0} # Render detected contours.
+        --. ... -dilate. 3
+        -negate... -*... 255 -to_rgb...
+        100%,100%,1,3,[0,0,255] -j[0] .,0,0,0,0,1,.. -rm[-2,-1]
+        -f. ${-math_lib}"if (i,draw_circle(#0,[x,y],3,1,[255,0,0]))" -rm.
+        -break
+
+      -else # Render color layer.
+
+        # Label color regions and inpaint strokes.
+        -distance.. 0 -*.. -1
+        -eq. 0 -label_fg. 0,0
+        min_color_area={$3^2}
+        -if $min_color_area --area_fg. 0,0 xy_bg={[xM,yM]} -gt. $min_color_area -*[-2,-1] -endif
+        -watershed. ..
+        -rm..
+        ind_bg={i($xy_bg)}
+
+        # Map random color palette.
+        -srand 0 {iM+1},1,1,3,">arg(1+c,j(-1) + u(85,125),u(0,0.5),u(0.7,0.9))" -hsv2rgb. -round. -point. $ind_bg,0,0,1,255 -point. 0,0,0,1,255
+        -map.. . -rm.
+      -endif
+    -endl
+
+    -if {$-1==-1} # Final rendering
+      -if {!$is_alpha} -gimp_set_layer_mode[0] multiply -endif
+
+    -elif {$-1==0} # Preview : Estimated geometry
+      -if {$is_alpha} -channels.. 100% -negate.. -endif -to_rgb[0]
+      --select_color. 0,255,255,255 -==. 0
+      -n... 150,255
+      -j... ..,0,0,0,0,1,. -k...
+    -elif {$-1==1} # Preview : Colored regions
+      -k.
+    -else # Preview : Colored lineart
+      -if {$is_alpha} -channels.. 100% -negate.. -endif -to_rgb[0]
+      -blend multiply
+    -endif
+
+  -endl -done
+
+
 #@gimp GAAP Test : gaap_test, gaap_test
 #@gimp : Sigma = float(0,0,100)
 #@gimp : Color = color(0,0,0)
