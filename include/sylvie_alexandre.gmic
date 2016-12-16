@@ -16503,6 +16503,208 @@ samj_rien_various :
 
 #################################################
 ##                                             ##
+##          Fonction samj_RGBtoLCH             ##
+##                                             ##
+#################################################
+# version 20161216
+# renvoie une chaîne de caractères ou une valeur L,C,H selon le type de demande et la valeur RGB entrée
+# exemple :
+# R_val=100 G_val=150 B_val=200 -text_outline ${"-samj_RGBtoLCH[] 0,"{/$R_val}","{/$G_val}","{/$B_val}""},2,2,23,2,1,255
+
+samj_RGBtoLCH:
+	-v -
+	Type_de_demande=$1 # 0=chaîne de caractères , 1=L , 2=C , 3=H
+	Ra=$2
+	Ga=$3
+	Ba=$4
+	# http://www.easyrgb.com/index.php?X=MATH
+	# Conversions RGB > XYZ
+
+	nt_Ra={$Ra/255}
+	nt_Ga={$Ga/255}
+	nt_Ba={$Ba/255}
+
+	-if {$nt_Ra>0.04045}
+		nt_Ra={{{$nt_Ra+0.055}/1.055}^2.4}
+	-else
+		nt_Ra={$nt_Ra/12.92}
+	-endif
+	-if {$nt_Ga>0.04045}
+		nt_Ga={{{$nt_Ga+0.055}/1.055}^2.4}
+	-else
+		nt_Ga={$nt_Ga/12.92}
+	-endif
+	-if {$nt_Ba>0.04045}
+		nt_Ba={{{$nt_Ba+0.055}/1.055}^2.4}
+	-else
+		nt_Ba={$nt_Ba/12.92}
+	-endif
+	nt_Ra={$nt_Ra*100}
+	nt_Ga={$nt_Ga*100}
+	nt_Ba={$nt_Ba*100}
+	#Observateur. = 2°, Illuminant = D65 sRGB
+	Xa={$nt_Ra*0.4124564+$nt_Ga*0.3575761+$nt_Ba*0.1804375}
+	Ya={$nt_Ra*0.2126729+$nt_Ga*0.7151522+$nt_Ba*0.0721750}
+	Za={$nt_Ra*0.0193339+$nt_Ga*0.1191920+$nt_Ba*0.9503041}
+
+		# Conversions XYZ > Lab
+
+	Xca=$Xa
+	Yca=$Ya
+	Zca=$Za
+
+	ref_Xa=95.047
+	ref_Ya=100.000
+	ref_Za=108.883
+	nt_Xa={$Xca/$ref_Xa}
+	nt_Ya={$Yca/$ref_Ya}
+	nt_Za={$Zca/$ref_Za}
+	-if {$nt_Xa>0.008856}
+		nt_Xa={$nt_Xa^{1/3}}
+	-else
+		nt_Xa={{7.787*$nt_Xa}+{16/116}}
+	-endif
+	-if {$nt_Ya>0.008856}
+		nt_Ya={$nt_Ya^{1/3}}
+	-else
+		nt_Ya={{7.787*$nt_Ya}+{16/116}}
+	-endif
+	-if {$nt_Za>0.008856}
+		nt_Za={$nt_Za^{1/3}}
+	-else
+		nt_Za={{7.787*$nt_Za}+{16/116}}
+	-endif
+	CIE_La={{116*$nt_Ya}-16}
+	CIE_aa={500*{$nt_Xa-$nt_Ya}}
+	CIE_ba={200*{$nt_Ya-$nt_Za}}
+
+		# Conversions Lab > LCH
+
+	var_H={atan2($CIE_ba,$CIE_aa)}  #Quadrant by signs
+	-if {$var_H>0}
+		var_H={{$var_H/pi}*180}
+	-else
+		var_H={360-{{abs($var_H)/pi}*180}}
+	-endif
+	CIE_L=$CIE_La
+	CIE_C={{{$CIE_aa*$CIE_aa}+{$CIE_ba*$CIE_ba}}^0.5}
+	CIE_H=$var_H
+
+	-if {$Type_de_demande==0} -u {$CIE_L}","{$CIE_C}","{$CIE_H}
+	-elif {$Type_de_demande==1} -u {$CIE_L}
+	-elif {$Type_de_demande==2} -u {$CIE_C}
+	-elif {$Type_de_demande==3} -u {$CIE_H}
+	-endif
+	-v +
+
+#################################################
+##                                             ##
+##        FIN Fonction samj_RGBtoLCH           ##
+##                                             ##
+#################################################
+
+
+
+
+
+#################################################
+##                                             ##
+##          Fonction samj_LCHtoRGB             ##
+##                                             ##
+#################################################
+# version 20161216
+# renvoie une chaîne de caractères ou une valeur R,G,B selon le type de demande et la valeur LCH entrée
+# exemples
+# -to_rgb[-1] -fill_color[-1] ${"-samj_LCHtoRGB[] 0,60.507,31.056,264,851"} -text_outline ${"-samj_LCHtoRGB[] 0,60.507,31.056,264,851"},2,2,23,2,1,255
+# L_val=60.507 C_val=31.056 H_val=264,851 -to_rgb[-1] -fill_color[-1] ${"-samj_LCHtoRGB[] 0,"{/$L_val}","{/$C_val}","{/$H_val}""} -text_outline ${"-samj_LCHtoRGB[] 0,"{/$L_val}","{/$C_val}","{/$H_val}""},2,2,23,2,1,255
+
+samj_LCHtoRGB:
+	-v -
+	Type_de_demande=$1 # 0=chaîne de caractères , 1=R , 2=G , 3=B
+
+	# http://www.easyrgb.com/index.php?X=MATH
+	# Conversions LCH > Lab
+	# CIE-H° from 0 to 360°
+	CIE_Lca=$2
+	CIE_aca={{cos({pi/180*$4})}*$3}
+	CIE_bca={{sin({pi/180*$4})}*$3}
+
+	# Conversions Lab > XYZ
+
+	nt_Yca={{$CIE_Lca+16}/116}
+	nt_Xca={$CIE_aca/500+$nt_Yca}
+	nt_Zca={$nt_Yca-$CIE_bca/200}
+	-if {{$nt_Yca^3}>0.008856}
+		nt_Yca={$nt_Yca^3}
+	-else
+		nt_Yca={{$nt_Yca-16/116}/7.787}
+	-endif
+	-if {{$nt_Xca^3}>0.008856}
+		nt_Xca={$nt_Xca^3}
+	-else
+		nt_Xca={{$nt_Xca-16/116}/7.787}
+	-endif
+	-if {{$nt_Zca^3}>0.008856}
+		nt_Zca={$nt_Zca^3}
+	-else
+		nt_Zca={{$nt_Zca-16/116}/7.787}
+	-endif
+	ref_Xca=95.047
+	ref_Yca=100.000
+	ref_Zca=108.883
+	Xca={$ref_Xca*$nt_Xca}
+	Yca={$ref_Yca*$nt_Yca}
+	Zca={$ref_Zca*$nt_Zca}
+
+	# Conversions XYZ > Lab
+
+	vcXa=$Xca
+	vcYa=$Yca
+	vcZa=$Zca
+	nt_X={$vcXa/100}	# X compris entre 0 et  95.047      ( Observateur = 2°, Illuminant = D65 )
+	nt_Y={$vcYa/100}	# Y compris entre 0 et 100.000
+	nt_Z={$vcZa/100}	# Z compris entre 0 et 108.883
+	nt_R={$nt_X*3.2404542+$nt_Y*-1.5371385+$nt_Z*-0.4985314}
+	nt_G={$nt_X*-0.9692660+$nt_Y*1.8760108+$nt_Z*0.0415560}
+	nt_B={$nt_X*0.0556434+$nt_Y*-0.2040259+$nt_Z*1.0572252}
+	-if {$nt_R>0.0031308}
+		nt_R={1.055*{$nt_R^{1/2.4}}-0.055}
+	-else
+		nt_R={12.92*$nt_R}
+	-endif
+	-if {$nt_G>0.0031308}
+		nt_G={1.055*{$nt_G^{1/2.4}}-0.055}
+	-else
+		nt_G={12.92*$nt_G}
+	-endif
+	-if {$nt_B>0.0031308}
+		nt_B={1.055*{$nt_B^{1/2.4}}-0.055}
+	-else
+		nt_B={12.92*$nt_B}
+	-endif
+
+	Rconv={$nt_R*255}
+	Gconv={$nt_G*255}
+	Bconv={$nt_B*255}
+	-if {$Type_de_demande==0} -u {$Rconv}","{$Gconv}","{$Bconv}
+	-elif {$Type_de_demande==1} -u {$Rconv}
+	-elif {$Type_de_demande==2} -u {$Gconv}
+	-elif {$Type_de_demande==3} -u {$Bconv}
+	-endif
+	-v +
+
+#################################################
+##                                             ##
+##        FIN Fonction samj_LCHtoRGB           ##
+##                                             ##
+#################################################
+
+
+
+
+
+#################################################
+##                                             ##
 ##          Fonction samj_RGBtoLab             ##
 ##                                             ##
 #################################################
