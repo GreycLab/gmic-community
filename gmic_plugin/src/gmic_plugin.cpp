@@ -48,8 +48,11 @@
 */
 
 
-// name and description for the plugin
-#define PLUGIN_DESCRIPTION	"Wrapper for the G'MIC framework (http://www.gmic.eu).\nWritten by Tobias Fleischer (http://www.reduxfx.com).";
+// version, name and description for the plugin
+#define	MAJOR_VERSION		0
+#define	MINOR_VERSION		3
+#define	BUILD_VERSION		1
+#define PLUGIN_DESCRIPTION	"Wrapper for the G'MIC framework (http://www.gmic.eu) written by Tobias Fleischer (http://www.reduxfx.com).";
 
 #ifdef OFX_PLUGIN
 #define PLUGIN_NAME	        "GMIC"
@@ -61,11 +64,6 @@
 #define PLUGIN_CATEGORY		"G'MIC                          "
 #define PLUGIN_UNIQUEID		"gmic_plugin                    "
 #endif
-
-// version information
-#define	MAJOR_VERSION		1
-#define	MINOR_VERSION		0
-#define	BUILD_VERSION		1
 
 #ifndef OFX_PLUGIN
 #ifndef AE_PLUGIN
@@ -143,18 +141,25 @@ public:
 		string effectContent = loadStringFromFile(get_gmic_rc_path() + "gmic_ofx.gmic");
 		if (effectContent == "") effectContent = loadStringFromFile(get_gmic_rc_path() + "gmic_stdlib.gmic");
 		if (effectContent == "") {
+			const char* lib = gmic_get_stdlib();
+			effectContent = string(lib);
+			gmic_delete_external((float*)lib);
+			if (
+				(int)effectContent.find("#@gimp :") < 0 && 
+				(int)effectContent.find("#@gmic_plugin :") < 0 && 
+				(int)effectContent.find("#@gui :") < 0) {
+				effectContent = "";
+			}
+		} 
+		if (effectContent == "") {
 			stringstream s;
 			s << gmic_stdlib_gmic;
 			effectContent = s.str();
 		}
-/*		if (effectContent == "") {
-			const char* lib = gmic_get_stdlib();
-			effectContent = string(lib);
-			gmic_delete_external((float*)lib);
-		} */
 		gmic_parse_multi(effectContent, &pluginData, &pluginContent);
 	};
 };
+
 PluginGlobalData pluginGlobalData;
 
 #endif
@@ -290,6 +295,7 @@ int pluginSetup(GlobalData* globalDataP, ContextData* contextDataP)
 	globalDataP->param[p++] = Parameter("Resize Mode", PT_SELECT, 0, 5, 1, 0, 0, 0, "Fixed (Inplace)|Dynamic|Downsample 1/2|Downsample 1/4|Downsample 1/8|Downsample 1/16");
 	globalDataP->param[p++] = Parameter("Ignore Alpha", PT_BOOL, 0, 1, 0, 0, 0, 0, "");
 	globalDataP->param[p] = Parameter("Preview/Draft Mode", PT_BOOL, 0, 1, 0, 0, 0, 0, ""); if (!hasContent || effectData.command == effectData.preview_command) globalDataP->param[p].displayStatus = DS_HIDDEN; p++;
+	globalDataP->param[p++] = Parameter("Log Verbosity", PT_SELECT, 0, 4, 0, 0, 0, 0, "Off|Level 1|Level 2|Level 3|");
 	globalDataP->param[p++] = Parameter("Advanced Options", PT_TOPIC_END);
 	globalDataP->nofParams = p;
 
@@ -303,16 +309,17 @@ int pluginSetup(GlobalData* globalDataP, ContextData* contextDataP)
 	strReplace(d, "<", "(");
 	strReplace(d, ">", ")");
 //	strReplace(d, "\n", "\\n");
-	globalDataP->pluginInfo.description = d;
+	globalDataP->pluginInfo.description = d + "\n\n" + PLUGIN_DESCRIPTION;
 
 	return 0;
 }
 
-#define PARAM_COMMAND (globalDataP->nofParams - 7)
-#define PARAM_OUTPUT (globalDataP->nofParams - 5)
-#define PARAM_RESIZE (globalDataP->nofParams - 4)
-#define PARAM_NOALPHA (globalDataP->nofParams - 3)
-#define PARAM_PREVIEW (globalDataP->nofParams - 2)
+#define PARAM_COMMAND (globalDataP->nofParams - 8)
+#define PARAM_OUTPUT (globalDataP->nofParams - 6)
+#define PARAM_RESIZE (globalDataP->nofParams - 5)
+#define PARAM_NOALPHA (globalDataP->nofParams - 4)
+#define PARAM_PREVIEW (globalDataP->nofParams - 3)
+#define PARAM_VERBOSITY (globalDataP->nofParams - 2)
 
 int pluginParamChange(int index, SequenceData* sequenceDataP, GlobalData* globalDataP, ContextData* contextDataP)
 {
@@ -428,7 +435,9 @@ int pluginProcess(SequenceData* sequenceDataP, GlobalData* globalDataP, ContextD
 		}
 		cmd += " -resize " + intToString(sequenceDataP->inWorld[0].width) + "," + intToString(sequenceDataP->inWorld[0].height);
  	}
-	cmd = "-v -1 " + cmd;
+	int verbosity = (int)PAR_VAL(PARAM_VERBOSITY) - 1;
+
+	cmd = "-v " + intToString(verbosity) + " " + cmd;
 	// cmd += " -display";
 	// set some variables that are defined globally for the GIMP plugin
 	// not really needed as the effects should work independently of GIMP
@@ -506,7 +515,7 @@ void getPluginInfo(int pluginIndex, PluginInfo& pluginInfo)
 	d = strToAscii(d);
 	strReplace(d, "<", "(");
 	strReplace(d, ">", ")");
-	pluginInfo.description = d;
+	pluginInfo.description = d + "\n\n" + PLUGIN_DESCRIPTION;
 	pluginInfo.major_version = MAJOR_VERSION;
 	pluginInfo.minor_version = MINOR_VERSION;
 }
