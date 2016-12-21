@@ -116,7 +116,7 @@ AbstractParameter::createFromNode(QDomNode node, QObject * parent)
   if (name == "link") {
     return new LinkParameter(node,parent);
   }
-  if (name == "const") {
+  if (name == "value") {
     return new ConstParameter(node,parent);
   }
   return 0;
