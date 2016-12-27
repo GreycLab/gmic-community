@@ -1123,17 +1123,19 @@ gcd_hue_level : -skip ${1=0}
 #@gui : Centre = int(128,0,255)
 #@gui : Detail = float(0,0,2)
 #@gui : Gamma = float(1,0.2,1.8)
+#@gui : Note = note("\n<i>Extra Shadow/Highlight recovery</i>"), sep = separator()
+#@gui : Boost = float(0.5,0,1)
 #@gui : Note = note("\n<i>Detail Mask</i>"), sep = separator()
 #@gui : Smooth = int(0,0,20)
 #@gui : Sep = separator()
 #@gui : Channels = choice(4,"HSI","HSV","Lab","Linear RGB","RGB","YCbCr")
 #@gui : Values = choice("cut","normalize")
 #@gui : Sep = separator()
-#@gui : Note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2016/09/25</i>.</small>")
+#@gui : Note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2016/12/27</i>.</small>")
 #@gui : Note = note("\n<small>Proposed update to Tone enhance.</small>")
-gcd_tone_enhance2 : -skip ${1=0},${2=1},${3=0},${4=1},${5=128},${6=0},${7=1},${8=0},${9=0},${10=0}
-  mode=${-arg\ 1+$9,hsi_i,hsv_v,lab_l,lrgb,rgb,ycbcr_y}
-  -ac "-_gcd_tone_enhance2 ${1-8}",$mode,{$10+1}
+gcd_tone_enhance2 : -skip ${1=0},${2=1},${3=0},${4=1},${5=128},${6=0},${7=1},${8=0.5},${9=0},${10=4},${11=0}
+  mode=${-arg\ 1+$10,hsi_i,hsv_v,lab_l,lrgb,rgb,ycbcr_y}
+  -ac "-_gcd_tone_enhance2 ${1-9}",$mode,{$11+1}
 
 _gcd_tone_enhance2 :
   -repeat $! -l[$>]
@@ -1143,6 +1145,10 @@ _gcd_tone_enhance2 :
     --n.. 0,255 -median. 3 -bilateral. 2%,30
     -gcd_srgb2luma. --. $5 --abs. -negate.
     --max.. 0 -min... 0 -abs...
+    -if {$8!=0.5}
+      --n[{$8>0.5?-3:-1}] 0,1 --gcd_ibezier[0] {1-$8}
+      -j[0] .,0,0,0,0,1,.. -rm[-2,-1]
+    -endif
     --/... {if(iM#-3>0,iM#-3/(1/$2-1),1)} -+. 1
     --/... {if(iM#-3>0,iM#-3/(1/$7-1),1)} -+. 1 -*[-2,-1]
     --/.. {if(iM#-2>0,iM#-2/(1/$4-1),1)} -+. 1 -*[-2,-1]
@@ -1469,6 +1475,16 @@ gcd_gamma : -skip ${1=1},${2=0},${3=255}
   -repeat $! -l[$>]
     -if {!$2} g={1/max($1,0.001)} -^ $g -* {$3^(1-$g)}
     -else -* -1 -+ $3 -max 0 -^ $1 -* {-$3^(1-$1)} -+ $3 -endif
+  -endl -done
+
+gcd_sbezier : -skip ${1=0.5},${2=255}
+  -repeat $! -l[-1] -/ $2 --sqr -*. {1-2*$1} -*.. {2*$1} -+ -* $2 -endl -done
+
+gcd_ibezier : -skip ${1=0.5},${2=255}
+  -if {$1==0.5} -return -endif
+  -repeat $! -l[-1]
+    d={1-2*$1} e={$1/$d} -/ {$2*$d} -+ {$e*$e}
+    -sqrt. -* {$1>0.5?-1:1} -- $e -* $2
   -endl -done
 
 gcd_label : -skip ${1=4},${2=0.067}
