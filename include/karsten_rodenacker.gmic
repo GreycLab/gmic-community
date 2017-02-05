@@ -275,27 +275,46 @@ _karo_yen :  -skip "${1=0} ${2=1}" -v -
 	-if {$>==0} -u $res -else -u ${},$res -endif
   -endl -done -v +
 
-#@cli _karo__otsu : _minval,_bins
-#@cli : Calculate otsu threshold (from gmic -otsu)
-#@cli : tested only with 256 classes from 0 to 255
-_karo__otsu : -skip "${1=0} ${2=1}" -v -
-  -repeat $! -l[$>]
-    im=$1 iM={$im+(w+1)*$2} total={is}
-    --*[-1] 'x' sum={is} -rm[-1]
-    sumB=0 wB=0 wF=0 varMax=0 threshold=0
-    -repeat {w}
-      wB={$wB+{@$>}}
-      -if {$wB==0} -continue -endif
-      wF={$total-$wB}
-      -if {$wF==0} -break -endif
-      sumB={$sumB+$>*{@$>}}
-      mB={$sumB/$wB}
-      mF={($sum-$sumB)/$wF}
-      varBetween={$wB*$wF*($mB-$mF)^2}
-      -if {$varBetween>$varMax} varMax=$varBetween threshold=$> -endif
-    -done -rm[-1]
-	res={$threshold*$2+$1} -u $res
-  -endl -done -v +
+# #@cli _karo__otsu : _minval,_bins
+# #@cli : Calculate otsu threshold (from gmic -otsu)
+# #@cli : tested only with 256 classes from 0 to 255
+# _karo__otsu : -skip "${1=0} ${2=1}" -v -
+#   -repeat $! -l[$>]
+#     im=$1 iM={$im+(w+1)*$2} total={is}
+#     --*[-1] 'x' sum={is} -rm[-1]
+#     sumB=0 wB=0 wF=0 varMax=0 threshold=0
+#     -repeat {w}
+#       wB={$wB+{@$>}}
+#       -if {$wB==0} -continue -endif
+#       wF={$total-$wB}
+#       -if {$wF==0} -break -endif
+#       sumB={$sumB+$>*{@$>}}
+#       mB={$sumB/$wB}
+#       mF={($sum-$sumB)/$wF}
+#       varBetween={$wB*$wF*($mB-$mF)^2}
+#       -if {$varBetween>$varMax} varMax=$varBetween threshold=$> -endif
+#     -done -rm[-1]
+# 	res={$threshold*$2+$1} -u $res
+#   -endl -done -v +
+#@cli _karo__otsu : _minval(0) _bins(1)
+#@cli : Calculate otsu threshold from a histogram
+#@cli : with class o = _minval and bin size = _bins
+#@cli : Threshold is stored in status
+#@cli : $ image.jpg -to_gray --histogram 256,0,255 -_karo__otsu , -threshold ${}
+-l.
+-/. {is}	#p
+--cumulate. x	#q_L
+--+. -1. -negate.	#q_h
+--f. "x" --*[0] . -rm.. -cumulate. x
+--+. {-iM} -negate.
+-/.. [-4]	#miu_L
+-/. [-3]	#miu_H
+--[-2,-1] -sqr.
+-*[-1--3] -replace_nan. 0.0
+-u {xM*$2+$1}
+-rm
+-endl
+-v +
 
 #cli _karo_bgt : _minval,_bins
 #cli : Autothreshold using SD from whole image starting from the mode of the histogram (image range 0,255)
