@@ -51,7 +51,7 @@
 // version, name and description for the plugin
 #define	MAJOR_VERSION		0
 #define	MINOR_VERSION		3
-#define	BUILD_VERSION		1
+#define	BUILD_VERSION		2
 #define PLUGIN_DESCRIPTION	"Wrapper for the G'MIC framework (http://www.gmic.eu) written by Tobias Fleischer (http://www.reduxfx.com).";
 
 #ifdef OFX_PLUGIN
@@ -232,7 +232,7 @@ int pluginSetup(GlobalData* globalDataP, ContextData* contextDataP)
 	
 	globalDataP->inplaceProcessing = false;
 
-	globalDataP->param[0] = Parameter("Input", PT_LAYER);
+	globalDataP->param[0] = Parameter("Input", "", PT_LAYER);
 	int p = 1;
 	for (int i = 0; i < (int)effectData.param.size(); i++) {
 		int t = PT_FLOAT;
@@ -275,7 +275,7 @@ int pluginSetup(GlobalData* globalDataP, ContextData* contextDataP)
 			t = PT_LAYER;
 		}
 		globalDataP->param[p] = Parameter(
-			effectData.param[i].name, t, (float)atof(effectData.param[i].minValue.c_str()), (float)atof(effectData.param[i].maxValue.c_str()), d1, d2, d3, d4, effectData.param[i].text);
+			effectData.param[i].name, "", t, (float)atof(effectData.param[i].minValue.c_str()), (float)atof(effectData.param[i].maxValue.c_str()), d1, d2, d3, d4, effectData.param[i].text);
 		globalDataP->param[p].flags = flags;
 		if (h) globalDataP->param[p].displayStatus = DS_HIDDEN;
 		p++;
@@ -284,19 +284,19 @@ int pluginSetup(GlobalData* globalDataP, ContextData* contextDataP)
 //	globalDataP->param[p++] = Parameter("Dummy", PT_FLOAT);
 
 	if (effectData.multiLayer) {
-		globalDataP->param[p++] = Parameter("Ext. In 1", PT_LAYER);
-		globalDataP->param[p++] = Parameter("Ext. In 2", PT_LAYER);
-		globalDataP->param[p++] = Parameter("Ext. In 3", PT_LAYER);
-		globalDataP->param[p++] = Parameter("Ext. In 4", PT_LAYER);
+		globalDataP->param[p++] = Parameter("Ext. In 1", "", PT_LAYER);
+		globalDataP->param[p++] = Parameter("Ext. In 2", "", PT_LAYER);
+		globalDataP->param[p++] = Parameter("Ext. In 3", "", PT_LAYER);
+		globalDataP->param[p++] = Parameter("Ext. In 4", "", PT_LAYER);
 	}	
-	globalDataP->param[p] = Parameter("Command", PT_TEXT, 0, 0, 0, 0, 0, 0, "-blur 2"); if (hasContent) globalDataP->param[p].displayStatus = DS_HIDDEN; p++;
-	globalDataP->param[p] = Parameter("Advanced Options", PT_TOPIC_START); globalDataP->param[p].flags = 1; p++;
-	globalDataP->param[p++] = Parameter("Output Layer", PT_SELECT, 0, 10, 1, 0, 0, 0, "Merged|Layer 0|Layer 1|Layer 2|Layer 3|Layer 4|Layer 5|Layer 6|Layer 7|Layer 8|Layer 9|");
-	globalDataP->param[p++] = Parameter("Resize Mode", PT_SELECT, 0, 5, 1, 0, 0, 0, "Fixed (Inplace)|Dynamic|Downsample 1/2|Downsample 1/4|Downsample 1/8|Downsample 1/16");
-	globalDataP->param[p++] = Parameter("Ignore Alpha", PT_BOOL, 0, 1, 0, 0, 0, 0, "");
-	globalDataP->param[p] = Parameter("Preview/Draft Mode", PT_BOOL, 0, 1, 0, 0, 0, 0, ""); if (!hasContent || effectData.command == effectData.preview_command) globalDataP->param[p].displayStatus = DS_HIDDEN; p++;
-	globalDataP->param[p++] = Parameter("Log Verbosity", PT_SELECT, 0, 4, 0, 0, 0, 0, "Off|Level 1|Level 2|Level 3|");
-	globalDataP->param[p++] = Parameter("Advanced Options", PT_TOPIC_END);
+	globalDataP->param[p] = Parameter("Command", "", PT_TEXT, 0, 0, 0, 0, 0, 0, "-blur 2"); if (hasContent) globalDataP->param[p].displayStatus = DS_HIDDEN; p++;
+	globalDataP->param[p] = Parameter("Advanced Options", "", PT_TOPIC_START); globalDataP->param[p].flags = 1; p++;
+	globalDataP->param[p++] = Parameter("Output Layer", "", PT_SELECT, 0, 10, 1, 0, 0, 0, "Merged|Layer 0|Layer 1|Layer 2|Layer 3|Layer 4|Layer 5|Layer 6|Layer 7|Layer 8|Layer 9|");
+	globalDataP->param[p++] = Parameter("Resize Mode", "", PT_SELECT, 0, 5, 1, 0, 0, 0, "Fixed (Inplace)|Dynamic|Downsample 1/2|Downsample 1/4|Downsample 1/8|Downsample 1/16");
+	globalDataP->param[p++] = Parameter("Ignore Alpha", "", PT_BOOL, 0, 1, 0, 0, 0, 0, "");
+	globalDataP->param[p] = Parameter("Preview/Draft Mode", "", PT_BOOL, 0, 1, 0, 0, 0, 0, ""); if (!hasContent || effectData.command == effectData.preview_command) globalDataP->param[p].displayStatus = DS_HIDDEN; p++;
+	globalDataP->param[p++] = Parameter("Log Verbosity", "", PT_SELECT, 0, 4, 0, 0, 0, 0, "Off|Level 1|Level 2|Level 3|");
+	globalDataP->param[p++] = Parameter("Advanced Options", "", PT_TOPIC_END);
 	globalDataP->nofParams = p;
 
 	string d = effectData.notes;
