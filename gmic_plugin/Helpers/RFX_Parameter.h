@@ -137,9 +137,9 @@ public:
 class Parameter
 {
 public:
-	Parameter(string _displayName = "", int _paramType = PT_FLOAT, float _minValue = 0.f, float _maxValue = 1.f, float _defaultValue0 = 0.f, float _defaultValue1 = 0.f, float _defaultValue2 = 0.f, float _defaultValue3 = 0.f, string _text = "") {
+	Parameter(string _paramName = "", string _displayName = "", int _paramType = PT_FLOAT, float _minValue = 0.f, float _maxValue = 1.f, float _defaultValue0 = 0.f, float _defaultValue1 = 0.f, float _defaultValue2 = 0.f, float _defaultValue3 = 0.f, string _text = "") {
 		displayName = _displayName;
-		paramName = displayName;
+		paramName = _paramName;
 		if (displayName == "") displayName = paramName;
 		paramType = _paramType;
 		defaultValue[0] = _defaultValue0;
@@ -222,7 +222,7 @@ public:
 		headlessMode = false;
 		customGlobalDataP = NULL;
 		// memset(&param[0], 0, sizeof(reduxfx::Parameter) * MAX_NOF_PARAMS);
-		param[0] = reduxfx::Parameter("input", PT_LAYER);
+		param[0] = reduxfx::Parameter("input", "Input", PT_LAYER);
 		nofParams = 1;
 		nofInputs = 0;
 		buttonName = " ";

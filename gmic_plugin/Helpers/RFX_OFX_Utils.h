@@ -63,6 +63,9 @@
 #include <thread>
 #endif
 
+
+// #include "../../../Helpers/TLog.h"
+
 #include <string>
 #include "RFX_Utils.h"
 #include "RFX_Parameter.h"
@@ -91,6 +94,7 @@ using namespace reduxfx;
 
 struct ContextData
 {
+    int pluginIndex;
 	OfxImageEffectHandle instance;
 	OfxPropertySetHandle inArgs;
 	OfxPropertySetHandle outArgs;
@@ -133,11 +137,12 @@ const int stepWidth = 1;
 const int stepWidth = 4;
 #endif
 
-inline void setContextData(ContextData &cd, OfxImageEffectHandle instance, OfxPropertySetHandle inArgs, OfxPropertySetHandle outArgs)
+inline void setContextData(ContextData &cd, OfxImageEffectHandle instance, OfxPropertySetHandle inArgs, OfxPropertySetHandle outArgs, int pluginIndex)
 {
 	cd.instance = instance;
 	cd.inArgs = inArgs;
 	cd.outArgs = outArgs;
+    cd.pluginIndex = pluginIndex;
 }
 
 // pointers64 to various bits of the host
@@ -182,6 +187,8 @@ static MyInstanceData* getMyInstanceData(OfxImageEffectHandle effect)
 
 static OfxStatus onLoad(int pluginIndex)
 {
+	ContextData contextData;
+	setContextData(contextData, NULL, NULL, NULL, pluginIndex);
 	globalData[pluginIndex].customGlobalDataP = createCustomGlobalData();
 	pluginSetup(&globalData[pluginIndex], NULL);
 	return kOfxStatOK;
@@ -189,6 +196,8 @@ static OfxStatus onLoad(int pluginIndex)
 
 static OfxStatus onUnload(int pluginIndex)
 {
+	ContextData contextData;
+	setContextData(contextData, NULL, NULL, NULL, pluginIndex);
 	pluginSetdown(&globalData[pluginIndex], NULL);
 	destroyCustomGlobalData(globalData[pluginIndex].customGlobalDataP);
 	return kOfxStatOK;
@@ -312,8 +321,8 @@ static void getAllParamData(int pluginIndex, MyInstanceData* myData, OfxTime t)
 		} else if (globalData[pluginIndex].param[i].paramType == PT_POINT) {
 			double myX, myY;
 			gParamHost->paramGetValueAtTime(myData->param[i], t, &myX, &myY);
-			myData->sequenceDataP->floatValue[i][0] = (float)myX;
-			myData->sequenceDataP->floatValue[i][1] = (float)myY;
+			myData->sequenceDataP->floatValue[i][0] = (float)myX * myData->sequenceDataP->downsample_x;
+			myData->sequenceDataP->floatValue[i][1] = (float)myY * myData->sequenceDataP->downsample_y;
 		} else if (globalData[pluginIndex].param[i].paramType == PT_ANGLE) {
 			double v;
 			gParamHost->paramGetValueAtTime(myData->param[i], t, &v);
@@ -353,8 +362,8 @@ static void getParamData(int pluginIndex, int paramIndex, MyInstanceData* myData
 	} else if (globalData[pluginIndex].param[i].paramType == PT_POINT) {
 		double myX, myY;
 		gParamHost->paramGetValueAtTime(myData->param[i], t, &myX, &myY);
-		myData->sequenceDataP->floatValue[i][0] = (float)myX;
-		myData->sequenceDataP->floatValue[i][1] = (float)myY;
+		myData->sequenceDataP->floatValue[i][0] = (float)myX * myData->sequenceDataP->downsample_x;
+		myData->sequenceDataP->floatValue[i][1] = (float)myY * myData->sequenceDataP->downsample_y;
 	} else if (globalData[pluginIndex].param[i].paramType == PT_ANGLE) {
 		double v;
 		gParamHost->paramGetValueAtTime(myData->param[i], t, &v);
@@ -392,8 +401,8 @@ static void setParamData(int pluginIndex, MyInstanceData* myData)
 			double myB = (double)myData->sequenceDataP->floatValue[i][2];
 			gParamHost->paramSetValue(myData->param[i], myR, myG, myB);
 		} else if (globalData[pluginIndex].param[i].paramType == PT_POINT) {
-			double myX = (double)myData->sequenceDataP->floatValue[i][0];
-			double myY = (double)myData->sequenceDataP->floatValue[i][1];
+			double myX = (double)myData->sequenceDataP->floatValue[i][0] / myData->sequenceDataP->downsample_x;
+			double myY = (double)myData->sequenceDataP->floatValue[i][1] / myData->sequenceDataP->downsample_y;
 			gParamHost->paramSetValue(myData->param[i], myX, myY);
 		} else if (globalData[pluginIndex].param[i].paramType == PT_ANGLE) {
 			double v;
@@ -423,7 +432,7 @@ OfxStatus getSpatialRoD(int pluginIndex, OfxImageEffectHandle effect, OfxPropert
 
 	OfxTime time;
 	gPropHost->propGetDouble(inArgs, kOfxPropTime, 0, &time);
-	
+
 	// my RoD is the same as my input's
 	OfxRectD rod;
 	gEffectHost->clipGetRegionOfDefinition(myData->input[0], time, &rod);
@@ -520,7 +529,7 @@ static void showAboutDialog(int pluginIndex, MyInstanceData* myData)
 static OfxStatus instanceChanged(int pluginIndex, OfxImageEffectHandle instance, OfxPropertySetHandle inArgs, OfxPropertySetHandle outArgs)
 {
 	ContextData contextData;
-	setContextData(contextData, instance, inArgs, outArgs);
+	setContextData(contextData, instance, inArgs, outArgs, pluginIndex);
 
 	// see why it changed
 	char *changeReason;
@@ -534,7 +543,7 @@ static OfxStatus instanceChanged(int pluginIndex, OfxImageEffectHandle instance,
 	gPropHost->propGetString(inArgs, kOfxPropType, 0, &typeChanged);
 
 	// was it a clip or a param?
-	bool isClip = strcmp(typeChanged, kOfxTypeClip) == 0;
+	// bool isClip = strcmp(typeChanged, kOfxTypeClip) == 0;
 	bool isParam = strcmp(typeChanged, kOfxTypeParameter) == 0;
 
 	// get the name of the thing that changed
@@ -576,7 +585,7 @@ static OfxStatus instanceChanged(int pluginIndex, OfxImageEffectHandle instance,
 
 #ifdef ABOUT_DIALOG
 		if (strcmp(objChanged, "About") == 0) {
-			showAboutDialog(myData);
+			showAboutDialog(pluginIndex, myData);
 		}
 #endif
 		for (int i = 0; i < globalData[pluginIndex].nofParams; i++) {
@@ -833,7 +842,7 @@ void convert_RGBA32_to_RGBA8P(ConvertData& data, const int startLine, const int 
 static OfxStatus render(int pluginIndex, OfxImageEffectHandle instance, OfxPropertySetHandle inArgs, OfxPropertySetHandle outArgs)
 {
 	ContextData contextData;
-	setContextData(contextData, instance, inArgs, outArgs);
+	setContextData(contextData, instance, inArgs, outArgs, pluginIndex);
 
 	// get the render window and the time from the inArgs
 	OfxTime time;
@@ -869,6 +878,7 @@ static OfxStatus render(int pluginIndex, OfxImageEffectHandle instance, OfxPrope
 		int dstRowBytes, dstBitDepth;
 		OfxRectI dstRect;
 		outputImg = ofxuGetImage(myData->output, time, dstRowBytes, dstBitDepth, dstIsAlpha, dstRect, dstData);
+
 		if (outputImg == NULL) throw OfxuNoImageException();
 		float scale = globalData[pluginIndex].scale;
 
@@ -878,6 +888,8 @@ static OfxStatus render(int pluginIndex, OfxImageEffectHandle instance, OfxPrope
 		gPropHost->propGetIntN(inArgs, kOfxImageEffectPropRenderWindow, 4, &renderWindow.x1);
 
 		myData->sequenceDataP->time = time;
+		myData->sequenceDataP->downsample_x = (float)renderScale.x;
+		myData->sequenceDataP->downsample_y = (float)renderScale.y;
 		
 		getAllParamData(pluginIndex, myData, time);
 
@@ -1230,7 +1242,6 @@ static OfxStatus render(int pluginIndex, OfxImageEffectHandle instance, OfxPrope
 		}
 #endif
 
-
 	} catch(OfxuNoImageException &ex) {
 		// if we were interrupted, the failed fetch is fine, just return kOfxStatOK
 		// otherwise, something weird happened
@@ -1317,13 +1328,13 @@ static void paramAddInt(OfxParamSetHandle effectParams, OfxPropertySetHandle& pr
 
 static void paramAddPoint(OfxParamSetHandle effectParams, OfxPropertySetHandle& props, const char* paramName, double defaultX, double defaultY)
 {
-	OfxStatus stat = gParamHost->paramDefine(effectParams, kOfxParamTypeInteger2D, paramName, &props);
+	OfxStatus stat = gParamHost->paramDefine(effectParams, kOfxParamTypeDouble2D, paramName, &props);
 	if (stat != kOfxStatOK) {
 		throw OfxuStatusException(stat);
 	}
 	gPropHost->propSetDouble(props, kOfxParamPropDefault, 0, defaultX);
 	gPropHost->propSetDouble(props, kOfxParamPropDefault, 1, defaultY);
-	gPropHost->propSetString(props, kOfxParamPropDoubleType, 0, kOfxParamDoubleTypeXY);
+	gPropHost->propSetString(props, kOfxParamPropDoubleType, 0, kOfxParamDoubleTypeXYAbsolute);
 	gPropHost->propSetString(props, kOfxParamPropDefaultCoordinateSystem, 0, kOfxParamCoordinatesNormalised);
 }
 
@@ -1364,7 +1375,7 @@ static OfxStatus describeInContext(int pluginIndex, OfxImageEffectHandle effect,
 	// get the context from the inArgs handle
 	char *context = NULL;
 	gPropHost->propGetString(inArgs, kOfxImageEffectPropContext, 0, &context);
-	bool isGeneralContext = strcmp(context, kOfxImageEffectContextGeneral) == 0;
+	// bool isGeneralContext = strcmp(context, kOfxImageEffectContextGeneral) == 0;
 
 	OfxPropertySetHandle props;
 	// define the single output clip in both contexts
@@ -1392,7 +1403,10 @@ static OfxStatus describeInContext(int pluginIndex, OfxImageEffectHandle effect,
 #ifdef ABOUT_DIALOG
 	{
 	OfxPropertySetHandle props;
-	gParamHost->paramDefine(paramSet, kOfxParamTypePushButton, "About", &props);
+#ifndef ABOUT_DIALOG_CAPTION
+#define ABOUT_DIALOG_CAPTION "About"
+#endif
+	gParamHost->paramDefine(paramSet, kOfxParamTypePushButton, ABOUT_DIALOG_CAPTION, &props);
 	}
 #endif
 
@@ -1449,7 +1463,7 @@ static OfxStatus describeInContext(int pluginIndex, OfxImageEffectHandle effect,
 			);
 		} else if (globalData[pluginIndex].param[i].paramType == PT_SELECT) {	
 			string t = globalData[pluginIndex].param[i].text;
-			t = strReplace(t, "|-|", "|(-|");
+			// t = strReplace(t, "|-|", "|(-|");
 			vector<string> choices;
 			strSplit(t, '|', choices);
 			paramAddChoice(
@@ -1568,6 +1582,7 @@ static OfxStatus describe(int pluginIndex, OfxImageEffectHandle effect)
 // The main function
 static OfxStatus pluginMain(int pluginIndex, const char *action, const void *handle, OfxPropertySetHandle inArgs, OfxPropertySetHandle outArgs)
 {
+// LOG << "main: " << pluginIndex << " " << action;
 	try {
 	// cast to appropriate type
 	OfxImageEffectHandle effect = (OfxImageEffectHandle)handle;

@@ -60,7 +60,7 @@
 #include <algorithm>
 #include <vector>
 #include <fstream>
-
+#include <string.h>
 using namespace std;
 
 namespace reduxfx {
@@ -111,6 +111,7 @@ static string strReplace(string& str, const string search, const string replace,
 	}
 	return str;
 }
+
 static void strSplit(const string& s, const char seperator, vector<string>& results)
 {
 	results.clear();
@@ -201,52 +202,44 @@ static string stringToHexString(const string str)
 	return bufferToHexString((const unsigned char*)str.c_str(), (int)str.length());
 }
 
-static string strGetToken(string s, const string token, const string delim = "\"")
+static string strGetTokenValue(const string script, const string token, const string defaultValue = "", bool ignoreCase = true)
 {
-	string res;
-	size_t pos = 0;
-	pos = s.find(token);
-	if (pos != string::npos) {
-		s = s.substr(pos);
-		pos = s.find(delim);
-		s = s.substr(pos+1);
-		pos = s.find(delim);
-		s = s.substr(0, pos);
-		res = s;
-	}
-	return res;
-}
+    string val = defaultValue;
+    int iPos = -1;
+    int iStartPos = 0;
 
-static string strGetTokenValue(const string script, const string token)
-{
-	int iPos = (int)script.find(token);
+    bool found = false;
+    do {
+        if (ignoreCase) {
+            string scriptL = strLowercase(script);
+            string tokenL = strLowercase(token);
+	        iPos = (int)scriptL.find(tokenL, iStartPos);
+        } else {
+	        iPos = (int)script.find(token, iStartPos);
+        }
+        if (iPos < 0) {
+            break;
+        } else if (iPos == 0 || script[iPos-1] == '\r' || script[iPos-1] == '\n') {
+            found = true;
+        } else {
+            iStartPos = iPos + 1;
+        }
+    } while (!found);
+
 	if (iPos >= 0) {
 		iPos = (int)script.find("=", iPos);
 		if (iPos < 0) iPos = (int)script.find(" ", iPos);
 		int iPos2 = (int)script.find_first_of("\r\n)", iPos);
-		if (iPos2 >= 0) {
-			string val = script.substr(iPos + 1, iPos2 - iPos - 1);
-			val = strTrim(val, " \t\r\n'\"");
-			return val;
-		}
+		if (iPos2 > 0) {
+			val = script.substr(iPos + 1, iPos2 - iPos - 1);
+        } else {
+			val = script.substr(iPos + 1);
+        }
 	}
-	return "";
+	val = strTrim(val, " \t\r\n'\"");
+	return val;
 }
 
-
-static string strGetTag(string s, const string tag)
-{
-	string res;
-	size_t pos = 0;
-	pos = s.find(tag);
-	if (pos != string::npos) {
-		s = s.substr(pos);
-		pos = s.find(">");
-		s = s.substr(0, pos);
-		res = s;
-	}
-	return res;
-}
 
 static string strToAscii(string& s)
 {
@@ -400,8 +393,8 @@ static string strRemoveXmlTags(const string s, bool replaceEntities = false)
 	}
 	if (replaceEntities) {
 		strReplace(r, "&amp;", "&");
-		strReplace(r, "\\251", "©");
-	//	strReplace(r, "&#244;", "ô");
+        strReplace(r, "\\251", "(C)");
+        //	strReplace(r, "&#244;", "ô");
 		//strReplace(r, "&#233;", "e");
 		for (int i = 230; i < 255; i++) {
 			unsigned char c = (unsigned char)i;
@@ -411,6 +404,14 @@ static string strRemoveXmlTags(const string s, bool replaceEntities = false)
 		}
 	}
 	return r;
+}
+
+static void strToChar(string src, char** dst)
+{
+	if (*dst) delete (*dst);
+	*dst = new char[src.length() + 1];
+	memset(*dst, 0, src.length() + 1);
+	strcpy(*dst, src.c_str());
 }
 
 }
