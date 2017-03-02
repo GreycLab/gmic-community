@@ -7,7 +7,10 @@ CONFIG += link_pkgconfig
 PKGCONFIG += opencv fftw3 zlib
 LIBS += -lfftw3_threads
 DEFINES += cimg_use_fftw3 cimg_use_zlib
-GMIC_PATH = ../../gmic/src/
+
+!defined(GMIC_PATH,var) {
+  GMIC_PATH = ../../gmic/src/
+}
 
 unix {
    VERSION = $$system(grep \"define.ZART_VERSION \" include/Common.h | sed -e \"s/.*VERSION //\")
