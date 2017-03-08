@@ -1,5 +1,8 @@
 TEMPLATE = app
-QT += xml network widgets
+
+QT       += core gui xml network
+greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
+
 CONFIG	+= qt
 CONFIG	+= warn_on
 QT_CONFIG -= no-pkg-config
@@ -8,9 +11,10 @@ PKGCONFIG += opencv fftw3 zlib
 LIBS += -lfftw3_threads
 DEFINES += cimg_use_fftw3 cimg_use_zlib
 
-!defined(GMIC_PATH,var) {
+isEmpty(GMIC_PATH) {
   GMIC_PATH = ../../gmic/src/
 }
+message( GMIC_PATH is $$GMIC_PATH )
 
 unix {
    VERSION = $$system(grep \"define.ZART_VERSION \" include/Common.h | sed -e \"s/.*VERSION //\")
@@ -20,7 +24,6 @@ isEmpty( VERSION ):{
    VERSION = 0.0.0
    message( Warning: VERSION was not found in include/Common.h. Set to $$VERSION )
 }
-
 
 # enable OpenMP by default on with g++, except on OS X
 !macx:*g++* {
