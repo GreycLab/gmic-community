@@ -8,7 +8,7 @@ CONFIG	+= warn_on
 QT_CONFIG -= no-pkg-config
 CONFIG += link_pkgconfig
 PKGCONFIG += opencv fftw3 zlib
-LIBS += -lfftw3_threads
+# LIBS += -lfftw3_threads
 DEFINES += cimg_use_fftw3 cimg_use_zlib
 
 isEmpty(GMIC_PATH) {
@@ -28,6 +28,10 @@ isEmpty( VERSION ):{
 # enable OpenMP by default on with g++, except on OS X
 !macx:*g++* {
     CONFIG += openmp
+}
+
+!win32 {
+ LIBS += -lfftw3_threads
 }
 
 # use qmake CONFIG+=openmp ... to force using openmp
