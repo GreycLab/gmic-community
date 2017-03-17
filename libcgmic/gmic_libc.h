@@ -98,7 +98,8 @@ extern "C"
 #endif
 
 GMIC_DLLINTERFACE int GMIC_CALLCONV gmic_delete_external(float* p);
-GMIC_DLLINTERFACE int GMIC_CALLCONV gmic_call(const char* _cmd, unsigned int* _nofImages, gmic_interface_image* _images, gmic_interface_options* _options);
+GMIC_DLLINTERFACE int GMIC_CALLCONV gmic_call(const char* _cmd, unsigned int* _nofImages,
+                                              gmic_interface_image* _images, gmic_interface_options* _options);
 GMIC_DLLINTERFACE const char* GMIC_CALLCONV gmic_get_stdlib();
 
 #ifdef __cplusplus
