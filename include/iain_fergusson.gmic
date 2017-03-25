@@ -1926,6 +1926,270 @@ local_similarity_mask_preview:
 
 #@gui Iain Fergusson
 
+
+#@gui IID Demosaic: iain_iid_demosaic,iain_iid_demosaic(0)
+#@gui : 1 Starting pattern = choice(1,"Red-Green","Blue-Green","Green-Red","Green-Blue")
+#@gui : 2 Clamp Radius = int (1,1,3)
+#@gui : sep = separator()
+#@gui : note = note("IID is a demosaicing algorithm that produces good colour detail and works well in the presence of chromatic aberrations. It attempts to reduce moire patterns. Noise tends to render as a maze like texture. False colours around edges will need post processing.")
+#@gui : sep = separator()
+#@gui : note = note("Clamp Radius: Interploated green pixels are clamped to local values. A clamp radius of 1 reduces ringing and overshoots but may limit some detials. A clamp radius of 3 will give more detials but also more ringing and overshoots. Not much difference can been seen unless you zoom in.")
+#@gui : sep = separator()
+#@gui : note = note("<small>Author : <i>Iain Fergusson</i>. 25 March 2017 - First release</small>")
+iain_iid_demosaic:
+pattern=$1
+
+chroma_diff=1.5
+chroma_radius=5
+clamp_radius1=$2
+
+-repeat $! -l[$>]
+-l
+-to_rgb
+# make two full colour versions using vertical and horizontal interpolation 
+--iain_iid_demosaic_vertical[0] $pattern,$clamp_radius1
+-iain_iid_demosaic_horizontal[0] $pattern,$clamp_radius1
+
+
+# compare versions
+
+--l
+
+# look for zippers
+--l[0]
+(1,-1)
+-convolve[0] [1]
+-k[0]
+-abs
+-blur 1
+-split c
+-add
+-endl
+--l[1]
+(1;-1)
+-convolve[0] [1]
+-k[0]
+-abs
+-blur 1
+-split c
+-add
+-endl
+
+-sub[-1,-2]
+
+# look for chroma variation
+--l[0]
+--split c
+-add[-1,-2,-3]
+-mul[-1] {1/3}
+-sub
+--blur $chroma_radius
+-sub
+-abs
+-blur 1
+-split c
+-add
+-endl
+--l[1]
+--split c
+-add[-1,-2,-3]
+-mul[-1] {1/3}
+-sub
+--blur $chroma_radius
+-sub
+-abs
+-blur 1
+-split c
+-add
+-endl
+
+-sub[-1,-2]
+
+-mul[-1] $chroma_diff  # weight for chroma variations
+
+-add[-1,-2] # add zippers weights to chroma weights
+
+-gt[-1] 0 # make mask for one direction
+
+# mask edges to force interpolation direction along edges
+
+-line[-1] 0,0,100%,0%,1,0
+-line[-1] 0,100%,100%,100%,1,0
+
+-line[-1] 0,0,0%,100%,1,1
+-line[-1] 100%,0%,100%,100%,1,1
+
+--eq[-1] 0 # make inverse mask for other direction
+
+
+# combine masked images
+-mul[0,-1]
+-mul[1,-1]
+-max
+-endl
+
+-k[-1]
+-endl
+-endl -done
+
+
+iain_iid_demosaic_vertical:
+-resize {w+8},{h+8},{d},{s},0,0,0.5,0.5
+	--l
+	-rgb2bayer $1,1
+		--l[0]
+		-to_rgb
+		-channels 1
+		(-0.1;0;0.6;1;0.6;0;-0.1)
+		-convolve[0] [1]
+		-remove[-1]
+		-endl
+
+		--iain_demosaic_clamp[0] $2
+		-rm[2]
+		-min[1,2]
+		-max[1,2]
+		
+	--to_rgb[1]
+		-rgb2bayer[-1] $1,1
+
+		-split[0] c
+		-split[-1] c
+		-sub[0] [4]
+		-sub[2] [6]
+
+		-append[0,1,2] c
+		-add[0] 128
+		-rgb2bayer[0] $1,1
+		-split[0] c
+	
+		-k[0,2,3]
+		-reverse[1,2]
+		
+		--l[0,1]
+		-reverse
+		-iain_guided_fillgrid
+		-endl
+		--l[1,2]
+
+		-iain_guided_fillgrid
+		-endl
+	-rm[0,2]
+
+	-reverse[0,1]
+	-sub[0,2] 128
+		-add[0] [1]
+		-add[2] [1]
+		-append c
+		-c 0,255	
+	-endl
+
+-k[1]
+-crop 4,4,{w-5},{h-5}
+
+iain_iid_demosaic_horizontal:
+-resize {w+8},{h+8},{d},{s},0,0,0.5,0.5 # add borders to limit errors at edges
+	--l
+	-rgb2bayer $1,1
+		--l[0] # interpolate green
+		-to_rgb
+		-channels 1
+		(-0.1,0,0.6,1,0.6,0,-0.1)
+		-convolve[0] [1]
+		-remove[-1]
+		-endl
+
+		--iain_demosaic_clamp[0] $2 # limit new green vlaues to local green minima and maxima
+		-rm[2]
+		-min[1,2]
+		-max[1,2]
+		
+		# create green-red and green-blue for colour interpolation
+		
+	--to_rgb[1]
+		-rgb2bayer[-1] $1,1
+
+		-split[0] c
+		-split[-1] c
+		-sub[0] [4]
+		-sub[2] [6]
+
+		-append[0,1,2] c
+		-add[0] 128
+		-rgb2bayer[0] $1,1
+		-split[0] c
+	
+		-k[0,2,3]
+		-reverse[1,2]
+		
+		--l[0,1] # interpolate colour differences using green channel as directional guide
+		-reverse
+		-iain_guided_fillgrid
+		-endl
+		--l[1,2]
+
+		-iain_guided_fillgrid
+		-endl
+	-rm[0,2]
+
+	-reverse[0,1]
+	-sub[0,2] 128
+		-add[0] [1]
+		-add[2] [1]
+		-append c
+		-c 0,255	
+	-endl
+
+-k[1]
+-crop 4,4,{w-5},{h-5}
+
+
+
+
+iain_demosaic_clamp:
+-channels 1
+
+
+--l
+-if {$1>2}
+--shift[0] 3,-2,0,0
+--shift[0] -3,-2,0,0
+--shift[0] -2,3,0,0
+--shift[0] -2,-3,0,0
+
+--shift[0] 3,0,0,0
+--shift[0] -3,0,0,0
+--shift[0] 0,3,0,0
+--shift[0] 0,-3,0,0
+-endif
+
+-if {$1>1}
+--shift[0] 1,2,0,0
+--shift[0] -1,2,0,0
+--shift[0] 2,1,0,0
+--shift[0] 2,-1,0,0
+
+--shift[0] 1,-2,0,0
+--shift[0] -1,-2,0,0
+--shift[0] -2,1,0,0
+--shift[0] -2,-1,0,0
+-endif 
+
+--shift[0] 1,0,0,0
+--shift[0] -1,0,0,0
+--shift[0] 0,1,0,0
+-shift[0] 0,-1,0,0
+
+
+--min[0--1]
+-max[0--2]
+-endl
+
+
+-add[1] [0]
+-add[2] [0]
+
+
 #@gui minimum_chroma_demosaic : iain_minimum_chroma_demosaic,iain_minimum_chroma_demosaic(0)
 #@gui : Starting pattern = choice(0,"Red-Green","Blue-Green","Green-Red","Green-Blue")
 #@gui : Moire size  = choice (2,"Small","Medium","Large","Extra Large")
