@@ -1930,10 +1930,13 @@ local_similarity_mask_preview:
 #@gui IID Demosaic: iain_iid_demosaic,iain_iid_demosaic(0)
 #@gui : 1 Starting pattern = choice(1,"Red-Green","Blue-Green","Green-Red","Green-Blue")
 #@gui : 2 Clamp Radius = int (1,1,3)
+
+#@gui : 3 Refinement Steps = int(1,0,10)
 #@gui : sep = separator()
-#@gui : note = note("IID is a demosaicing algorithm that produces good colour detail and works well in the presence of chromatic aberrations. It attempts to reduce moire patterns. Noise tends to render as a maze like texture. False colours around edges will need post processing.")
+#@gui : note = note("IID is a demosaicing algorithm that produces good colour detail and works well in the presence of chromatic aberrations. It attempts to reduce moire patterns. Noise tends to render as a maze like texture.")
 #@gui : sep = separator()
-#@gui : note = note("Clamp Radius: Interploated green pixels are clamped to local values. A clamp radius of 1 reduces ringing and overshoots but may limit some detials. A clamp radius of 3 will give more detials but also more ringing and overshoots. Not much difference can been seen unless you zoom in.")
+#@gui : note = note("<b>Clamp Radius:</b> Interploated green pixels are clamped to local values. A clamp radius of 1 reduces ringing and overshoots but may limit some detials. A clamp radius of 3 will give more detials but also more ringing and overshoots. Not much difference can been seen unless you zoom in.")
+#@gui : note = note("<b>Refinement Steps:</b> Uses the initital demosaic as a guide for a new partial demosaic, and can be repeated. Each step gives better luma details and noise rendering but degrades chroma edges. Use a low value of clamp radius to reduce arefacts but also the effectiveness. Two or three refinements steps is probably the sweet spot.")
 #@gui : sep = separator()
 #@gui : note = note("<small>Author : <i>Iain Fergusson</i>. 25 March 2017 - First release</small>")
 iain_iid_demosaic:
@@ -1944,6 +1947,7 @@ chroma_radius=5
 clamp_radius1=$2
 
 -repeat $! -l[$>]
+--l
 -l
 -to_rgb
 # make two full colour versions using vertical and horizontal interpolation 
@@ -2030,6 +2034,15 @@ clamp_radius1=$2
 
 -k[-1]
 -endl
+-endl
+-if {$3>0}
+-iain_luma_guided_demosaic $1,$3,$2
+-else
+-k[1]
+-endif
+
+
+
 -endl -done
 
 
@@ -2188,6 +2201,55 @@ iain_demosaic_clamp:
 
 -add[1] [0]
 -add[2] [0]
+
+iain_luma_guided_demosaic:
+-resize {w+8},{h+8},{d},{s},0,0,0.5,0.5 # add borders to limit errors at edges
+-remove_opacity
+-repeat $2
+--l
+
+--split[1] c
+-add[-1,-2,-3] 
+-mul[-1] .33333333333333333
+
+-rm[1]
+
+-sub[0] [1]
+
+-add[0] 255
+-rgb2bayer[0] $1,1
+-reverse
+
+-split[1] c
+
+
+--iain_guided_diagonal_interpolation[0,1]
+--iain_guided_diagonal_interpolation[0,3]
+-rm[1,3]
+-reverse[1,2]
+--iain_guided_straight_interpolation[0,1]
+--iain_guided_straight_interpolation[0,2]
+--iain_guided_straight_interpolation[0,3]
+-rm[1,2,3]
+-sub[1,2,3] 255
+-append[1,2,3] c
+-to_rgb
+-add
+-c 0,255
+-endl
+-rm[1]
+-if {$3>0}
+-split[1] c
+
+--iain_demosaic_clamp[0] $3
+-rm[4]
+-min[2] [4] -max[2] [5]
+-rm[-1,-2]
+-append[1,2,3] c
+-endif
+-done
+-k[1]
+-crop 4,4,{w-5},{h-5}
 
 
 #@gui minimum_chroma_demosaic : iain_minimum_chroma_demosaic,iain_minimum_chroma_demosaic(0)
