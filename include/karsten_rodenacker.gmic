@@ -71,6 +71,42 @@ karos_about :
 
 #@cli :: KaRo's Tests
 
+#@cli wykoread : _filename
+#@cli : Read Wyko/Bruker/Vision ASCII file and produce image(s)
+#@cli : Data preceded by "RAW_DATA" and/or "Intensity" are imported
+wykoread : -skip "${1=Wyko_Example.ASC}"
+  -e[^-1] "Read Vision surface profilometry OPD text data "$1 
+  -v - -l[]
+    -i raw:"$1",uchar nm={b}
+    # Retrieve header information.
+    -s +,10
+    size_x=-1 size_y=-1 hend=-1 rend=-1
+    -repeat $!
+      -if {same(['{$>,t}'],'"X Size"',6)} -rows[$>] 6,100% size_x={{$>,t}}
+      -elif {same(['{$>,t}'],'"Y Size"',6)} -rows[$>] 6,100% size_y={{$>,t}}
+      -elif {same(['{$>,t}'],'"RAW_DATA"',8)} hend=$>
+      -elif {same(['{$>,t}'],'"Intensity"',9)} rend=$> -break
+      -endif
+    -done
+    -if {$hend>0}
+      -rm[0-{$hend+1}] 
+      -if {$rend>$hend} -a[0-{$rend-$hend-3}] y -rm[1,2] -a[1--1] y -else -a y -endif
+      #-e "Size = ("$size_x,$size_y,$hend,$rend")"
+      # Save remaining data as a pure ascii file.
+      -replace_str "Bad","nan"
+      -discard 13
+      file_tmp=${-file_rand}
+      -if {$!>1} -o.. raw:$file_tmp,uchar -rm.. -i dlm:$file_tmp -nm. $nm 
+        -o.. raw:${file_tmp}_,uchar -rm.. -i dlm:${file_tmp}_ -nm. ${nm}_ -file_rm ${file_tmp}_
+      -else -o raw:$file_tmp,uchar -rm -i dlm:$file_tmp -nm. $nm 
+      -endif
+      -file_rm $file_tmp
+	  -rotate -90,0
+    -else
+      -rm
+    -endif
+  -endl -v + 
+
 #@cli pseudo_c : Pseudo coloring of greyscale image
 pseudo_c : -v - -if {s!=1} -to_gray. -endif {iM},1,1,3,u(255) -round. -map.. . -rm.  -v +
 
