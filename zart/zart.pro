@@ -134,7 +134,7 @@ PRE_TARGETDEPS +=
 CONFIG(release, debug|release) {
     message(Release build)
     DEFINES += QT_NO_DEBUG_OUTPUT
-    QMAKE_CXXFLAGS += -ffast-math
+#    QMAKE_CXXFLAGS += -ffast-math
 }
 
 CONFIG(debug, debug|release) {
