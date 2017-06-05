@@ -608,10 +608,10 @@ gcd_tonemap_area : -skip ${1=100},${2=0},${3=0}
 
 #@gui Auto Balance: gcd_auto_balance, gcd_auto_balance(1)
 #@gui : note = note("<i>Map based tone and color balance</i>"), sep = separator()
-#@gui : Area = float(100,0,200)
+#@gui : Area = float(10,0,200)
 #@gui : Smooth = float(0,0,2)
-#@gui : Channels = choice(3,"HSI","HSV","Lab","Linear RGB","RGB","YCbCr")
-#@gui : Balance sRGB = bool(0)
+#@gui : Channels = choice(0,"HSI","HSV","Lab","Linear RGB","RGB","YCbCr")
+#@gui : Balance sRGB = bool(1)
 #@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2017/06/03</i>.</small>")
 gcd_auto_balance : -skip ${1=100},${2=0},${3=3},${4=0}
   mode=${-arg\ 1+$3,hsi_i,hsv_v,lab_l,lrgb,rgb,ycbcr_y}
@@ -1545,6 +1545,57 @@ gcd_fix_alpha :
   -repeat $! -l[$>] -if {s==2||s==4}
     -sh 0,{s-2} -sh[0] 100%,100% -max[-1] 1 --neq[-1] 1 -*[-3,-1] -k[0]
   -endif -endl -done
+
+#@cli gcd_noalpha
+#@cli : Remove any gimp alpha channel and zero transparencies
+gcd_noalpha :
+  -e[^-1] "Remove gimp alpha channel from image$?."
+  -v - -repeat $! -l[$>] -if {s==2||s==4}
+    m={s-2} -sh 0,$m -sh.. 100% -neq. 0 -*.. . -k[0] -channels 0,$m
+  -endif -endl -done -v +
+
+#@cli gcd_splitalpha
+#@cli : Split any gimp alpha channel and zero transparencies
+gcd_splitalpha :
+  -e[^-1] "Split gimp alpha channel from image$?."
+  -v - -repeat $! -l[$>] -if {s==2||s==4}
+    m={s-2} -sh 0,$m -sh.. 100% [-1] -neq.. 0 -*[1,2] -k[^1] -channels.. 0,$m
+  -endif -endl -done -v +
+
+#@cli gcd_force_rgb
+#@cli : Force selected gimp images to be in RGB mode.
+gcd_force_rgb :
+   -e[^-1] "Force gimp image$? to be in RGB mode."
+   -v - -repeat $! -l[$>]
+     -if {s>4} -v + -error[] "Command '-gcd_force_rgb': Image ["$>"] is not a G,GA,RGB or RGBA image ("{s}" channels)."
+     -elif {s==4} -sh 0,2 -sh.. 3 -neq. 0 -*.. . -k[0] -channels 0,2
+     -elif {s==2} -sh 0 -sh.. 1 -neq. 0 -*.. . -k[0] -channels 0 -r 100%,100%,100%,3
+     -elif {s==1} -r 100%,100%,100%,3
+     -endif
+   -endl -done -v +
+
+#@cli gcd_force_rgba
+#@cli : Force selected gimp images to be in RGBA mode.
+gcd_force_rgba :
+   -e[^-1] "Force gimp image$? to be in RGBA mode."
+   -v - -repeat $! -l[$>]
+     -if {s>4} -v + -error[] "Command '-gcd_force_rgba': Image ["$>"] is not a G,GA,RGB or RGBA image ("{s}" channels)."
+     -elif {s==4} --channels 3 -neq. 0 -*
+     -elif {s==3} -channels 0,3 -sh. 3 -f. 255 -rm.
+     -elif {s==2} --channels 1 -neq. 0 -* -r 100%,100%,100%,4 -sh. 2 -f. .. -rm.
+     -elif {s==1} -r 100%,100%,100%,4 -sh. 3 -f. 255 -rm.
+     -endif
+   -endl -done -v +
+
+#@cli gcd_force_a
+#@cli : Force selected gimp images to have an alpha channel.
+gcd_force_a :
+  -e[^-1] "Force gimp image$? to have an alpha channel."
+  -v - -repeat $! -l[$>]
+    -if {s==1||s==3} -channels 0,{s} -sh. {s-1} -f. 255 -rm.
+    -elif {s==2||s==4} --channels 100% -neq. 0 -* -endif
+  -endl -done -v +
+
 
 #@gui _
 
