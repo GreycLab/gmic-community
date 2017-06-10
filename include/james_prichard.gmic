@@ -170,41 +170,38 @@ wh={w},{h}
 -v +
 
 #@gui jpr_shapes_gradient : jpr_shapes_gradient,jpr_shapes_gradient(0)
-#@gui : note = note("lots of local regressions using shapeaverage suppress noise in the gradients of small areas random areas chosen by watershed")
-#@gui : Pre Blur = float(4.5,0,15)
-#@gui : Watershed Threshold = float(0.25,0.05,1)
-#@gui : Gradient Flatten = float(0.01,0.01,3)
-#@gui : Gradient Cap = float(7,0.5,15)
-#@gui : updateauthornote = note("<small>update 2013-Jan-31 author @jayprich</small>")
+#@gui : note = note("convert an image to local patches with some gradient patch shape is via watershed algorithm")
+#@gui : Pre Blur = float(2,0,15)
+#@gui : Watershed Threshold = float(0.25,0.01,10)
+#@gui : Gradient Flatten = float(0.001,0.001,0.1)
+#@gui : Gradient Cap = float(100,5,200)
+#@gui : updateauthornote = note("<small>update 2017-Jun-10 author @jayprich</small>")
 
 #@cli jpr_shapes_gradient :
-#@cli : lots of local regressions using shapeaverage
-#@cli : suppress noise in the gradients of small areas
-#@cli : random areas chosen by watershed
+#@cli : convert an image to local patches with some gradient
+#@cli : patch shape is via watershed algorithm
+#@cli : pre-blur,threshold,grad-flatten,grad-cap
+#@cli : e.g. 2,0.5,0.01,100
 
 jpr_shapes_gradient:
 # regress smooth gradients on odd shape areas
 -v -
 -repeat $! -l[$<]
-100%,100%,1,1,0.1*(x-w/2)
-# create odd shape mask from image
+100%,100%,1,1,0.1*(x-w/2) # x gradient
 --norm[0]
 -b[-1] $1
--segment_watershed[-1] $2,0
--gt[-1] 0
-# ensure the smooth gradient is zero on the separating lines
--*[1] [-1]                 # raw shape gradients
---blend_shapeaverage[1,-1] # shapeaverage
+-segment_watershed[-1] $2,0 # shapes from image
+--blend[1,-1] shapeaverage0 # shapeaverage
 --[1,-1]                   # gradient with zero mean
 --sqr[1]           # square
 [-2]x1             # copy shape mask as needs to be top layer
--blend_shapeaverage[-2,-1] # fine means
+-blend[-2,-1] shapeaverage0 # fine means
 -+[-1] $3          # avoid oversensitivity of small shapes to gradient
 -sqrt[-1]          # root mean square
 -/[1,-1]           # norm
---blend_shapeaverage[0,-1] # main colours
+--blend[0,-1] shapeaverage0 # main colours
 -*[0] [-3]         # original x normed
--blend_shapeaverage[0,-2]
+-blend[0,-2] shapeaverage0
 -c[0] -$4,$4
 -*[0,1]            # gradient component to add
 -+[0,1]
@@ -587,8 +584,6 @@ mid={round(0.5/$1-0.5)}
 -v +
 
 #@gui __
-
-blend_shapeaverage : -blend shapeaverage0
 
 # Local Variables:
 # mode: sh
