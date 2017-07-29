@@ -71,18 +71,86 @@ karos_about :
 
 #@cli :: KaRo's Tests
 
+#@cli gwyddionread : _filename
+#@cli : Read gwyddion ASCII file and produce image
+#@cli : Data beginning after "Start of Data:" are imported
+#@cli : [x-length, y-length, x-offset, y-offset, header lines] are returned in ${}
+#@cli : gwyddion Example header
+#@cli : |# File Format = ASCII
+#@cli : |# Created by Gwyddion 2.48
+#@cli : |# Original file: gwyddion_Example.asc
+#@cli : |# x-pixels = 640
+#@cli : |# y-pixels = 480
+#@cli : |# x-length = 313789.96127244376
+#@cli : |# y-length = 235219.70492879587
+#@cli : |# x-offset = 0
+#@cli : |# y-offset = 0
+#@cli : |# Bit2nm = 1.0
+#@cli : |# Start of Data:
+gwyddionread : -skip "${1=gwyddion_Example.asc}"
+  -e[^-1] "Read gwyddion ASCII text data: "$1 
+  -v - 
+  -l[]
+    -i raw:"$1",uchar nm={b}
+    # Retrieve header information.
+    -s +,10
+    size_x=-1 size_y=-1 
+    len_x=-1 len_y=-1 
+    offs_x=-1 offs_y=-1 
+    bit2nm=-1 
+    hend=-1
+    -repeat $!
+      -if   {same(['{$>,t}'],'"# x-pixels ="',12)} -rows[$>] 12,100% size_x={{$>,t}}
+      -elif {same(['{$>,t}'],'"# y-pixels ="',12)} -rows[$>] 12,100% size_y={{$>,t}}
+      -elif {same(['{$>,t}'],'"# x-length ="',12)} -rows[$>] 12,100% len_x={{$>,t}}
+      -elif {same(['{$>,t}'],'"# y-length ="',12)} -rows[$>] 12,100% len_y={{$>,t}}
+      -elif {same(['{$>,t}'],'"# x-offset ="',12)} -rows[$>] 12,100% offs_x={{$>,t}}
+      -elif {same(['{$>,t}'],'"# y-offset ="',12)} -rows[$>] 12,100% offs_y={{$>,t}}
+      -elif {same(['{$>,t}'],'"# Bit2nm ="',10)}   -rows[$>] 10,100% bit2nm={{$>,t}}
+      -elif {same(['{$>,t}'],'"# Start of Data:"',16)} hend=$> -break
+      -endif
+    -done
+    -if {$hend>0}
+      -rm[0-{$hend+1}] -a y
+       #-e "Size = ("$size_x,$size_y,$len_x,$len_y,$hend")"
+       # Save remaining data as a pure ascii file.
+      -discard 13
+      file_tmp=${-file_rand}
+      -if {$!>1} -o.. raw:$file_tmp,uchar -rm.. -i dlm:$file_tmp -nm. $nm 
+        -o.. raw:${file_tmp}_,uchar -rm.. -i dlm:${file_tmp}_ -nm. ${nm}_ -file_rm ${file_tmp}_
+      -else -o raw:$file_tmp,uchar -rm -i dlm:$file_tmp -nm. $nm 
+      -endif
+      -file_rm $file_tmp
+    -else
+      -rm
+    -endif
+    -u [$len_x,$len_y,$offs_x,$offs_y,$bit2nm]
+  -endl 
+  -v + 
+
 #@cli wykoread : _filename
 #@cli : Read Wyko/Bruker/Vision ASCII file and produce image(s)
 #@cli : Data preceded by "RAW_DATA" and/or "Intensity" are imported
+#@cli : Wyko Example header
+#@cli : |Wyko ASCII Data File Format 0	1	1
+#@cli : |X Size	640
+#@cli : |Y Size	480
+#@cli : |Block Name	Type	Length	Value
+#@cli : |Wavelength	7	4	71.992500
+#@cli : |Aspect	7	4	1.000000
+#@cli : |Pixel_size	7	4	0.000985
+#@cli : |Magnification	8	8	10.050000
+#@cli : |ScannerSpeed	7	4	2.315832
+#@cli : |RAW_DATA	3	1228800	
 wykoread : -skip "${1=Wyko_Example.ASC}"
-  -e[^-1] "Read Vision surface profilometry OPD text data "$1 
+  -e[^-1] "Read Vision surface profilometry OPD text data: "$1 
   -v - -l[]
     -i raw:"$1",uchar nm={b}
     # Retrieve header information.
     -s +,10
     size_x=-1 size_y=-1 hend=-1 rend=-1
     -repeat $!
-      -if {same(['{$>,t}'],'"X Size"',6)} -rows[$>] 6,100% size_x={{$>,t}}
+      -if   {same(['{$>,t}'],'"X Size"',6)} -rows[$>] 6,100% size_x={{$>,t}}
       -elif {same(['{$>,t}'],'"Y Size"',6)} -rows[$>] 6,100% size_y={{$>,t}}
       -elif {same(['{$>,t}'],'"RAW_DATA"',8)} hend=$>
       -elif {same(['{$>,t}'],'"Intensity"',9)} rend=$> -break
@@ -101,7 +169,7 @@ wykoread : -skip "${1=Wyko_Example.ASC}"
       -else -o raw:$file_tmp,uchar -rm -i dlm:$file_tmp -nm. $nm 
       -endif
       -file_rm $file_tmp
-	  -rotate -90,0
+      -rotate -90,0
     -else
       -rm
     -endif
