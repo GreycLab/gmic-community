@@ -510,41 +510,49 @@ hist_percentile :
     -endl
   -done -u $sres -v +
 
-#@cli hist_feature : _moment,_nth,_zero,_min0,_stepw
+#@cli hist_feature : _moment,_nth,_zero,_min0,_stepw,_percent
 #@cli : Estimation of features mode,sum,mean,SD,min,max,median from histogram
-#@cli : _moment=-2/mode,m0,m1,m2,min,max,med -1/mode 0/sum 1/mean 2/SD 3/min 4/max 5/median
+#@cli : _moment=-2/mode,m0,m1,m2,min,max,med,iqr -1/mode 0/sum 1/mean 2/SD 3/min 4/max 5/median 6/iqr 7/loq 8/hiq
 #@cli : _nth extreme value
 #@cli : _zero Class 0 is zeroed if !=0
 #@cli : _min0 value of class 0
 #@cli : _stepw value of class width (bin size)
-#@cli : Def. val.: '_moment=-2', 'nth=1', '_zero=0', '_min0=0', '_stepw=1'
+#@cli : _percent 
+#@cli : Def. val.: '_moment=-2', 'nth=1', '_zero=0', '_min0=0', '_stepw=1', '_percent=25%'
 #@cli : Updated 140314 (smoothing replaced by nth selection)
-#@cli : $ image.jpg -luminance --histogram 256,0,255 -dh.. ,,256,0,255 -hist_feature , -repeat 7 t={_arg($>+1${})} -text $t,40,{$>*25+5},23,1,128 -done -rm.
+#@cli : Updated 100817 (percent parameter and iqr,loq,hi feature added)
+#@cli : $ image.jpg -luminance --histogram 256,0,255 -dh.. ,,256,0,255 -hist_feature , -repeat 8 t={_arg($>+1${})} -text $t,40,{$>*25+5},23,1,128 -done -rm.
 hist_feature :
-  -check "${1=-2}>=-2&&$1<=5&&isint($1)&&isint(${2=1})&&$2>0"
-  -skip ${3=0},${4=0},${5=1}
-  -e[^-1] "Calculate md,m0,m1,m2,$2th-min,$2th-max,med from 1d histogram$?."
+  -check "${1=-2}>=-2&&$1<=8&&isint($1)&&isint(${2=1})&&$2>0"
+  -skip ${3=0},${4=0},${5=1},${6=25%}
+  -e[^-1] "Calculate md,m0,m1,m2,$2th-min,$2th-max,med,iqr from 1d histogram$?."
   -v -
   -repeat $!
     -l[$>]
       -if {h>1||d>1||s>1} -v + -e[^-1] "Image "$>" seemingly not 1d!" -v - -continue -endif
   # Delete class zero
-      -if {$3!=0} -set[-1] 0,0 -endif
+      -if {$3!=0} -set. 0,0 -endif
   # Calculate features
       md={xM*$5+$4}
       m0={is}
-      --*[-1] 'x*$5+$4' m1={is/$m0} -rm[-1]
-      --*[-1] '(x*$5+$4)^2' m2={sqrt(is/$m0-$m1^2)} -rm[-1]
+      --*. 'x*$5+$4' m1={is/$m0} -rm[-1]
+      --*. '(x*$5+$4)^2' m2={sqrt(is/$m0-$m1^2)} -rm[-1]
   # Median, min, max
-	  --cumulate[-1]
-	  --ge[-1] $2 mn={${-arg\ 1,{[xM,yM,zM,cM]}}*$5+$4} -rm[-1]
-	  -if {$2>1} --ge[-1] {iM-$2} mx=${-arg\ 1,{[xM,yM,zM,cM]}} -rm[-1] -else  mx=${-arg\ 1,{[xM,yM,zM,cM]}} -endif
-	  mx={$mx*$5+$4}
-	  --ge[-1] {iM/2} med1=${-arg\ 1,{[xM,yM,zM,cM]}} -rm[-1]
-	  --le[-1] {iM/2} med2=${-arg\ 1,{[xm,ym,zm,cm]}} -rm[-1,-2]
-	  med={($med1+$med2)/2*$5+$4}
+      --cumulate.
+      --ge. $2 mn={${-arg\ 1,{[xM,yM,zM,cM]}}*$5+$4} -rm[-1]
+      -if {$2>1} --ge. {iM-$2} mx=${-arg\ 1,{[xM,yM,zM,cM]}} -rm. -else  mx=${-arg\ 1,{[xM,yM,zM,cM]}} -endif
+      mx={$mx*$5+$4}
+      --ge. {iM/2} med1=${-arg\ 1,{[xM,yM,zM,cM]}} -rm.
+      --le. {iM/2} med2=${-arg\ 1,{[xm,ym,zm,cm]}} -rm[-1,-2]
+      med={($med1+$med2)/2*$5+$4}
+  # iqr
+      -hist_percentile. $6,$3,$4,$5 qu=${}
+      hiq=${-arg\ 2,$qu}
+      loq=${-arg\ 1,$qu}
+      iqr={${-arg\ 2,$qu}-${-arg\ 1,$qu}+1}
+      -if {$iqr<-1} iqr-=2 -endif
   # Prepare result for one image
-      res=$md\,$m0\,$m1\,$m2\,$mn\,$mx\,$med
+      res=$md\,$m0\,$m1\,$m2\,$mn\,$mx\,$med\,$iqr\,$loq\,$hiq
       -if {$1>-2} res=${-arg\ {$1+2},$res} -endif
   # Concatenate results for image list
      -if {$>==0} sres=$res -else sres=$sres\,$res -endif
