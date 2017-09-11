@@ -474,14 +474,15 @@ hist_percentile :
   -done -u $sres -v +
 
 #@cli hist_feature : _nofeature>=-2,_nth>0,_zero={0|1},_min0,_stepw,_percent[%]>0
-#@cli : Estimation from histogram (1d image) the features mode,sum,mean,SD,min,max,median,iqr,loq,hiq returned in status (${})
+#@cli : Estimation from histogram (frequency dist, 1d image) the features 
+#@cli :  'mode','sum' (m0),'mean' (m1),'SD' (m2),'min','max','median','iqr' (hiq-loq+1),'loq','hiq' returned in status (${}).
 #@cli : _nofeature=-2 mode,m0,m1,m2,min,max,med,iqr,loq,hiq,-1 mode,0 sum,1 mean,2 SD,3 min,4 max,5 median,6 iqr,7 loq,8 hiq
-#@cli : _nth extreme value
+#@cli : _nth extreme value (nth+1 occurence!)
 #@cli : _zero Class 0 is zeroed if !=0
 #@cli : _min0 value of class 0
 #@cli : _stepw value of class width (bin size)
 #@cli : _percent 
-#@cli : Default valalues: '_nofeature=-2', 'nth=1', '_zero=0', '_min0=0', '_stepw=1', '_percent=25%'
+#@cli : Default valalues: '_nofeature=-2', '_nth=1', '_zero=0', '_min0=0', '_stepw=1', '_percent=25%'
 #@cli : Updated 140314 (smoothing replaced by nth selection)
 #@cli : Updated 100817 (percent parameter and iqr,loq,hiq feature added)
 #@cli : $ image.jpg -luminance --histogram 256,0,255 -dh.. ,,256,0,255 -hist_feature , -repeat 8 t={_arg($>+1${})} -text $t,40,{$>*25+5},23,1,128 -done -rm.
@@ -521,6 +522,29 @@ hist_feature :
      -if {$>==0} sres=$res -else sres=$sres\,$res -endif
     -endl
   -done -u $sres -v +
+
+#@cli hist_feature_demo : Parameters like in -hist_feature
+#@cli : Plot of features in blue into the histogram with Gaussian in green
+#@cli : $ -sp 0 -luminance --threshold 40 -* -histogram 256,0,255 -= 0,0 -hist_feature_demo ,
+hist_feature_demo :
+  -check "${1=-2}>=-2&&$1<=8&&isint($1)&&isint(${2=1})&&$2>0"
+  -skip ${3=0},${4=0},${5=1},${6=25%}
+  -e[^-1] "Plot features from hist_feature into 1d histogram$?."
+  -v -
+  -l.
+  -hist_feature. -2,${2-6} vv=${}
+  md=${-arg\ 1,$vv} m0=${-arg\ 2,$vv} m1=${-arg\ 3,$vv} m2=${-arg\ 4,$vv} 
+  mn=${-arg\ 5,$vv} mx=${-arg\ 6,$vv} med=${-arg\ 7,$vv} 
+  lo=${-arg\ 9,$vv} hi=${-arg\ 10,$vv} 
+  --gaussian. $m2,0,0 -shift. {-w/2+$m1} -*. {$m0/is} -round. 1
+  v={iM#-2}
+  --*. 0 
+  -=. $v,$md -=. $v,$m1 -=. {$v*0.25},$mn -=. {$v*0.25},$mx -=. $v,$med
+  -=. {$v*(1-$6)},$lo -=. {$v*(1-$6)},$hi
+  -a c -plot. 3
+  -u $vv
+  -endl
+  -v +
 
 #@cli karo_nth_max : _n(1),_ind(=0)
 #@cli : Return in the status the n-th max or the index of the n-th max of an image
