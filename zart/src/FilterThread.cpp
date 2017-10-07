@@ -177,12 +177,12 @@ FilterThread::run()
 
       if (_commandUpdated) {
         delete _gmic;
-        QString c = QString("foo: -skip $\"*\" ") + _command;
+        QString c = QString("foo: skip $\"*\" ") + _command;
         _gmic = new gmic("", c.toLatin1().constData());
         _commandUpdated = false;
       }
 
-      _gmic->run("-v -");
+      _gmic->run("v -");
       QString c;
       c += QString("_x=") + QString("%1").arg(_xMouse);
       c += QString(" _y=") + QString("%1").arg(_yMouse);
@@ -190,9 +190,9 @@ FilterThread::run()
       QString call;
       _arguments.lock();
       if (_arguments.object().isEmpty())
-        call = QString(" -foo 0");
+        call = QString(" foo 0");
       else
-        call = QString(" -foo %1").arg(_arguments.object());
+        call = QString(" foo %1").arg(_arguments.object());
       _arguments.unlock();
       c += call;
 
@@ -286,7 +286,7 @@ FilterThread::run()
       CImg<unsigned char> src(reinterpret_cast<unsigned char*>(_imageSource.image()->imageData),
                               3, _imageSource.width(), _imageSource.height(), 1, true);
       _gmic_images = src.get_permute_axes("yzcx");
-      QString errorCommand = QString("-gimp_error_preview \"%1\"").arg(e.what());
+      QString errorCommand = QString("gui_error_preview \"%1\"").arg(e.what());
 
       try {
         _gmic->run(errorCommand.toLatin1().constData(),_gmic_images,_gmic_images_names);
