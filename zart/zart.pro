@@ -46,9 +46,18 @@ openmp {
     QMAKE_LFLAGS += -fopenmp
 }
 
-# compile our own version of gmic, with the same cimg_* flags as zart
-#LIBS += $$GMIC_PATH/libgmic.a
-SOURCES += $$GMIC_PATH/gmic.cpp
+# use qmake CONFIG+=enable_dynamic_linking ... to link against libgmic.so
+CONFIG(enable_dynamic_linking) {
+    isEmpty(GMIC_LIB_PATH) {
+	GMIC_LIB_PATH = $$GMIC_PATH/..
+    }
+    LIBS += -L$$GMIC_LIB_PATH -lgmic
+} else {
+    # compile our own version of gmic, with the same cimg_* flags as zart
+    #LIBS += $$GMIC_PATH/libgmic.a
+    SOURCES += $$GMIC_PATH/gmic.cpp
+}
+
 DEFINES += gmic_build gmic_is_parallel cimg_use_abort
 
 INCLUDEPATH += $$PWD $$PWD/include $$PWD/$$GMIC_PATH/
