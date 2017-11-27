@@ -291,7 +291,7 @@ karo_label : -check "$1>=0" -skip ${2=0} -skip ${3=0}
 	-endif
   -endl -done -v +
 
-#@cli karo_threshold : _method={ triangle | yen | otsu | _otsu | bgt | intera | rats | fixnnn},_delclass>0,_smooth>0
+#@cli karo_threshold : _method={ triangle | yen | otsu | _otsu | bgt | intermeans | intera | rats | fixnnn},_delclass>0,_smooth>0
 #@cli : Calculate threshold (from ImageJ) in range [0,255], evtl. normalization necessary.
 #@cli : For each method user function _karo_"_method" is called!
 #@cli : If {_delclass > 0} delete cluster {_delclass-1}. 
@@ -408,6 +408,26 @@ _karo_bgt: -skip "${1=0} ${2=1}" -v - fact=1.5
     -else res={$md+$fact*$sd} -endif
 	-u {$res*$2+$1} -rm
   -endl -v +
+
+#@cli _karo_intermeans : _minval,_bins
+#@cli : Calculate intermeans threshold (from ImageJ autothreshold IsoData)
+#@cli : from last selected data and store it in status
+_karo_intermeans : skip "${1=0} ${2=1}"
+  e[^-1] "Calculate intermeans threshold from last selected (1d) histogram$? in range ["$1","{$1+(w-1)*$2}"]." v -
+  l. if {h>1||d>1||s>1} u "?" else
+    split={"
+      min=0; whiledo(i(min)==0,min++);
+      max=w; whiledo(i(max)==0,max--);
+      if(min>=max,res=w/2,
+        mvI=min;
+        dowhile(sum1=sum2=sum3=sum4=0.0;
+        for(id=min,id<=mvI,id++,sum1+=id*i(id);sum2+=i(id));
+        for(id=mvI+1,id<=max,id++,sum3+=id*i(id);sum4+=i(id));
+        res=(sum1/sum2+sum3/sum4)/2.0;mvI++,
+        (mvI+1)<=res&&mvI<(max-1)));
+      round(res)"}
+    u {$1+$split*$2} fi
+  endl v +
 
 #@cli karo_rats : _pow(0.5)
 #@cli : Robust automatic threshold selection (Kittler et al. 1985)
