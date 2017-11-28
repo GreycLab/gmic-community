@@ -291,7 +291,7 @@ karo_label : check "$1>=0" skip ${2=0} skip ${3=0}
 	-fi
   endl done v +
 
-#@cli karo_threshold : _method={ triangle | yen | otsu | _otsu | bgt | intermeans | intera | rats | fixnnn},_delclass>0,_smooth>0
+#@cli karo_threshold : _method={ triangle | yen | otsu | _otsu | bgt | intermeans | intera | rats | fixnnn | huang | huang2 | li },_delclass>0,_smooth>0
 #@cli : Calculate threshold (from ImageJ) in range [0,255], evtl. normalization necessary.
 #@cli : For each method user function _karo_"_method" is called!
 #@cli : If {_delclass > 0} delete cluster {_delclass-1}. 
@@ -442,6 +442,118 @@ karo_rats :
     if {$>==0} sres=$res else sres=$sres\,$res fi
   endl done
   u $sres v +
+
+_karo_huang : skip "${1=0} ${2=1}"
+# public static int Huang(int [] data ) {
+# 	// Implements Huang's fuzzy thresholding method 
+# 	// Uses Shannon's entropy function (one can also use Yager's entropy function) 
+# 	// Huang L.-K. and Wang M.-J.J. (1995) "Image Thresholding by Minimizing  
+# 	// the Measures of Fuzziness" Pattern Recognition, 28(1): 41-51
+# 	// M. Emre Celebi  06.15.2007
+# 	// Ported to ImageJ plugin by G. Landini from E Celebi's fourier_0.8 routines
+  huang={"
+           threshold=-1;
+           first_bin=0;
+           for(ih=0,ih<w,if(i(ih)!=0,first_bin=ih;break());ih++);
+           last_bin=w-1;
+           for(ih=w-1,ih>=first_bin,if(i(ih)!=0,last_bin=ih;break());ih--);
+           term = 1.0 / ( last_bin - first_bin );
+           mu_0=["{^}"];
+           sum_pix = num_pix = 0;
+           for ( ih = first_bin, ih < w, sum_pix += ih * i(ih); num_pix += i(ih);
+             mu_0[ih] = sum_pix / num_pix; ih++ );
+           mu_1 = mu_0;
+           sum_pix = num_pix = 0;
+           for (ih = last_bin, ih > 0, sum_pix+=ih*i(ih);
+             num_pix += i(ih);
+             mu_1[ih-1] = sum_pix / num_pix; ih-- );
+           min_ent = 1e31;
+           for (it = 0, it < w, 
+             ent = 0.0;
+             for (ih = 0,ih<=it,
+               mu_x = 1.0 / ( 1.0 + term * abs(ih - mu_0[it]));
+               if (!((mu_x  < 1e-06)||(mu_x > 0.999999)),
+                 ent += i(ih) * ( -mu_x * log ( mu_x ) - ( 1.0 - mu_x ) * log ( 1.0 - mu_x )));
+               ih++);
+             for (ih = it + 1, ih < w, 
+               mu_x = 1.0 / ( 1.0 + term * abs (ih - mu_1[it]));
+               if (!((mu_x  < 1e-06)||(mu_x > 0.999999)),
+                 ent += i(ih) * ( -mu_x * log ( mu_x ) - ( 1.0 - mu_x ) * log ( 1.0 - mu_x )));
+               ih++);
+             if (ent < min_ent, min_ent = ent; threshold = it; _(print(min_ent,threshold)));
+             it++ ); 
+           threshold"}
+  u {$huang*$2+$1} rm
+
+_karo_huang2 : skip "${1=0} ${2=1}"
+  huang2={"
+#	// Implements Huang's fuzzy thresholding method 
+#	// Uses Shannon's entropy function (one can also use Yager's entropy function) 
+#	// Huang L.-K. and Wang M.-J.J. (1995) "Image Thresholding by Minimizing  
+#	// the Measures of Fuzziness" Pattern Recognition, 28(1): 41-51
+#	// Reimplemented (to handle 16-bit efficiently) by Johannes Schindelin Jan 31, 2011
+           for(first=0,first<w&&i(first)==0,first++);
+           for(last=w-1,last>first&&i(last)==0,last--);
+           if(first==last,break());
+           S=["{^}"]; W=S; 
+           S[0]=i(0);
+           for(ii=max(1,first),ii<=last,S[ii]=S[ii-1]+i(ii);W[ii]=W[ii-1]+ii*i(ii);ii++);
+           C=last-first;
+           Smu=S;
+           for(ii=1,ii<(C+1),mu=1/(1+ii/C);Smu[ii]=-mu*log(mu)-(1-mu)*log(1-mu);ii++);
+           bestThreshold = 0;
+           bestEntropy = 1e31;
+           for(threshold=first,threshold<=last,
+             entropy=0; mu=round(W[threshold]/S[threshold]);
+             for(ii=first,ii<=threshold,entropy+=Smu[abs(ii-mu)]*i(ii);ii++);
+             mu=round((W[last] - W[threshold]) / (S[last] - S[threshold]));
+             for(ii=threshold+1,ii<=last,entropy+=Smu[abs(ii-mu)]*i(ii);ii++);
+             if(bestEntropy>entropy,bestEntropy=entropy;bestThreshold=threshold);
+             threshold++);
+           bestThreshold"}
+           u {$huang2*$2+$1} rm
+
+
+_karo_li : skip "${1=0} ${2=1}"
+  li={"
+#public static int Li(int [] data ) {
+#// Implements Li's Minimum Cross Entropy thresholding method
+#// This implementation is based on the iterative version (Ref. 2) of the algorithm.
+#// 1) Li C.H. and Lee C.K. (1993) "Minimum Cross Entropy Thresholding" 
+#//    Pattern Recognition, 26(4): 617-625
+#// 2) Li C.H. and Tam P.K.S. (1998) "An Iterative Algorithm for Minimum 
+#//    Cross Entropy Thresholding"Pattern Recognition Letters, 18(8): 771-776
+#// 3) Sezgin M. and Sankur B. (2004) "Survey over Image Thresholding 
+#//    Techniques and Quantitative Performance Evaluation" Journal of 
+#//    Electronic Imaging, 13(1): 146-165 
+#//    http://citeseer.ist.psu.edu/sezgin04survey.html
+#// Ported to ImageJ plugin by G.Landini from E Celebi's fourier_0.8 routines
+      tolerance=0.5;
+      num_pixels=0;
+      mean = 0.0;
+      for (ih = 0, ih < w, ih++, num_pixels += i(ih);mean += ih * i(ih));
+      mean /= num_pixels;
+      new_thresh = mean;
+      dowhile(
+        old_thresh = new_thresh;
+        threshold = (old_thresh+0.5);
+        sum_back = 0;
+        num_back = 0;
+        for ( ih = 0, ih<=threshold, ih++,
+          sum_back += ih * i(ih);
+          num_back += i(ih));
+        if(num_back == 0,mean_back=0.0,mean_back=(sum_back/num_back));
+        sum_obj = 0;
+        num_obj = 0;
+        for ( ih = threshold + 1, ih < w, ih++,
+          sum_obj += ih * i(ih);
+          num_obj += i(ih));
+        if(num_obj == 0,mean_obj=0.0,mean_obj=(sum_obj/num_obj));
+        temp = ( mean_back - mean_obj ) / ( log ( mean_back ) - log ( mean_obj ) );
+        if (temp < -2.220446049250313e-16, new_thresh=floor(temp - 0.5),new_thresh=floor(temp + 0.5)),
+        abs(new_thresh-old_thresh)>tolerance);
+      threshold"}
+  u {$li*$2+$1} rm
 
 #@cli _kr_histogram : _nb_levels>0[%],_value0[%],_value1[%]
 #@cli : Computes the histogram and returns in status the value of first class and the bin size
