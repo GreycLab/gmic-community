@@ -121,10 +121,18 @@ GMIC_DLLINTERFACE int GMIC_CALLCONV gmic_call(const char* _cmd, unsigned int* _n
       gmic_image<float>& img = images[i];
       if (_options && _options->interleave_output) {
         img.permute_axes("CXYZ");
-				_images[i].interleave = true;
+		_images[i].interleave = true;
+        _images[i].width = img._height;
+        _images[i].height = img._depth;
+        _images[i].depth = img._spectrum;
+        _images[i].spectrum = img._width;
       } else {
-				_images[i].interleave = false;
-			}
+		_images[i].interleave = false;
+        _images[i].width = img._width;
+        _images[i].height = img._height;
+        _images[i].depth = img._depth;
+        _images[i].spectrum = img._spectrum;
+	  }
       if (_options && _options->output_format == E_FORMAT_BYTE) {
         gmic_image<unsigned char> img_tmp;
         img_tmp = img;
@@ -137,10 +145,6 @@ GMIC_DLLINTERFACE int GMIC_CALLCONV gmic_call(const char* _cmd, unsigned int* _n
         _images[i].data = img._data;
         img._is_shared = true;
       }
-      _images[i].width = img._width;
-      _images[i].height = img._height;
-      _images[i].depth = img._depth;
-      _images[i].spectrum = img._spectrum;
       std::strcpy(_images[i].name, images_names[i]);
     }
   }
