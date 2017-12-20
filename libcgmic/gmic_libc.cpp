@@ -121,13 +121,13 @@ GMIC_DLLINTERFACE int GMIC_CALLCONV gmic_call(const char* _cmd, unsigned int* _n
       gmic_image<float>& img = images[i];
       if (_options && _options->interleave_output) {
         img.permute_axes("CXYZ");
-		_images[i].interleave = true;
+		    _images[i].is_interleaved = true;
         _images[i].width = img._height;
         _images[i].height = img._depth;
         _images[i].depth = img._spectrum;
         _images[i].spectrum = img._width;
       } else {
-		_images[i].interleave = false;
+		    _images[i].is_interleaved = false;
         _images[i].width = img._width;
         _images[i].height = img._height;
         _images[i].depth = img._depth;
