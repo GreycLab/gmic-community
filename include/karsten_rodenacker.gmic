@@ -67,8 +67,221 @@
 #@gui : note = note{"\nThe functions defined are quite <i>experimental</i> and subject to changes.
 #@gui : Please do not rely on the fact that they will perform equally forever."}
 karos_about :
-  fx_logo_version{round(u(0.5,3.49))} $_version [0] *. 0 text. "KaRo's",10%,22%,57,1,255 text. "Tests",40%,60%,57,1,200 
+  fx_logo_version{round(u(0.5,3.49))} $_version [0] *. 0 text. "KaRo's",10%,22%,57,1,255 text. "Tests",40%,60%,57,1,200
   +to_gray. skeleton. , n[-1--2] 0,255 dilate.. 2 -[-1--2] + n 0,255
+
+#------------------------------------
+#
+#@cli :: PINK-library operators
+#
+#------------------------------------
+
+_wrbytepnk :
+  output_pink3d ${1}.pnk
+
+_xpink :
+  na={-1,n}
+  filename=${-file_rand}
+  x_filename={/$filename}
+  prefix=pink.
+  if {!${-is_windows}}
+    -x "which "${prefix}${1}" >/dev/null 2>&1"
+    if {${}!=0} prefix=""
+      -x "which "$1" >/dev/null 2>&1"
+      if {${}!=0} v + error "Executable (pink.)"$1" not found in PATH, status = "${}"!! Returning!!\n" fi
+    fi
+    output_pink3d ${filename}.pnk -x ${prefix}${1}" "${filename}".pnk $2 "${filename}"_o.pnk >/dev/null 2>&1"
+  else
+    output_pink3d ${filename}.pnk -x $1" "${x_filename}".pnk $2 "${x_filename}"_o.pnk"
+  fi
+  status=${}
+  file_rm ${x_filename}.pnk
+  if {$status!=0" && "['"$1"']!='seuilauto'} v + error "Exec status is "${status}"."
+  elif ${filename}_o.pnk i ${filename}_o.pnk file_rm ${x_filename}_o.pnk k. nm. $na
+  else v + error "Exec error!!"
+  fi
+
+_xpinks :
+  s={s} if {$s>1} s. c fi
+  repeat $! l[$>]  _xpink $1,"$2" k. endl done
+  if {$s>1} a[-$s--1] c fi
+
+_xframe :
+  line 0%,0%,100%,0% line 0%,100%,100%,100% line 0%,0%,0%,100% line 100%,0%,100%,100%
+
+#@cli output_pink3d : filename,_type
+#@cli : Save selected images as _type-coded (P5,P8,P9) PPM files (PINK extension for 3d volumetric images).
+output_pink3d : skip ${2=P5}
+  e[^-1] "Output image$? as file '$1' (in 3d pink extension of "$2"-coded PPM format)."
+  v - if {$!==1} filename0="$1"
+  else repeat $! filename$>=${filename\ "\"$1\"",$>} done
+  fi
+  repeat $! l[$>]
+    if {['"$2"']=='P5'}
+      if {d==1} o. ppm:${filename$>}  # 2d image, save as regular PPM format.
+      else                            # 3d image, save as PINK PPM extension.
+        ({'P5\n{w}\ {h}\ {d}\n255\n'})
+        +channels.. 0 y. x a[-2,-1] x
+        o. raw:${filename$>},uchar
+        rm.
+      fi
+    elif {['"$2"']=='P8'}
+      ({'P8\n{w}\ {h}\ {d}\n{iM}\n'})
+      +channels.. 0 cast. uint,uchar y[-2,-1] x a[-2,-1] x
+      o. raw:${filename$>},uchar
+      rm.
+    elif {['"$2"']=='P9'}
+      ({'P9\n{w}\ {h}\ {d}\n{ceil(iM)}\n'})
+      +channels.. 0 cast. float,uchar y[-2,-1] x a[-2,-1] x
+      o. raw:${filename$>},uchar
+      rm.
+    else error "Type "$2"not implemented!" fi
+  endl done v +
+
+#@cli pink
+#@cli : Pink wrapper name,p1,...,pn (requires the PINK library to be installed).
+#@cli : (http://pinkhq.com/)
+#@cli : prepares input, calls external "name input p1...pn output" and reads output (/tmp)
+#@cli : $ image.jpg +pink asfr,5 pink[0] asf,5
+#@cli : $ image.jpg +blur 2 pink maxima,4
+pink : v -
+  if {$#>1} ({"'${2--1}'"}) replace. {','},{"' '"} p={t} rm. else p=" " fi
+  v + e[^-1] "Call pink package on image$? with cmd: \"$1 [img] "$p" [img]\"." v -
+  repeat $! l[$>] _xpinks $1,$p endl done v +
+
+#@cli pink_grayskel : _connectivity={ 4 | 8 | 6 | 26 }, _lambda=0
+#@cli : (http://pinkhq.com/doxygen/grayskel_8c.html)
+#@cli : Grayscale homotopic skeleton (requires the PINK library to be installed).
+#@cli : Default values: 'connectivity=4' and 'lambda=0'.
+#@cli : $ image.jpg +pink_grayskel , +pink_grayskel[0] ,10 +pink_grayskel[0] ,100 append_tiles 2
+pink_grayskel : skip ${1=4},${2=0}
+  check "${1=4}==4 || $1==8 || $1==6 || $1==26"
+  repeat $! l[$>] _xpinks "grayskel","null $1 $2" endl done
+
+#@cli pink_heightmaxima : _connectivity={ 4 | 8 | 6 | 26 },_height=1
+#@cli : (http://pinkhq.com/doxygen/heightmaxima_8c.html)
+#@cli : Heightmaxima filtering (requires the PINK library to be installed).
+#@cli : Default values: 'connectivity=4' and 'height=1'.
+#@cli : $ image.jpg +blur 2 +pink_heightminima ,15 +pink_heightmaxima[0,1] ,15 -[-3,-1] -[-3,-1] keep[-1,-2]
+pink_heightmaxima : check "${1=4}==4 || $1==8 || $1==6 || $1==26" skip ${2=1}
+  e[^-1] "Filter by heightmaxima exec with connectivity $1 height $2."
+  v - repeat $! l[$>]
+    s={s} if {$s>1} s. c fi
+    repeat $! l[$>] _xpink "heightmaxima","$1 $2" k. endl done
+    if {$s>1} a[-$s--1] c fi
+  endl done v +
+
+#@cli pink_heightminima : _connectivity={ 4 | 8 | 6 | 26 },_height=1
+#@cli : (http://pinkhq.com/doxygen/heightminima_8c.html)
+#@cli : Heightminima filtering (requires the PINK library to be installed).
+#@cli : Default values: 'connectivity=4' and 'height=1'.
+#@cli : $ image.jpg +blur 2 +pink_heightminima ,15 +pink_heightmaxima[0,1] ,15 -[-3,-1] -[-3,-1] keep[-1,-2]
+pink_heightminima : check "${1=4}==4 || $1==8 || $1==6 || $1==26" skip ${2=1}
+  e[^-1] "Apply filter by heightminima exec with connectivity $1 height $2."
+  v - repeat $! l[$>]
+    s={s} if {$s>1} s. c fi
+    repeat $! l[$>] _xpink "heightminima","$1 $2" k. endl done
+    if {$s>1} a[-$s--1] c fi
+  endl done v +
+
+#@cli pink_htkern : _connectivity={ 4 | 8 | 6 | 26 }, _type={""|u}
+#@cli : (http://pinkhq.com/doxygen/htkern_8c.html)
+#@cli : (http://pinkhq.com/doxygen/htkernu_8c.html)
+#@cli : Grayscale ultimate homotopic thinning/thickening without condition (requires the PINK library to be installed).
+#@cli : Default values: 'connectivity=4' and 'type=""'.
+#@cli : $ image.jpg +pink_htkern ,u +pink_htkern[0] , +-[-1,-2] remove[0]
+pink_htkern : skip ${1=4},${2=""}
+  repeat $! l[$>] _xpinks htkern$2,"null $1" endl done
+
+#@cli pink_lvkern : _connectivity={ 4 | 8 | 6 | 26 }, _type={""|u}
+#@cli : (http://pinkhq.com/doxygen/lvkern_8c.html)
+#@cli : (http://pinkhq.com/doxygen/lvkernu_8c.html)
+#@cli : Grayscale ultimate leveling thinning/thickening without condition (requires the PINK library to be installed).
+#@cli : Default values: 'connectivity=4' and 'type=""'.
+#@cli : $ image.jpg pink_lvkern ,u
+pink_lvkern : skip ${1=4},${2=""}
+  check "${1=4}==4 || $1==8 || $1==6 || $1==26"
+  repeat $! l[$>] _xpinks lvkern${2},"null $1" endl done
+
+#@cli pink_reg_minima : _connectivity={ 4 | 8 | 6 | 26 }
+#@cli : (http://pinkhq.com/doxygen/minima_8c.html)
+#@cli : Regional minima (requires the PINK library to be installed).
+#@cli : Default values: 'connectivity=4'.
+#@cli : $ image.jpg +blur 2 pink_reg_minima ,
+pink_reg_minima : check "${1=4}==4 || $1==8 || $1==6 || $1==26"
+  e[^-1] "Compute regional minima exec with connectivity $1."
+  v - repeat $! l[$>]
+    s={s} if {$s>1} s. c fi
+    repeat $! l[$>]  _xpink "minima","$1" k. endl done
+    if {$s>1} a[-$s--1] c fi
+  endl done v +
+
+#@cli pink_skelcurv : _prio={0|1|2|3|4|8|6|26},_connectivity={ 4 | 8 | 6 | 26 },_inhibit={""}
+#@cli : (http://pinkhq.com/doxygen/skelcurv_8c.html)
+#@cli : Curvilinear binary skeleton guided by a priority function or image (requires the PINK library to be installed).
+#@cli : Default values: 'prio=0', 'connectivity=4' and 'inhibit=""'.
+#@cli : $ image.jpg threshold 50% {w},{h} fill[-1] 'if(x>w/2,255,0)' tp=${-path_tmp} output[-1] ${tp}/inhibit.pgm remove[-1] +pink_skelcurv[0] , +pink_skelcurv[0] ,,${tp}/inhibit.pgm exec "rm "${tp}"/inhibit.pgm"
+#@cli : $ image.jpg threshold 50% +pink_skelcurv , +pink_skelcurv[-2] ,8
+pink_skelcurv : skip ${1=0},${2=4},${3=""}
+  e[^-1] "Curvilinear binary skeleton guided by a priority function or image from image$?, prio=$1, connectivity=$2, inhibit=$3."
+  repeat $! l[$>] _xpinks "skelcurv","$1 $2 $3" endl done
+
+#@cli pink_skelend : _connectivity={ 4 | 8 | 6 | 26 },_n=0
+#@cli : (http://pinkhq.com/doxygen/skelend_8c.html)
+#@cli : Homotopic skeleton of a 2d or 3d binary image with dynamic detection of end points (requires the PINK library to be installed).
+#@cli : Default values: 'connectivity=4' and 'n=0'.
+#@cli : $ image.jpg threshold 50% +pink_skelend , +pink_skelend[-2] ,-1
+pink_skelend : skip ${1=4},${2=0}
+  repeat $! l[$>] _xpinks "skelend","$1 $2" endl done
+
+#@cli pink_skeleton : _prio={0|1|2|3|4|8|6|26},_connectivity={ 4 | 8 | 6 | 26 },_inhibit={""}
+#@cli : (http://pinkhq.com/doxygen/skeleton_8c.html)
+#@cli : Ultimate binary skeleton guided by a priority image (requires the PINK library to be installed).
+#@cli : Default values: 'prio=0', 'connectivity=4' and 'inhibit=""'.
+#@cli : $ image.jpg threshold 50% +pink_skeleton[-1] ,
+ pink_skeleton : skip ${1=0},${2=4},${3=""}
+  repeat $! l[$>] _xpinks "skeleton","$1 $2 $3" endl done
+
+#@cli pink_skelpar : _algorithm={0...29},_nsteps=_1,_inhibit=""
+#@cli : (http://pinkhq.com/doxygen/skelpar_8c.html)
+#@cli : Parallel binary skeleton (requires the PINK library to be installed).
+#@cli : Default values: 'algorithm=4', 'nsteps=-1' and 'inhibit=""'.
+#@cli : $ image.jpg threshold 50% +pink_skelpar[-1] 0 +pink_skelpar[-1] 2
+pink_skelpar : skip ${1=4},${2=-1},${3=""}
+  repeat $! l[$>] _xframe _xpinks "skelpar","$1 $2 $3" endl done
+
+#@cli pink_wshed : _connectivity={ 4 | 8 | 6 | 26 },_inverse={ 0 | 1 },_height=0
+#@cli : (http://pinkhq.com/doxygen/wshedtopo_8c.html)
+#@cli : Watershed (requires the PINK library to be installed).
+#@cli : Default values: 'connectivity=4', 'inverse=0' and 'height=0'.
+#@cli : $ image.jpg +pink_wshed ,1,5 pink_wshed[0] ,,5
+pink_wshed : check "${1=4}==4 || $1==8 || $1==6 || $1==26" skip ${2=0},${3=0}
+  e[^-1] "Compute wshedtopo exec with connectivity $1 inversion $2 height $3."
+  v - repeat $! l[$>]
+    s={s} if {$s>1} s. c fi
+    if {d==1}
+      check "${1=4}==4 || $1==8"
+      repeat $! l[$>]
+        f max(min(i,255),0)
+        if {$2!=0} negate 255 fi
+        if {$3>=0} pink heightminima,$1,$3 fi
+        pink wshedtopo,$1
+        if {$2!=0} negate 255 fi
+      endl done
+    else
+      check "$1==6 || $1==26"
+      repeat $! l[$>]
+        f max(min(i,255),0)
+        if {$2!=0} negate 255 fi
+        if {$3>=0}
+          pink heightminima,$1,$3
+        fi
+        pink wshedtopo,$1
+        if {$2!=0} negate 255 fi
+      endl done
+    fi
+    if {$s>1} a[-$s--1] c fi
+  endl done v +
 
 #@cli :: KaRo's Tests
 
@@ -89,16 +302,16 @@ karos_about :
 #@cli : |# Bit2nm = 1.0
 #@cli : |# Start of Data:
 gwyddionread : skip "${1=gwyddion_Example.asc}"
-  e[^-1] "Read gwyddion ASCII text data: "$1 
-  v - 
+  e[^-1] "Read gwyddion ASCII text data: "$1
+  v -
   l[]
     i raw:"$1",uchar nm={b}
     # Retrieve header information.
     s +,10
-    size_x=-1 size_y=-1 
-    len_x=-1 len_y=-1 
-    offs_x=-1 offs_y=-1 
-    bit2nm=-1 
+    size_x=-1 size_y=-1
+    len_x=-1 len_y=-1
+    offs_x=-1 offs_y=-1
+    bit2nm=-1
     hend=-1
     repeat $!
       if   {same(['{$>,t}'],'"# x-pixels ="',12)} rows[$>] 12,100% size_x={{$>,t}}
@@ -117,17 +330,17 @@ gwyddionread : skip "${1=gwyddion_Example.asc}"
        # Save remaining data as a pure ascii file.
       discard 13
       file_tmp=${-file_rand}
-      if {$!>1} o.. raw:$file_tmp,uchar rm.. i dlm:$file_tmp nm. $nm 
+      if {$!>1} o.. raw:$file_tmp,uchar rm.. i dlm:$file_tmp nm. $nm
         o.. raw:${file_tmp}_,uchar rm.. i dlm:${file_tmp}_ nm. ${nm}_ file_rm ${file_tmp}_
-      else o raw:$file_tmp,uchar rm i dlm:$file_tmp nm. $nm 
+      else o raw:$file_tmp,uchar rm i dlm:$file_tmp nm. $nm
       fi
       file_rm $file_tmp
     else
       rm
     fi
     u [$len_x,$len_y,$offs_x,$offs_y,$bit2nm]
-  endl 
-  v + 
+  endl
+  v +
 
 #@cli wykoread : _filename
 #@cli : Read Wyko/Bruker/Vision ASCII file and produce image(s)
@@ -142,9 +355,9 @@ gwyddionread : skip "${1=gwyddion_Example.asc}"
 #@cli : |Pixel_size	7	4	0.000985
 #@cli : |Magnification	8	8	10.050000
 #@cli : |ScannerSpeed	7	4	2.315832
-#@cli : |RAW_DATA	3	1228800	
+#@cli : |RAW_DATA	3	1228800
 wykoread : skip "${1=Wyko_Example.ASC}"
-  e[^-1] "Read Vision surface profilometry OPD text data: "$1 
+  e[^-1] "Read Vision surface profilometry OPD text data: "$1
   v - l[]
     i raw:"$1",uchar nm={b}
     # Retrieve header information.
@@ -158,23 +371,23 @@ wykoread : skip "${1=Wyko_Example.ASC}"
       fi
     done
     if {$hend>0}
-      rm[0-{$hend+1}] 
+      rm[0-{$hend+1}]
       if {$rend>$hend} a[0-{$rend-$hend-3}] y rm[1,2] a[1--1] y else a y fi
       #-e "Size = ("$size_x,$size_y,$hend,$rend")"
       # Save remaining data as a pure ascii file.
       replace_str "Bad","nan"
       discard 13
       file_tmp=${-file_rand}
-      if {$!>1} o.. raw:$file_tmp,uchar rm.. i dlm:$file_tmp nm. $nm 
+      if {$!>1} o.. raw:$file_tmp,uchar rm.. i dlm:$file_tmp nm. $nm
         o.. raw:${file_tmp}_,uchar rm.. i dlm:${file_tmp}_ nm. ${nm}_ file_rm ${file_tmp}_
-      else o raw:$file_tmp,uchar rm i dlm:$file_tmp nm. $nm 
+      else o raw:$file_tmp,uchar rm i dlm:$file_tmp nm. $nm
       fi
       file_rm $file_tmp
       rotate -90,0
     else
       rm
     fi
-  endl v + 
+  endl v +
 
 #@cli pseudo_c : Pseudo coloring of greyscale image
 pseudo_c : v - if {s!=1} to_gray. fi {iM},1,1,3,u(255) round. map.. . rm.  v +
@@ -188,7 +401,7 @@ sincos :
   else
     $1,$2,1,1,'init(a=pi*w;b=pi*h);sin(a/(x+1))*cos(b/(y+1))'
     +f. 'sign(i)' eq. 1 +neq. 1 *[1] ... *. ... n[-1,-2] 0,255
-    f[-1,-2] 'if(i==255,0,i)' +[-1,-2] rm.. 
+    f[-1,-2] 'if(i==255,0,i)' +[-1,-2] rm..
   fi
   nm. sincos endl v +
 
@@ -308,7 +521,7 @@ karo_zerleg :
 #@cli karo_threshold : _method={ triangle | yen | otsu | _otsu | bgt | intermeans | intera | rats | fixnnn | huang | huang2 | li },_delclass>0,_smooth>0
 #@cli : Calculate threshold (from ImageJ) in range [0,255], evtl. normalization necessary.
 #@cli : For each method user function _karo_"_method" is called!
-#@cli : If {_delclass > 0} delete cluster {_delclass-1}. 
+#@cli : If {_delclass > 0} delete cluster {_delclass-1}.
 #@cli : If {_smooth > 0} blur_x histogram with amplitude _smooth.
 #@cli : No histogram processing for otsu, rats and intera!
 #@cli : $ image.jpg luminance. karo_threshold. otsu
@@ -369,7 +582,7 @@ _karo_triangle : skip "${1=0} ${2=1}"
     res={$1+$split*$2}
 # Concatenate results for image list
     if {$>==0} sres=$res else sres=$sres\,$res fi
-    rm[0] 
+    rm[0]
   endl done u $sres v +
 
 #@cli _karo_yen : _minval,_bins
@@ -383,7 +596,7 @@ _karo_yen :  skip "${1=0} ${2=1}" v -
     +sqr.. cumulate.
     +mirror... x sqr. cumulate. mirror[-1,-4] x
     *[-1,-2] log. replace_inf. {iM} *. -1
-    +*.. -1.0 +. 1.0 *[-1,-3] log.. replace_inf.. {iM} *.. 2.0 
+    +*.. -1.0 +. 1.0 *[-1,-3] log.. replace_inf.. {iM} *.. 2.0
     +[-1,-2] k.
     if {$mn>0} repeat $mn =. 0,$> done fi
     if {$mx<(w-1)} repeat {w-$mx} =. 0,{$mx+$>} done fi
@@ -459,9 +672,9 @@ karo_rats :
 
 _karo_huang : skip "${1=0} ${2=1}"
 # public static int Huang(int [] data ) {
-# 	// Implements Huang's fuzzy thresholding method 
-# 	// Uses Shannon's entropy function (one can also use Yager's entropy function) 
-# 	// Huang L.-K. and Wang M.-J.J. (1995) "Image Thresholding by Minimizing  
+# 	// Implements Huang's fuzzy thresholding method
+# 	// Uses Shannon's entropy function (one can also use Yager's entropy function)
+# 	// Huang L.-K. and Wang M.-J.J. (1995) "Image Thresholding by Minimizing
 # 	// the Measures of Fuzziness" Pattern Recognition, 28(1): 41-51
 # 	// M. Emre Celebi  06.15.2007
 # 	// Ported to ImageJ plugin by G. Landini from E Celebi's fourier_0.8 routines
@@ -482,34 +695,34 @@ _karo_huang : skip "${1=0} ${2=1}"
              num_pix += i(ih);
              mu_1[ih-1] = sum_pix / num_pix; ih-- );
            min_ent = 1e31;
-           for (it = 0, it < w, 
+           for (it = 0, it < w,
              ent = 0.0;
              for (ih = 0,ih<=it,
                mu_x = 1.0 / ( 1.0 + term * abs(ih - mu_0[it]));
                if (!((mu_x  < 1e-06)||(mu_x > 0.999999)),
                  ent += i(ih) * ( -mu_x * log ( mu_x ) - ( 1.0 - mu_x ) * log ( 1.0 - mu_x )));
                ih++);
-             for (ih = it + 1, ih < w, 
+             for (ih = it + 1, ih < w,
                mu_x = 1.0 / ( 1.0 + term * abs (ih - mu_1[it]));
                if (!((mu_x  < 1e-06)||(mu_x > 0.999999)),
                  ent += i(ih) * ( -mu_x * log ( mu_x ) - ( 1.0 - mu_x ) * log ( 1.0 - mu_x )));
                ih++);
              if (ent < min_ent, min_ent = ent; threshold = it; _(print(min_ent,threshold)));
-             it++ ); 
+             it++ );
            threshold"}
   u {$huang*$2+$1} rm
 
 _karo_huang2 : skip "${1=0} ${2=1}"
   huang2={"
-#	// Implements Huang's fuzzy thresholding method 
-#	// Uses Shannon's entropy function (one can also use Yager's entropy function) 
-#	// Huang L.-K. and Wang M.-J.J. (1995) "Image Thresholding by Minimizing  
+#	// Implements Huang's fuzzy thresholding method
+#	// Uses Shannon's entropy function (one can also use Yager's entropy function)
+#	// Huang L.-K. and Wang M.-J.J. (1995) "Image Thresholding by Minimizing
 #	// the Measures of Fuzziness" Pattern Recognition, 28(1): 41-51
 #	// Reimplemented (to handle 16-bit efficiently) by Johannes Schindelin Jan 31, 2011
            for(first=0,first<w&&i(first)==0,first++);
            for(last=w-1,last>first&&i(last)==0,last--);
            if(first==last,break());
-           S=["{^}"]; W=S; 
+           S=["{^}"]; W=S;
            S[0]=i(0);
            for(ii=max(1,first),ii<=last,S[ii]=S[ii-1]+i(ii);W[ii]=W[ii-1]+ii*i(ii);ii++);
            C=last-first;
@@ -532,13 +745,13 @@ _karo_li : skip "${1=0} ${2=1}"
 #public static int Li(int [] data ) {
 #// Implements Li's Minimum Cross Entropy thresholding method
 #// This implementation is based on the iterative version (Ref. 2) of the algorithm.
-#// 1) Li C.H. and Lee C.K. (1993) "Minimum Cross Entropy Thresholding" 
+#// 1) Li C.H. and Lee C.K. (1993) "Minimum Cross Entropy Thresholding"
 #//    Pattern Recognition, 26(4): 617-625
-#// 2) Li C.H. and Tam P.K.S. (1998) "An Iterative Algorithm for Minimum 
+#// 2) Li C.H. and Tam P.K.S. (1998) "An Iterative Algorithm for Minimum
 #//    Cross Entropy Thresholding"Pattern Recognition Letters, 18(8): 771-776
-#// 3) Sezgin M. and Sankur B. (2004) "Survey over Image Thresholding 
-#//    Techniques and Quantitative Performance Evaluation" Journal of 
-#//    Electronic Imaging, 13(1): 146-165 
+#// 3) Sezgin M. and Sankur B. (2004) "Survey over Image Thresholding
+#//    Techniques and Quantitative Performance Evaluation" Journal of
+#//    Electronic Imaging, 13(1): 146-165
 #//    http://citeseer.ist.psu.edu/sezgin04survey.html
 #// Ported to ImageJ plugin by G.Landini from E Celebi's fourier_0.8 routines
       tolerance=0.5;
@@ -576,9 +789,9 @@ _karo_li : skip "${1=0} ${2=1}"
 #@cli : Default values: 'nb_levels=256', '_value0=0%', '_value1=100%'
 #@cli : $ sp barbara /. 2 +. 32 _kr_histogram , e ${}
 _kr_histogram : skip "${1=256} ${2=0%} ${3=100%}" v -
-  if ${-is_percent\ $2} mn={im+(iM-im)*$2} else mn=$2 fi 
-  if ${-is_percent\ $3} mx={im+(iM-im)*$3} else mx=$3 fi 
-  u {$mn},{($mx-$mn)/($1-1)} 
+  if ${-is_percent\ $2} mn={im+(iM-im)*$2} else mn=$2 fi
+  if ${-is_percent\ $3} mx={im+(iM-im)*$3} else mx=$3 fi
+  u {$mn},{($mx-$mn)/($1-1)}
   histogram. ${1-3} v +
 
 #@cli _kr_histogram8 : _nb_levels>0[%],_value0[%],_value1[%]
@@ -619,7 +832,7 @@ hist_percentile :
   done u $sres v +
 
 #@cli hist_feature : _nofeature>=-2,_nth>0,_zero={0|1},_min0,_stepw,_percent[%]>0
-#@cli : Estimation from histogram (frequency dist, 1d image) the features 
+#@cli : Estimation from histogram (frequency dist, 1d image) the features
 #@cli :  'mode','sum' (m0),'mean' (m1),'SD' (m2),'min','max','median','iqr' (hiq-loq+1),'loq','hiq' returned in status (${}).
 #@cli : nofeature=-2 mode,m0,m1,m2,min,max,med,iqr,loq,hiq,
 #@cli :   -1 mode,0 sum,1 mean,2 SD,3 min,4 max,5 median,
@@ -677,12 +890,12 @@ hist_feature_demo :
   e[^-1] "Plot features from hist_feature into 1d histogram$?." v -
   l.
   hist_feature. -2,${2-6} vv=${}
-  md=${-arg\ 1,$vv} m0=${-arg\ 2,$vv} m1=${-arg\ 3,$vv} m2=${-arg\ 4,$vv} 
-  mn=${-arg\ 5,$vv} mx=${-arg\ 6,$vv} med=${-arg\ 7,$vv} 
-  lo=${-arg\ 9,$vv} hi=${-arg\ 10,$vv} 
+  md=${-arg\ 1,$vv} m0=${-arg\ 2,$vv} m1=${-arg\ 3,$vv} m2=${-arg\ 4,$vv}
+  mn=${-arg\ 5,$vv} mx=${-arg\ 6,$vv} med=${-arg\ 7,$vv}
+  lo=${-arg\ 9,$vv} hi=${-arg\ 10,$vv}
   +gaussian. $m2,0,0 shift. {-w/2+$m1} *. {$m0/is} round. 1
   v={iM#-2}
-  +*. 0 
+  +*. 0
   =. $v,$md =. $v,$m1 =. {$v*0.25},$mn =. {$v*0.25},$mx =. $v,$med
   =. {$v*(1-$6)},$lo =. {$v*(1-$6)},$hi
   a c plot. 3
@@ -740,7 +953,7 @@ karo_li2st :
 #@cli : Execute use_skeleton (CImg demo) external.
 karo_skeleton : v - if {$#>0} karo_li2st ${1--1} p=${} else p="" fi v +
   e "Compute use_skeleton exec with options "$p" on$?" v -
-  repeat $! l[$>] 
+  repeat $! l[$>]
    s={s} if {$s>1} s. c fi
    repeat $! l[$>] karo_xcimg use_skeleton,${p}" -visu 0" mv. 0 k[0] endl done
    if {$s>1} a[-$s--1] c fi
@@ -827,7 +1040,7 @@ _kr_ch2ch :
   cmy,cmy_c,cmy_m,cmy_y,cmyk,cmyk_c,cmyk_m,cmyk_y,cmyk_k}
   else u "$1" fi else u "$1" fi
 
-#@cli descriptive_feature : 
+#@cli descriptive_feature :
 #@cli : Estimation of features number(sum,m0),mean(m1),SD(m2),skewness(m3),kurtosis(m4),min,max,median
 #@cli : from skalar images
 #@cli : Ex.: image.jpg to_gray descriptive_feature e ${}
@@ -846,7 +1059,7 @@ descriptive_feature :
       m0={whds} m1={ia} m2={sqrt(iv)} med={ic} mx={iM} mn={im}
       +- $m1 pow. 3 m3={is/($m0*$m2^3)} rm.
       +- $m1 pow. 4 m4={is/($m0*$m2^4)-3} rm.
-      res=$m0\,$m1\,$m2\,$m3\,$m4\,$mn\,$mx\,$med 
+      res=$m0\,$m1\,$m2\,$m3\,$m4\,$mn\,$mx\,$med
     fi
 # Concatenate results for image list
       if {$>==0} sres=$res else sres=$sres\,$res fi
@@ -859,10 +1072,10 @@ descriptive_feature :
 #@cli : _size>=2(5)
 #@cli : _ckernel (custom kernel only if _kernel==3)
 #@cli : Derived from D Tschumperle's fx_morpho_v2 (gmic_stdlib.gmic)
-mmorpho : 
+mmorpho :
   skip "${2=0} ${3=5} ${4=1,0,1; 0,1,0; 1,0,1}"
   v - ac=Ero,Dil,Open,Close,"Ori-Ero","Dil-Ori","Ori-Open","Close-Ori","(Ori*2-(Open+Close))*0.5","Close-Open"
-  ke=Square,Octagon,Circle,Custom v + 
+  ke=Square,Octagon,Circle,Custom v +
   e[^-1] "Math. morph. filter "${-arg\ {$1+1},$ac}" with kernel "${-arg\ {$2+1},$ke}" and size "$3 v -
   ({'"$4"'}) f. "(i>=_'0' && i<=_'9') || i==_',' || i==_';'?i:-1" discard. -1 ckernel={t} rm.
   if {$2==0} m "my_erode: erode $""1" m "my_dilate: dilate $""1"
@@ -887,7 +1100,7 @@ mmorpho :
   repeat $! l[$>]
   my_action[0]
   endl done
-  uncommand my_erode,my_dilate,my_action 
+  uncommand my_erode,my_dilate,my_action
   v +
 
 #@gui CImg Skeleton : fx_karo_cimg_skel, fx_karo_cimg_skel_preview(0)
