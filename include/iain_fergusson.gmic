@@ -1926,6 +1926,152 @@ local_similarity_mask_preview:
 
 #@gui Iain Fergusson
 
+#@gui iain_remove_pattern: iain_remove_pattern,iain_remove_pattern_preview(0)
+#@gui : note = note("<b>Smooth<b>")
+#@gui : Pre blur = float (3,1,50)
+#@gui : Smoothness = float (3,1,14)
+#@gui : radius = float (3,1,40)
+#@gui : Sep = separator ()
+#@gui : note = note("<b>Recover detials<b>")
+#@gui : Recover detials  = bool(0)
+#@gui : Recovery amount = float (4,0,10)
+#@gui : Tile size = int(128,16,512)
+#@gui : Quality = choice(1,"1","3","5","super slow")
+#@gui : Sep = separator ()
+#@gui : preview = choice(0,"output","FFT of input","FFT of output","FFT difference")
+#@gui : Sep = separator ()
+#@gui : note = note("This filter remove patterns by eliminating peaks in frequency domain while protecting edges.")
+
+#@gui : note = note("Stage 1 Pre-blur: Create a guide image that has the pattern blured out")
+#@gui : note = note("Stage 2 Smooth: Use guide image to do edge-protected smoothing. Make sure pattern is removed before trying to recover detials.")
+#@gui : note = note("Stage 3 Detials: Recover detials by keeping non-peaks the the frequency domain.")
+
+iain_remove_pattern:
+-remove_opacity
+--l
+--blur[0] $1
+-guided[0] [1],$2,$3
+-k[0]
+-endl
+-if $4
+-sub[0] [1]
+-add[0] 128
+
+-fft_details_tiles_stack[0] $5,$5,$6,1,$7
+-sub[0] 128
+-to_rgb
+-add
+-else
+-k[-1]
+-endif
+-c 0,255
+
+iain_remove_pattern_preview:
+
+-if {$8==0}
+-iain_remove_pattern[0] $1,$2,$3,$4,$5,$6,$7
+-elif  {$8==1}
+-to_rgb -display_fft
+-elif {$8==2}
+-iain_remove_pattern[0] $1,$2,$3,$4,$5,$6,$7
+-to_rgb -display_fft
+-elif {$8==3}
+--iain_remove_pattern[0] $1,$2,$3,$4,$5,$6,$7
+-sub
+-to_rgb -display_fft
+-endif
+
+
+iain_remove_pattern_tiles_stack:
+offset={round($3/3)}
+-remove_opacity
+-luminance
+--l
+ 
+-if {$5>0}
+
+--shift[0] $offset,$offset,0,0
+-iain_remove_pattern_tiles[-1] $1,$2,$3
+-shift[-1] {$offset*-1},{$offset*-1},0,0,1
+
+--shift[0] {$offset*-1},{$offset*-1},0,0
+-iain_remove_pattern_tiles[-1] $1,$2,$3
+-shift[-1] $offset,$offset,0,0,1
+-endif
+-if {$5>1}
+--shift[0] $offset,0,0,0
+-iain_remove_pattern_tiles[-1] $1,$2,$3
+-shift[-1] {$offset*-1},0,0,0,1
+
+--shift[0] 0,$offset,0,0
+-iain_remove_pattern_tiles[-1] $1,$2,$3
+-shift[-1] 0,{$offset*-1},0,0,1
+-endif
+-if {$5>2}
+--shift[0] {$offset*-1},0,0,0
+-iain_remove_pattern_tiles[-1] $1,$2,$3
+-shift[-1] $offset,0,0,0,1
+
+--shift[0] 0,{$offset*-1},0,0
+-iain_remove_pattern_tiles[-1] $1,$2,$3
+-shift[-1] 0,$offset,0,0,1
+-endif
+
+-iain_remove_pattern_tiles[0] $1,$2,$3
+
+-blend_median
+-endl
+
+-if $4
+-sub
+-add 128
+-else
+-k[1]
+-endif
+
+
+iain_remove_pattern_tiles:
+
+-l[0]
+size=$3
+offset={$size/3}
+				cropwidth1={w}
+				cropheight1={h}
+				-resize[0] {w+($size-w%$size)},{h+($size-h%$size)},{d},{s},0,0 
+				tc={round(w/$size)} tr={round(h/$size)} 
+
+				-split_tiles $tc,$tr
+				-apply_parallel "-iain_remove_pattern_fft $1,$2,$3"
+			
+-append_tiles $tc,$tr
+-crop 0,0,{$cropwidth1-1},{$cropheight1-1}	
+-endl
+
+
+iain_remove_pattern_fft:
+-luminance
+
+-fftpolar
+--log[0]
+-blur[-1] 10
+-exp[-1]
+--l[-1]
+-fill[0] $1
+-circle[-1] 50%,50%,14%,1,$2
+
+-endl
+-mul[-2,-1]
+--lt[-1] [0]
+
+-circle[-1] 50%,50%,{w*.005},1,1
+-mul[0] [-1]
+-k[0,1]
+-ifftpolar
+
+-c 0,255
+
+
+
 #@gui pyramid_processing: iain_pyramid_processing,iain_pyramid_processing(0)
 #@gui : 1 levels = int(4,1,6)
 #@gui : 2 noise = float(50,1,100)
