@@ -44,7 +44,7 @@
 #@gui : note = link("https://github.com/dtschump/gmic-community","https://github.com/dtschump/gmic-community")
 #@gui : note = note("Les filtres contenus dans ce r\303\251pertoire sont majoritairement traduits en fran\303\247ais et/ou en cours de d\303\251veloppement.")
 #@gui : note = note("The filters included in this directory are mostly translated into French and/or experimental.")
-#@gui : note = note("Version 2018/04/03 GMIC 2.2.2 pre")
+#@gui : note = note("Version 2018/04/04 GMIC 2.2.2 pre")
 
 samj_about :
 
@@ -24209,6 +24209,126 @@ samj_en_Lignes_Epaisseur_Variable :
 #@gui ________
 #@gui  <b>Testing</b>
 #@gui <i>Lylejk</i>
+
+
+
+
+
+#################################################
+##                                             ##
+##   garagecoder_lylejk_samj_points_outlines   ##
+##                                             ##
+#################################################
+
+#@gui Point Star Outline  : garagecoder_lylejk_samj_points_outlines , garagecoder_lylejk_samj_points_outlines_preview(0)
+#@gui : note = link("https://discuss.pixls.us/t/place-some-points-on-outlines-with-gmic/7006/5","https://discuss.pixls.us/t/place-some-points-on-outlines-with-gmic/7006/5")
+#@gui : note = note("<span foreground="orangered"><b><u>Choice Filter</u></b></span>")
+#@gui : Choice Filter = choice(0,"Garagecoder Staroutline","Garagecoder Pointoutline","samj")
+#@gui : note = note("<span foreground="orangered"><b><u>Garagecoder Staroutline</u></b></span>")
+#@gui : Less Than Staroutline = float(0.05,0,0.5)
+#@gui : Shapecloud = int(10,3,20)
+#@gui : note = note("<span foreground="orangered"><b><u>Garagecoder Pointoutline</u></b></span>")
+#@gui : Less Than Pointoutline = float(0.12,0,0.5)
+#@gui : note = note("<span foreground="orangered"><b><u>samj</u></b></span>")
+#@gui : Determination_Contours = int(0,0,2)
+#@gui : Type_Rendu = int(0,0,2)
+#@gui : Dilatation = int(2,0,10)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right")
+#@gui : sep = separator(), note = note("<small>Authors: <i>Garagecoder - Lyle Kroll - samj</i>.      Latest update: <i>2018/04/04</i>.</small>")
+
+garagecoder_lylejk_samj_points_outlines :
+	Choice_Filter=$1
+	Less_Than_Staroutline=$2
+	Shapecloud_Staroutline=$3
+	Less_Than_Pointoutline=$4
+	Determination_Contours=$5
+	Type_Rendu=$6
+	Dilatation={2+$7}
+
+-if {$Choice_Filter==0} # Staroutline By Garagecoder 
+	normalize[-1] 0,255
+	blur[-1] 2
+	isophotes[-1] 6
+	100%,100%,1,1
+	noise[-1] 0.5,1
+	lt[-1] {$Less_Than_Staroutline-0.5}
+	mul[-1,-2]
+	shape_star ,
+	garagecoder_example_shapecloud[-2] [-1],$Shapecloud_Staroutline
+	rm[-1]
+-elif {$Choice_Filter==1} # Pointoutline By Garagecoder 
+	normalize[-1] 0,255
+	blur[-1] 2 
+	isophotes[-1] 6 
+	100%,100%,1,1
+	noise[-1] 0.5,1
+	lt. {$Less_Than_Pointoutline-0.5}
+	mul[-1,-2]
+	_circle 5
+	dilate[-2] [-1]
+	rm.
+-elif {$Choice_Filter==2} # By samj
+	-if {$Determination_Contours==0}
+		-blur[-1] 2 
+		-isophotes[-1] 6 
+	-elif {$Determination_Contours==1} 
+		-n[-1] 128,255
+		-to_pseudogray[-1] 5,1,8
+		-blur[-1] 2
+		-isophotes[-1] 6
+	-elif {$Determination_Contours==2} 
+		-tones[-1] 3
+		-isophotes[-1,-2]  3
+		-blend[-1,-2] alpha
+		-blend[-1,-2] alpha
+		-mul[-1] 255
+		-isophotes[-1] 3
+	-endif
+
+	{w},{h},1,4
+	-repeat {{{w}+{h}}/1.5} # delete points
+		-line[-2] 50%,50%,{u(100)}%,{u(100)}%,1,0,0,0,0
+	-done
+	-repeat {{{w}+{h}}/2}  # points on outlines
+		-line[-1] {u(100)}%,{u(100)}%,{u(100)}%,{u(100)}%,1,255,255,255,255
+	-done
+	-repeat {{{w}+{h}}/5}  # points outside the outlines
+		-point {u(100)}%,{u(100)}%,0,1,255,255,255,255
+	-done
+	-and[-1,-2]
+	-if {$Type_Rendu==0}
+		-dilate_circ[-1] $Dilatation
+	-elif {$Type_Rendu==1}
+		-i [-1]
+		-i [-1]
+		-dilate_circ[-3] $Dilatation
+		-dilate[-2] 6,1
+		-dilate[-1] 1,6
+		-blend[-1,-2,-3] alpha
+	-elif {$Type_Rendu==2}
+		-dilate_circ[-1] $Dilatation
+		-sponge[-1] 5
+	-endif
+-endif
+
+garagecoder_lylejk_samj_points_outlines_preview :
+	gui_split_preview "garagecoder_lylejk_samj_points_outlines $*",$-1
+
+
+# By Garagecoder
+garagecoder_example_shapecloud : -check ${"is_image_arg $1"}" && isval(${2=9})"
+  -repeat $! -pass$1 0 -l[$>,-1]
+    kw={$2+1-$2%2} r. $kw,$kw,1,1,5 n. 0,1
+    +gt[0,1] 0 convolve[-2] [-1] -rm.
+    convolve[0] [1] rm[1] +eq. 0 +[-2,-1] /
+  -endl -done
+
+
+#################################################
+##                                             ##
+## END garagecoder_lylejk_samj_points_outlines ##
+##                                             ##
+#################################################
 
 
 
