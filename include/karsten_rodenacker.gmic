@@ -1408,6 +1408,89 @@ fx_karo_pink_bianca :
 fx_karo_pink_bianca_preview :
   gui_split_preview "-fx_karo_pink_bianca ${1-6}",$7
 
+#@cli output_pinklist : _filename (def. $TMPDIR/pink.list)
+#@cli : Write a pink list file from (2,n) or (3,n) coordinate list image
+output_pinklist : 
+  check {w<=3&&w>1} skip ${1=$TMPDIR/pink.list} 
+  e[^-1] "Generetate a pink list file $1 from the ("{w}","{h}") image"
+  v -
+#  file_rand nn=${}.list
+  nn=$1.list
+  typ={w==3?'n':'b'}
+  ($typ,32,{'{h}'})
+  o.. asc:$nn rm..
+  i raw:$nn,uchar s +,10 rm[1] a y 
+  file_rm $nn
+  o raw:$1,uchar rm
+  v +
+
+#@cli input_pinklist : file_name, _mode
+#@cli : Read a pink list file (type G from pink.delaunay) at file_name and prepare
+#@cli : _mode == 0 a 3d object or
+#@cli : _mode != 0 the vertice, hull, edge lists and the adjacency matrix
+#@cli : Other list file types are still not implemented
+input_pinklist :
+  check $1 skip ${2=0} 
+  e[^-1] "Read pinklist $1" v -
+  i[0] raw:$1,uchar s[0] -,10
+  if {{0,@0}=={'G'}}
+    rows[0] 2,100% n={{0,t}} rm[0]
+    3,$n,1,1 nm. vertices
+    1,$n,1,1 nm. vhull
+    0 nm. edges
+    repeat {$!-3} l[{$>},vertices,vhull,edges]
+      s[0] -,32
+      =[vertices] {0,t},0,$> =[vertices] {1,t},1,$> =[vertices] {2,t},2,$>
+      =[vhull] {3,t},0,$> {{4,t}*3},1,1,1 p=$>
+      repeat {4,t} =. 2,{$>*3} =. $p,{$>*3+1} =. {{$>+5},t},{$>*3+2} done
+      a[edges] .,x rm[1-4,-1]
+    endl done
+    k[vhull,vertices,edges] mv[vhull] 0
+    ver={vertices,h}
+    edg={edges,{w/3}}
+    nhull={vhull,is}
+    if {$2==0}
+      if {vhull,is} repeat {vertices,h}
+        if {vhull,@{$>}} (1,$>) a[edges] .,x rm. edg+=1 fi
+      done fi
+      ({'CImg3d'}) mv. -3
+      ($ver,$edg) mv. -3
+      (255^255^255) r. {$edg-$nhull}
+      (0,0,255) .x{$nhull-1} a[-1--$nhull] x
+      (0.6) r. {$edg-$nhull}
+      (1) .x{$nhull-1} a[-1--$nhull] x
+      unroll y a[-1--8] y rm..
+    else
+      $ver,$ver 
+      repeat {{edges,w}/3}
+        =. 1,{edges,@{$>*3+1}},{edges,@{$>*3+2}}
+      done
+    fi
+    u $ver,$edg,$nhull
+  elif  {{0,@0}=={'b'}} e "2d list file" 
+    rows[0] 2,100% n={{0,t}} rm[0]
+    error "Not implemented!"
+  elif  {{0,@0}=={'n'}} e "3d list file" 
+    rows[0] 2,100% n={{0,t}} rm[0]
+    error "Not implemented!"
+  fi 
+  v +
+
+#@cli pink_delaunay : _mode
+#@cli : Prepare the delaunay triangulation from a list of coordimates (vertices)
+#@cli : using the external program pink.delaunay
+#@cli : _mode == 0 a 3d object or
+#@cli : _mode != 0 the vertice, hull, edge lists and the adjacency matrix
+#@cli : $ 2,50,1,1 rand 0,512 pink_delaunay. 0
+pink_delaunay : skip ${1=0} v -
+  file_rand nn=${}
+  output_pinklist. $nn".tmp"
+  x 0,"pink.delaunay "$nn".tmp "$nn".del"
+  input_pinklist[] $nn".del",$1
+  file_rm $nn.tmp
+  file_rm $nn.del
+  v +
+
 #@gui _
 
 # Local Variables:
