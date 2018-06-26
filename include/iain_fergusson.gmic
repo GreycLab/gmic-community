@@ -1923,7 +1923,132 @@ local_similarity_mask_preview:
 
 #@gui _<b>Testing</b>
 
+
+
 #@gui Iain Fergusson
+
+#@gui Detect Moire: iain_detect_moire,iain_detect_moire_preview(0)
+#@gui : threshold = float(50,0,100)
+#@gui : mask size = float(5,0,100)
+#@gui : expand/contract = int (9,-50,50)
+#@gui : sep = separator ()
+#@gui : preview saturation = float (30,0,100)
+#@gui : sep = separator ()
+#@gui : note = note("Detect Moire on bayer patterns. Requires RGB bayer image as input. Output is a black and white mask.")
+#@gui : note = note("Preview shows mask boundary on top of a fast demosaic that will show more moire than a good demosaicing algorithm.")
+iain_detect_moire_preview:
+--moire_2018_2[0] $1,$2,$3
+-laplacian[-1]
+-abs[-1]
+-l[0]
+-split c
+
+-l[1]
+(0,1)
+-resize[-1] [0],0,2
+--mul[0] [1]
+-eq[1] 0
+--mul[0] [1]
+-k[2,3]
+
+-endl
+
+
+ 
+(0.25,0.5,0.25;0.5,1,0.5;0.25,0.5,0.25)
+-convolve[0,1,2,3] [-1]
+-rm[-1]
+
+-add[1,2]
+-mul[1] 0.5
+
+-append c
+
+-adjust_colors 0,0,0,0,$4,0,255
+-endl
+-remove_opacity
+## -n 0,255
+-add
+-c 0,255
+
+
+
+iain_detect_moire:
+
+-skip $1,$2,$3
+
+-channels 1
+
+--l[0] # detect diagonal HF
+
+(1,0,1;0,-4,0;1,0,1)
+-convolve[0] [1]
+-rm[1]
+-abs
+-endl
+
+--l[0] # detect Horizontal HF
+
+(1,0,-2,0,1)
+-convolve[0] [1]
+-rm[1]
+-abs
+-endl
+--l[0] # detect vertical HF
+
+(1;0;-2;0;1)
+-convolve[0] [1]
+-rm[1]
+-abs
+-endl
+-add[-1,-2] # add H and V HF
+-rm[0]
+
+
+-sub[0] [1]
+-k[0]
+
+-c 0,255
+
+
+-l[0]  # pixel denoise
+--l[0]
+(1,0,1;1,0,1;1,0,1)
+-dilate[0] [1]
+-rm[1]
+-endl
+--l[0]
+(1,0,1;1,0,1;1,0,1)
+-erode[0] [1]
+-rm[1]
+-endl
+-min[0,1]
+-max[0,1]
+-endl
+
+-mul 10
+-c 0,255
+
+# remove false HF detail at edges
+thickness=5
+-linethick 0%,0%,100%,0%,$thickness,1,0
+-linethick 0%,0%,0%,100%,$thickness,1,0
+-linethick 100%,0%,100%,100%,$thickness,1,0
+-linethick 0%,100%,100%,100%,$thickness,1,0
+
+-blur $2
+-gt $1
+-mul 255
+
+-if {$3>0}
+-dilate $3
+-endif
+
+-if {$3<0}
+-erode {$3*-1}
+-endif
+
+
 
 #@gui iain_remove_pattern: iain_remove_pattern,iain_remove_pattern_preview(0)
 #@gui : note = note("<b>Smooth<b>")
