@@ -1812,6 +1812,74 @@ gcd_geometric_median : skip ${1=3},${2=12}
     I(#0,x,y) = Y;1" k[0]
   endl done -v +
 
+#@cli gcd_poisson_disk : _radius[%]>0,_value,_max_iters>0
+#@cli : Add poisson disk sampling noise to selected images.
+#@cli : Default values: 'radius=8', 'value=1' and 'max_iters=30'.
+#@cli : $ 800,800 gcd_poisson_disk 8
+gcd_poisson_disk : check "${1=8}>0 && ${3=30}>0" skip ${2=1}
+  e[^-1] "Add noise points to image$?, with specified minimum distance."
+  v - repeat $! l[$>]
+    R={${"is_percent $1"}?max(w,h,d)*$1:$1}
+    # [0] input image to draw samples on
+    dim={d>1?3:h>1?2:1} cw={0.999*$R/sqrt($dim)} # dimensions, grid cell width
+    ({[w,h,d,1]}) y. c  # [1] image dimensions vector
+    {[ceil(I/$cw)]}     # [2] "accelerator" grid/cells
+    r[1] 1,1,1,$dim,-1  # keep only used dimensions in [1]
+    1,1,1,$dim 1,1,1,1  # [3] samples list, [4] active list
+    {vector$dim(2*ceil(sqrt($dim))+1)} r. 100%,100%,100%,2 # [5] cell proximity kernel
+    f. "P=[x,y,z]-int([w/2,h/2,d/2]);[sum(sqr(P)),dot(P,[1,w#2,w#2*h#2])]"
+    r. {[whd,s,1,1,-1]} sort. +,x z. 0,1,100%,100% y. c # sort kernel by distance
+    nm[1] dims nm[2] grid nm[3] samples nm[4] active nm[5] prox
+    eval ${-math_lib}"
+      const N = "$dim";
+      const radius = "$R";
+      const grid_cw = "$cw";
+      const max_sample_attempts = $3;
+      mag2(vec) = (sum(sqr(vec)));
+      prox = I#5;
+      lim = I#1;
+      
+      dar_insert(#3,I#1,0);               # dummy sample to simplify bounds checks
+      dar_insert(#3,u(I#1),1);            # add initial sample to list
+      dar_insert(#4,1,0);                 # add its index to active list
+      I(#2,int(I[#3,1]/grid_cw)) = 1;     # add its index to grid cell
+      I(#0,I[#3,1]) = $2;                 # draw the point
+
+      whiledo (dar_size(#4)>0,
+        R = int(u(dar_size(#4)-1e-4));    # choose a random active list index
+        P = i[#4,R];                      # get the index of that sample
+        T = I[#3,P];                      # position vector of that sample
+        
+        for (attempts=0, attempts < max_sample_attempts, ++attempts,
+
+          dowhile (S=4*(u(vectorN(1))-0.5); M=mag2(S), M <= 1 || M > 4);
+          
+          X = T + radius * S;             # potential sample from annulus around T
+          if (min(X)<0 || min(lim-X)<0, continue()); # check within bounds
+
+          # check proximity of surrounding points
+          G = int(X/grid_cw);             # grid cell position vector
+          GI = dot(G,[1,w#2,w#2*h#2]);    # grid cell direct buffer index
+          
+          for (K=0;rejected=0, K<size(prox), ++K,
+            V = i[#2,GI+prox[K]];         # sample index from grid to check
+            if (V>0 && mag2(I[#3,V]-X)<sqr(radius), rejected=1;break())
+          );
+
+          if (!rejected,
+            Q = dar_size(#3);               # sample found, get new index
+            dar_insert(#3,X,Q);             # insert into samples list
+            dar_insert(#4,Q,dar_size(#4));  # insert its index into active
+            I(#2,G) = Q;                    # insert its index into grid
+            I(#0,X) = $2;                   # draw the point
+            break();
+          );
+        );
+        
+        if (attempts == max_sample_attempts, dar_remove(#4,R));
+      );
+    " k[0]
+  endl done v +
 
 #@gui _
 
