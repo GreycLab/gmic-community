@@ -38,10 +38,283 @@
 #  knowledge of the CeCILL license and that you accept its terms.
 #
 
-#@gui _<b>Degradations</b>
-#---------------------------
+#@gui _<b>Testing</b>
+#@gui <i>Joan Rake</i>
 
-#@gui UltraWarp+++ : fx_ultrawarpplusplusplus, fx_ultrawarpplusplusplus(1)
+#@gui <b>Degradations</b>
+
+#@gui Cascading self glitching: fx_self_glitching_cascade, fx_self_glitching_cascade_preview(1)
+#@gui : 1. Shift channels = choice("RGB&#47;sRGB","CMYK&#47;CMY","HSV&#47;HSV8","HSL&#47;HSL8","HSI&#47;HSI8","LCH&#47;LCH8","Lab&#47;Lab8","HCY&#47;YCbCr","YIQ&#47;YIQ8","YUV&#47;YUV8","Bayer&#47;INT24","XYZ&#47;XYZ8")
+#@gui : 2. Alt choice = bool(0)
+#@gui : 3. Process Alpha = bool(0)
+#@gui : 4,5. Zeroth shift = point(50,50,0,1,255,255,255,175)
+#@gui : 6. Boundary = choice(3,"Zero","Nearest","Periodic","Mirror")
+#@gui : sep = separator()
+#@gui : 7. Iterations = int(3,1,16)
+#@gui : sep = separator()
+#@gui : 8. Power = float(0,-5,5)
+#@gui : 9. Bias = float(0,-255,255)
+#@gui : 10. Negate = bool(0)
+#@gui : 11. Operator = choice("Add","Multiply","Bitwise And","Bitwise Or","Bitwise Xor","Power","Reverse Power","Modulo","Reverse Modulo","Divide","Reverse Divide","Subtract","Reverse Subtract","Left Bitwise Shift", "ReverseLBS", "Right Bitwise Shift", "ReverseRBS","Average","Round","Reverse Round","Sine","Reverse Sine","Cosine","Reverse Cosine","Tangent","Reverse Tangent &#40;CPU-intensive&#41;","Cosecant","Reverse Cosecant","Secant","Reverse Secant","Cotangent","Reverse Cotangent")
+#@gui : 12. Post-Shift Multiplier = float(1,0,10)
+#@gui : 13. Post-Shift Modulo = int(255,1,1023)
+#@gui : 14. Post-Shift Addition = int(0,-1023,1023)
+#@gui : 15,16. First shift target = point(55,55,0,1,255,0,0,175)
+#@gui : 17,18. Cascade centre point = point(45,45,0,1,0,255,0,175)
+#@gui : 19. Shift randomness = float(0.75,0,4)
+#@gui : 20. Boundary = choice(3,"Zero","Nearest","Periodic","Mirror")
+#@gui : sep = separator(), 21. Run on channel(s) = choice("All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
+#@gui : sep = separator(), 22. Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : sep = separator(), note = note("<small>Author: <i><a href="https://goo.gl/Ryf7Cv">David Tschumperl&#233;</a></i>.      Latest update: <i>2018/08/19</i>.</small>")
+fx_self_glitching_cascade :
+shift {$4-50}%,{$5-50}%,0,0,$6,0
+repeat $7
+repeat $! l[$>] if {!$3} split_opacity fi l[0]
+if {$2}
+if {$1==0} rgb2srgb
+elif {$1==1} rgb2cmy
+elif {$1==2} rgb2hsv8
+elif {$1==3} rgb2hsl8
+elif {$1==4} rgb2hsi8
+elif {$1==5} rgb2lch8
+elif {$1==6} rgb2lab8
+elif {$1==7} rgb2ycbcr
+elif {$1==8} rgb2yiq8
+elif {$1==9} rgb2yuv8
+elif {$1==10} rgb2int
+elif {$1==11} rgb2xyz8
+fi else
+if {$1==1} rgb2cmyk
+elif {$1==2} rgb2hsv
+elif {$1==3} rgb2hsl
+elif {$1==4} rgb2hsi
+elif {$1==5} rgb2lch
+elif {$1==6} rgb2lab
+elif {$1==7} rgb2hcy
+elif {$1==8} rgb2yiq
+elif {$1==9} rgb2yuv
+elif {$1==10} rgb2bayer 0
+elif {$1==11} rgb2xyz
+fi fi
+f "init(
+shift = ([w,h]-1)*([$17,$18]-[$15,$16]+(2*(u-0.5)*sqrt((($17-$15)^2)+(($18-$16)^2))*($19^3)))%;
+const sign = $10?-1:1;
+const boundary = $20;
+);
+val = sign*((2^$8)*j(shift) + $9);
+(($11==0?(val + i):
+$11==1?(val * i):
+$11==2?(val & i):
+$11==3?(val | i):
+$11==4?xor(val,i):
+$11==5?(val^i):
+$11==6?(i^val):
+$11==7?(val%i):
+$11==8?(i%val):
+$11==9?(val / i):
+$11==10?(i / val):
+$11==11?(i - val):
+$11==12?(val - i):
+$11==13?(val << i):
+$11==14?(i << val):
+$11==15?(val >> i):
+$11==16?(i >> val):
+$11==17?avg(i,val):
+$11==18?round(val,i,0):
+$11==19?round(i,val,0):
+$11==20?i*sin(val*2*pi/$13):
+$11==21?val*sin(i*2*pi/$13):
+$11==22?sign*i*cos(val*2*pi/$13):
+$11==23?sign*val*cos(i*2*pi/$13):
+$11==24?i*tan(val*pi/$13):
+$11==25?val*tan(i*pi/$13):
+$11==26?i*sin($13/(val*2*pi)):
+$11==27?val*sin($13/(i*2*pi)):
+$11==28?sign*i*cos($13/(val*2*pi)):
+$11==29?sign*val*cos($13/(i*2*pi)):
+$11==30?i*tan($13/(val*pi)):
+val*tan($13/(i*pi))
+)*$12)%$13+$14;
+"
+if {$2}
+if {$1==0} srgb2rgb
+elif {$1==1} cmy2rgb
+elif {$1==2} hsv82rgb
+elif {$1==3} hsl82rgb
+elif {$1==4} hsi82rgb
+elif {$1==5} lch82rgb
+elif {$1==6} lab82rgb
+elif {$1==7} ycbcr2rgb
+elif {$1==8} yiq82rgb
+elif {$1==9} yuv82rgb
+elif {$1==10} int2rgb
+elif {$1==11} xyz82rgb
+fi else
+if {$1==1} cmyk2rgb
+elif {$1==2} hsv2rgb
+elif {$1==3} hsl2rgb
+elif {$1==4} hsi2rgb
+elif {$1==5} lch2rgb
+elif {$1==6} lab2rgb
+elif {$1==7} hcy2rgb
+elif {$1==8} yiq2rgb
+elif {$1==9} yuv2rgb
+elif {$1==10} bayer2rgb 0,0,0
+elif {$1==11} xyz2rgb
+fi fi
+endl a c endl done done
+fx_self_glitching_cascade_preview :
+index=0
+layers=l
+-repeat {max(0,$layers)}
+-ac[$index] "-fx_self_glitching_cascade $*",$21
+index={$index+1}
+-done
+
+#@gui Sawtoother [CMYK] : sawtoother_cmyk, sawtoother_cmyk_preview(1)+
+#@gui : note = note("Splits image into CMYK channels and uses modulo operations to generate sawtooth waves and map channel intensities to them.")
+#@gui : note = note("<small>This filter was intended for screwing up images but it can also be used for quick analysis among other things.</small>"), sep = separator()
+#@gui : Cyan factor = float(1,0,20)
+#@gui : Cyan shift = float(0,-255,255)
+#@gui : Cyan smoothness = float(0,0,10)
+#@gui : Cyan modulo = bool(1)
+#@gui : Cyan multiplier = float(1,0,20)
+#@gui : Cyan phase shift = float(0,-255,255)
+#@gui : sep = separator()
+#@gui : Magenta factor = float(1,0,20)
+#@gui : Magenta shift = float(0,-255,255)
+#@gui : Magenta smoothness = float(0,0,10)
+#@gui : Magenta modulo = bool(1)
+#@gui : Magenta multiplier = float(1,0,20)
+#@gui : Magenta phase shift = float(0,-255,255)
+#@gui : sep = separator()
+#@gui : Yellow factor = float(1,0,20)
+#@gui : Yellow shift = float(0,-255,255)
+#@gui : Yellow smoothness = float(0,0,10)
+#@gui : Yellow modulo = bool(1)
+#@gui : Yellow multiplier = float(1,0,20)
+#@gui : Yellow phase shift = float(0,-255,255)
+#@gui : sep = separator()
+#@gui : Key factor = float(1,0,20)
+#@gui : Key shift = float(0,-255,255)
+#@gui : Key smoothness = float(0,0,10)
+#@gui : Key modulo = bool(1)
+#@gui : Key multiplier = float(1,0,20)
+#@gui : Key phase shift = float(0,-255,255)
+#@gui : sep = separator()
+#@gui : Tones range = choice("All tones","Shadows","Mid-tones","Highlights")
+#@gui : Tones smoothness = float(2,0,10)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right")
+sawtoother_cmyk :
+repeat $! l. split_opacity rv to_rgb.
+fx_start_mix $25,$26
+rgb2cmyk. s. c
+if {$4} b[-4] $3% +[-4] $6 %[-4] {256/$1} *[-4] $1 %[-3] 256 *[-4] $5 +[-4] $2 else *[-4] $1 +[-4] {$2*$1} b[-4] $3% fi
+if {$10} b[-3] $9% +[-3] $12 %[-3] {256/$7} *[-3] $7 %[-3] 256 *[-3] $11 +[-3] $8 else *[-3] $7 +[-3] {$8*$7} b[-3] $9% fi
+if {$16} b[-2] $15% +[-2] $18 %[-2] {256/$13} *[-2] $13 %[-2] 256 *[-2] $17 +[-2] $14 else *[-2] $13 +[-2] {$14*$13} b[-2] $15% fi
+if {$22} b[-1] $21% +[-1] $24 %[-1] {256/$19} *[-1] $19 %[-1] 256 *[-1] $23 +[-1] $20 else *[-1] $19 +[-1] {$20*$19} b[-1] $21% fi
+a[-4--1] c cmyk2rgb.
+fx_end_mix $25
+if {$!!=3} rv a c fi endl mv. 0 done
+sawtoother_cmyk_preview :
+gui_split_preview "sawtoother_cmyk $*",$-1
+
+#@gui Sawtoother [HSV] : sawtoother_hsv, sawtoother_hsv_preview(1)+
+#@gui : note = note("Splits image into HSV channels and uses modulo operations to generate sawtooth waves and map channel intensities to them.")
+#@gui : note = note("<small>This filter was intended for screwing up images but it can also be used for quick analysis among other things.</small>"), sep = separator()
+#@gui : Hue factor = float(1,0,20)
+#@gui : Hue shift = float(0,-180,180)
+#@gui : Hue smoothness = float(0,0,10)
+#@gui : Hue modulo = bool(1)
+#@gui : Hue multiplier = float(1,0,20)
+#@gui : Hue phase shift = float(0,-180,180)
+#@gui : sep = separator()
+#@gui : Saturation factor = float(1,0,20)
+#@gui : Saturation shift = float(0,-1,1)
+#@gui : Saturation smoothness = float(0,0,10)
+#@gui : Saturation modulo = bool(1)
+#@gui : Saturation multiplier = float(1,0,20)
+#@gui : Saturation phase shift = float(0,-1,1)
+#@gui : sep = separator()
+#@gui : Value factor = float(1,0,20)
+#@gui : Value shift = float(0,-1,1)
+#@gui : Value smoothness = float(0,0,10)
+#@gui : Value modulo = bool(1)
+#@gui : Value multiplier = float(1,0,20)
+#@gui : Value phase shift = float(0,-1,1)
+#@gui : sep = separator()
+#@gui : Tones range = choice("All tones","Shadows","Mid-tones","Highlights")
+#@gui : Tones smoothness = float(2,0,10)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right")
+sawtoother_hsv :
+repeat $! l. split_opacity rv to_rgb.
+fx_start_mix $19,$20
+rgb2hsv. s. c -[-2,-1] 0.5
++[-2,-1] 0.5
+if {$4} b[-3] $3% +[-3] $6 %[-3] {360/($1)^2} *[-3] $1 %[-3] 360 *[-3] {$5*$1} +[-3] {$2} else *[-3] $1 +[-3] {$2*$1} b[-3] $3% fi %[-3] 360
+if {$10} b[-2] $9% +[-2] $12 %[-2] {(1+(1/255))/$7} *[-2] {$7} %[-2] {(1+(1/255))} *[-2] $11 +[-2] {$8} else *[-2] $7 +[-2] {$8*$7} b[-2] $9% fi
+if {$16} b[-1] $15% +[-1] $18 %[-1] {(1+(1/255))/$13} *[-1] {$13} %[-1] {(1+(1/255))} *[-1] $17 +[-1] {$14} else *[-1] $13 +[-1] {$14*$13} b[-1] $15% fi
+c[-2,-1] 0,1 a[-3--1] c hsv2rgb.
+fx_end_mix $19
+if {$!!=3} rv a c fi endl mv. 0 done
+sawtoother_hsv_preview :
+gui_split_preview "sawtoother_hsv $*",$-1
+
+#@gui Sawtoother [RGB] : sawtoother_rgb, sawtoother_rgb_preview(1)+
+#@gui : note = note("Splits image into RGB channels and uses modulo operations to generate sawtooth waves and map channel intensities to them.")
+#@gui : note = note("<small>This filter was intended for screwing up images but it can also be used for quick analysis among other things.</small>"), sep = separator()
+#@gui : Red factor = float(1,0,20)
+#@gui : Red shift = float(0,-255,255)
+#@gui : Red smoothness = float(0,0,10)
+#@gui : Red modulo = bool(1)
+#@gui : Red multiplier = float(1,0,20)
+#@gui : Red phase shift = float(0,-255,255)
+#@gui : sep = separator()
+#@gui : Green factor = float(1,0,20)
+#@gui : Green shift = float(0,-255,255)
+#@gui : Green smoothness = float(0,0,10)
+#@gui : Green modulo = bool(1)
+#@gui : Green multiplier = float(1,0,20)
+#@gui : Green phase shift = float(0,-255,255)
+#@gui : sep = separator()
+#@gui : Blue factor = float(1,0,20)
+#@gui : Blue shift = float(0,-255,255)
+#@gui : Blue smoothness = float(0,0,10)
+#@gui : Blue modulo = bool(1)
+#@gui : Blue multiplier = float(1,0,20)
+#@gui : Blue phase shift = float(0,-255,255)
+#@gui : sep = separator()
+#@gui : Tones range = choice("All tones","Shadows","Mid-tones","Highlights")
+#@gui : Tones smoothness = float(2,0,10)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right")
+fx_start_mix :
+if {$1==1} +tones. 3 +[-2,-1] b[-2,-1] $2% r[-2,-1] ... *. ... mv... $!
+elif {$1==2} +tones. 3 +[-3,-1] b[-2,-1] $2% r[-2,-1] ... *.. ... mv... $!
+elif {$1==3} +tones. 3 +[-3,-2] b[-2,-1] $2% r[-2,-1] ... *.. ... mv... $!
+fi
+fx_end_mix :
+if {$1==1} *[-3,-1] +[-2,-1]
+elif {$1==2} *[-2,-1] +[-2,-1]
+elif {$1==3} *[-2,-1] +[-2,-1]
+fi
+c 0,255
+sawtoother_rgb :
+repeat $! l. split_opacity rv to_rgb.
+fx_start_mix $19,$20
+s. c
++[-2,-1] 0.5
+if {$4} b[-3] $3% +[-3] $6 %[-3] {256/$1} *[-3] $1 %[-3] 256 *[-3] $5 +[-3] $2 else *[-3] $1 +[-3] {$2*$1} b[-3] $3% fi
+if {$10} b[-2] $9% +[-2] $12 %[-2] {256/$7} *[-2] $7 %[-2] 256 *[-2] $11 +[-2] $8 else *[-2] $7 +[-2] {$8*$7} b[-2] $9% fi
+if {$16} b[-1] $15% +[-1] $18 %[-1] {256/$13} *[-1] $13 %[-1] 256 *[-1] $17 +[-1] $14 else *[-1] $13 +[-1] {$14*$13} b[-1] $15% fi
+a[-3--1] c +. 0 c. 0,255
+fx_end_mix $19
+if {$!!=3} rv a c fi endl mv. 0 done
+sawtoother_rgb_preview :
+gui_split_preview "sawtoother_rgb $*",$-1
+
+#@gui _<b>Artistic</b>
+
+#@gui UltraWarp++++ : fx_ultrawarpplusplusplusplus, fx_ultrawarpplusplusplusplus(1)
 #@gui : note = note("Sequence of multiple partially-randomised texture generation and image deformation filters with multi-iteration warping")
 #@gui : note = note("<small>This modular filter is extremely complex and its logic may not follow that which you expect. Left on its default settings, it is very likely to munge your image beyond recognition.</small>"), sep = separator()
 #@gui : 1.  Quick Refresh Button = bool(0)
@@ -50,15 +323,15 @@
 #@gui : 3.  Plasma Scale = float(3.3,0,20)
 #@gui : 4.  Plasma Alpha Channel = bool(0)
 #@gui : sep = separator()
-#@gui : 5.  Segmentation [no alpha channel] = bool(1)
-#@gui : 6.  Edge Threshold = float (20,0.01,60)
+#@gui : 5.  Segmentation [no alpha channel] = bool(0)
+#@gui : 6.  Edge Threshold = float (5,0.01,60)
 #@gui : 7.  Smoothness = float (0,0,60)
 #@gui : sep = separator()
 #@gui : 8.  Blur = float (0,0,30)
 #@gui : sep = separator()
-#@gui : 9.  Quadtree Pixelisation [no alpha channel] = bool(1)
-#@gui : 10.  Quadtree Min Precision = int(4,2,2048)
-#@gui : 11.  Quadtree Max Precision = int(256,0,2048)
+#@gui : 9.  Quadtree Pixelisation [no alpha channel] = bool(0)
+#@gui : 10.  Quadtree Min Precision = int(4,2,8192)
+#@gui : 11.  Quadtree Max Precision = int(256,0,8192)
 #@gui : 12.  Quadtree Min Homogeneity = float(4.8,0,5)
 #@gui : 13.  Quadtree Max Homogeneity = float(5,0,5)
 #@gui : sep = separator()
@@ -67,44 +340,47 @@
 #@gui : 16. Maximum Noise = float(0,0,8)
 #@gui : 17. Noise Channel(s) = choice(2,"All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
 #@gui : sep = separator(), note = note("<small>Warping</small>")
-#@gui : 18. Warp Iterations = int(5,0,30)
-#@gui : 19. Warp Intensity = float(2.8,0,30)
-#@gui : 20. Warp Offset = float(10,0,2000)
+#@gui : 18. Warp Iterations = int(3,0,30)
+#@gui : 19. Warp Intensity = float(3,0,10)
+#@gui : 20. Warp Offset = float(20,0,2000)
 #@gui : 21. Scale to Width = bool(1)
 #@gui : 22. Scale to Height = bool(1)
 #@gui : 23. Correlated Channels = choice("Random","Off","On")
-#@gui : 24. Warp Channel(s) = choice(2,"Random","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
-#@gui : 25. Random Negation = bool(1)
-#@gui : 26. Random Negation Channel(s) = choice(2,"Random","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
-#@gui : 27. Gamma Offset = float(0.25,0,1)
-#@gui : 28. Hue Offset = float(1,0,1)
-#@gui : 29. Normalise = bool(1)
+#@gui : 24. Boundary = choice(5,"Random","Random [non-transparent]","Transparent","Nearest","Periodic", "Mirror")
+#@gui : 25. Warp Channel(s) = choice(2,"Random","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
+#@gui : 26. Random Negation = bool(1)
+#@gui : 27. Random Negation Channel(s) = choice(2,"Random","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
+#@gui : 28. Gamma Offset = float(0.25,0,1)
+#@gui : 29. Hue Offset = float(1,0,1)
+#@gui : 30. Normalise = bool(1)
 #@gui : sep = separator(), note = note("<small>Final HSV Scaling</small>")
-#@gui : 30. Minimum Hue = float(0,0,20)
-#@gui : 31. Maximum Hue = float(5,0,20)
-#@gui : 32. Minimum Saturation = float(0,0,20)
-#@gui : 33. Maximum Saturation = float(3,0,20)
-#@gui : 34. Minimum Value = float(0,0,20)
-#@gui : 35. Maximum Value = float(20,0,20)
+#@gui : 31. Minimum Hue = float(0,0,20)
+#@gui : 32. Maximum Hue = float(5,0,20)
+#@gui : 33. Minimum Saturation = float(0,0,20)
+#@gui : 34. Maximum Saturation = float(3,0,20)
+#@gui : 35. Minimum Value = float(0.5,0,20)
+#@gui : 36. Maximum Value = float(2,0,20)
 #@gui : note = note("<small>Set these to their minimum values for randomisation</small>")
-#@gui : 36. Hue Offset = float(-180.01, -180.01, 180)
-#@gui : 37. Saturation Offset = float(-0.01, -0.01, 1)
-#@gui : 38. Value Offset = float(-20.01,-20.01,20)
+#@gui : 37. Hue Offset = float(-180.01, -180.01, 180)
+#@gui : 38. Saturation Offset = float(0, -1.01, 1)
+#@gui : 39. Value Offset = float(0,-20.01,20)
 #@gui : sep = separator(),
-#@gui : -3. Normalise = bool(1)
-#@gui : -2. Channel(s) = choice("All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
+#@gui : -4. Normalise = bool(1)
+#@gui : -3. Normalisation Channel(s) = choice(11,"All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
+#@gui : sep = separator(),
+#@gui : -2. UltraWarp++++ Channel(s) = choice("All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
 #@gui : -1. Value action = choice("None","Cut","Normalize")
 
-ultrawarpplusplusplus:
+ultrawarpplusplusplusplus:
 
 # plasma rendering and pixelisation followed by random warp with gamma and hue randomisation and final HSV scaling
 
-  hue_min={$30}
-  hue_max={$31}
-  sat_min={$32}
-  sat_max={$33}
-  val_min={$34}
-  val_max={$35}
+  hue_min={$31}
+  hue_max={$32}
+  sat_min={$33}
+  sat_max={$34}
+  val_min={$35}
+  val_max={$36}
 
   j={min($hue_min,$hue_max)+(u*(max($hue_min,$hue_max)-min($hue_min,$hue_max)))}
   k={min($sat_min,$sat_max)+(u*(max($sat_min,$sat_max)-min($sat_min,$sat_max)))}
@@ -135,7 +411,7 @@ ultrawarpplusplusplus:
   -endif
 
   noise_exp={max(0,$n_min+(u*($n_max-$n_min)))}
-  n_amt={4^($noise_exp-3)-((4^(-3))*($noise_exp-1))}
+  n_amt={(2^($noise_exp-3))*$noise_exp}
 
   -if {$5}
     -fx_segment_watershed {$6},{$7},0,2,0
@@ -159,37 +435,37 @@ ultrawarpplusplusplus:
       h_min = {$h_min - $h_max}
     -endif
 
-    -fx_noise {$noise_exp},{$14},{$17},1,0
+    -fx_noise {$n_amt},{$14},{$17},1,0
     -fx_quadtree 0,{max(2,round($p_min+(u*($p_max-$p_min))))},{max(0,round($h_min+(u*($h_max-$h_min))))},0,3,1.5,1,1,0
 
   -endif
 
-  -fx_noise {$noise_exp},{$14},{$17},1,0
+  -fx_noise {$n_amt},{$14},{$17},1,0
 
   f={$18} # iterations
   i={$19} # warp intensity
   m={$20} # offset magnitude
-  s={$27} # gamma
-  v={$28} # hue
+  s={$28} # gamma
+  v={$29} # hue
 
   -repeat {max(0,$f)}
 
     -if {$21}
-      scale_x=w/100
+        scale_x=w/10
+        a={((2^($19-5))*$19)*(u-0.5)*$scale_x*0.025}
     -else
-      scale_x=1
+        scale_x=1
+        a={((2^($19-5))*$19)*(u-0.5)}
     -endif
     -if {$22}
-      scale_y=h/100
+        scale_y=h/10
+        b={((2^($19-5))*$19)*(u-0.5)*$scale_y*0.025}
     -else
-      scale_y=1
+        scale_y=1
+        b={((2^($19-5))*$19)*(u-0.5)}
     -endif
-
-    a=(u-0.5)*$i
-    b=(u-0.5)*$i
     c=(u-0.5)*$m*sign($m)*$scale_x
     d=(u-0.5)*$m*sign($m)*$scale_y
-    f={round((u*2.98)+0.51)}
     g={round((u*33.98)-0.49)}
     h={(u-0.5)*$s*200}
     o={(u-0.5)*$v*200}
@@ -203,23 +479,35 @@ ultrawarpplusplusplus:
     -endif
 
     -if {$24==0}
+      f={round((u*2.98)-0.49)}
+    -elif {$24==1}
+      f={round((u*2.98)+0.51)}
+    -else
+      f={($24)-2}
+    -endif
+
+
+    -if {$25==0}
       -fx_warp_by_intensity {$a},{$b},{$c},{$d},{$e},0,{$f},{$g},0
     -else
       -ac  "-if {$21}
-              scale_x=w/100
+                scale_x=w/10
+                a={((2^($19-5))*$19)*(u-0.5)*$scale_x*0.025}
             -else
-              scale_x=1
+                scale_x=1
+                a={((2^($19-5))*$19)*(u-0.5)}
             -endif
             -if {$22}
-              scale_y=h/100
+                scale_y=h/10
+                b={((2^($19-5))*$19)*(u-0.5)*$scale_y*0.025}
             -else
-              scale_y=1
+                scale_y=1
+                b={((2^($19-5))*$19)*(u-0.5)}
             -endif
-            a={(u-0.5)*$19}
-            b={(u-0.5)*$19}
+
             c={(u-0.5)*$20*sign($20)*$scale_x}
             d={(u-0.5)*$20*sign($20)*$scale_y}
-            f={round((u*2.98)+0.51)}
+
 
             -if {$23==1}
               e=0
@@ -229,128 +517,265 @@ ultrawarpplusplusplus:
               e={round(u)}
             -endif
 
-         -_fx_warp_by_intensity {$a},{$b},{$c},{$d},{$e},0,{$f}",{$24},0
+            -if {$24==0}
+              f={round((u*2.98)-0.49)}
+            -elif {$24==1}
+              f={round((u*2.98)+0.51)}
+            -else
+              f={($24)-2}
+            -endif
+
+
+         -_fx_warp_by_intensity {$a},{$b},{$c},{$d},{$e},0,{$f}",{$25},0
     -endif
 
 
-    -if {$25}
+    -if {$26}
       nn={round(u)}
       -if {$nn}
-        -if {$26==0}
+        -if {$27==0}
           nch={round((u*33.98)-0.49)}
           -ac "-negate",{$nch}
         -else
-          -ac "-negate",{$26}
+          -ac "-negate",{$27}
         -endif
       -endif
     -endif
-
     -fx_adjust_colors 0,0,{$h},{$o},0,0
 
-    -if {$29}
+
+
+    -if {$30}
       -ac "-n 0,255",3
     -endif
 
   -done
 
-  -if {$36==-180.1}
+  -if {$37==-180.1}
     hh=((u-0.5)*360)
   -else
-    hh={$36}
+    hh={$37}
   -endif
-  -if {$37==-0.01}
+  -if {$38==-8.01}
     ss=((u-0.5)*2)
   -else
-    ss={$37}
+    ss={$38}
   -endif
-  -if {$38==-20.01}
+  -if {$39==-20.01}
     vv=((u-0.5)*2)
   -else
-    vv={$38}
+    vv={$39}
   -endif
 
   -fx_mix_hsv {$j},{$hh},0,{$k},{$ss},0,{$l},{$vv},0,0,2,0
 
-  -if {$-3}
-    -ac "-n 0,255",3
+  -if {$-4}
+    -ac "-n 0,255",{$-3}
   -endif
 
-fx_ultrawarpplusplusplus:
+fx_ultrawarpplusplusplusplus:
 
 index=0
 layers=l
 
 -repeat {max(0,$layers)}
-  -ac[$index] "-ultrawarpplusplusplus $*",$-2,$-1
+  -ac[$index] "-ultrawarpplusplusplusplus $*",$-2,$-1
   -fx_adjust_colors[$index] 0,0,0,{(u-0.5)*200},0,0
   index={$index+1}
 -done
 
 
-#@gui _<b>Testing</b>
-#---------------------
+#@gui Hard Painting : fx_hard_painting, fx_hard_painting_preview(0)+
+#@gui : note = note("Modular filter which can be used to apply an extremely-glossy paint effect.")
+#@gui : sep = separator(), note = note("<small>Painting authors: <i>Lyle Kroll</i>, <i>Angelo Lama</i> and <i><a href="https://goo.gl/Ryf7Cv">David Tschumperl&#233;</a></i>.\nLatest update: <i>2011/28/02</i>.</small>")
+#@gui : Abstraction = int(1,0,20)
+#@gui : Details scale = float(2.5,0,100)
+#@gui : Color = float(4,0,25)
+#@gui : Smoothness = float(50,0,2000)
+#@gui : Sharpen shades = bool(1)
+#@gui : sep = separator (), note = note("<small>Graphic novel author: <i>PhotoComiX</i>. Latest update : <i>2011/13/11</i>.</small>")
+#@gui : note = link("Filter explained here","http://www.gimpchat.com/viewtopic.php?f=9&t=1582")
+#@gui : Graphic novel iterations = int(1,0,10)
+#@gui : sep = separator ()
+#@gui : note = note("Apply Local Normalization")
+#@gui : Skip this step = bool(false)
+#@gui : sep = separator ()
+#@gui : note = note(" Local Normalization Controls")
+#@gui : Ln amplititude = float(2,0,60)
+#@gui : Ln size = float(6,0,64)
+#@gui : Ln neightborhood-smoothness = float(5,0,40)
+#@gui : Ln average-smoothness = float(20,0,40)
+#@gui : sep = separator()
+#@gui : Skip all other steps = bool(false)
+#@gui : sep = separator()
+#@gui : sep = separator()
+#@gui : note = note(" Pencil Options")
+#@gui : Pencil size = float(0.62,0,4)
+#@gui : Pencil amplitude = float(14,0,200)
+#@gui : sep = separator()
+#@gui : Skip all other steps = bool(false)
+#@gui : sep = separator()
+#@gui : sep = separator()
+#@gui : Activate "pencil smoother" = bool(true)
+#@gui : note = note(" If unchecked the 3 sliders below are disabled ")
+#@gui : sep = separator()
+#@gui : Pencil smoother sharpness = float(0.5,0,2)
+#@gui : Pencil smoother edge protection = float(0.78,0,1)
+#@gui : Pencil smoother smoothness = float(1.92,0,10)
+#@gui : sep = separator()
+#@gui : Skip all other steps = bool(false)
+#@gui : sep = separator ()
+#@gui : sep = separator()
+#@gui : note = note ("Boost Merging Options")
+#@gui : Swap layers = bool (false)
+#@gui : Mixer = choice("Overlay","Multiply","Soft light","Color Burn","Darken","Stamp","Hard Light","Value","Grain Merge","Freeze","Lightness", "Luminance","*Colors Doping","*Comix Colors*" ,"Graphic Colours","*Graphix Colors","*Vivid Edges*","*Dark Edges*","*Dark Screen*","*Vivid Screen*","Interpolate")
+#@gui : Opacity = float(1,0,1)
+#@gui : Intensity = float(1,0,1)
+#@gui : sep = separator ()
+#@gui : Add painter's touch = bool(true)
+#@gui : sep = separator ()
+#@gui : Painter's touch sharpness = float(0.5,0,2)
+#@gui : Painter's edge protection flow = float(0.8,0,1)
+#@gui : Painter's smoothness =float(1.28,0,10)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right")
+fx_hard_painting : skip ${4=0},${5=0}
+repeat $! l[$>]
+to_colormode {max(3,s)} split_opacity -rv
+repeat $1 fx_normalize_local. 10,6,5,20,1,11 done
+fx_smooth_anisotropic. {100*$2},0.2,1,$2,{2*$2},0.8,90,2,0,1,1,2,1,16
+fx_mix_lab. 1,0,0,$3,0,0.5,$3,0,0.5,0,2,0
+if $5 fx_segment_watershed. 10,1,0 fi
+smooth. $4,0,1,1,1
+endl done
+rv a c
+-split_opacity -l[0]
+-repeat {max(0,$6)}
+  -if {$7==0} -fx_normalize_local $8,$9,$10,$11,1,3,0 -endif
+  -if {$12==0} --fx_pencilbw $13,$14,0,0,0 -endif
+  -if {$15==1} -keep[-1] -break -endif
+  -if {$16==1} -fx_smooth_anisotropic[-1] 60,$17,$18,$19,1.1,0.8,30,2,0,1,1,0 -endif
+  -if {$20==1} -keep[-1] -break -endif
+  -if {$21==1} -reverse -endif
+  -if {$22==0} -fx_compose_overlay $23,0
+  -elif {$22==1} -fx_compose_multiply $23,0
+  -elif {$22==2} -fx_compose_softlight $23,0
+  -elif {$22==3} -fx_compose_colorburn $23,0
+  -elif {$22==4} -fx_compose_darken $23,0
+  -elif {$22==5} -fx_compose_stamp $23,0
+  -elif {$22==6} -fx_compose_hardlight $23,0
+  -elif {$22==7} -fx_compose_value $23,1
+  -elif {$22==8} -fx_compose_grainmerge $23,0
+  -elif {$22==9} -fx_compose_freeze $23,0
+  -elif {$22==10} -fx_compose_lightness $23,1
+  -elif {$22==11} -fx_compose_luminance $23,1
+  -elif {$22==12} -fx_compose_colordoping $23,0
+  -elif {$22==13} -fx_compose_comix_color $23,0,$24
+  -elif {$22==14} -fx_compose_graphicolor $23,0,$24
+  -elif {$22==15} -fx_compose_graphixcolor $23,0
+  -elif {$22==16} -fx_compose_vividedges $23,0.50,0,$24
+  -elif {$22==17} -fx_compose_darkedges $23,0.50,0,$24
+  -elif {$22==18} -fx_compose_vividscreen $23,0,$24
+  -elif {$22==19} -fx_compose_darkscreen $23,0,$24
+  -elif {$22==20} -fx_compose_interpolation $23,0 -endif
+  -if {$25==1} -fx_smooth_anisotropic 60,$26,$27,$28,1.1,0.8,30,2,0,1,1,0 -endif
+-done
+endl
+fx_hard_painting_preview :
+gui_split_preview "fx_hard_painting $*",$-1
 
-#@gui <i>Joan Rake</i>
+#@gui _<b>Rendering</b>
 
-#@gui Cascading self glitching: fx_self_glitching_cascade, fx_self_glitching_cascade_preview(1)
-#@gui : Channels = choice("RGB","CMY","CMYK","HSV","HSL","HSI","LCH","YCbCr","YIQ","YUV","HCY","Bayer")
-#@gui : Alpha Glitch = bool(0)
-#@gui : Zeroth shift = point(50,50)
-#@gui : Boundary = choice(3,"Zero","Nearest","Periodic","Mirror")
-#@gui : Iterations = int(3,1,10)
-#@gui : Power = float(0,-5,5)
-#@gui : Bias = float(0,-255,255)
-#@gui : Negate = bool(0)
-#@gui : Operator = choice("Add","Multiply","Bitwise And","Bitwise Or","Bitwise Xor","Power","Reverse Power","Modulo","Reverse Modulo","Divide","Reverse Divide","Subtract","Reverse Subtract","Left Bitwise Shift", "ReverseLBS", "Right Bitwise Shift", "ReverseRBS","Average","Round","Reverse Round","Sine","Reverse Sine","Cosine","Reverse Cosine","Tangent &#40;CPU-intensive&#41;","Reverse Tangent &#40;CPU-intensive&#41;")
-#@gui : First shift target = point(50,50)
-#@gui : Cascade centre point = point(50,50)
-#@gui : Shift randomness = float(0.75,0,4)
-#@gui : Boundary = choice(3,"Zero","Nearest","Periodic","Mirror")
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
-#@gui : sep = separator(), note = note("<small>Authors: <i>David Tschumperl&#233;</i> and <i>Joan Rake</i>.      Latest update: <i>2018/08/21</i>.</small>")
-fx_self_glitching_cascade :
-shift {$3-50}%,{$4-50}%,0,0,$5,0
-repeat $6
-repeat $! l[$>] if {!$2} split_opacity fi l[0]
-if {$1==1} rgb2cmy elif {$1==2} rgb2cmyk elif {$1==3} rgb2hsv elif {$1==4} rgb2hsl elif {$1==5} rgb2hsi elif {$1==6} rgb2lch elif {$1==7} rgb2ycbcr elif {$1==8} rgb2yiq elif {$1==9} rgb2yuv elif {$1==10} rgb2hcy elif {$1==11} rgb2bayer 0 fi
-f "init(
-shift = ([w,h]-1)*([$13,$14]-[$11,$12]+(2*(u-0.5)*sqrt((($13-$11)^2)+(($14-$12)^2))*($15^3)))%;
-const sign = $9?-1:1;
-const boundary = $16;
-);
-val = sign*((2^$7)*j(shift) + $8);
-($10==0?(val + i):
-$10==1?(val * i):
-$10==2?(val & i):
-$10==3?(val | i):
-$10==4?xor(val,i):
-$10==5?(val^i):
-$10==6?(i^val):
-$10==7?(val%i):
-$10==8?(i%val):
-$10==9?(val / i):
-$10==10?(i / val):
-$10==11?(i - val):
-$10==12?(val - i):
-$10==13?(val << i):
-$10==14?(i << val):
-$10==15?(val >> i):
-$10==16?(i >> val):
-$10==17?avg(i,val):
-$10==18?round(val,i,0):
-$10==19?round(i,val,0):
-$10==20?i*sin(val*2*pi/255):
-$10==21?val*sin(i*2*pi/255):
-$10==22?i*cos(val*2*pi/255):
-$10==23?val*cos(i*2*pi/255):
-$10==24?(i*tan(val*pi/255)):
-(val*tan(i*pi/255))
-)%255;
-"
-if {$1==1} cmy2rgb elif {$1==2} cmyk2rgb elif {$1==3} hsv2rgb elif {$1==4} hsl2rgb elif {$1==5} rgb2hsi elif {$1==6} lch2rgb elif {$1==7} ycbcr2rgb elif {$1==8} yiq2rgb elif {$1==9} yuv2rgb elif {$1==10} hcy2rgb elif {$1==11} bayer2rgb 0,0,0 fi
-endl a c endl done done
-fx_self_glitching_cascade_preview :
-fx_self_glitching_cascade $*
+#@gui Rectexture : fx_rectexture, fx_rectexture(1)
+#@gui : note = note("Generates textures from rectangles, difference blending and warping.")
+#@gui : Recompute = button(0)
+#@gui : Iterations = int(10,0,500)
+#@gui : Colours = choice(3,"Random colours &#40;difference blending&#41;","Random colours &#40;diffblend &#43; sine mapping&#41;","Random colours &#40;diffblend &#43; sinemap &#43; random HSV mixing&#41;","Black and white")
+#@gui : Warp Multiplier = float(1,0,5)
+#@gui : Warp Boundary = choice(5,"Random","Random [non-transparent]","Transparent","Nearest","Periodic", "Mirror")
+#@gui : Channel(s) = choice(3,"All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
+#@gui : Value action = choice("None","Cut","Normalize")
+
+rectexture:
+  -split_opacity -l[0]
+
+  -if {$3==0}
+    -fill_color[-1] ${-RGB}
+  -elif {$3==1}
+    -fill_color[-1] ${-RGB}
+  -elif {$3==2}
+    -fill_color[-1] ${-RGB}
+  -else
+    rr={255*round(u)}
+    -fill_color[-1] $rr,$rr,$rr
+  -endif
+  -repeat {max(0,$2)}
+    +fill_color 0,0,0
+    -if {$3==0}
+      -rectangle[-1] {u(-50,150)}%,{u(-50,150)}%,{u(-50,150)}%,{u(-50,150)}%,1,${-RGB}
+      -blend[-1,-2] difference
+    -elif {$3==1}
+      -rectangle[-1] {u(-50,150)}%,{u(-50,150)}%,{u(-50,150)}%,{u(-50,150)}%,1,${-RGB}
+      -blend[-1,-2] difference
+    -elif {$3==2}
+      -rectangle[-1] {u(-50,150)}%,{u(-50,150)}%,{u(-50,150)}%,{u(-50,150)}%,1,${-RGB}
+      -blend[-1,-2] difference
+    -else
+      -rectangle[-1] {u(-50,150)}%,{u(-50,150)}%,{u(-50,150)}%,{u(-50,150)}%,1,255,255,255
+      -blend[-1,-2] difference
+    -fi
+  -done
+  -if {$5==0}
+    f={u(0,3)}
+  -elif {$5==1}
+    f={u(0,2)+1}
+  -else
+    f={($5)-2}
+  -fi
+  -fx_warp_by_intensity {$4*(u(2)-1)},{$4*(u(2)-1)},{w*$4*(u(2)-1)},{h*$3*(u(2)-1)},0,0,{$f},0,0
+  -if {$3==1}
+       -normalize 0,{u(5,20)*pi} sin[-1] -n 0,255
+  -fi
+  -if {$3==2}
+      -normalize 0,{u(5,20)*pi} sin[-1] -n 0,255
+      mults=u(0,2.5)
+      multv=u(0,2.5)
+      -fx_mix_hsv {(2^u(0,2.5))-1},{u(-180,180)},0,{(2^$mults)-1},{max(0,2-(2^$mults))*u(-1,1)},0,{(2^$multv)-1},{max(0,2-(2^$multv))*u(-1,1)},0,0,2,0
+  -fi
+  -endl a c
+
+fx_rectexture:
+
+  index=0
+  layers=l
+
+  -repeat {max(0,$layers)}
+    -ac[$index] "-rectexture $*",$-2,$-1
+    index={$index+1}
+  -done
+
+#@gui Rays from image : fx_rays_from_image, fx_rays_from_image(1)
+#@gui : Power = float (5,0,10)
+#@gui : X-center (%) = float(50,-100,200)
+#@gui : Y-center (%) = float(50,-100,200)
+#@gui : Channel(s) = choice("All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
+#@gui : Value action = choice("None","Cut","Normalize")
+
+rays_from_image:
+
+-fx_transform_polar 0,$2,$3,"(R-a)*(4^(($1)-5))*$1/5","a",3
+
+fx_rays_from_image:
+
+index=0
+layers=l
+
+-repeat {max(0,$layers)}
+  -ac[$index] "-rays_from_image $*",$-2,$-1
+  index={$index+1}
+-done
+
+######################
+
 
 # Local Variables:
 # mode: sh
