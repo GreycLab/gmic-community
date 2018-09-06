@@ -43,15 +43,29 @@
 #  knowledge of the CeCILL license and that you accept its terms.
 #
 
-# major upgrade to existing deform command
-#@cli deform : _amplitude>=0,_interpolation,_matrix_density[%]>=0,_matrix_interpolation,_mode,-100<=_character<=100
-#@cli : Apply random smooth deformation on selected images.
+#@cli invert_rgb
+#@cli : Inverts images in the RGB colour space.
+invert_rgb:
+repeat $! split_opacity
+c 0,255 *[$>] -1 +[$>] 255
+a c
+done
+
+#@cli invert_rgba
+#@cli : Inverts images in the RGBA colour space.
+invert_rgba:
+repeat $!
+c 0,255 *[$>] -1 +[$>] 255
+done
+
+#@cli jr_deform : _amplitude>=0,_interpolation,_matrix_density[%]>=0,_matrix_interpolation,_mode,-100<=_character<=100
+#@cli : Apply random smooth deformation on selected images. An upgrade to the existing deform command.
 #@cli : 'interpolation' can be { 0=none | 1=linear | 2=bicubic }.
 #@cli : 'matrix_interpolation' can be { 0=linear | 1=bicubic }.
 #@cli : 'mode' can be { 0=noise | 1=spread_noise }.
 #@cli : Default value: 'amplitude=10'.
 #@cli : $ image.jpg +deform[0] 10 +deform[0] 20
-deform : skip ${1=10},${2=1},${3=2%},${4=1},${5=0},${6=0}
+jr_deform : skip ${1=10},${2=1},${3=2%},${4=1},${5=0},${6=0}
 e[^-1] "Apply random smooth deformation on image$?, with amplitude $1."
 v - repeat $! l[$>]
 S={${"is_percent $3"}?max(w,h)*$3:$3}
@@ -65,19 +79,19 @@ endl done v +
 #@gui ____<b>Degradations</b>
 
 # slight upgrade to existing fx_noise command
-#@gui Noise [additive] : fx_noise, fx_noise_preview(0)
+#@gui Noise [additive] (JR's mod) : fx_noise_plus, fx_noise_plus_preview(0)
 #@gui : Amplitude = float(10,0,200)
 #@gui : Noise type = choice("Gaussian","Uniform","Salt and pepper","Poisson","Rice")
 #@gui : sep = separator(), Channel(s) = choice("All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
 #@gui : Value action = choice(1,"None","Cut","Normalize")
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
 #@gui : sep = separator(), note = note("<small>Author: <i><a href="http://ow.ly/wpsV30fzhdI">David Tschumperl&#233;</a></i>.      Latest update: <i>2010/29/12</i>.</small>")
-fx_noise :
-ac "_fx_noise $1,$2",$3,$4
-_fx_noise :
+jr_fx_noise :
+ac "_jr_fx_noise $1,$2",$3,$4
+_jr_fx_noise :
 repeat $! l[$>] split_opacity l[0] noise $1,$2 endl a c endl done
-fx_noise_preview :
-gui_split_preview "fx_noise $*",${-3--1}
+jr_fx_noise_preview :
+gui_split_preview "jr_fx_noise $*",${-3--1}
 
 #@gui _<b>Testing</b>
 #@gui <i>Joan Rake</i>
@@ -183,6 +197,7 @@ fx_hard_painting_preview :
 gui_split_preview "fx_hard_painting $*",$-1
 
 #@gui Neon : fx_neon, fx_neon_preview(0)
+#@gui : note = note("Turns image outlines into bright, neon-like lines.")
 #@gui : sep = separator(), note = note("Gradient norm")
 #@gui : 1. Smoothness = float(0,0,10)
 #@gui : 2. Linearity = float(0.45,0,1.5)
@@ -206,7 +221,7 @@ gui_split_preview "fx_hard_painting $*",$-1
 #@gui : 17. Size = float(2,0,5)
 #@gui : 18. Intensity = float(1,0,2)
 fx_neon :
-rgb2hsl s c 
+to_rgb rgb2hsl s c 
 *.. {$7^2.5}
 a[0-2] c hsl2rgb
 if $6
@@ -216,25 +231,147 @@ b.. $8
 fi
 blend multiply,$6
 fi
-if {$9||$10}
-+b[0] $9,1 *. {$10*sqrt($9)} -. {(($10*sqrt($9)*128)-1)^(sqrt($11))}
-fi
-if {$13||$14}
-+b[0] $13,1 *. {$14*sqrt($13)} -. {(($14*sqrt($13)*128)-1)^(sqrt($15))}
-fi
-if {$17||$18}
-+b[0] $17,1 *. {($10+$14)*$17*$18*($7^3)}
-fi
-rgb2hsl[1,2] s[1,2] c 
++b[0] $9,1 *[1] {$10*sqrt($9)} -[1] {(($10*sqrt($9)*128)-1)^(sqrt($11))}
++b[0] $13,1 *[2] {$14*sqrt($13)} -[2] {(($14*sqrt($13)*128)-1)^(sqrt($15))}
++b[0] $17,1 *[3] {($10+$14)*$17*$18}
+rgb2hsl[1-3] s[1-3] c 
 *[2] {$12^2.5}
 *[5] {$16^2.5}
-a[1-3] c a[2-4] c hsl2rgb[1,2]
+*[8] 0
+a[1-3] c a[2-4] c a[3-5] c hsl2rgb[1-3]
 blend add,$6
 fx_neon_preview :
 fx_neon $*
 
+#@gui Neon alpha: fx_neon_alpha, fx_neon_alpha_preview(0)
+#@gui : note = note("An attempt to make the Neon filter work with alpha channels. Low-quality, comes with some artefacts.")
+#@gui : sep = separator(), note = note("Gradient norm")
+#@gui : 1. Smoothness = float(0,0,10)
+#@gui : 2. Linearity = float(0.45,0,1.5)
+#@gui : 3. Min threshold = float(40,0,100)
+#@gui : 4. Max threshold = float(60,0,100)
+#@gui : 5. Negative = bool(0)
+#@gui : 6. Blur original = float(2,0,20)
+#@gui : 7. Saturation = float(1.15,0,4)
+#@gui : sep = separator(), note = note("Colour Glow 1")
+#@gui : 8. Size = float(20,0,100)
+#@gui : 9. Intensity = float(0.4,0,3)
+#@gui : 10. Darken = float(0.1,0,1)
+#@gui : 11. Saturation = float(2.25,0,4)
+#@gui : sep = separator(), note = note("Colour Glow 2")
+#@gui : 12. Size = float(5,0,100)
+#@gui : 13. Intensity = float(0.2,0,3)
+#@gui : 14. Darken = float(0.1,0,1)
+#@gui : 15. Saturation = float(2.25,0,4)
+#@gui : sep = separator(), note = note("Boost Glow")
+#@gui : 16. Size = float(2,0,5)
+#@gui : 17. Intensity = float(1,0,2)
+fx_neon_alpha :
+repeat $! l[$>]
+to_rgba
++split_opacity 
+rm[1]
+fx_solidify_td[0] 100,0,10,2,0 +invert_rgb[0]
+blend[1,2] difference
+fx_gradient_norm[1] ${1-4},0
+if {$7!=1}
+l[0] to_rgb[0] rgb2hsl[0] s[0] c 
+*[1] {$7^2.5}
+a[0-2] c hsl2rgb[0]
+endl fi
+if $6
+b[0] $6
+fi
+
+
+
+[0] [1] a[2,3] c b[2] $8,1 *[2] {$9*sqrt($8)} -[2] {(($9*sqrt($8)*128)-1)^(sqrt($10))}
+[0] [1] a[3,4] c b[3] $12,1 *[3] {$13*sqrt($12)} -[3] {(($13*sqrt($12)*128)-1)^(sqrt($14))}
+split_opacity[2,3]
+
+l[2] to_rgb[0] rgb2hsv[0] s[0] c 
+*[1] {$11^2.5}
++[2] 1
+a[0-2] c hsv2rgb[0] endl
+l[4] to_rgb[0] rgb2hsv[0] s[0] c 
+*[1] {$15^2.5}
++[2] 1
+a[0-2] c hsv2rgb[0] endl
+
+
+
+
+blend[3,5] average
+blend[2,4] add
+
+
+b[2] {$9*13}
+
++blend[0,2] add rm[0] mv[3] 0
+[1]
+a[0,1] c a[1,2] c [1] mv[3] 0
+blend[0,1] alpha blend[0,1] add
+
+#a[0,1] c
+
+
+
+
+
+
+
+
+
+#+b[1] $16,1 *[2] {($9+$13)*$16*$17}
+#+b[1] $8,1 *[3] {$9*sqrt($8)} -[3] {(($9*sqrt($8)*128)-1)^(sqrt($10))}
+#+b[1] $12,1 *[4] {$13*sqrt($12)} -[4] {(($13*sqrt($12)*128)-1)^(sqrt($14))}
+#+b[0] {$12+$8}
+#blend[3,4] add
+#+a[0,3] c 
+#a[0,1] c rm[2]
+
+#blend[0,1] add
+
+
+
+
+
+
+
+
+
+
+
+
+
+#+b[2] $8,1 *[3] {$9*sqrt($8)} -[3] {(($9*sqrt($8)*128)-1)^(sqrt($10))}
+#+b[1] $16,1 *[2] {($9+$13)*$16*$17}
+#blend[1,3] add
+
+
+#rgb2hsl[1] s[1] c *[2] $11 a[1-3] c  hsl2rgb[1] a[1-2] c *[1]
+
+#[1] rv[0,1] blend[0,1] alpha blend[0,1] add
+#+a[0,1] c
+
+#+b[1] $12,1 *[3] {$13*sqrt($12)} -[3] {(($13*sqrt($12)*128)-1)^(sqrt($14))}
+#+b[0] $16,1 *[2] {($9+$13)*$16*$17}
+#blend[0,2] add
+#c 0,255
+#+a[0,1] c
+#blend[0-1] 
+#rv[1-4] blend[1-4] add
+
+
+#a[0,1] c
+endl done
+fx_neon_alpha_preview :
+fx_neon_alpha $*
+
+
+
 #@gui Dreamy Abstraction : fx_dreamy_abstraction, fx_dreamy_abstraction_preview()
-#@gui : note = note("A less aggressive alternative to the Painting filter. Yes, Joan Rake made a filter which ISN'T aggressive! ")
+#@gui : note = note("A less-aggressive alternative to the Painting filter. Yes, 'Joan Rake' made a filter that isn't aggressive! The horror!")
 #@gui : sep = separator(), note = note("Segmentation")
 #@gui : Edge threshold = float(2,0,30)
 #@gui : Smoothness = float(1,0,10)
@@ -290,7 +427,7 @@ if {$5>=0}
 if {$6==5}
 ac. "spread {([$5,$5]/100)*max(w,h)}",$7,1
 else
-ac. "_fx_noise {255*$5/100},$6",$7,1
+ac. "_jr_fx_noise {255*$5/100},$6",$7,1
 fi
 blend ${_mode{$MergingOption2+1}},$Opacity2
 if {$10>=0}
@@ -436,8 +573,8 @@ CF={$9*$14*$20}
 if {$19} z {-$CF},{-$CF},{w+$CF},{h+$CF} fi
 noise_poissondisk $2,$3
 fx_edge_offsets $4,$5,$6,$7,$8
-deform $9,$10,$ms1,$12,$13
-deform $14,$15,$ms2,$17,$18
+jr_deform $9,$10,$ms1,$12,$13
+jr_deform $14,$15,$ms2,$17,$18
 if {$19} z {$CF},{$CF},{w-$CF},{h-$CF} fi
 fx_crazy_texture_preview :
 fx_crazy_texture $*
@@ -699,118 +836,434 @@ repeat {max(0,l)}
 ac[$>] "-fx_self_glitching_cascade $*",$25
 done
 
-#@gui Sawtoother [CMYK] : sawtoother_cmyk, sawtoother_cmyk_preview(1)+
-#@gui : note = note("Splits image into CMYK channels and uses modulo operations to generate sawtooth waves and map channel intensities to them.")
-#@gui : note = note("<small>This filter was intended for screwing up images but it can also be used for quick analysis among other things.</small>"), sep = separator()
-#@gui : Cyan factor = float(1,0,20)
-#@gui : Cyan shift = float(0,-255,255)
-#@gui : Cyan smoothness = float(0,0,10)
-#@gui : Cyan modulo = bool(1)
-#@gui : Cyan multiplier = float(1,0,20)
-#@gui : Cyan phase shift = float(0,-255,255)
-#@gui : sep = separator()
-#@gui : Magenta factor = float(1,0,20)
-#@gui : Magenta shift = float(0,-255,255)
-#@gui : Magenta smoothness = float(0,0,10)
-#@gui : Magenta modulo = bool(1)
-#@gui : Magenta multiplier = float(1,0,20)
-#@gui : Magenta phase shift = float(0,-255,255)
-#@gui : sep = separator()
-#@gui : Yellow factor = float(1,0,20)
-#@gui : Yellow shift = float(0,-255,255)
-#@gui : Yellow smoothness = float(0,0,10)
-#@gui : Yellow modulo = bool(1)
-#@gui : Yellow multiplier = float(1,0,20)
-#@gui : Yellow phase shift = float(0,-255,255)
-#@gui : sep = separator()
-#@gui : Key factor = float(1,0,20)
-#@gui : Key shift = float(0,-255,255)
-#@gui : Key smoothness = float(0,0,10)
-#@gui : Key modulo = bool(1)
-#@gui : Key multiplier = float(1,0,20)
-#@gui : Key phase shift = float(0,-255,255)
+#@gui Sawtoother [CMY(/K)] : sawtoother_cmy_k, sawtoother_cmy_k_preview(1)+
+#@gui : note = note("Splits image into CMY or CMYK channels and uses modulo operations to generate sawtooth waves and map channel intensities to them.")
+#@gui : note = note("<small>This filter was intended for screwing up images but it can also be used for quick analysis among other things.</small>")
+#@gui : sep = separator(), note = note("<b>Cyan</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Magenta</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Yellow</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Key</b>")
+#@gui : Include channel = bool(0)
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
 #@gui : sep = separator()
 #@gui : Tones range = choice("All tones","Shadows","Mid-tones","Highlights")
 #@gui : Tones smoothness = float(2,0,10)
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right")
-sawtoother_cmyk :
+sawtoother_cmy_k :
 repeat $! l. split_opacity rv to_rgb.
-fx_start_mix $25,$26
-rgb2cmyk. s. c
-if {$4} b[-4] $3% +[-4] $6 %[-4] {256/$1} *[-4] $1 %[-3] 256 *[-4] $5 +[-4] $2 else *[-4] $1 +[-4] {$2*$1} b[-4] $3% fi
-if {$10} b[-3] $9% +[-3] $12 %[-3] {256/$7} *[-3] $7 %[-3] 256 *[-3] $11 +[-3] $8 else *[-3] $7 +[-3] {$8*$7} b[-3] $9% fi
-if {$16} b[-2] $15% +[-2] $18 %[-2] {256/$13} *[-2] $13 %[-2] 256 *[-2] $17 +[-2] $14 else *[-2] $13 +[-2] {$14*$13} b[-2] $15% fi
-if {$22} b[-1] $21% +[-1] $24 %[-1] {256/$19} *[-1] $19 %[-1] 256 *[-1] $23 +[-1] $20 else *[-1] $19 +[-1] {$20*$19} b[-1] $21% fi
-a[-4--1] c cmyk2rgb.
-fx_end_mix $25
+fx_start_mix $26,$27
+if $19 rgb2cmyk. else rgb2cmy. fi s. c
+index=0
+if {$19} index=-1 if {$23} b[-1] $22% +[-1] $25 %[-1] {256/$20} *[-1] $20 %[-1] 256 *[-1] $24 +[-1] $21 else *[-1] $20 +[-1] {$21*$20} b[-1] $22% fi fi
+if {$4} b[{$index-3}] $3% +[{$index-3}] $6 %[{$index-3}] {256/$1} *[{$index-3}] $1 %[{$index-3}] 256 *[{$index-3}] $5 +[{$index-3}] $2 else *[{$index-3}] $1 +[{$index-3}] {$2*$1} b[{$index-3}] $3% fi
+if {$10} b[{$index-2}] $9% +[{$index-2}] $12 %[{$index-2}] {256/$7} *[{$index-2}] $7 %[{$index-2}] 256 *[{$index-2}] $11 +[{$index-2}] $8 else *[{$index-2}] $7 +[{$index-2}] {$8*$7} b[{$index-2}] $9% fi
+if {$16} b[{$index-1}] $15% +[{$index-1}] $18 %[{$index-1}] {256/$13} *[{$index-1}] $13 %[{$index-1}] 256 *[{$index-1}] $17 +[{$index-1}] $14 else *[{$index-1}] $13 +[{$index-1}] {$14*$13} b[{$index-1}] $15% fi
+c 0,255 a[{$index-3}--1] c
+if $19 cmyk2rgb. else cmy2rgb. fi
+fx_end_mix $26
 if {$!!=3} rv a c fi endl mv. 0 done
-sawtoother_cmyk_preview :
-gui_split_preview "sawtoother_cmyk $*",$-1
+sawtoother_cmy_k_preview :
+sawtoother_cmy_k $*
+#gui_split_preview "sawtoother_cmy_k $*",$-1
 
-#@gui Sawtoother [HSV] : sawtoother_hsv, sawtoother_hsv_preview(1)+
-#@gui : note = note("Splits image into HSV channels and uses modulo operations to generate sawtooth waves and map channel intensities to them.")
-#@gui : note = note("<small>This filter was intended for screwing up images but it can also be used for quick analysis among other things.</small>"), sep = separator()
-#@gui : Hue factor = float(1,0,20)
-#@gui : Hue shift = float(0,-180,180)
-#@gui : Hue smoothness = float(0,0,10)
-#@gui : Hue modulo = bool(1)
-#@gui : Hue multiplier = float(1,0,20)
-#@gui : Hue phase shift = float(0,-180,180)
-#@gui : sep = separator()
-#@gui : Saturation factor = float(1,0,20)
-#@gui : Saturation shift = float(0,-1,1)
-#@gui : Saturation smoothness = float(0,0,10)
-#@gui : Saturation modulo = bool(1)
-#@gui : Saturation multiplier = float(1,0,20)
-#@gui : Saturation phase shift = float(0,-1,1)
-#@gui : sep = separator()
-#@gui : Value factor = float(1,0,20)
-#@gui : Value shift = float(0,-1,1)
-#@gui : Value smoothness = float(0,0,10)
-#@gui : Value modulo = bool(1)
-#@gui : Value multiplier = float(1,0,20)
-#@gui : Value phase shift = float(0,-1,1)
+#@gui Sawtoother [HSX] : sawtoother_hsx, sawtoother_hsx_preview(1)+
+#@gui : note = note("Splits image into HSV, HSI or HSL channels and uses modulo operations to generate sawtooth waves and map channel intensities to them.")
+#@gui : note = note("<small>This filter was intended for screwing up images but it can also be used for quick analysis among other things.</small>")
+#@gui : sep = separator(), note = note("<b>Hue</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-180,180)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-180,180)
+#@gui : sep = separator(), note = note("<b>Saturation</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-1,1)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-1,1)
+#@gui : sep = separator(), note = note("<b>Value&#47;Intensity&#47;Lightness</b>")
+#@gui : Channel = choice("Value","Intensity","Lightness)
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-1,1)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-1,1)
 #@gui : sep = separator()
 #@gui : Tones range = choice("All tones","Shadows","Mid-tones","Highlights")
 #@gui : Tones smoothness = float(2,0,10)
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right")
-sawtoother_hsv :
+sawtoother_hsx :
 repeat $! l. split_opacity rv to_rgb.
-fx_start_mix $19,$20
-rgb2hsv. s. c -[-2,-1] 0.5
-+[-2,-1] 0.5
+fx_start_mix $20,$21
+if {$13==1} rgb2hsi. elif {$13==2} rgb2hsl. else rgb2hsv. fi
+s. c
 if {$4} b[-3] $3% +[-3] $6 %[-3] {360/($1)^2} *[-3] $1 %[-3] 360 *[-3] {$5*$1} +[-3] {$2} else *[-3] $1 +[-3] {$2*$1} b[-3] $3% fi %[-3] 360
 if {$10} b[-2] $9% +[-2] $12 %[-2] {(1+(1/255))/$7} *[-2] {$7} %[-2] {(1+(1/255))} *[-2] $11 +[-2] {$8} else *[-2] $7 +[-2] {$8*$7} b[-2] $9% fi
-if {$16} b[-1] $15% +[-1] $18 %[-1] {(1+(1/255))/$13} *[-1] {$13} %[-1] {(1+(1/255))} *[-1] $17 +[-1] {$14} else *[-1] $13 +[-1] {$14*$13} b[-1] $15% fi
-c[-2,-1] 0,1 a[-3--1] c hsv2rgb.
+if {$17} b[-1] $16% +[-1] $19 %[-1] {(1+(1/255))/$14} *[-1] {$14} %[-1] {(1+(1/255))} *[-1] $18 +[-1] {$15} else *[-1] $14 +[-1] {$15*$14} b[-1] $16% fi
+c[-2,-1] 0,1 a[-3--1] c
+if {$13==1} hsi2rgb. elif {$13==2} hsl2rgb. else hsv2rgb. fi
+fx_end_mix $20
+if {$!!=3} rv a c fi endl mv. 0 done
+sawtoother_hsx_preview :
+gui_split_preview "sawtoother_hsx $*",$-1
+
+#@gui Sawtoother [LCH8] : sawtoother_lch8, sawtoother_lch8_preview(1)+
+#@gui : note = note("Splits image into LCH8 channels and uses modulo operations to generate sawtooth waves and map channel intensities to them.")
+#@gui : note = note("<small>This filter was intended for screwing up images but it can also be used for quick analysis among other things.</small>")
+#@gui : sep = separator(), note = note("<b>Luminance</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Chroma</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Hue</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator()
+#@gui : Tones range = choice("All tones","Shadows","Mid-tones","Highlights")
+#@gui : Tones smoothness = float(2,0,10)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right")
+sawtoother_lch8 :
+repeat $! l. split_opacity rv to_rgb.
+fx_start_mix $19,$20
+rgb2lch8. s. c
+if {$4} b[-3] $3% +[-3] $6 %[-3] {256/$1} *[-3] $1 %[-3] 256 *[-3] $5 +[-3] $2 else *[-3] $1 +[-3] {$2*$1} b[-3] $3% fi
+if {$10} b[-2] $9% +[-2] $12 %[-2] {256/$7} *[-2] $7 %[-2] 256 *[-2] $11 +[-2] $8 else *[-2] $7 +[-2] {$8*$7} b[-2] $9% fi
+if {$16} b[-1] $15% +[-1] $18 %[-1] {256/($13)^2} *[-1] $13 %[-1] 256 *[-1] {$17*$13} +[-1] {$14} else *[-1] $13 +[-1] {$14*$13} b[-1] $15% fi %[-1] 256
+a[-3--1] c c. 0,255 lch82rgb.
 fx_end_mix $19
 if {$!!=3} rv a c fi endl mv. 0 done
-sawtoother_hsv_preview :
-gui_split_preview "sawtoother_hsv $*",$-1
+sawtoother_lch8_preview :
+sawtoother_lch8 $*
+#gui_split_preview "sawtoother_lch8 $*",$-1
+
+#@gui Sawtoother [YIQ8] : sawtoother_yiq8, sawtoother_yiq8_preview(1)+
+#@gui : note = note("Splits image into YIQ8 channels and uses modulo operations to generate sawtooth waves and map channel intensities to them.")
+#@gui : note = note("<small>This filter was intended for screwing up images but it can also be used for quick analysis among other things.</small>")
+#@gui : sep = separator(), note = note("<b>Y &#40;Luminance&#41;</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Chrominance I</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Chrominance Q</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator()
+#@gui : Tones range = choice("All tones","Shadows","Mid-tones","Highlights")
+#@gui : Tones smoothness = float(2,0,10)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right")
+fx_start_mix :
+if {$1==1} +tones. 3 +[-2,-1] b[-2,-1] $2% r[-2,-1] ... *. ... mv... $!
+elif {$1==2} +tones. 3 +[-3,-1] b[-2,-1] $2% r[-2,-1] ... *.. ... mv... $!
+elif {$1==3} +tones. 3 +[-3,-2] b[-2,-1] $2% r[-2,-1] ... *.. ... mv... $!
+fi
+fx_end_mix :
+if {$1==1} *[-3,-1] +[-2,-1]
+elif {$1==2} *[-2,-1] +[-2,-1]
+elif {$1==3} *[-2,-1] +[-2,-1]
+fi
+c 0,255
+sawtoother_yiq8 :
+repeat $! l. split_opacity rv to_rgb.
+fx_start_mix $19,$20
+rgb2yiq8. s. c
++[-2,-1] 0.5
+if {$4} b[-3] $3% +[-3] $6 %[-3] {256/$1} *[-3] $1 %[-3] 256 *[-3] $5 +[-3] $2 else *[-3] $1 +[-3] {$2*$1} b[-3] $3% fi
+if {$10} b[-2] $9% +[-2] $12 %[-2] {256/$7} *[-2] $7 %[-2] 256 *[-2] $11 +[-2] $8 else *[-2] $7 +[-2] {$8*$7} b[-2] $9% fi
+if {$16} b[-1] $15% +[-1] $18 %[-1] {256/$13} *[-1] $13 %[-1] 256 *[-1] $17 +[-1] $14 else *[-1] $13 +[-1] {$14*$13} b[-1] $15% fi
+a[-3--1] c c. 0,255 yiq82rgb.
+fx_end_mix $19
+if {$!!=3} rv a c fi endl mv. 0 done
+sawtoother_yiq8_preview :
+gui_split_preview "sawtoother_yiq8 $*",$-1
+
+#@gui Sawtoother [XYZ8] : sawtoother_xyz8, sawtoother_xyz8_preview(1)+
+#@gui : note = note("Splits image into XYZ8 channels and uses modulo operations to generate sawtooth waves and map channel intensities to them.")
+#@gui : note = note("<small>This filter was intended for screwing up images but it can also be used for quick analysis among other things.</small>")
+#@gui : sep = separator(), note = note("<b>X</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Y</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Z</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator()
+#@gui : Tones range = choice("All tones","Shadows","Mid-tones","Highlights")
+#@gui : Tones smoothness = float(2,0,10)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right")
+fx_start_mix :
+if {$1==1} +tones. 3 +[-2,-1] b[-2,-1] $2% r[-2,-1] ... *. ... mv... $!
+elif {$1==2} +tones. 3 +[-3,-1] b[-2,-1] $2% r[-2,-1] ... *.. ... mv... $!
+elif {$1==3} +tones. 3 +[-3,-2] b[-2,-1] $2% r[-2,-1] ... *.. ... mv... $!
+fi
+fx_end_mix :
+if {$1==1} *[-3,-1] +[-2,-1]
+elif {$1==2} *[-2,-1] +[-2,-1]
+elif {$1==3} *[-2,-1] +[-2,-1]
+fi
+c 0,255
+sawtoother_xyz8 :
+repeat $! l. split_opacity rv to_rgb.
+fx_start_mix $19,$20
+rgb2xyz8. s. c
++[-2,-1] 0.5
+if {$4} b[-3] $3% +[-3] $6 %[-3] {256/$1} *[-3] $1 %[-3] 256 *[-3] $5 +[-3] $2 else *[-3] $1 +[-3] {$2*$1} b[-3] $3% fi
+if {$10} b[-2] $9% +[-2] $12 %[-2] {256/$7} *[-2] $7 %[-2] 256 *[-2] $11 +[-2] $8 else *[-2] $7 +[-2] {$8*$7} b[-2] $9% fi
+if {$16} b[-1] $15% +[-1] $18 %[-1] {256/$13} *[-1] $13 %[-1] 256 *[-1] $17 +[-1] $14 else *[-1] $13 +[-1] {$14*$13} b[-1] $15% fi
+a[-3--1] c c. 0,255 xyz82rgb.
+fx_end_mix $19
+if {$!!=3} rv a c fi endl mv. 0 done
+sawtoother_xyz8_preview :
+gui_split_preview "sawtoother_xyz8 $*",$-1
+
+#@gui Sawtoother [YUV8] : sawtoother_yuv8, sawtoother_yuv8_preview(1)+
+#@gui : note = note("Splits image into YUV8 channels and uses modulo operations to generate sawtooth waves and map channel intensities to them.")
+#@gui : note = note("<small>This filter was intended for screwing up images but it can also be used for quick analysis among other things.</small>")
+#@gui : sep = separator(), note = note("<b>Y &#40;Luminance&#41;</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Chrominance I</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Chrominance Q</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator()
+#@gui : Tones range = choice("All tones","Shadows","Mid-tones","Highlights")
+#@gui : Tones smoothness = float(2,0,10)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right")
+fx_start_mix :
+if {$1==1} +tones. 3 +[-2,-1] b[-2,-1] $2% r[-2,-1] ... *. ... mv... $!
+elif {$1==2} +tones. 3 +[-3,-1] b[-2,-1] $2% r[-2,-1] ... *.. ... mv... $!
+elif {$1==3} +tones. 3 +[-3,-2] b[-2,-1] $2% r[-2,-1] ... *.. ... mv... $!
+fi
+fx_end_mix :
+if {$1==1} *[-3,-1] +[-2,-1]
+elif {$1==2} *[-2,-1] +[-2,-1]
+elif {$1==3} *[-2,-1] +[-2,-1]
+fi
+c 0,255
+sawtoother_yuv8 :
+repeat $! l. split_opacity rv to_rgb.
+fx_start_mix $19,$20
+rgb2yuv8. s. c
++[-2,-1] 0.5
+if {$4} b[-3] $3% +[-3] $6 %[-3] {256/$1} *[-3] $1 %[-3] 256 *[-3] $5 +[-3] $2 else *[-3] $1 +[-3] {$2*$1} b[-3] $3% fi
+if {$10} b[-2] $9% +[-2] $12 %[-2] {256/$7} *[-2] $7 %[-2] 256 *[-2] $11 +[-2] $8 else *[-2] $7 +[-2] {$8*$7} b[-2] $9% fi
+if {$16} b[-1] $15% +[-1] $18 %[-1] {256/$13} *[-1] $13 %[-1] 256 *[-1] $17 +[-1] $14 else *[-1] $13 +[-1] {$14*$13} b[-1] $15% fi
+a[-3--1] c c. 0,255 yuv82rgb.
+fx_end_mix $19
+if {$!!=3} rv a c fi endl mv. 0 done
+sawtoother_yuv8_preview :
+gui_split_preview "sawtoother_yuv8 $*",$-1
+
+#@gui Sawtoother [YCbCr] : sawtoother_ycbcr, sawtoother_ycbcr_preview(1)+
+#@gui : note = note("Splits image into YCbCr channels and uses modulo operations to generate sawtooth waves and map channel intensities to them.")
+#@gui : note = note("<small>This filter was intended for screwing up images but it can also be used for quick analysis among other things.</small>")
+#@gui : sep = separator(), note = note("<b>Y &#40;Luminance&#41;</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Blue Chrominance</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Red Chrominance</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator()
+#@gui : Tones range = choice("All tones","Shadows","Mid-tones","Highlights")
+#@gui : Tones smoothness = float(2,0,10)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right")
+fx_start_mix :
+if {$1==1} +tones. 3 +[-2,-1] b[-2,-1] $2% r[-2,-1] ... *. ... mv... $!
+elif {$1==2} +tones. 3 +[-3,-1] b[-2,-1] $2% r[-2,-1] ... *.. ... mv... $!
+elif {$1==3} +tones. 3 +[-3,-2] b[-2,-1] $2% r[-2,-1] ... *.. ... mv... $!
+fi
+fx_end_mix :
+if {$1==1} *[-3,-1] +[-2,-1]
+elif {$1==2} *[-2,-1] +[-2,-1]
+elif {$1==3} *[-2,-1] +[-2,-1]
+fi
+c 0,255
+sawtoother_ycbcr :
+repeat $! l. split_opacity rv to_rgb.
+fx_start_mix $19,$20
+rgb2ycbcr. s. c
++[-2,-1] 0.5
+if {$4} b[-3] $3% +[-3] $6 %[-3] {256/$1} *[-3] $1 %[-3] 256 *[-3] $5 +[-3] $2 else *[-3] $1 +[-3] {$2*$1} b[-3] $3% fi
+if {$10} b[-2] $9% +[-2] $12 %[-2] {256/$7} *[-2] $7 %[-2] 256 *[-2] $11 +[-2] $8 else *[-2] $7 +[-2] {$8*$7} b[-2] $9% fi
+if {$16} b[-1] $15% +[-1] $18 %[-1] {256/$13} *[-1] $13 %[-1] 256 *[-1] $17 +[-1] $14 else *[-1] $13 +[-1] {$14*$13} b[-1] $15% fi
+a[-3--1] c c. 0,255 ycbcr2rgb.
+fx_end_mix $19
+if {$!!=3} rv a c fi endl mv. 0 done
+sawtoother_ycbcr_preview :
+gui_split_preview "sawtoother_ycbcr $*",$-1
+
+#@gui Sawtoother [YCbCrGLIC] : sawtoother_ycbcrglic, sawtoother_ycbcrglic_preview(1)+
+#@gui : note = note("Splits image into YCbCr channels &#40;<a href="https://web.archive.org/web/20180906062556/https://github.com/GlitchCodec/GLIC/blob/master/colorspaces.pde">using GLIC version</a>&#41; and uses modulo operations to generate sawtooth waves and map channel intensities to them.")
+#@gui : note = note("<small>This filter was intended for screwing up images but it can also be used for quick analysis among other things.</small>")
+#@gui : sep = separator(), note = note("<b>Y &#40;Luminance&#41;</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Blue Chrominance</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Red Chrominance</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator()
+#@gui : Tones range = choice("All tones","Shadows","Mid-tones","Highlights")
+#@gui : Tones smoothness = float(2,0,10)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right")
+fx_start_mix :
+if {$1==1} +tones. 3 +[-2,-1] b[-2,-1] $2% r[-2,-1] ... *. ... mv... $!
+elif {$1==2} +tones. 3 +[-3,-1] b[-2,-1] $2% r[-2,-1] ... *.. ... mv... $!
+elif {$1==3} +tones. 3 +[-3,-2] b[-2,-1] $2% r[-2,-1] ... *.. ... mv... $!
+fi
+fx_end_mix :
+if {$1==1} *[-3,-1] +[-2,-1]
+elif {$1==2} *[-2,-1] +[-2,-1]
+elif {$1==3} *[-2,-1] +[-2,-1]
+fi
+c 0,255
+sawtoother_ycbcrglic :
+repeat $! l. split_opacity rv to_rgb.
+fx_start_mix $19,$20
+rgb2ycbcr. s. c
++[-2,-1] 0.5
+if {$4} b[-3] $3% +[-3] $6 %[-3] {256/$1} *[-3] $1 %[-3] 256 *[-3] $5 +[-3] $2 else *[-3] $1 +[-3] {$2*$1} b[-3] $3% fi
+if {$10} b[-2] $9% +[-2] $12 %[-2] {256/$7} *[-2] $7 %[-2] 256 *[-2] $11 +[-2] $8 else *[-2] $7 +[-2] {$8*$7} b[-2] $9% fi
+if {$16} b[-1] $15% +[-1] $18 %[-1] {256/$13} *[-1] $13 %[-1] 256 *[-1] $17 +[-1] $14 else *[-1] $13 +[-1] {$14*$13} b[-1] $15% fi
+a[-3--1] c c. 0,255 yuv82rgb.
+fx_end_mix $19
+if {$!!=3} rv a c fi endl mv. 0 done
+sawtoother_ycbcrglic_preview :
+gui_split_preview "sawtoother_ycbcrglic $*",$-1
 
 #@gui Sawtoother [RGB] : sawtoother_rgb, sawtoother_rgb_preview(1)+
 #@gui : note = note("Splits image into RGB channels and uses modulo operations to generate sawtooth waves and map channel intensities to them.")
-#@gui : note = note("<small>This filter was intended for screwing up images but it can also be used for quick analysis among other things.</small>"), sep = separator()
-#@gui : Red factor = float(1,0,20)
-#@gui : Red shift = float(0,-255,255)
-#@gui : Red smoothness = float(0,0,10)
-#@gui : Red modulo = bool(1)
-#@gui : Red multiplier = float(1,0,20)
-#@gui : Red phase shift = float(0,-255,255)
-#@gui : sep = separator()
-#@gui : Green factor = float(1,0,20)
-#@gui : Green shift = float(0,-255,255)
-#@gui : Green smoothness = float(0,0,10)
-#@gui : Green modulo = bool(1)
-#@gui : Green multiplier = float(1,0,20)
-#@gui : Green phase shift = float(0,-255,255)
-#@gui : sep = separator()
-#@gui : Blue factor = float(1,0,20)
-#@gui : Blue shift = float(0,-255,255)
-#@gui : Blue smoothness = float(0,0,10)
-#@gui : Blue modulo = bool(1)
-#@gui : Blue multiplier = float(1,0,20)
-#@gui : Blue phase shift = float(0,-255,255)
+#@gui : note = note("<small>This filter was intended for screwing up images but it can also be used for quick analysis among other things.</small>")
+#@gui : sep = separator(), note = note("<b>Red</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Green</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Blue</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
 #@gui : sep = separator()
 #@gui : Tones range = choice("All tones","Shadows","Mid-tones","Highlights")
 #@gui : Tones smoothness = float(2,0,10)
@@ -834,11 +1287,118 @@ s. c
 if {$4} b[-3] $3% +[-3] $6 %[-3] {256/$1} *[-3] $1 %[-3] 256 *[-3] $5 +[-3] $2 else *[-3] $1 +[-3] {$2*$1} b[-3] $3% fi
 if {$10} b[-2] $9% +[-2] $12 %[-2] {256/$7} *[-2] $7 %[-2] 256 *[-2] $11 +[-2] $8 else *[-2] $7 +[-2] {$8*$7} b[-2] $9% fi
 if {$16} b[-1] $15% +[-1] $18 %[-1] {256/$13} *[-1] $13 %[-1] 256 *[-1] $17 +[-1] $14 else *[-1] $13 +[-1] {$14*$13} b[-1] $15% fi
-a[-3--1] c +. 0 c. 0,255
+a[-3--1] c. 0,255
 fx_end_mix $19
 if {$!!=3} rv a c fi endl mv. 0 done
 sawtoother_rgb_preview :
 gui_split_preview "sawtoother_rgb $*",$-1
+
+#@gui Sawtoother [sRGB] : sawtoother_srgb, sawtoother_srgb_preview(1)+
+#@gui : note = note("Splits image into sRGB channels and uses modulo operations to generate sawtooth waves and map channel intensities to them.")
+#@gui : note = note("<small>This filter was intended for screwing up images but it can also be used for quick analysis among other things.</small>")
+#@gui : sep = separator(), note = note("<b>Red</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Green</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Blue</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator()
+#@gui : Tones range = choice("All tones","Shadows","Mid-tones","Highlights")
+#@gui : Tones smoothness = float(2,0,10)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right")
+fx_start_mix :
+if {$1==1} +tones. 3 +[-2,-1] b[-2,-1] $2% r[-2,-1] ... *. ... mv... $!
+elif {$1==2} +tones. 3 +[-3,-1] b[-2,-1] $2% r[-2,-1] ... *.. ... mv... $!
+elif {$1==3} +tones. 3 +[-3,-2] b[-2,-1] $2% r[-2,-1] ... *.. ... mv... $!
+fi
+fx_end_mix :
+if {$1==1} *[-3,-1] +[-2,-1]
+elif {$1==2} *[-2,-1] +[-2,-1]
+elif {$1==3} *[-2,-1] +[-2,-1]
+fi
+c 0,255
+sawtoother_srgb :
+repeat $! l. split_opacity rv to_rgb.
+fx_start_mix $19,$20
+rgb2srgb. s. c 
++[-2,-1] 0.5
+if {$4} b[-3] $3% +[-3] $6 %[-3] {256/$1} *[-3] $1 %[-3] 256 *[-3] $5 +[-3] $2 else *[-3] $1 +[-3] {$2*$1} b[-3] $3% fi
+if {$10} b[-2] $9% +[-2] $12 %[-2] {256/$7} *[-2] $7 %[-2] 256 *[-2] $11 +[-2] $8 else *[-2] $7 +[-2] {$8*$7} b[-2] $9% fi
+if {$16} b[-1] $15% +[-1] $18 %[-1] {256/$13} *[-1] $13 %[-1] 256 *[-1] $17 +[-1] $14 else *[-1] $13 +[-1] {$14*$13} b[-1] $15% fi
+a[-3--1] c c. 0,255 srgb2rgb.
+fx_end_mix $19
+if {$!!=3} rv a c fi endl mv. 0 done
+sawtoother_srgb_preview :
+sawtoother_srgb $*
+#gui_split_preview "sawtoother_srgb $*",$-1
+
+#@gui Sawtoother [Lab8] : sawtoother_lab8, sawtoother_lab8_preview(1)+
+#@gui : note = note("Splits image into Lab8 channels and uses modulo operations to generate sawtooth waves and map channel intensities to them.")
+#@gui : note = note("<small>This filter was intended for screwing up images but it can also be used for quick analysis among other things.</small>")
+#@gui : sep = separator(), note = note("<b>Luminance</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Chrominance a</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator(), note = note("<b>Chrominance b</b>")
+#@gui : Factor = float(1,0,20)
+#@gui : Shift = float(0,-256,256)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Modulo = bool(1)
+#@gui : Multiplier = float(1,0,20)
+#@gui : Phase shift = float(0,-256,256)
+#@gui : sep = separator()
+#@gui : Tones range = choice("All tones","Shadows","Mid-tones","Highlights")
+#@gui : Tones smoothness = float(2,0,10)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right")
+fx_start_mix :
+if {$1==1} +tones. 3 +[-2,-1] b[-2,-1] $2% r[-2,-1] ... *. ... mv... $!
+elif {$1==2} +tones. 3 +[-3,-1] b[-2,-1] $2% r[-2,-1] ... *.. ... mv... $!
+elif {$1==3} +tones. 3 +[-3,-2] b[-2,-1] $2% r[-2,-1] ... *.. ... mv... $!
+fi
+fx_end_mix :
+if {$1==1} *[-3,-1] +[-2,-1]
+elif {$1==2} *[-2,-1] +[-2,-1]
+elif {$1==3} *[-2,-1] +[-2,-1]
+fi
+c 0,255
+sawtoother_lab8 :
+repeat $! l. split_opacity rv to_rgb.
+fx_start_mix $19,$20
+rgb2lab8. s. c
+if {$4} b[-3] $3% +[-3] $6 %[-3] {256/$1} *[-3] $1 %[-3] 256 *[-3] $5 +[-3] $2 else *[-3] $1 +[-3] {$2*$1} b[-3] $3% fi
+if {$10} b[-2] $9% +[-2] $12 %[-2] {256/$7} *[-2] $7 %[-2] 256 *[-2] $11 +[-2] $8 else *[-2] $7 +[-2] {$8*$7} b[-2] $9% fi
+if {$16} b[-1] $15% +[-1] $18 %[-1] {256/$13} *[-1] $13 %[-1] 256 *[-1] $17 +[-1] $14 else *[-1] $13 +[-1] {$14*$13} b[-1] $15% fi
+a[-3--1] c lab82rgb.
+fx_end_mix $19
+if {$!!=3} rv a c fi endl mv. 0 done
+sawtoother_lab8_preview :
+sawtoother_lab8 $*
+#gui_split_preview "sawtoother_lab8 $*",$-1
 
 #@gui _<b>Deformations</b>
 
