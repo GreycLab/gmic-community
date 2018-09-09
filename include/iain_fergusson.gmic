@@ -1972,7 +1972,113 @@ local_similarity_mask_preview:
 
 #@gui Iain Fergusson
 
+#@gui PNG Processing: iain_png_processing,iain_png_processing(0)
+#@gui : Number of colours = int (4,2,256)
+#@gui : Refine Palette = bool(0)
+#@gui : Dither Pattern = choice(0,"Lines","Checkerboard","Diffusion","None")
+#@gui : sep = separator ()
+#@gui : Pre Smooth = bool(0)
+#@gui : Smooth radius = float(3,0,20)
+#@gui : Smooth Amount = float(3,0,20)
+#@gui : sep = separator ()
+#@gui : Pre-Sharpen (Constrained) = bool(0)
+#@gui : Sharpen radius = float(.75,0,10)
+#@gui : Amount = float(2,0,10)
+#@gui : Threshold = float(1,0,50)
+#@gui : Constraint Radius = int(5,0,10)
+#@gui : Overshoot = float(0,0,50)
+#@gui : sep = separator ()
+#@gui : Post Median = bool(0)
+#@gui : Median radius = int (1,1,10)
+#@gui : Median repeats = int (1,1,5)
+#@gui : sep = separator ()
+#@gui : note = note("This filter provides tools to improve the compressabilty or visual quality when creating an indexed image.)
+#@gui : note = note("Author : <i>Iain Fergusson</i>. release: 9 September 2018 )
 
+
+
+iain_png_processing:
+-repeat $! -l[$>]
+nm=${-gui_layer_name}
+dither_pattern=$3
+do_smooth=$4
+smooth_radius=$5
+smooth_amount=$6
+do_sharp=$7
+sharp_radius=$8
+sharp_amount=$9
+sharp_threshold=$10
+constrant_radius=$11
+overshoot=$12
+do_median=$13
+median_radius=$14
+median_repeat=$15
+
+
+-remove_opacity
+-if $do_smooth
+-bilateral[0] $smooth_radius,$smooth_amount
+-endif
+
+-if $do_sharp
+-iain_constrained_sharpen[0] $sharp_radius,$sharp_amount,$sharp_threshold,$constrant_radius,$overshoot,0,1
+-endif
+--colormap $1,$2,1
+-if {$dither_pattern==2}
+--index[0] [1],1,0
+-elif {$dither_pattern!=2}
+--index[0] [1],0,0
+-endif
+--map[-1] [-2]
+
+	-if {$dither_pattern<=1}
+	--sub[0] [-1]
+	-abs[-1]
+	--add[0] [4]
+	--sub[0] [4]
+	-index[-1] [1],0,0
+	-index[-2] [1],0,0
+		-l[-1,-2]
+			-if {$dither_pattern==1}
+			(0,255;255,0)
+			-elif {$dither_pattern==0}
+			(0;255)
+			-endif
+		-resize[-1] [0],0,2
+		-channels[-1] 0
+		-append[-1,-2] c
+		-blend alpha
+		-endl
+		-if $do_median
+			-repeat $median_repeat
+			-l[-1]
+				-repeat {($median_radius*2)+1}
+				amount={$>-$median_radius}
+					-if {$amount!=0}
+					--shift[0] $amount,0,0,0,0
+					-endif
+				 -done
+			-blend_median
+		-endl
+		
+			-done
+		-endif
+	--map[-1] [1]
+	-k[-1]
+	## -rm[1]
+	-else
+	-rm[-1]
+	-if $do_median
+		-repeat $median_repeat
+		-horiz_median[-1] $median_radius
+		-done
+	-endif
+		--map[-1] [1]
+	-k[-1]
+	-endif
+
+nm name($nm)
+-endl -done
 
 
 
