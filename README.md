@@ -1,7 +1,3 @@
-# FORKED VERSION OF ACTUAL G'MIC COMMUNITY REPOSITORY - GO <a href="https://github.com/dtschump/gmic-community">HERE</a> FOR THE ACTUAL REPO.
-
------------------------
-
 <a href="http://gmic.eu">![Logo](http://gmic.eu/img/logo4.jpg)</a>
 
 #### A Full-Featured Open-Source Framework for Image Processing
