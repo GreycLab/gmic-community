@@ -3,7 +3,7 @@
 #  File        : joan_rake.gmic
 #                ( G'MIC commands file )
 #
-#  Description : The author of these filters ('Joan Rake', not her real 
+#  Description : The author of these filters ('Joan Rake', not her real
 #                name) describes them as a gritty and overloaded series of
 #                mistakes which will probably be frowned upon by hordes of
 #                snobbish graphic designers. Good for them, Joan doesn't care.
@@ -43,6 +43,55 @@
 #  knowledge of the CeCILL license and that you accept its terms.
 #
 
+#@gui Vibrato Texture : fx_vibrato_texture, fx_vibrato_texture_preview(0)
+#@gui : note = note("This filter is inspired by the Paint.NET plugin named Vibrato authored by MadJik for Paint.NET.")
+#@gui : sep = separator()
+#@gui : 1. X-Orientation = bool(1)
+#@gui : 2. Y-Orientation = bool(1)
+#@gui : 3. U- Factor = float(.85,.1,15)
+#@gui : 4. V- Factor = float(.85,.1,15)
+#@gui : 5. X-Scale Factor = float(1,.1,15)
+#@gui : 6. Y-Scale Factor = float(1,.1,15)
+#@gui : 7. XY-Scale Factor = float(1,.1,3)
+#@gui : 8. Percentage-Based X Pixel Shift = float(0,-200,200)
+#@gui : 9. Percentage-Based Y Pixel Shift = float(0,-200,200)
+#@gui : 10. Elevation = float(.7,-1,1)
+#@gui : 11. Z 0-1 Multiplier = float(.5,0.1,1)
+#@gui : 12. Z Exponential Multiplier = float(1,1,15)
+#@gui : 13. Apply Inversion Factor = bool(0)
+#@gui : 14. Inversion Factor = float(1,-1,10)
+#@gui : 15. Final Mod Factor = float(1,1,32)
+#@gui : 16. Invert Vibrato = bool(0)
+#@gui : sep = separator(), 17. Image Influence Factor = float(1,-8,8)
+#@gui : sep = separator(), Channel(s) = choice{"All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]"}
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse")
+#@gui : sep = separator(), note = note("<small>Author : <i>Reptorian</i>.      Latest update : <i>2018/09/26</i>.</small>")
+fx_vibrato_texture:
+ac "_fx_vibrato_texture ${1-18}",$18
+
+_fx_vibrato_texture:
+repeat $! l[$>]
+#if {x+$1}
+n 0,255 f "q=($8/100)*w; 
+l=($9/100)*h; 
+X=(($1?w-x+q:x+q)/w-.5) * 2 * 1/$5 * 1/$7; 
+Y=(($2?h-y+l:y+l)/h-.5) * 2 * 1/$6 * 1/$7; 
+g=1*13^(-$14); 
+U=sqrt($3); 
+V=sqrt($4);
+Z=((X-Y) * (X-U) * (X+U) * (Y-V) * (Y+V))+ $10; 
+D=$13?(1-(Z>g?Z:1-Z * -1)):Z;
+C=(D+((1-i/255)/(($3>1?$3:1/$3)*($4>1?$4:1/$4)))*$17)*(D+((1-i/255)/(($3>1?$3:1/$3)*($4>1?$4:1/$4)))*$17)*$11*$12*$12;
+F=abs(C)>1?C-int(C):C;
+$16?F:1-F;
+" n 0,255 mul $15 mod 256
+# fi
+endl done
+
+fx_vibrato_texture_preview :
+gui_split_preview "fx_vibrato_texture ${1--2}",$-1
+
+
 #@cli invert_rgb
 #@cli : Inverts images in the RGB colour space.
 invert_rgb:
@@ -59,35 +108,88 @@ l[1] c 0,255 *[$>] -1 +[$>] 255 endl
 a c
 done
 
-#@cli jr_deform : _amplitude>=0,_interpolation,_matrix_density[%]>=0,_matrix_interpolation,_mode,-100<=_character<=100
-#@cli : Apply random smooth deformation on selected images. An upgrade to the existing deform command.
-#@cli : 'interpolation' can be { 0=none | 1=linear | 2=bicubic }.
-#@cli : 'matrix_interpolation' can be { 0=linear | 1=bicubic }.
-#@cli : 'mode' can be { 0=noise | 1=spread_noise }.
-#@cli : Default value: 'amplitude=10'.
-#@cli : $ image.jpg +deform[0] 10 +deform[0] 20
-jr_deform : skip ${1=10},${2=1},${3=2%},${4=1},${5=0},${6=0}
-e[^-1] "Apply random smooth deformation on image$?, with amplitude $1."
-v - repeat $! l[$>]
-S={${"is_percent $3"}?max(w,h)*$3:$3}
-P={$4==0?3:5}
-if {$5==1} +r. $3,$3,1,4 spread. {max(w,h)*($6+100)/200},{max(w,h)*($6+100)/200} else
-$3,$3,1,4 noise. $1
-fi
-ac. "adjust_colors 0,$6,0,0,0",rgba r. ..,..,1,4,$P warp.. .,1,$2,1 rm.
-endl done v +
-
 #@gui _<b>Testing</b>
 #@gui <i>Joan Rake</i>
 
+#@gui Mesh blend : fx_mesh_blend, fx_mesh_blend_preview(1)
+#@gui : note = note("Universal blending algorithm. Resizes an RGB&#40;A&#41; image to a 256x256 image and uses it as an RGBA LUT 'transfer function mesh' to blend two other images together. Based on method shown <a href="https://discuss.pixls.us/t/im-generating-new-blending-modes-for-krita/8104/16">on discuss.pixls.us</a>.")
+#@gui : sep = separator(), note = note("<small>[0] is bottom layer, [1] is top layer, [2] is mesh. Mesh origin is at bottom-left. Plugin GUI preview does not accurately show mesh.</small>")
+#@gui : Process as = choice(0,"Three-by-three","Self-mesh and self-blend for each layer")
+#@gui : Resize interpolation = choice(3,"None","Nearest","Average","Bilinear","Grid","Bicubic")
+#@gui : Reverse blending layers = bool(0)
+#@gui : Dimensions = choice("Bottom layer","Top layer")
+#@gui : Blend alpha channels = bool(0)
+#@gui : Keep mesh = bool(0)
+_fx_mesh_blend :
+r. 256,256,100%,100%,$1
+if $4 to_rgba else to_rgb fi
+if $2 rv[0,1] fi
+f[$3] "i(#2,i(#0),256-i(#1))"
+if {!$5} rm[2] fi
+if $3 rm[0] else rm[1] fi
+fx_mesh_blend :
+if {$1==0} repeat {int($!/3)} l[$>-{$>+2}] rv _fx_mesh_blend ${2-6} endl done 
+elif {$1==1} repeat $! l[$>] [0]x2 _fx_mesh_blend ${2-6} endl done fi
+fx_mesh_blend_preview :
+fx_mesh_blend $*
+
+
 #@gui <b>Artistic</b>
 
-fx_dreamy_watercolour 0,0.45,40,60,0,1,50,0,10,2,1,1,0.5,10,0,0,7,1,3,1,1,1,1,1,11,1,25,27,0.6,0,17.5,1,0,1
+#@gui Whirling lines : fx_whirling_lines, fx_whirling_lines_preview()
+#@gui : note = note("Creates fingerprint-like lines out of images by blurring and rounding their values. Works best with single-channel images.")
+#@gui : 1. Blur = float(30,0,100)
+#@gui : 2. Round = float(6,0,255)
+#@gui : sep = separator(), note = note("Gradient norm")
+#@gui : 3. Norm mode = choice("Gradient norm","Hessian","Laplacian","Rotation-invariant gradient")
+#@gui : 4. Smoothness = float(0,0,10)
+#@gui : 5. Contrast = float(0.45,0,1.5)
+#@gui : 6. Min threshold = float(40,0,100)
+#@gui : 7. Max threshold = float(60,0,100)
+#@gui : 8. Dilate or erode = int(0,-5,20)
+#@gui : 9. Negative = bool(0)
+#@gui : sep = separator(), note = note("Antialias")
+#@gui : 10. Amplitude = float(30,0,100)
+#@gui : 11. Edge threshold (%) = float(0,0,100)
+#@gui : 12. Smoothness = float(3,0,10)
+#@gui : 13. Value action = choice(3,"None","Cut","Normalize","Cut then normalize")
+fx_whirling_lines :
+b $1 f "round(i,$2)"
+if {$3==1}
+b $4
++hessian xx sqr.
++hessian.. yy sqr. +[-2,-1]
+hessian.. zz sqr.. +[-2,-1] b $4
+s={s} s. c +[-$s--1] sqrt.
+elif {$3==2}
+b $4 laplacian abs to_gray to_rgb
+elif {$3==3}
+b $4 gradient xyz abs blend add to_gray to_rgb
+else
+b $4 gradient_norm
+fi
+c 0,255
+^ $5
+c $6%,$7%
+n 0,255
+if {$8>=0}
+dilate_circ $8 
+elif {$8<=0}
+erode {-$8}
+fi
+if $9 negate fi
+if {$10!=0||$11!=100}
+fx_smooth_antialias ${10-12}
+fi
+if {$13==1} c 0,255 elif {$13==2} n 0,255 elif {$13==3} c 0,255 n 0,255 fi
+fx_whirling_lines_preview :
+fx_whirling_lines $*
+
 #@gui Dreamy Watercolour : fx_dreamy_watercolour, fx_dreamy_watercolour(0)
 #@gui : note = note("Creates abstract watercolour images.")
 #@gui : sep = separator(), note = note("<b>Gradient norm</b>")
 #@gui : 1. Smoothness = float(0,0,10)
-#@gui : 2. Linearity = float(0.45,0,1.5)
+#@gui : 2. Linearity = float(0.3,0,2)
 #@gui : 3. Min threshold = float(40,0,100)
 #@gui : 4. Max threshold = float(60,0,100)
 #@gui : 5. Negative = bool(0)
@@ -132,8 +234,22 @@ fx_dreamy_watercolour 0,0.45,40,60,0,1,50,0,10,2,1,1,0.5,10,0,0,7,1,3,1,1,1,1,1,
 #@gui : 25. Sharpen channel(s) = choice(11,"All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]")
 #@gui : 26. Value action = choice(1,"None","Cut","Normalize")
 #@gui : 27. Antialias = float(25,0,100)
-#@gui : sep = separator(), note = note("<b>Syntexturise &#40;FFT&#41;</b>")
-#@gui : 28. Blend mode = choice(27,"add","alpha","and","average","blue","burn","darken",
+#@gui : sep = separator(), note = note("<b>Plasma</b>")
+#@gui : 28. Alpha = float(0.5,0,5)
+#@gui : 29. Beta = float(0,0,100)
+#@gui : 30. Scale = float(8,1,20)
+#@gui : 31. Randomize = bool(1)
+#@gui : 32. Transparency = bool(0)
+#@gui : 33-35. Color balance = color(128,128,128)
+#@gui : 36. Fix edges = float(0.5,0,1)
+#@gui : sep = separator(), note = note("<b>Transfer colours</b>")
+#@gui : 37. Enable = bool(1)
+#@gui : 38. Regularization = int(8,0,32)
+#@gui : 39. Preserve luminance = float(0.2,0,1)
+#@gui : 40. Precision = _choice(1,"Low","Normal","High","Very high")
+#@gui : 41. Reference colors = choice(1,"Plasma","Painting")
+#@gui : 42. Add user-defined constraints (interactive) = _bool(0)
+#@gui : 43. Blend mode = choice(27,"add","alpha","and","average","blue","burn","darken",
 #@gui : "difference","divide","dodge","exclusion","freeze",
 #@gui : "grainextract","grainmerge","green","hardlight","hardmix",
 #@gui : "hue","interpolation","lighten","lightness","linearburn",
@@ -141,18 +257,35 @@ fx_dreamy_watercolour 0,0.45,40,60,0,1,50,0,10,2,1,1,0.5,10,0,0,7,1,3,1,1,1,1,1,
 #@gui : "overlay","pinlight","red","reflect","saturation","screen",
 #@gui : "shapeaverage","softburn","softdodge","softlight","stamp",
 #@gui : "subtract","value","vividlight","xor")
-#@gui : 29. Opacity = float(0.5,0,1)
-#@gui : 30. Reverse order = bool(0)
+#@gui : 44. Opacity = float(0.75,0,1)
+#@gui : 45. Reverse order = bool(0)
+#@gui : sep = separator(), note = note("<b>Local normalisation</b>")
+#@gui : 46. Amplitude = float(1,0,80)
+#@gui : 47. Radius = int(20,1,96)
+#@gui : 48. Neighborhood smoothness = float(40,0,60)
+#@gui : 49. Average smoothness = float(40,0,60)
+#@gui : 50. Constrain values = bool(1)
+#@gui : 51. Channel(s) = choice(2,"All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
 #@gui : sep = separator(), note = note("<b>Noise</b>")
-#@gui : 31. Amplitude = float(17.5,0,200)
-#@gui : 32. Noise type = choice(1,"Gaussian","Uniform","Salt and pepper","Poisson","Rice")
-#@gui : 33. sep = separator(), Channel(s) = choice("All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
-#@gui : 34. Value action = choice(2,"None","Cut","Normalize")
+#@gui : 52. Power = float(1.25,0,5)
+#@gui : 53. Noise type = choice("Gaussian","Uniform","Salt and pepper","Poisson","Rice")
+#@gui : 54. Channel(s) = choice(2,"All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
+#@gui : 55. Value action = choice(1,"None","Cut","Normalize")
+#@gui : 56. Blend mode = choice(27,"add","alpha","and","average","blue","burn","darken",
+#@gui : "difference","divide","dodge","exclusion","freeze",
+#@gui : "grainextract","grainmerge","green","hardlight","hardmix",
+#@gui : "hue","interpolation","lighten","lightness","linearburn",
+#@gui : "linearlight","luminance","multiply","negation","or",
+#@gui : "overlay","pinlight","red","reflect","saturation","screen",
+#@gui : "shapeaverage","softburn","softdodge","softlight","stamp",
+#@gui : "subtract","value","vividlight","xor")
+#@gui : 57. Opacity = float(1,0,1)
 fx_dreamy_watercolour :
 repeat $! l[$>]
 to_rgb
 if $6
-+b $1 l[1] gradient_norm c 0,255 ^ $2
++b $1
+l[1] gradient_norm c 0,255 ^ $2
 c $3%,$4%
 if $5 negate fi
 n 0,255
@@ -164,11 +297,18 @@ fi
 fx_dreamy_abstraction[0] ${10-27}
 n[1] 0,255 negate[1] blend[0,1] multiply,$6
 -m "MergeChoice : $""=_mode" -MergeChoice "add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor","edges","error"
-+syntexturize[0] 100%,100% n[0] 0,255
-if $30 rv fi
-blend ${_mode{$28+1}},$29
+100%,100%,1,3 
+CF={$30*20*$36}
+ l[1] if {$36} z {-$CF},{-$CF},{w+$CF},{h+$CF} fi fx_plasma ${28-35} if {$36} z {$CF},{$CF},{w-$CF},{h-$CF} fi endl
+if $37 fx_transfer_rgb ${38-42} fi
+if $45 rv fi
+blend ${_mode{$43+1}},$44
 endl done
-jr_fx_noise ${31-34}
+fx_normalize_local ${46-51}
+if $52
+100%,100%,1,3 fc[1] 127,127,127 jr_fx_noise[1] {(2^($52/5))*($52*20)},${53-55}
+blend ${_mode{$56+1}},$57
+fi
 fx_dreamy_watercolour_preview :
 fx_dreamy_watercolour $*
 
@@ -267,8 +407,8 @@ rv a c
 -if {$25==1} -fx_smooth_anisotropic 60,$26,$27,$28,1.1,0.8,30,2,0,1,1,0 -endif
 -done
 endl
-fx_hard_painting_preview : -fx_hard_painting $*
-#gui_split_preview "-fx_hard_painting $*",${-3--1}
+fx_hard_painting_preview :
+gui_split_preview "-fx_hard_painting $*",${-3--1}
 
 #@gui Neon : fx_neon, fx_neon_preview(0)
 #@gui : note = note("Turns bright image outlines into bright, neon-like lines.")
@@ -300,12 +440,17 @@ fx_hard_painting_preview : -fx_hard_painting $*
 #@gui : 21. Size = float(2,0,5)
 #@gui : 22. Intensity = float(1,0,2)
 #@gui : sep = separator()
-#@gui : 23. Alpha = bool(0)
-#@gui : 24. Alpha power = float(1,0,5)
-#@gui : 25. Alpha multiplier = float(1,0,5)
-#@gui : sep = separator(), 26-28. Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : 23. Smooth hues = float(0,0,20)
+#@gui : sep = separator()
+#@gui : 24. Alpha = bool(0)
+#@gui : 25. Alpha power = float(1,0,5)
+#@gui : 26. Alpha multiplier = float(1,0,5)
+#@gui : sep = separator(), 27-29. Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
 fx_neon :
 repeat $! l[$>]
+if $9
+b $9
+fi
 +fc 0,0,0 rv blend alpha
 to_rgb rgb2hsl s c 
 *.. {$8^2.5}
@@ -339,8 +484,8 @@ b.. $9
 fi
 blend multiply,$7
 fi
-+b[0] $13,1 *[1] {$14*sqrt($13)} -[1] {(($14*sqrt($13)*128)-1)^(sqrt($15))}
-+b[0] $17,1 *[2] {$18*sqrt($17)} -[2] {(($18*sqrt($17)*128)-1)^(sqrt($19))}
++b[0] {$13%*100},1 *[1] {$14*sqrt($13%)*10} -[1] {(($14*sqrt($13%)*128)-1)^(sqrt($15))}
++b[0] {$17%*100},1 *[2] {$18*sqrt($17%)*10} -[2] {(($18*sqrt($17%)*128)-1)^(sqrt($19))}
 +b[0] $21,1 *[3] {($14+$18)*$21*$22}
 rgb2hsl[1-3] s[1-3] c 
 *[2] {$16^2.5}
@@ -349,11 +494,14 @@ rgb2hsl[1-3] s[1-3] c
 a[1-3] c a[2-4] c a[3-5] c hsl2rgb[1-3]
 blend add,$7
 if $23
-rgb2hsv8 100%,100%,1,1 f[1] "((j(#0,0,0,0,2)/255)^(1/$24))*255*$25" f[0] "[i0,i1,255]" hsv82rgb[0]  a c
+rgb2ycbcr s c b[1,2] {$23%*100} a c ycbcr2rgb
+fi
+if $24
+rgb2hsv8 100%,100%,1,1 f[1] "((j(#0,0,0,0,2)/255)^(1/$25))*255*$26" f[0] "[i0,i1,255]" hsv82rgb[0]  a c
 fi
 endl done
 fx_neon_preview :
-gui_split_preview "-fx_neon ${1-25}",${-3--1}
+gui_split_preview "-fx_neon ${1-26}",${-3--1}
 #@gui Neon alpha: fx_neon_alpha, fx_neon_alpha_preview(0)
 #@gui : note = note("An attempt to make the Neon filter work with alpha channels. Low-quality, comes with some artefacts.")
 #@gui : sep = separator(), note = note("Gradient norm")
@@ -480,13 +628,12 @@ fx_neon_alpha_preview :
 fx_neon_alpha $*
 
 
-
 #@gui Dreamy abstraction : fx_dreamy_abstraction, fx_dreamy_abstraction_preview()
-#@gui : note = note("A less-aggressive alternative to the Painting filter. Yes, 'Joan Rake' made a filter that isn't aggressive! The horror!")
+#@gui : note = note("A less-aggressive alternative to the Painting filter. Yes, 'Joan Rake' made a filter that isn't aggressive! What kind of digital paint has she been sniffing?")
 #@gui : sep = separator(), note = note("Segmentation")
-#@gui : Edge threshold = float(2,0,30)
-#@gui : Smoothness = float(1,0,10)
-#@gui : Blend mode = choice(1,"add","alpha","and","average","blue","burn","darken",
+#@gui : 1. Edge threshold = float(2,0,30)
+#@gui : 2. Smoothness = float(1,0,10)
+#@gui : 3. Blend mode = choice(1,"add","alpha","and","average","blue","burn","darken",
 #@gui : "difference","divide","dodge","exclusion","freeze",
 #@gui : "grainextract","grainmerge","green","hardlight","hardmix",
 #@gui : "hue","interpolation","lighten","lightness","linearburn",
@@ -494,12 +641,12 @@ fx_neon_alpha $*
 #@gui : "overlay","pinlight","red","reflect","saturation","screen",
 #@gui : "shapeaverage","softburn","softdodge","softlight","stamp",
 #@gui : "subtract","value","vividlight","xor")
-#@gui : Opacity = float(0.5,0,1)
+#@gui : 4. Opacity = float(0.5,0,1)
 #@gui : sep = separator(), note = note("Noise")
-#@gui : Noise amplitude = float(10,0,100)
-#@gui : Noise type = choice("Gaussian","Uniform","Salt and pepper","Poisson","Rice","Spread")
-#@gui : Noise channel(s) = choice("All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
-#@gui : Blend mode = choice(7,"add","alpha","and","average","blue","burn","darken",
+#@gui : 5. Noise amplitude = float(10,0,100)
+#@gui : 6. Noise type = choice("Gaussian","Uniform","Salt and pepper","Poisson","Rice","Spread")
+#@gui : 7. Noise channel(s) = choice("All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
+#@gui : 8. Blend mode = choice(7,"add","alpha","and","average","blue","burn","darken",
 #@gui : "difference","divide","dodge","exclusion","freeze",
 #@gui : "grainextract","grainmerge","green","hardlight","hardmix",
 #@gui : "hue","interpolation","lighten","lightness","linearburn",
@@ -507,18 +654,23 @@ fx_neon_alpha $*
 #@gui : "overlay","pinlight","red","reflect","saturation","screen",
 #@gui : "shapeaverage","softburn","softdodge","softlight","stamp",
 #@gui : "subtract","value","vividlight","xor")
-#@gui : Opacity = float(1,0,1)
-#@gui : sep = separator(), note = note("Blur &#38; Constrained Sharpen")
-#@gui : Blur strength = float(3,0,20)
-#@gui : Sharpen radius factor = float(1,0,5)
-#@gui : Amount factor = float(1,0,5)
-#@gui : Threshold = float(1,0,5)
-#@gui : Constraint radius factor = float(1,0,5)
-#@gui : Overshoot factor = float(1,0,20)
-#@gui : Sharpen channel(s) = choice(11,"All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]")
-#@gui : Value action = choice(1,"None","Cut","Normalize")
-#@gui : Antialias = float(25,0,100)
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : 9. Opacity = float(1,0,1)
+#@gui : 10. sep = separator(), note = note("Blur &#38; Constrained Sharpen")
+#@gui : 11. Blur strength = float(3,0,20)
+#@gui : 12. Sharpen radius factor = float(1,0,5)
+#@gui : 13. Amount factor = float(1,0,5)
+#@gui : 14. Threshold = float(1,0,5)
+#@gui : 15. Constraint radius factor = float(1,0,5)
+#@gui : 16. Overshoot factor = float(1,0,20)
+#@gui : 17. Sharpen channel(s) = choice(11,"All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]")
+#@gui : 18. Value action = choice(1,"None","Cut","Normalize")
+#@gui : 19. Antialias = float(25,0,100)
+#@gui : sep = separator(), note = note("Glow")
+#@gui : 20. Size = float(5,0,50)
+#@gui : 21. Intensity = float(1,0,3)
+#@gui : 22. Darken = float(0,0,1)
+#@gui : 23. Saturation = float(1.5,0,4)
+#@gui : sep = separator(), 24-26. Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
 fx_dreamy_abstraction :
 -m "MergeChoice : $""=_mode" -MergeChoice "add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor","edges","error"
 MergingOption1=$3
@@ -664,7 +816,7 @@ fx_rectexture:
 #@gui : sep = separator(), note = note("Deform 2")
 #@gui : note = note("<small>Set matrix density to 1 for automatic size &#40;fine&#41;</small>")
 #@gui : Strength = float(1.5,0,30)
-#@gui : Interpolation = choice("none","bilinear","bicubic")
+
 #@gui : Matrix density &#40;&#37;&#41; = float(1,1,100)
 #@gui : Matrix interpolation &#40;&#37;&#41; = choice(1,"bilinear","bicubic")
 #@gui : Matrix contrast = float(0,-100,100)
@@ -685,51 +837,111 @@ if {$19} z {$CF},{$CF},{w-$CF},{h-$CF} fi
 fx_crazy_texture_preview :
 fx_crazy_texture $*
 
-
+#@gui CubeHelix: fx_cubehelix, fx_cubehelix_preview(1)
+#@gui : Convert to grayscale = bool(1)
+#@gui : Min threshold = float(0,0,100)
+#@gui : Max threshold = float(100,0,100)
+#@gui : Pre-normalise = bool(0)
+#@gui : Start colour = color(0,0,0)
+#@gui : End colour = color(255,255,255)
+#@gui : Start hue = float(1,0,3)
+#@gui : Rotations = float(-1.5,-20,20)
+#@gui : Hue intensity = float(1,0,5)
+#@gui : Gamma power = float(0,-4,4)
+#@gui : sep = separator()
+#@gui : Scale hues = float(-0.5,-2,2)
+#@gui : note = note("-2 = hyper, -1 = normal, 0 = flattened, 1 = anti, 2 = hyper-anti)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
 fx_cubehelix :
-
-
-
-f "	map1=vector
-	map2=vectorN(vectorN(0))	
-	A=[-0.14861,1.78277;-0.29227,-0.90649;1.97294,0];
-	cubehelix(nlev,start,rots,hue,gamma) = for(n=1,n=nlev,i++,
-	fract=(n-1)/(nlev-1);
-    	angle=2*pi*(start/3+1+rots*fract);
-    	fract=fract^gamma;
-    	amp=hue*fract*(1-fract)/2;
-    	map(n,:)=fract+amp*(A*[cos(angle),sin(angle)])';
-    	for(o=1,o=3,o++,
-        map(n,o)<0?
-            map(n,o)=0:
-        map(n,o)>1?
-            map(n,o)=1;
-        ));
-	cubehelix(
-	
-
-map = CubeHelix(nlev,start,rots,hue,gamma)
-map=zeros(nlev,3);
-A=[-0.14861,1.78277;-0.29227,-0.90649;1.97294,0];
-for i=1:nlev
-    fract=(i-1)/(nlev-1);
-    angle=2*pi*(start/3+1+rots*fract);
-    fract=fract^gamma;
-    amp=hue*fract*(1-fract)/2;
-    map(i,:)=fract+amp*(A*[cos(angle);sin(angle)])';
-    for j=1:3
-        if map(i,j)<0
-            map(i,j)=0;
-        elseif map(i,j)>1
-            map(i,j)=1;
-        end
-    end
-end
-
+repeat $! l[$>]
+if $1 to_gray fi to_rgb abs c 0,255 c $2%,$3% if $4 n 0,255 fi *. {1/255}
+f "angle=(2*pi*(($11/3)+1+$12*I));fract=(I^(2^($14^2)));amp=($13*fract*(1-fract)/2);
+helix=(amp*[-0.14861*cos(angle[0])+1.78277*sin(angle[0]),-0.29227*cos(angle[1])-0.90649*sin(angle[1]),1.97294*cos(angle[2])]);
+scale=([${8-10}]-[${5-7}])/255;
+([${5-7}]/255)-$15*(fract*scale+helix)+(1+$15)*(fract+(helix*sign(scale)))*scale"
+c 0,1
+*. 255
+endl done
+fx_cubehelix_preview :
+gui_split_preview "fx_cubehelix $*",${-3--1}
 
 #@gui _<b>Degradations</b>
 
-#@gui Noise [additive] (jr's mod) : jr_fx_noise jr_fx_noise_preview(0)
+#@gui Bomb blend : fx_blend_bomb, fx_blend_bomb_preview()
+#@gui : note = note("Creates a random transfer function 'mesh' and then blends images accordingly. Based on method shown <a href="https://discuss.pixls.us/t/im-generating-new-blending-modes-for-krita/8104/16">on discuss.pixls.us</a>.")
+#@gui : Recompute = button(0)
+#@gui : Process as = choice(1,"Two-by-two","Self-blend for each layer")
+#@gui : Mesh X = int(16,1,256)
+#@gui : Mesh Y = int(16,1,256)
+#@gui : Mesh smoothness = float(2,0,10)
+#@gui : Contrast scheme = choice("Arctan","Clip","Power")
+#@gui : Mesh contrast = float(50,0,100)
+#@gui : Reverse blending layers = bool(0)
+#@gui : Dimensions = choice("Bottom layer","Top layer")
+#@gui : Alpha = bool(0)
+#@gui : Normalise = bool(0)
+#@gui : Output mesh = bool(0)
+_fx_blend_bomb :
+to_rgba
+$1,$2,1,4 noise. 255
+if $8 ac. "noise 255",rgba_a fi
+r. 256,256 n. 0,255 blur. {$3^2}%
+l. if {$4==0}
+f "val = i/255; (val-0.5+(atan((val-0.5)*($5/10)^3)/pi)+0.5)*255" n 0,255
+elif {$4==1}
+c {($5-1/255)/2}%,{100-($5-1/255)/2}% n 0,255
+elif {$4==2}
+f "val = (2*i/255)-1; (val*(abs(val)^(0-($5/100)))+1)*255/2"
+fi endl
+rv
+fx_mesh_blend 0,1,$6,$7,$8,$10
+if $9 ac "n 0,255",rgba fi
+fx_blend_bomb :
+if {$2==0} repeat {int($!/2)} l[$>,{$>+1}] _fx_blend_bomb ${3-12} endl done
+elif {$2==1} repeat $! l[$>] [0] _fx_blend_bomb ${3-12} endl done fi
+fx_blend_bomb_preview :
+fx_blend_bomb $*
+
+#@gui JIFF [JPEG] self-bomb : fx_jiff_bomb, fx_jiff_bomb_preview()
+#@gui : note = note("OI! TRY SMOOTHING THIS!")
+#@gui : note = note("<small>Adds JPEG artefacts and then self-bomb-blends. Use grid interpolation with scale factors above 1 to destroy the results even more.</small>")
+#@gui : Recompute = button(0)
+#@gui : sep = separator()
+#@gui : Quality (%) = int(50,1,100)
+#@gui : Mesh X = int(16,1,256)
+#@gui : Mesh Y = int(16,1,256)
+#@gui : Mesh smoothness = float(0.5,0,10)
+#@gui : Contrast scheme = choice(1,"Arctan","Clip","Power)
+#@gui : Mesh contrast = float(75,0,100)
+#@gui : Scale X = float(1,0.05,16)
+#@gui : Scale Y = float(1,0.05,16)
+#@gui : Interpolation = choice(0,"None","Nearest","Average","Bilinear","Grid","Bicubic")
+#@gui : Normalise = bool(0)
+#@gui : Output mesh = bool(0)
+#@gui : sep = separator()
+#@gui : Solidify alpha = bool(1)
+#@gui : Smoothness (%) = float(75,0,100)
+#@gui : Regularization = choice(1,"Isotropic","Delaunay-oriented","Edge-oriented")
+#@gui : Regularization iterations = int(20,0,100)
+#@gui : Dilation / erosion = int(0,-20,20)
+#@gui : Colorspace = choice(1,"sRGB","Linear RGB")
+fx_jiff_bomb :
+repeat $! l[$>]
+if $13
++fx_solidify_td ${14-18}
+negate. rv blend alpha
+fi
+ww={w}
+hh={h}
+r {$8*100}%,{$9*100}%,100%,100%,$10
+fx_jpeg_artefacts $2
+fx_blend_bomb 0,1,${3-7},0,0,0,${11-12}
+r $ww,$hh,100%,100%,$10
+endl done
+fx_jiff_bomb_preview :
+fx_jiff_bomb $*
+
+#@gui Noise [additive] : fx_noise, fx_noise_preview(0)
 #@gui : Amplitude = float(10,0,200)
 #@gui : Noise type = choice("Gaussian","Uniform","Salt and pepper","Poisson","Rice")
 #@gui : sep = separator(), Channel(s) = choice("All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
@@ -737,15 +949,14 @@ end
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
 #@gui : sep = separator(), note = note("<small>Author: <i><a href="http://ow.ly/wpsV30fzhdI">David Tschumperl&#233;</a></i>.      Latest update: <i>2010/29/12</i>.</small>")
 jr_fx_noise :
-ac "_jr_fx_noise $1,$2",$3,$4
+ac "_fx_noise $1,$2",$3,$4
 _jr_fx_noise :
 repeat $! l[$>] split_opacity l[0] noise $1,$2 endl a c endl done
 jr_fx_noise_preview :
 gui_split_preview "jr_fx_noise $*",${-3--1}
 
 #@gui Quick Desaturate: jr_desaturate, jr_desaturate_preview(1)
-#@gui : note = note("Generates greyscale images, allowing for different &#40;s&#47;&#41;RGB channel intensities before merging. A smaller counterpart to the 'Black &#38;
- White' filter intended for generating intensity maps.")
+#@gui : note = note("Generates greyscale images, allowing for different &#40;s&#47;&#41;RGB channel intensities before merging. A smaller counterpart to the 'Black &#38; White' filter intended for generating intensity maps.")
 #@gui : Colour space = choice("RGB","sRGB")
 #@gui : Channel 1 = float(1,0,3)
 #@gui : Channel 2 = float(1,0,3)
@@ -778,7 +989,7 @@ endl a c
 #@gui Colour Space Swap: csswap, csswap_preview()
 #@gui : To RGB from = choice("RGB","sRGB","CMYK","CMY","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YIQ8","YIQ","YUV8","YUV","Bayer","HCY","XYZ8","XYZ")
 #@gui : Multiply = float(1,-10,10)
-#@gui : Add = int(0,-256,256)
+#@gui : Add = float(0,-360,360)
 #@gui : From RGB to = choice("RGB","sRGB","CMYK","CMY","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YIQ8","YIQ","YUV8","YUV","Bayer","HCY","XYZ8","XYZ")
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
 csswap:
@@ -830,7 +1041,7 @@ elif {$sc==18} rgb2yuv
 elif {$sc==19} rgb2bayer 0
 elif {$sc==20} rgb2hcy
 elif {$sc==21} rgb2xyz8
-elif {$cs==22} rgb2xyz
+elif {$sc==22} rgb2xyz
 fi
 to_rgb endl a c endl done
 csswap_preview :
@@ -870,7 +1081,7 @@ gui_split_preview "csswap $*",${-3--1}
 #@gui : "Geometric Mean","Bright Hard Mix","Dark Hard Mix")
 #@gui : 20. Multiplier 1 = float(1,-10,10)
 #@gui : 21. Addition 1 = int(0,-1024,1024)
-#@gui : 22. Post-Shift Modulo = int(256,1,1024)
+#@gui : 22. Post-Shift Modulo = int(256,0,1024)
 #@gui : 23. Multiplier 2 = float(1,-10,10)
 #@gui : 24. Addition 2 = int(0,-1024,1024)
 #@gui : sep = separator(), 25. Run on channel(s) = choice("All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
@@ -978,11 +1189,11 @@ mode==60?(if((s1+s2)>=255,255,0)):
 val = sign*((2^$16)*j(#-1) + $17);operate($19,val,i,$20,$16);
 " rm.
 if {$8}
-f "((((i*$20)+$21)%$22)*$23)+$24;"
+*. $20 +.$21 if $22 %. $22 fi *. $23 +. $24
 fi
 done
 if {!$8}
-f "((((i*$20)+$21)%$22)*$23)+$24;"
+*. $20 +.$21 if $22 %. $22 fi *. $23 +. $24
 fi
 if {$2}
 if {$1==0} srgb2rgb
@@ -1104,11 +1315,12 @@ repeat $! l. split_opacity rv to_rgb.
 fx_start_mix $20,$21
 if {$13==1} rgb2hsi. elif {$13==2} rgb2hsl. else rgb2hsv. fi
 s. c
-if {$4} b[-3] $3% +[-3] $6 %[-3] {360/($1)^2} *[-3] $1 %[-3] 360 *[-3] {$5*$1} +[-3] {$2} else *[-3] $1 +[-3] {$2*$1} b[-3] $3% fi %[-3] 360
+if {$4} +[-3] $6 %[-3] {360/($1)^2} *[-3] $1 %[-3] 360 *[-3] {$5*$1} +[-3] {$2} else *[-3] $1 +[-3] {$2*$1} fi %[-3] 360
 if {$10} b[-2] $9% +[-2] $12 %[-2] {(1+(1/255))/$7} *[-2] {$7} %[-2] {(1+(1/255))} *[-2] $11 +[-2] {$8} else *[-2] $7 +[-2] {$8*$7} b[-2] $9% fi
 if {$17} b[-1] $16% +[-1] $19 %[-1] {(1+(1/255))/$14} *[-1] {$14} %[-1] {(1+(1/255))} *[-1] $18 +[-1] {$15} else *[-1] $14 +[-1] {$15*$14} b[-1] $16% fi
 c[-2,-1] 0,1 a[-3--1] c
 if {$13==1} hsi2rgb. elif {$13==2} hsl2rgb. else hsv2rgb. fi
+if $3 l[-1] +b $3% rgb2hsv[0,1] f.. "[i0(#1),i1,i2]" rm. hsv2rgb endl fi
 fx_end_mix $20
 if {$!!=3} rv a c fi endl mv. 0 done
 sawtoother_hsx_preview :
@@ -1145,11 +1357,13 @@ gui_split_preview "sawtoother_hsx $*",$-1
 sawtoother_lch8 :
 repeat $! l. split_opacity rv to_rgb.
 fx_start_mix $19,$20
-rgb2lch8. s. c
-if {$4} b[-3] $3% +[-3] $6 %[-3] {256/$1} *[-3] $1 %[-3] 256 *[-3] $5 +[-3] $2 else *[-3] $1 +[-3] {$2*$1} b[-3] $3% fi
+rgb2lch8.
+s. c
+if {$4} +[-3] $6 %[-3] {256/$1} *[-3] $1 %[-3] 256 *[-3] $5 +[-3] $2 else *[-3] $1 +[-3] {$2*$1} b[-3] $3% fi
 if {$10} b[-2] $9% +[-2] $12 %[-2] {256/$7} *[-2] $7 %[-2] 256 *[-2] $11 +[-2] $8 else *[-2] $7 +[-2] {$8*$7} b[-2] $9% fi
 if {$16} b[-1] $15% +[-1] $18 %[-1] {256/($13)^2} *[-1] $13 %[-1] 256 *[-1] {$17*$13} +[-1] {$14} else *[-1] $13 +[-1] {$14*$13} b[-1] $15% fi %[-1] 256
 a[-3--1] c c. 0,255 lch82rgb.
+if $3 l[-1] +b $3% rgb2lch8[0,1] f.. "[i0,i1,i2(#1)]" rm. lch82rgb endl fi
 fx_end_mix $19
 if {$!!=3} rv a c fi endl mv. 0 done
 sawtoother_lch8_preview :
@@ -1583,6 +1797,244 @@ sawtoother_lab8 $*
 
 #@gui _<b>Deformations</b>
 
+#@cli jr_deform : _amplitude>=0,_interpolation,_matrix_density[%]>=0,_matrix_interpolation,_mode,-100<=_character<=100
+#@cli : Apply random smooth deformation on selected images. An upgrade to the existing deform command.
+#@cli : 'interpolation' can be { 0=none | 1=linear | 2=bicubic }.
+#@cli : 'matrix_interpolation' can be { 0=linear | 1=bicubic }.
+#@cli : 'mode' can be { 0=noise | 1=spread_noise }.
+#@cli : 'boundary' can be  { 0=dirichlet | 1=neumann | 2=periodic | 3=mirror }.
+#@cli : Default value: 'amplitude=10'.
+#@cli : $ image.jpg +deform[0] 10 +deform[0] 20
+jr_deform : skip ${1=10},${2=1},${3=2%},${4=1},${5=0},${6=0}
+e[^-1] "Apply random smooth deformation on image$?, with amplitude $1."
+v - repeat $! l[$>]
+S={${"is_percent $3"}?max(w,h)*$3:$3}
+P={$4==0?3:5}
+if {$5==1} +r. $3,$3,1,4 spread. {max(w,h)*($6+100)/200},{max(w,h)*($6+100)/200} else
+$3,$3,1,4 noise. $1
+fi
+ac. "adjust_colors 0,$6,0,0,0",rgba r. ..,..,1,4,$P warp.. .,1,$2,$7 rm.
+endl done v +
+
+#@gui Random deformations (JR's mod) : fx_jr_deform, fx_jr_deform_preview(1)
+#@gui : Recompute = button(0)
+#@gui : Amplitude = float(5,0,50)
+#@gui : Interpolation = choice(1,"None","Linear","Bicubic")
+#@gui : Matrix density = float(10,1,100)
+#@gui : Matrix interpolation = choice(1,"Linear","Bicubic")
+#@gui : Mode = choice("Noise","Spread noise")
+#@gui : Character = float(0,-100,100)
+#@gui : Boundary = choice(1,"Dirichlet","Neumann","Periodic","Mirror")
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+fx_jr_deform :
+repeat $! l[$>]
+jr_deform ${2-8}
+endl done
+fx_jr_deform_preview :
+gui_split_preview "fx_jr_deform $*",${-3--1}
+
+#@gui Custom box : fx_custom_box, fx_custom_box_preview()
+#@gui : Float 1 = float(0,-2,2)
+#@gui : Box 2 = text(1,"\n")
+fx_custom_box :
+skip ${2="-skip skip"}
+m "_fx_custom_box_start : $2"
+_fx_custom_box_start
+uncommand _fx_custom_box_start
+fx_custom_box_preview:
+skip ${2="-skip skip"}
+# if anyone can help me to put this in UltraWarp 2 it would be a really powerful filter
+_gcp_arg="$2"
+
+fx_custom_box $_gcp_arg
+
+#@gui UltraWarp 2 : fx_ultrawarptwo, fx_ultrawarptwo_preview(1)
+#@gui : 1. Recompute = button(0)
+#@gui : sep = separator(), note = note("<b>Warping</b>")
+#@gui : 2. Iterations = int(3,1,30)
+#@gui : 3. From RGB to = choice(1,"Random","RGB","sRGB","CMYK","CMY","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YIQ8","YIQ","YUV8","YUV","Bayer","HCY","XYZ8","XYZ")
+#@gui : 4. X-factor centre = float(0,-30,30)
+#@gui : 5. X-factor range = float(3,0,30)
+#@gui : 6. Y-factor centre = float(0,-30,30)
+#@gui : 7. Y-factor range = float(3,0,30)
+#@gui : 8. X-offset centre = float(0,-30,30)
+#@gui : 9. X-offset range = float(3,0,30)
+#@gui : 10. Y-offset centre = float(0,-30,30)
+#@gui : 11. Y-offset range = float(3,0,30)
+#@gui : 12. Correlated channels = choice(2,"On","Off","Random")
+#@gui : 13. Interpolation = choice(2,"Nearest","Linear","Random")
+#@gui : 14. Boundary = choice(5,"Transparent","Nearest","Periodic","Mirror","Random","Random &#40;non-transparent&#41;")
+#@gui : 15. Warp Channel(s) = choice(3,"None","Random","All","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
+#@gui : 16. Include alpha = bool(0)
+#@gui : 17. To RGB from = choice(1,"Random","RGB","sRGB","CMYK","CMY","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YIQ8","YIQ","YUV8","YUV","Bayer","HCY","XYZ8","XYZ")
+#@gui : 18. Random negation = bool(1)
+#@gui : sep = separator(), note = note("<b>Post-warping HSX8 mixing</b>")
+#@gui : 19. Repeat for each iteration = bool(1)
+#@gui : 20. X channel = choice("Value","Intensity","Lightness")
+#@gui : 21. Hue factor centre = float(1,-20,20)
+#@gui : 22. Hue factor range = float(0.5,0,20)
+#@gui : 23. Saturation factor centre = float(2.5,-20,20)
+#@gui : 24. Saturation factor range = float(5,0,20)
+#@gui : 25. X channel factor centre = float(1,-20,20)
+#@gui : 26. X channel factor range = float(0,0,20)
+#@gui : 27. Alpha factor centre = float(1,-20,20)
+#@gui : 28. Alpha factor range = float(0,0,20)
+#@gui : 29. Hue shift centre = float(0,-255,255)
+#@gui : 30. Hue shift range = float(255,0,255)
+#@gui : 31. Saturation shift centre = float(0,-255,255)
+#@gui : 32. Saturation shift range = float(255,0,255)
+#@gui : 33. X channel shift centre = float(0,-255,255)
+#@gui : 34. X channel shift range = float(0,0,255)
+#@gui : 35. Alpha shift centre = float(0,-255,255)
+#@gui : 36. Alpha shift range = float(0,0,255)
+#@gui : sep = separator(), note = note("<b>Custom code</b>")
+fx_ultrawarptwo :
+
+repeat $! l[$>] to_rgba split_opacity
+
+
+
+iter=$2
+sc=$3
+xfc=$4
+xfr=$5
+yfc=$6
+yfr=$7
+xoffc=$8
+xoffr=$9
+yoffc=$10
+yoffr=$11
+corr=$12
+inter=$13
+bound=$14
+chann=$15
+alpha=$16
+cs=$17
+rn=$18
+
+rpo=$19
+vil=$20
+hfc=$21
+hfr=$22
+sfc=$23
+sfr=$24
+vilfc=$25
+vilfr=$26
+afc=$27
+afr=$28
+hoffc=$29
+hoffr=$30
+soffc=$31
+soffr=$32
+viloffc=$33
+viloffr=$34
+aoffc=$35
+aoffr=$36
+
+repeat $iter
+if $alpha
+
+opacity=2
+else
+opacity=1
+fi
+repeat $opacity
+if {$sc==0}
+frgbt={floor(u(0,23))}
+else
+frgbt={$sc-1}
+fi
+if {$cs==0}
+trgbf={floor(u(0,23))}
+else
+trgbf={$cs-1}
+fi
+if {$>==0}
+csswap[$>] 0,1,0,$frgbt
+fi
+if {$>==1||$chann!=0}
+if {$chann==1}
+channel={floor(u(2,37))}
+else
+channel=$chann
+fi
+if {$channel==0}
+channels=0
+elif {$channel>=2}
+channels={$channel-1}
+elif {$channel>=6}
+channels=$channel
+else
+channels={$channel-2}
+fi
+if {$corr==2}
+correl=round(u)
+else
+correl=$corr
+fi
+if {$inter==2}
+interp=round(u)
+else
+interp=$inter
+fi
+if {$bound==4}
+bounds={floor(u(4))}
+elif {$bound==5}
+bounds={floor(u(3))+1}
+else
+bounds=$bound
+fi
+xf={($xfc+u(-$xfr,$xfr))}
+yf={($yfc+u(-$yfr,$yfr))}
+xoff={($xoffc+u(-$xoffr,$xoffr))}
+yoff={($yoffc+u(-$yoffr,$yoffr))}
+xff={sign($xf)*w*0.00002*(abs($xf)^2)}
+yff={sign($yf)*h*0.00002*(abs($yf)^2)}
+xofff={sign($xoff)*w*0.00002*(abs($xoff)^2)}
+yofff={sign($yoff)*w*0.00002*(abs($yoff)^2)}
+fx_warp_by_intensity[$>] $xff,$yff,$xofff,$yofff,$correl,$interp,$bounds,$channels,0
+fi
+if {$>==0}
+csswap[$>] $trgbf,1,0,0
+fi
+if $rn
+if {round(u)}
+negate[$>]
+fi
+fi
+done
+if {$>==($iter-1)||$rpo}
+hf={$hfc+u(-$hfr,$hfr)}
+sf={$sfc+u(-$sfr,$sfr)}
+vilf={$vilfc+u(-$vilfr,$vilfr)}
+af={$afc+u(-$afr,$afr)}
+hoff={$hoffc+u(-$hoffr,$hoffr)}
+soff={$soffc+u(-$soffr,$soffr)}
+viloff={$viloffc+u(-$viloffr,$viloffr)}
+aoff={$aoffc+u(-$aoffr,$aoffr)}
+l[0] if {$vil==1} rgb2hsi8 elif {$vil==2} rgb2hsl8 else rgb2hsv8 fi
+s c
+*[0] $hf +[0] {$hoff*max(1,abs($hf))} %[0] 255
+*[1] $sf +[1] {$soff*max(1,abs($sf))}
+*[2] $vilf +[2] {$viloff*max(1,abs($vilf))}
+a c
+if {$vil==1} hsi82rgb elif {$vil==2} hsl82rgb else hsv82rgb fi
+endl
+*[1] $af +[1] {$aoff*max(1,abs($af))}
+fi
+
+done
+to_rgb[0]
+to_gray[1]
+a c
+endl
+done
+
+
+fx_ultrawarptwo_preview:
+fx_ultrawarptwo $*
+
+
 #@gui UltraWarp++++ : fx_ultrawarpplusplusplusplus, fx_ultrawarpplusplusplusplus(1)
 #@gui : note = note("Sequence of multiple partially-randomised texture generation and image deformation filters with multi-iteration warping")
 #@gui : note = note("<small>This modular filter is extremely complex and its logic may not follow that which you expect. Left on its default settings, it is very likely to munge your image beyond recognition.</small>"), sep = separator()
@@ -1641,212 +2093,169 @@ sawtoother_lab8 $*
 #@gui : -1. Value action = choice("None","Cut","Normalize")
 
 ultrawarpplusplusplusplus:
-
-# plasma rendering and pixelisation followed by random warp with gamma and hue randomisation and final HSV scaling
-
-  hue_min={$31}
-  hue_max={$32}
-  sat_min={$33}
-  sat_max={$34}
-  val_min={$35}
-  val_max={$36}
-
-  j={min($hue_min,$hue_max)+(u*(max($hue_min,$hue_max)-min($hue_min,$hue_max)))}
-  k={min($sat_min,$sat_max)+(u*(max($sat_min,$sat_max)-min($sat_min,$sat_max)))}
-  l={min($val_min,$val_max)+(u*(max($val_min,$val_max)-min($val_min,$val_max)))}
-
-  -if {$2}
-
-    -if {$4} ch=0 -else ch=2 -endif
-
-    -ac  "rr={round(u*255)}
-          gg={round(u*255)}
-          bb={round(u*255)}
-
-          -fx_plasma 0.5,0,{$3},1,1,{$rr},{$gg},{$bb}
-          -if {$4} -to_rgba -else ch=2 -to_rgb -endif",{$ch}
-
-  -endif
-
-  -fx_gaussian_blur {$8},0,0,1,2,0,0
-
-  n_min={$15}
-  n_max={$16}
-
-  -if {$n_min > $n_max}
-    n_min = {$n_min + $n_max}
-    n_max = {$n_min - $n_max}
-    n_min = {$n_min - $n_max}
-  -endif
-
-  noise_exp={max(0,$n_min+(u*($n_max-$n_min)))}
-  n_amt={(2^($noise_exp-3))*$noise_exp}
-
-  -if {$5}
-    -fx_segment_watershed {$6},{$7},0,2,0
-  -endif
-  -if {$9}
-
-    p_min={$10}
-    p_max={$11}
-    h_min={$12}
-    h_max={$13}
-
-    -if {$p_min > $p_max}
-      p_min = {$p_min + $p_max}
-      p_max = {$p_min - $p_max}
-      p_min = {$p_min - $p_max}
-    -endif
-
-    -if {$h_min > $h_max}
-      h_min = {$h_min + $h_max}
-      h_max = {$h_min - $h_max}
-      h_min = {$h_min - $h_max}
-    -endif
-
-    -fx_noise {$n_amt},{$14},{$17},1,0
-    -fx_quadtree 0,{max(2,round($p_min+(u*($p_max-$p_min))))},{max(0,round($h_min+(u*($h_max-$h_min))))},0,3,1.5,1,1,0
-
-  -endif
-
-  -fx_noise {$n_amt},{$14},{$17},1,0
-
-  f={$18} # iterations
-  i={$19} # warp intensity
-  m={$20} # offset magnitude
-  s={$28} # gamma
-  v={$29} # hue
-
-  -repeat {max(0,$f)}
-
-    -if {$21}
-        scale_x=w/10
-        a={((2^($19-5))*$19)*(u-0.5)*$scale_x*0.025}
-    -else
-        scale_x=1
-        a={((2^($19-5))*$19)*(u-0.5)}
-    -endif
-    -if {$22}
-        scale_y=h/10
-        b={((2^($19-5))*$19)*(u-0.5)*$scale_y*0.025}
-    -else
-        scale_y=1
-        b={((2^($19-5))*$19)*(u-0.5)}
-    -endif
-    c=(u-0.5)*$m*sign($m)*$scale_x
-    d=(u-0.5)*$m*sign($m)*$scale_y
-    g={round((u*33.98)-0.49)}
-    h={(u-0.5)*$s*200}
-    o={(u-0.5)*$v*200}
-
-    -if {$23==1}
-      e=0
-    -elif {$23==2}
-      e=1
-    -else
-      e={round(u)}
-    -endif
-
-    -if {$24==0}
-      f={round((u*2.98)-0.49)}
-    -elif {$24==1}
-      f={round((u*2.98)+0.51)}
-    -else
-      f={($24)-2}
-    -endif
-
-
-    -if {$25==0}
-      -fx_warp_by_intensity {$a},{$b},{$c},{$d},{$e},0,{$f},{$g},0
-    -else
-      -ac  "-if {$21}
-                scale_x=w/10
-                a={((2^($19-5))*$19)*(u-0.5)*$scale_x*0.025}
-            -else
-                scale_x=1
-                a={((2^($19-5))*$19)*(u-0.5)}
-            -endif
-            -if {$22}
-                scale_y=h/10
-                b={((2^($19-5))*$19)*(u-0.5)*$scale_y*0.025}
-            -else
-                scale_y=1
-                b={((2^($19-5))*$19)*(u-0.5)}
-            -endif
-
-            c={(u-0.5)*$20*sign($20)*$scale_x}
-            d={(u-0.5)*$20*sign($20)*$scale_y}
-
-
-            -if {$23==1}
-              e=0
-            -elif {$23==2}
-              e=1
-            -else
-              e={round(u)}
-            -endif
-
-            -if {$24==0}
-              f={round((u*2.98)-0.49)}
-            -elif {$24==1}
-              f={round((u*2.98)+0.51)}
-            -else
-              f={($24)-2}
-            -endif
-
-
-         -_fx_warp_by_intensity {$a},{$b},{$c},{$d},{$e},0,{$f}",{$25},0
-    -endif
-
-
-    -if {$26}
-      nn={round(u)}
-      -if {$nn}
-        -if {$27==0}
-          nch={round((u*33.98)-0.49)}
-          -ac "-negate",{$nch}
-        -else
-          -ac "-negate",{$27}
-        -endif
-      -endif
-    -endif
-    -fx_adjust_colors 0,0,{$h},{$o},0,0
-
-
-
-    -if {$30}
-      -ac "-n 0,255",3
-    -endif
-
-  -done
-
-  -if {$37==-180.1}
-    hh=((u-0.5)*360)
-  -else
-    hh={$37}
-  -endif
-  -if {$38==-8.01}
-    ss=((u-0.5)*2)
-  -else
-    ss={$38}
-  -endif
-  -if {$39==-20.01}
-    vv=((u-0.5)*2)
-  -else
-    vv={$39}
-  -endif
-
-  -fx_mix_hsv {$j},{$hh},0,{$k},{$ss},0,{$l},{$vv},0,0,2,0
-
-  -if {$-4}
-    -ac "-n 0,255",{$-3}
-  -endif
+hue_min={$31}
+hue_max={$32}
+sat_min={$33}
+sat_max={$34}
+val_min={$35}
+val_max={$36}
+j={min($hue_min,$hue_max)+(u*(max($hue_min,$hue_max)-min($hue_min,$hue_max)))}
+k={min($sat_min,$sat_max)+(u*(max($sat_min,$sat_max)-min($sat_min,$sat_max)))}
+l={min($val_min,$val_max)+(u*(max($val_min,$val_max)-min($val_min,$val_max)))}
+-if {$2}
+-if {$4} ch=0 -else ch=2 -endif
+-ac  "rr={round(u*255)}
+gg={round(u*255)}
+bb={round(u*255)}
+-fx_plasma 0.5,0,{$3},1,1,{$rr},{$gg},{$bb}
+-if {$4} -to_rgba -else ch=2 -to_rgb -endif",{$ch}
+-endif
+-fx_gaussian_blur {$8},0,0,1,2,0,0
+n_min={$15}
+n_max={$16}
+-if {$n_min > $n_max}
+n_min = {$n_min + $n_max}
+n_max = {$n_min - $n_max}
+n_min = {$n_min - $n_max}
+-endif
+noise_exp={max(0,$n_min+(u*($n_max-$n_min)))}
+n_amt={(2^($noise_exp-3))*$noise_exp}
+-if {$5}
+-fx_segment_watershed {$6},{$7},0,2,0
+-endif
+-if {$9}
+p_min={$10}
+p_max={$11}
+h_min={$12}
+h_max={$13}
+-if {$p_min > $p_max}
+p_min = {$p_min + $p_max}
+p_max = {$p_min - $p_max}
+p_min = {$p_min - $p_max}
+-endif
+-if {$h_min > $h_max}
+h_min = {$h_min + $h_max}
+h_max = {$h_min - $h_max}
+h_min = {$h_min - $h_max}
+-endif
+-fx_noise {$n_amt},{$14},{$17},1,0
+-fx_quadtree 0,{max(2,round($p_min+(u*($p_max-$p_min))))},{max(0,round($h_min+(u*($h_max-$h_min))))},0,3,1.5,1,1,0
+-endif
+-fx_noise {$n_amt},{$14},{$17},1,0
+f={$18}
+i={$19}
+m={$20}
+s={$28}
+v={$29}
+-repeat {max(0,$f)}
+-if {$21}
+scale_x=w/10
+a={((2^($19-5))*$19)*(u-0.5)*$scale_x*0.025}
+-else
+scale_x=1
+a={((2^($19-5))*$19)*(u-0.5)}
+-endif
+-if {$22}
+scale_y=h/10
+b={((2^($19-5))*$19)*(u-0.5)*$scale_y*0.025}
+-else
+scale_y=1
+b={((2^($19-5))*$19)*(u-0.5)}
+-endif
+c=(u-0.5)*$m*sign($m)*$scale_x
+d=(u-0.5)*$m*sign($m)*$scale_y
+g={round((u*33.98)-0.49)}
+h={(u-0.5)*$s*200}
+o={(u-0.5)*$v*200}
+-if {$23==1}
+e=0
+-elif {$23==2}
+e=1
+-else
+e={round(u)}
+-endif
+-if {$24==0}
+f={round((u*2.98)-0.49)}
+-elif {$24==1}
+f={round((u*2.98)+0.51)}
+-else
+f={($24)-2}
+-endif
+-if {$25==0}
+-fx_warp_by_intensity {$a},{$b},{$c},{$d},{$e},0,{$f},{$g},0
+-else
+-ac  "-if {$21}
+scale_x=w/10
+a={((2^($19-5))*$19)*(u-0.5)*$scale_x*0.025}
+-else
+scale_x=1
+a={((2^($19-5))*$19)*(u-0.5)}
+-endif
+-if {$22}
+scale_y=h/10
+b={((2^($19-5))*$19)*(u-0.5)*$scale_y*0.025}
+-else
+scale_y=1
+b={((2^($19-5))*$19)*(u-0.5)}
+-endif
+c={(u-0.5)*$20*sign($20)*$scale_x}
+d={(u-0.5)*$20*sign($20)*$scale_y}
+-if {$23==1}
+e=0
+-elif {$23==2}
+e=1
+-else
+e={round(u)}
+-endif
+-if {$24==0}
+f={round((u*2.98)-0.49)}
+-elif {$24==1}
+f={round((u*2.98)+0.51)}
+-else
+f={($24)-2}
+-endif
+-_fx_warp_by_intensity {$a},{$b},{$c},{$d},{$e},0,{$f}",{$25},0
+-endif
+-if {$26}
+nn={round(u)}
+-if {$nn}
+-if {$27==0}
+nch={round((u*33.98)-0.49)}
+-ac "-negate",{$nch}
+-else
+-ac "-negate",{$27}
+-endif
+-endif
+-endif
+-fx_adjust_colors 0,0,{$h},{$o},0,0
+-if {$30}
+-ac "-n 0,255",3
+-endif
+-done
+-if {$37==-180.1}
+hh=((u-0.5)*360)
+-else
+hh={$37}
+-endif
+-if {$38==-8.01}
+ss=((u-0.5)*2)
+-else
+ss={$38}
+-endif
+-if {$39==-20.01}
+vv=((u-0.5)*2)
+-else
+vv={$39}
+-endif
+-fx_mix_hsv {$j},{$hh},0,{$k},{$ss},0,{$l},{$vv},0,0,2,0
+-if {$-4}
+-ac "-n 0,255",{$-3}
+-endif
 
 fx_ultrawarpplusplusplusplus:
-
 -repeat {max(0,l)}
-  -ac[$>] "-ultrawarpplusplusplusplus $*",$-2,$-1
-  -fx_adjust_colors[$>] 0,0,0,{(u-0.5)*200},0,0
+-ac[$>] "-ultrawarpplusplusplusplus $*",$-2,$-1
+-fx_adjust_colors[$>] 0,0,0,{(u-0.5)*200},0,0
 -done
 
 #@gui Rays from image : fx_rays_from_image, fx_rays_from_image(1)
@@ -1866,4 +2275,78 @@ fx_rays_from_image:
   -ac[$>] "-rays_from_image $*",$-2,$-1
 -done
 
+#@gui _<b>Contours</b>
+
+#@gui Gradient norm [JR's mod] : fx_jr_gradient_norm, fx_jr_gradient_norm_preview(1)
+#@gui : Smoothness = float(0,0,10)
+#@gui : Contrast = float(0.45,0,1.5)
+#@gui : Min threshold = float(40,0,100)
+#@gui : Max threshold = float(60,0,100)
+#@gui : Negative = bool(0)
+#@gui : Include orientation = choice("Off","On","On &#40;extrapolate if negative&#41;")
+#@gui : Scale X = float(1,0,5)
+#@gui : Scale Y = float(1,0,5)
+#@gui : Interpolation = choice(2,"Nearest","Average","Bilinear","Bicubic")
+#@gui : Alpha = bool(0)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : sep = separator(), note = note("<small>Author: <i><a href="http://ow.ly/wpsV30fzhdI">David Tschumperl&#233;</a></i>.      Latest update: <i>2010/29/12</i>.</small>")
+
+jr_dir2rgb :
+v - channels 0,1 repeat $! l[$>] nm={0,n}
+s c complex2polar round.. 0.001
+*. {180/pi} %. 360 100%,100%,1,1,1 mv... $!
+c 0,360 if {im!=iM} n. 0,1 else f. 1  fi
+a c hsv2rgb
+nm $nm endl done v +
+
+jr_gradient_norm :
+b $1 gradient_norm c 0,255 ^ $2
+c $3%,$4%
+if $5 negate fi
+n 0,255
+
+fx_jr_gradient_norm :
+repeat $! l[$>]
+if {$9==3}
+inter=5
+else 
+inter={1+$9}
+fi
+if {$7!=1||$8!=1}
+ww={w}
+hh={h}
+shift -0.5,-0.5,0,0,1
+r {max(1,$7*w)},{max(1,$8*h)},100%,100%,$inter
+fi
+if $6
++l luminance gradient append c
+blur $1 orientation +jr_dir2rgb
+endl rm[1]
+if $5
+l[1]
+rgb2hsv8 100%,100%,1,1 f[1] "j(#0,0,0,0,2)" f[0] "[i0,i1,255]" hsv82rgb[0]  a c
+if {$6==2}
+fx_solidify_td 100,0,10,2,0
+fi
+rgb2hsv8 f "[i0,i1,255]" hsv82rgb
+endl
+fi
+fi
+jr_gradient_norm[0] ${1-5}
+if {$7!=1||$8!=1}
+r $ww,$hh,100%,100%,$inter
+fi
+if $6 blend multiply fi
+if {$6==1} c 0,255 f "I==[255,255,255]?[0,0,0]:I" fi
+if $10 rgb2hsv8 100%,100%,1,1 if {$6} [1] f[2] "j(#0,0,0,0,1)" f[0] "[i0,255,i2]" fi f[1] "j(#0,0,0,0,2)" f[0] "[i0,i1,255]" hsv82rgb[0] if {$6} blend[1,2] multiply fi a c fi
+endl done
+fx_jr_gradient_norm_preview : 
+gui_split_preview "fx_jr_gradient_norm $*",${-3--1}
+
 ######################
+
+# Local Variables:
+# mode: sh
+# End:
+#
+# (End of G'MIC custom commands)
