@@ -1657,6 +1657,24 @@ negative :
   e[^-1] "Compute negative of image$?."
   v - repeat $! l[$>] - {iM} endl done * -1 v +
 
+transfer_colors : skip ${2=0}
+  e[^-1] "Transfer colors of image $1 to image$?."
+  v - pass$1 0 mv. 0 to_rgb[0] to_colormode[^0] {max(3,${-max_s})} c 0,255   # Convert all images to RGB[A]
+  repeat $! l[$>] split_opacity rgb2ycbcr[0] a c endl done                   # Perform RGB[A] to YCbCr[A] conversion.
+  l[0] s c histogram_cumul 256,1,0,255 a c * 255 endl                        # Compute channel-by-channel cumulative histogram of target image.
+  repeat {$!-1} l[0,{$<+1}]
+    if $2 repeat 3 sh[0,1] $> equalize. 256,0,255 index. ..,0,0 rm[-2,-1] done     # Transfer brightness + colors.
+    else repeat 2 sh[0,1] {$>+1} equalize. 256,0,255 index. ..,0,0 rm[-2,-1] done  # Transfer colors only.
+    fi
+  endl done rm[0]
+  repeat $! l[$>] split_opacity ycbcr2rgb[0] a c endl done    # Perform YCbCr[A] to RGB[A] conversion.
+  c 0,255
+  v +
+
+_transfer_colors :  # Check transfer_colors performance.
+  repeat $! l[$>] rgb2ycbcr s c histogram 256,0,255 a c -dg 300,200 endl done
+
+
 # Local Variables:
 # mode: sh
 # End:
