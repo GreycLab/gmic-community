@@ -620,6 +620,44 @@ gcd_unstereo_preview :
 #@gui _<b>Testing</b>
 #@gui <i>Garagecoder</i>
 
+#@gui Deblur Texture : fx_gcd_blur_deblur_texture, fx_gcd_blur_deblur_texture_preview(0)
+#@gui : note = note("<i>Variance-based edge preserving deblur or smooth</i>"), sep = separator()
+#@gui : Iters = int(4,1,20)
+#@gui : Sigma = float(1,0,4)
+#@gui : Edges = float(0.5,0,1)
+#@gui : Action = choice("Deblur","Smooth")
+#@gui : Channels = choice(2,"RGB","Linear RGB","Luma","Chroma")
+#@gui : Percentage sigma = bool(0)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2018/09/02</i>.</small>")
+#@gui : note = note("\n<small><b><u>Notes</u></b></small>")
+#@gui : note = note("<small>Iters: overall amount, increases computation time.</small>")
+#@gui : note = note("<small>Sigma: detail scale.</small>")
+#@gui : note = note("<small>Edges: amount of edge preservation.</small>")
+#@gui : note = note("<small>Percentage sigma: make detail scale relative to image size.</small>")
+fx_gcd_blur_deblur_texture : skip ${1=4},${2=1},${3=0.5},${4=0},${5=2},${6=0}
+  v - repeat $! l[$>]
+    mode=${-arg\ 1+$5,rgb,lrgb,ycbcr_y,ycbcr_cbcr}
+    if $6 r=$2% else r=$2 fi
+    if $4 ac "repeat $1 gcd_blur_texture "$r",$3 done",$mode,1
+    else ac "repeat $1 +l +gcd_blur_texture "$r",$3 norm sub endl add done",$mode,1 fi
+  endl done v +
+
+fx_gcd_blur_deblur_texture_preview :
+  gui_split_preview "fx_gcd_blur_deblur_texture $*",${-3--1}
+
+#@cli gcd_blur_texture : std_deviation>=0[%],0<=edge_exponent<=1
+#@cli : Edge preserving smooth.
+#@cli : Default values: 'std_deviation=1' and 'edge_exponent=1'.
+#@cli : $ image.jpg gcd_blur_texture 1
+gcd_blur_texture : skip ${1=1},${2=1}
+  e[^-1] "Apply blur texture filter of size $1, on image$?."
+  v - repeat $! l[$>] # i = i + (A(k) - i) / stddev(k)^p
+    [0] +sqr. b[-2,-1] $1 +sqr.. sub[-2,-1]
+    max. 0 +eq. 0 add[-2,-1] sqrt. pow. -$2
+    j[0] ..,0,0,0,0,1,. k[0]
+  endl done v +
+
 #@gui LMS Adjustment : gcd_balance_lms, gcd_balance_lms(1)
 #@gui : note = note("<i>Chromatically adapt to a new illuminant</i>"), sep = separator()
 #@gui : Long = float(1,0.5,1.5)
