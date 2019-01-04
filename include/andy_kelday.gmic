@@ -620,6 +620,81 @@ gcd_unstereo_preview :
 #@gui _<b>Testing</b>
 #@gui <i>Garagecoder</i>
 
+#@gui CRMT Tiles : fx_gcd_crmt_tile, fx_gcd_crmt_tile(1)
+#@gui : note = note("<i>Tiling by Clone, Rotate, Mirror, Translate method.</i>"), sep = separator()
+#@gui : Constants = text{"t_w=[w] t_h=[round(1/2*sqrt(3)*$t_w)]"}
+#@gui : Image Size = text("[3*$t_w,2*$t_h]")
+#@gui : Command List = text{1,"C0 T0 C0 Fo R-60 T[-1/2*$t_w,0]"}
+#@gui : Inpaint = bool(0)
+#@gui : sep = separator(), note = note("<small>Implementation : <i>Garagecoder</i>.     Latest update : <i>2018/12/06</i>.</small>")
+#@gui : note = note("<small>Author: <i>G. Bachelier</i></small>")
+#@gui : note = note("\n<b>Warning</b>: alpha version, don't expect perfection!")
+fx_gcd_crmt_tile :
+  m "_crmt_tile_C : [$""1]"
+  m "_crmt_tile_R : rotate. $""1 autocrop."
+  m "_crmt_tile_Fo : mirror. x"
+  m "_crmt_tile_Fi : mirror. y"
+  ({'"_crmt_tiling_command : $1 {``$2},1,4 $3"'})
+  replace_str. "C","_crmt_tile_C "
+  replace_str. "Fo","_crmt_tile_Fo "
+  replace_str. "Fi","_crmt_tile_Fi "
+  replace_str. "R","_crmt_tile_R "
+  replace_str. "T","_crmt_tile_T "
+  replace_str. "[","{["
+  replace_str. "]","]}"
+  m {t}
+  rm.
+  repeat $! l[$>]
+    _crmt_tiling_command k[1]
+    if $4
+      +channels[0] 100% negate. dilate. 3
+      inpaint[0] .,0,0 rm.
+    fi
+  endl done
+  uncommand _crmt_tiling_command
+
+_crmt_tile_T : skip ${1=0},${2=0} # this command actually renders as well
+  #split_opacity. n. 0,1 j[1] ..,$1,$2,0,0,1,. rm[-2,-1]
+  f. ':i3>0?I(#1,$1+x,$2+y)=I;i' rm.
+
+#@gui Deblur Texture : fx_gcd_blur_deblur_texture, fx_gcd_blur_deblur_texture_preview(0)
+#@gui : note = note("<i>Variance-based edge preserving deblur or smooth</i>"), sep = separator()
+#@gui : Iters = int(4,1,20)
+#@gui : Sigma = float(1,0,4)
+#@gui : Edges = float(0.5,0,1)
+#@gui : Action = choice("Deblur","Smooth")
+#@gui : Channels = choice(2,"RGB","Linear RGB","Luma","Chroma")
+#@gui : Percentage sigma = bool(0)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2018/09/02</i>.</small>")
+#@gui : note = note("\n<small><b><u>Notes</u></b></small>")
+#@gui : note = note("<small>Iters: overall amount, increases computation time.</small>")
+#@gui : note = note("<small>Sigma: detail scale.</small>")
+#@gui : note = note("<small>Edges: amount of edge preservation.</small>")
+#@gui : note = note("<small>Percentage sigma: make detail scale relative to image size.</small>")
+fx_gcd_blur_deblur_texture : skip ${1=4},${2=1},${3=0.5},${4=0},${5=2},${6=0}
+  v - repeat $! l[$>]
+    mode=${-arg\ 1+$5,rgb,lrgb,ycbcr_y,ycbcr_cbcr}
+    if $6 r=$2% else r=$2 fi
+    if $4 ac "repeat $1 gcd_blur_texture "$r",$3 done",$mode,1
+    else ac "repeat $1 +l +gcd_blur_texture "$r",$3 norm sub endl add done",$mode,1 fi
+  endl done v +
+
+fx_gcd_blur_deblur_texture_preview :
+  gui_split_preview "fx_gcd_blur_deblur_texture $*",${-3--1}
+
+#@cli gcd_blur_texture : std_deviation>=0[%],0<=edge_exponent<=1
+#@cli : Edge preserving smooth.
+#@cli : Default values: 'std_deviation=1' and 'edge_exponent=1'.
+#@cli : $ image.jpg gcd_blur_texture 1
+gcd_blur_texture : skip ${1=1},${2=1}
+  e[^-1] "Apply blur texture filter of size $1, on image$?."
+  v - repeat $! l[$>] # i = i + (A(k) - i) / stddev(k)^p
+    [0] +sqr. b[-2,-1] $1 +sqr.. sub[-2,-1]
+    max. 0 +eq. 0 add[-2,-1] sqrt. pow. -$2
+    j[0] ..,0,0,0,0,1,. k[0]
+  endl done v +
+
 #@gui LMS Adjustment : gcd_balance_lms, gcd_balance_lms(1)
 #@gui : note = note("<i>Chromatically adapt to a new illuminant</i>"), sep = separator()
 #@gui : Long = float(1,0.5,1.5)
@@ -1791,7 +1866,7 @@ gcd_extract_clut : -skip ${1=8},${2=3},${3=5},${4=5}
   (0,1;0,1/0,1;0,1^0,0;1,1/0,0;1,1^0,0;0,0/1,1;1,1)
   -*. 255 -r. $b,$b,$b,3,3 -r. $s,$s,1,3,-1
   -repeat {$!-1} -l[$>,-1] nm="[CLUT: "{0,n}"]"
-    --patchmatch. ..,1,1,1,$3,$4 -warp[0] .,0
+    --matchpatch. ..,1,1,1,$3,$4 -warp[0] .,0
     -rm. -r.. $b,$b,$b,3,-1 -b.. $2 -nm.. $nm
   -endl -done -rm. -v +
 
