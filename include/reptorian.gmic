@@ -51,21 +51,26 @@ blend darken mul 2
 #@cli : (eq. to 'modular_operation').
 #@cli : $ modo 1, 255, {128/255}, 1
 modo : modular_operation $*
-#@cli modular_operation : 0>=operation<=5,chan_v>0, 0>value(%)<=1,two_layers=0|two_layers=1,reverse_layer=0|reverse_layer=1
-#@cli : Manipulates image or channels with varients of modulo operations assuming assigned channel plus epsilon
-#@cli : Default value: 'ops=0', 'chan_v=255 ', 'value=100%','alpha_preserve=1',
+#@cli modular_operation : 0>=operation<=5,chan_v>0, 0>value(%)<=1,two_layers=0|two_layers=1
 modular_operation :
-if {$4==0} +f[0] "$2" split_opacity[0] rv[1,2]
-elif {$4==1} split_opacity rv[1,2] +f[3] "255-i" +f[0] "(i#2/255+i#4/255*i#3/255)*255" rm[2-4] if {$5==0} rv[0,1] fi fi
-if {$1==0} f[0] "eps=.0000000000001;img=i#0;vp=$3;mv=(i#1*vp)+eps;f=img-mv*floor(img/mv);f>i#1*vp?i#1*vp:f"
-elif {$1==1} f[0] "eps=.0000000000001;img=i#0;vp=$3;mv=(i#1*vp)+eps;nf=img-mv*floor(img/mv);minm=i#1*vp;e=ceil((i#0/minm))%2>0?i#1:0;cinv=i#0>0?e:i#1;cinv>0?nf:mv-nf"
-elif {$1==2} f[0] "eps=.0000000000001;img=i#0;vp=$3;ivp=1/vp;simg=ivp*img;maxm=i#1+eps;f=simg-maxm*floor(simg/maxm)"
-elif {$1==3} f[0] "eps=.0000000000001;img=i#0;vp=$3;ivp=1/vp;simg=ivp*img;maxm=i#1+eps;f=simg-maxm*floor(simg/maxm);minm=i#1*vp;e=ceil((i#0/minm))%2>0?i#1:0;cinv=i#0>0?e:i#1;cinv>0?f:i#1-f"
-elif {$1==4} f[0] "eps=.0000000000001;img=i#0;vpi=$3*i#1;fimg=img+vpi;maxm=i#1+eps;fimg-maxm*floor(fimg/maxm)"
-elif {$1==5} f[0] "eps=.0000000000001;img=i#0;vpi=$3*i#1;fimg=img+vpi;maxm=i#1+eps;f=fimg-maxm*floor(fimg/maxm);cinv=fimg>maxm?i#1:0;cinv>0?maxm-f:f" fi
-rm[1]
-if {$4==1} compose_channels[1] max fi
-a c
+if {$4==0} repeat $! l[$>] split_opacity _modular_formula[0] $1,$2,$3,0 a c -endl done rv
+elif {$4==1} repeat {int($!/2)} l[{$>*2},{$>*2+1}] _modular_blending_pre[0,1]
+endl done fi
+_modular_blending_pre :
+split_opacity rv[1,2] +f[3] "255-i" +f[0] "(i#2/255+i#4/255*i#3/255)*255" rm[2-4] l[0,1] +rv l[0,1] _modular_formula[0,1] 3,255,.2,1 rm[1] endl l[1,2]  _modular_formula[0,1] 3,255,.2,1 rm[1] endl
+endl compose_channels[2] max [2] a[0,2] c a[1,2] c rv
+#@cli modf:
+#@cli : (eq. to '_modular_formula)
+#@cli : $ modf 3,255,{128/255},0
+modf : _modular_formula $*
+#@cli _modular_formula : 0>=operation<=5,chan_v>0, 0>value(%)<=1,two_layers=0|two_layers=1
+_modular_formula :
+if {$1==0} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;mv=($2*vp)+eps;f=img-mv*floor(img/mv);f>$2*vp?$2*vp:f"
+elif {$1==1} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;mv=($2*vp)+eps;nf=img-mv*floor(img/mv);minm=$2*vp;e=ceil((i#0/minm))%2>0?$2:0;cinv=i#0>0?e:$2;cinv>0?nf:mv-nf"
+elif {$1==2} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;ivp=1/vp;simg=ivp*img;maxm=$2+eps;f=simg-maxm*floor(simg/maxm)"
+elif {$1==3} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;ivp=1/vp;simg=ivp*img;maxm=$2+eps;f=simg-maxm*floor(simg/maxm);minm=$2*vp;e=ceil((i#0/minm))%2>0?$2:0;cinv=i#0>0?e:$2;cinv>0?f:$2-f"
+elif {$1==4} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;vpi=vp*$2;fimg=img+vpi;maxm=$2+eps;fimg-maxm*floor(fimg/maxm)"
+elif {$1==5} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;vpi=vp*$2;fimg=img+vpi;maxm=$2+eps;f=fimg-maxm*floor(fimg/maxm);cinv=fimg>maxm?$2:0;cinv>0?maxm-f:f" fi
 
 #@gui _<b>Testing</b>
 #@gui <i>Reptorian</i>
