@@ -1,0 +1,621 @@
+#@gmic
+#
+#  File        : reptorian.gmic
+#                ( G'MIC commands file )
+#
+#  Description : The author of these filters is simply experimenting with G'MIC coding. Sometimes, inspired by existing filters.
+#
+#  Copyright   : Reptorian
+#                ( https://discuss.pixls.us/u/reptorian/summary )
+#
+#  License     : CeCILL v2.0
+#                ( http://www.cecill.info/licences/Licence_CeCILL_V2-en.html )
+#
+#  This software is governed by the CeCILL  license under French law and
+#  abiding by the rules of distribution of free software.  You can  use,
+#  modify and/ or redistribute the software under the terms of the CeCILL
+#  license as circulated by CEA, CNRS and INRIA at the following URL
+#  "http://www.cecill.info".
+#
+#  As a counterpart to the access to the source code and  rights to copy,
+#  modify and redistribute granted by the license, users are provided only
+#  with a limited warranty  and the software's author,  the holder of the
+#  economic rights,  and the successive licensors  have only  limited
+#  liability.
+#
+#  In this respect, the user's attention is drawn to the risks associated
+#  with loading,  using,  modifying and/or developing or reproducing the
+#  software by the user in light of its specific status of free software,
+#  that may mean  that it is complicated to manipulate,  and  that  also
+#  therefore means  that it is reserved for developers  and  experienced
+#  professionals having in-depth computer knowledge. Users are therefore
+#  encouraged to load and test the software's suitability as regards their
+#  requirements in conditions enabling the security of their systems and/or
+#  data to be ensured and,  more generally, to use and operate it in the
+#  same conditions as regards security.
+#
+#  The fact that you are presently reading this means that you have had
+#  knowledge of the CeCILL license and that you accept its terms.
+#
+
+#@cli sol : eq. to '_solarize'.
+sol :
+_solarize
+#@cli _solarize :
+#@cli : Solarize values. If values are greater than .5 (0-1 range assumed), then the values becomes inverted. Finally, it is normalized. Note that this doesn't work on -1,1 though.
+_solarize :
++negate
+blend darken mul 2
+
+#@cli modo :
+#@cli : (eq. to 'modular_operation').
+#@cli : $ modo 1, 255, {128/255}, 1
+modo : modular_operation $*
+#@cli modular_operation : 0>=operation<=5,chan_v>0, 0>value(%)<=1,two_layers=0|two_layers=1
+modular_operation :
+if {$4==0} repeat $! l[$>] split_opacity _modular_formula[0] $1,$2,$3,0 a c -endl done rv
+elif {$4==1} repeat {int($!/2)} l[{$>*2},{$>*2+1}] _modular_blending_pre[0,1] $1,$2,$3,1
+endl done fi
+_modular_blending_pre :
+split_opacity rv[1,2] +f[3] "255-i" +f[0] "(i#2/255+i#4/255*i#3/255)*255" rm[2-4] l[0,1] +rv l[0,1] _modular_formula[0,1] $1,$2,$3,1 rm[1] endl l[1,2]  _modular_formula[0,1] $1,$2,$3,1 rm[1] endl
+endl compose_channels[2] max [2] a[0,2] c a[1,2] c rv
+#@cli modf:
+#@cli : (eq. to '_modular_formula)
+#@cli : $ modf 3,255,{128/255},0
+modf : _modular_formula $*
+#@cli _modular_formula : 0>=operation<=5,chan_v>0, 0>value(%)<=1,two_layers=0|two_layers=1
+_modular_formula :
+if {$1==0} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;mv=($2*vp)+eps;f=img-mv*floor(img/mv);f>$2*vp?$2*vp:f"
+elif {$1==1} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;mv=($2*vp)+eps;nf=img-mv*floor(img/mv);minm=$2*vp;e=ceil((i#0/minm))%2>0?$2:0;cinv=i#0>0?e:$2;cinv>0?nf:mv-nf"
+elif {$1==2} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;ivp=1/vp;simg=ivp*img;maxm=$2+eps;f=simg-maxm*floor(simg/maxm)"
+elif {$1==3} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;ivp=1/vp;simg=ivp*img;maxm=$2+eps;f=simg-maxm*floor(simg/maxm);minm=$2*vp;e=ceil((i#0/minm))%2>0?$2:0;cinv=i#0>0?e:$2;cinv>0?f:$2-f"
+elif {$1==4} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;vpi=vp*$2;fimg=img+vpi;maxm=$2+eps;fimg-maxm*floor(fimg/maxm)"
+elif {$1==5} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;vpi=vp*$2;fimg=img+vpi;maxm=$2+eps;f=fimg-maxm*floor(fimg/maxm);cinv=fimg>maxm?$2:0;cinv>0?maxm-f:f" fi
+
+#@gui _<b>Testing</b>
+#@gui <i>Reptorian</i>
+
+#@gui Modulos Operations : fx_modulo, fx_modulo_preview(0)
+#@gui : note = note("This filters applies modulo operation after arithmetic operation. Future version of this filter might be able to be used on different color space and channels.")
+#@gui : sep = separator()
+#@gui : Multiply = float(1,0,32)
+#@gui : Addition = int(0,0,255)
+#@gui : sep = separator(), note = note("<small>Author : <i>Reptorian</i>.      Latest update : <i>2018/08/18</i>.</small>")
+fx_modulo:
+repeat $! l[$>] split_opacity l[0]
+mul $1 add $2 mod 256
+endl a c endl done
+fx_modulo_preview :
+gui_split_preview "fx_modulo $*"
+
+#@gui Channel Overblur-Overline-Blur-Sharpen : fx_OOBS, _fx_OOBS_preview(0)
+#@gui : sep = separator()
+#@gui : 1. Color Space = choice("RGB&#47;sRGB","HSV&#47;HSV8","HSL&#47;HSL8","HSI&#47;HSI8","LCH&#47;LCH8","Lab&#47;Lab8","YCbCr&#47;YCbCrGLIC","YIQ&#47;YIQ8","YUV&#47;YUV8","XYZ&#47;XYZ8")
+#@gui : 2. Alt Choice = bool(0)
+#@gui : sep = separator()
+#@gui : note = note("Configuration for OOBS filter")
+#@gui : 3. Use Master Editor(Manipulate Multiple Channels at Once?) = bool(1)
+#@gui : 4. Edit Channel #1? = bool(1)
+#@gui : 5. Edit Channel #2? = bool(1)
+#@gui : 6. Edit Channel #3? = bool(1)
+#@gui : 7. Edit Alpha Channel? = bool(0)
+#@gui : sep = separator()
+#@gui : note = note("<b>Master Editor</b>")
+#@gui : 8. Overblur/Overline/Sharpen/Blur = choice ("Overblur","Overline","Blur","Sharpen")
+#@gui : 9. Effect Factor = float (1,.1,100)
+#@gui : 10. Multiplication Factor = float (1,.1,10)
+#@gui : 11. Blend Operation = choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
+#@gui : 12. Blending Opacity = float (100,.01,100)
+#@gui : sep = separator(), note = note("<u>Individual Channels</u>"), sep = separator()
+#@gui : note = note("<b>Channel #1</b>")
+#@gui : 13. Overblur/Overline/Sharpen/Blur = choice ("Overblur","Overline","Blur","Sharpen")
+#@gui : 14. Effect Factor = float (1,.1,10)
+#@gui : 15. Multiplication Factor = float (1,.1,10)
+#@gui : 16. Blend Operation = choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
+#@gui : 17. Blending Opacity = float (100,.01,100)
+#@gui : sep = separator()
+#@gui : note = note("<b>Channel #2</b>")
+#@gui : 18. Overblur/Overline/Sharpen/Blur = choice ("Overblur","Overline","Blur","Sharpen")
+#@gui : 19. Effect Factor = float (1,.1,10)
+#@gui : 20. Multiplication Factor = float (1,.1,10)
+#@gui : 21. Blend Operation = choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
+#@gui : 22. Blending Opacity = float (100,.01,100)
+#@gui : sep = separator()
+#@gui : note = note("<b>Channel #3</b>")
+#@gui : 23. Overblur/Overline/Sharpen/Blur = choice ("Overblur","Overline","Blur","Sharpen")
+#@gui : 24. Effect Factor = float (1,.1,10)
+#@gui : 25. Multiplication Factor = float (1,.1,10)
+#@gui : 26. Blend Operation = choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
+#@gui : 27. Blending Opacity = float (100,.01,100)
+#@gui : sep = separator()
+#@gui : note = note("<b>Alpha Channel</b>")
+#@gui : 28. Overblur/Overline/Sharpen/Blur = choice ("Overblur","Overline","Blur","Sharpen")
+#@gui : 29. Effect Factor = float (1,.1,10)
+#@gui : 30. Multiplication Factor = float (1,.1,10)
+#@gui : 31. Blend Operation = choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
+#@gui : 32. Blending Opacity = float (100,.01,100)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse")
+#@gui : sep = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2019/01/7</i>.</small>")
+fx_OOBS:
+-m "MergeChoice : $""=_mode" -MergeChoice "add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor","edges","error"
+split_opacity
+local[0]
+if {$2==0}
+if ($1==1} rgb2hsv
+elif ($1==2} rgb2hsl
+elif ($1==3} rgb2hsi
+elif ($1==4} rgb2lch
+elif ($1==5} rgb2lab
+elif ($1==6} rgb2ycbcr
+elif ($1==7} rgb2yiq
+elif ($1==8} rgb2yuv
+elif ($1==9} rgb2xyz
+fi
+elif {$2==1}
+if {$1==0} rgb2srgb
+elif {$1==1} rgb2hsv8
+elif {$1==2} rgb2hsl8
+elif {$1==3} rgb2hsi8
+elif {$1==4} rgb2lch8
+elif {$1==5} rgb2lab8
+elif {$1==6} rgb2ycbcrglic
+elif {$1==7} rgb2yiq8
+elif {$1==8} rgb2yuv8
+elif {$1==9} rgb2xyz8
+fi fi
+s c
+if {$3==1}
+if {$4==1} local[0] +oobs_edit[0] $8,$9,$10 -blend[0,1] ${_mode{$11+1}},$12/100 endl fi
+if {$5==1} local[1] +oobs_edit[0] $8,$9,$10 -blend[0,1] ${_mode{$11+1}},$12/100 endl fi
+if {$6==1} local[2] +oobs_edit[0] $8,$9,$10 -blend[0,1] ${_mode{$11+1}},$12/100 endl fi
+elif {$3==0}
+if {$4==1} local[0] +oobs_edit[0] $13,$14,$15 -blend[0,1] ${_mode{$16+1}},$17/100 endl fi
+if {$5==1} local[1] +oobs_edit[0] $18,$19,$20 -blend[0,1] ${_mode{$21+1}},$22/100 endl fi
+if {$6==1} local[2] +oobs_edit[0] $23,$24,$25 -blend[0,1] ${_mode{$26+1}},$27/100 endl fi
+fi
+a c
+if {$2==0}
+if ($1==1} hsv2rgb
+elif ($1==2} hsl2rgb
+elif ($1==3} hsi2rgb
+elif ($1==4} lch2rgb
+elif ($1==5} lab2rgb
+elif ($1==6} ycbcr2rgb
+elif ($1==7} yiq2rgb
+elif ($1==8} yuv2rgb
+elif ($1==9} xyz2rgb
+fi
+elif {$2==1}
+if {$1==0} srgb2rgb
+elif {$1==1} hsv82rgb
+elif {$1==2} hsl82rgb
+elif {$1==3} hsi82rgb
+elif {$1==4} lch82rgb
+elif {$1==5} lab82rgb
+elif {$1==6} ycbcrglic2rgb
+elif {$1==7} yiq82rgb
+elif {$1==8} yuv82rgb
+elif {$1==9} xyz82rgb
+fi fi
+endl
+local[1]
+if {$3==1} if {$7==1} +oobs_edit[0] $8,$9,$10 -blend[0,1] ${_mode{$11+1}},$12/100 fi
+elif {$3==0} if {$7==1} +oobs_edit[0] $28,$29,$30 -blend[0,1] ${_mode{$31+1}},$32/100 fi
+fi
+endl
+a c
+oobs_edit :
+if {$1==0} -overblur_overline[0] 0,$2,$3 fi
+if {$1==1} -overblur_overline[0] 1,$2,$3 fi
+if {$1==2} -blur[0] {$2*$3} fi
+if {$1==3} -sharpen[0] {$2*$3} fi
+overblur_overline :
+if {$1==0} +blur[0] $2
+elif {$1==1} +sharpen[0] $2
+fi
++blend[0,1] difference
+mul[2] $3
+remove[1]
+-blend[0,1] add
+_fx_OOBS_preview :
+gui_split_preview "fx_OOBS ${1--2}",$-1
+#@gui Vibrato: fx_vibrato, _fx_vibrato_preview(0)
+#@gui : note = note("This is the advanced version of the Vibrato filter. If you do want to manipulate multiple channels at once, use <u>Vibrato - Basic</u> filter. <i>Note: Disable channel mulplication for non-transparent images.</i> \n\n")
+#@gui : note = note("This filter is the one of the G'MIC version of <b>MadJik's</b> <i>Paint.NET plugin</i>")
+#@gui : sep = separator()
+#@gui : Colour Space = choice("RGB", "CMY", "HSI", "HSL", "HSV", "LAB", "LCH", "YCbCr", "YCbCr-Glic", "YUV", "YIQ", "XYZ", "Bayer")
+#@gui : sep = separator()
+#@gui : Manipulate multiple channels at once? = bool(1)
+#@gui : Process Channel 1? = bool(1)
+#@gui : Process Channel 2? = bool(1)
+#@gui : Process Channel 3? = bool(1)
+#@gui : Process Alpha Channel? = bool(1)
+#@gui : Inherit Alpha? = bool(1)
+#@gui : X-Orientation = bool(1)
+#@gui : Y-Orientation = bool(1)
+#@gui : U- Factor = float(.85,.1,15)
+#@gui : V- Factor = float(.85,.1,15)
+#@gui : X-Scale Factor = float(1,.1,15)
+#@gui : Y-Scale Factor = float(1,.1,15)
+#@gui : XY-Scale Factor = float(1,.1,3)
+#@gui : Percentage-Based X Pixel Shift = float(0,-200,200)
+#@gui : Percentage-Based Y Pixel Shift = float(0,-200,200)
+#@gui : Elevation = float(.7,-100,100)
+#@gui : Multiply Blending = bool(0)
+#@gui : Invert Vibrato = bool(0)
+#@gui : Vibrato Blending Factor = float (100,0,100)
+#@gui : Channel Influence Factor = float(1,-8,8)
+#@gui : Final Channel Modulos Multiplication Factor = float(1,1,32)
+#@gui : sep = separator()
+#@gui : note = note("- <b>Channel #1</b> - ")
+#@gui : Process Channel? = bool(1)
+#@gui : X-Orientation = bool(1)
+#@gui : Y-Orientation = bool(1)
+#@gui : U-Factor = float(.85,.1,15)
+#@gui : V-Factor = float(.85,.1,15)
+#@gui : X-Scale Factor = float(1,.1,15)
+#@gui : Y-Scale Factor = float(1,.1,15)
+#@gui : XY-Scale Factor = float(1,.1,3)
+#@gui : Percentage-Based X Pixel Shift = float(0,-200,200)
+#@gui : Percentage-Based Y Pixel Shift = float(0,-200,200)
+#@gui : Elevation = float(.7,-100,100)
+#@gui : Multiply Blending = bool(0)
+#@gui : Invert Vibrato = bool(0)
+#@gui : Vibrato Blending Factor = float (100,0,100)
+#@gui : Channel Influence Factor = float(1,-8,8)
+#@gui : Final Channel Modulos Multiplication Factor = float(1,1,32)
+#@gui : sep = separator()
+#@gui : note = note("- <b>Channel #2</b> - ")
+#@gui : Process Channel? = bool(1)
+#@gui : X-Orientation = bool(1)
+#@gui : Y-Orientation = bool(1)
+#@gui : U-Factor = float(.85,.1,15)
+#@gui : V-Factor = float(.85,.1,15)
+#@gui : X-Scale Factor = float(1,.1,15)
+#@gui : Y-Scale Factor = float(1,.1,15)
+#@gui : XY-Scale Factor = float(1,.1,3)
+#@gui : Percentage-Based X Pixel Shift = float(0,-200,200)
+#@gui : Percentage-Based Y Pixel Shift = float(0,-200,200)
+#@gui : Elevation = float(.7,-100,100)
+#@gui : Multiply Blending = bool(0)
+#@gui : Invert Vibrato = bool(0)
+#@gui : Vibrato Blending Factor = float (100,0,100)
+#@gui : Channel Influence Factor = float(1,-8,8)
+#@gui : Final Channel Modulos Multiplication Factor = float(1,1,32)
+#@gui : sep = separator()
+#@gui : note = note("- <b>Channel #3</b> - ")
+#@gui : Process Channel? = bool(1)
+#@gui : X-Orientation = bool(1)
+#@gui : Y-Orientation = bool(1)
+#@gui : U-Factor = float(.85,.1,15)
+#@gui : V-Factor = float(.85,.1,15)
+#@gui : X-Scale Factor = float(1,.1,15)
+#@gui : Y-Scale Factor = float(1,.1,15)
+#@gui : XY-Scale Factor = float(1,.1,3)
+#@gui : Percentage-Based X Pixel Shift = float(0,-200,200)
+#@gui : Percentage-Based Y Pixel Shift = float(0,-200,200)
+#@gui : Elevation = float(.7,-100,100)
+#@gui : Multiply Blending = bool(0)
+#@gui : Invert Vibrato = bool(0)
+#@gui : Vibrato Blending Factor = float (100,0,100)
+#@gui : Channel Influence Factor = float(1,-8,8)
+#@gui : Final Channel Modulos Multiplication Factor = float(1,1,32)
+#@gui : sep = separator()
+#@gui : note = note("- <b>Alpha Channel #1</b> - ")
+#@gui : Process Channel? = bool(0)
+#@gui : X-Orientation = bool(1)
+#@gui : Y-Orientation = bool(1)
+#@gui : U-Factor = float(.85,.1,15)
+#@gui : V-Factor = float(.85,.1,15)
+#@gui : X-Scale Factor = float(1,.1,15)
+#@gui : Y-Scale Factor = float(1,.1,15)
+#@gui : XY-Scale Factor = float(1,.1,3)
+#@gui : Percentage-Based X Pixel Shift = float(0,-200,200)
+#@gui : Percentage-Based Y Pixel Shift = float(0,-200,200)
+#@gui : Elevation = float(.7,-100,100)
+#@gui : Multiply Blending = bool(1)
+#@gui : Invert Vibrato = bool(0)
+#@gui : Vibrato Blending Factor = float (100,0,100)
+#@gui : Channel Influence Factor = float(1,-8,8)
+#@gui : Final Channel Modulos Multiplication Factor = float(1,1,32)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse")
+#@gui : sep = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2018/12/19</i>.</small>")
+
+fx_vibrato:
+split_opacity
+local[0]
+if {$1==1} rgb2cmy
+elif {$1==2} rgb2hsi8
+elif {$1==3} rgb2hsl8
+elif {$1==4} rgb2hsv8
+elif {$1==5} rgb2lab8
+elif {$1==6} rgb2lch8
+elif {$1==7} rgb2ycbcr
+elif {$1==8} rgb2ycbcrglic
+elif {$1==9} rgb2yuv8
+elif {$1==10} rgb2yiq8
+elif {$1==11} rgb2xyz8
+elif {$1==12} rgb2bayer 0
+fi
+
+s c
+
+if {$2==1}
+if {$3==1} -vibrato[0] $8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22 fi
+if {$4==1} -vibrato[1] $8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22 fi
+if {$5==1} -vibrato[2] $8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22 fi
+elif {$2==0}
+if {$23==1} -vibrato[0] $24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38 fi
+if {$39==1} -vibrato[1] $40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52,$53,$54 fi
+if {$55==1} -vibrato[2] $56,$57,$58,$59,$60,$61,$62,$63,$64,$65,$66,$67,$68,$69,$70 fi
+fi
+a c
+
+if {$1==1} cmy2rgb
+elif {$1==2} hsi82rgb
+elif {$1==3} hsl82rgb
+elif {$1==4} hsv82rgb
+elif {$1==5} lab82rgb
+elif {$1==6} lch82rgb
+elif {$1==7} ycbcr2rgb
+elif {$1==8} ycbcrglic2rgb
+elif {$1==9} yuv82rgb
+elif {$1==10} yiq82rgb
+elif {$1==11} xyz82rgb
+elif {$1==12} bayer2rgb 0,0,0
+fi
+endl
+if {$2==1}
+if {$6==1} -vibrato[1] $8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$7,$19,$20,$21,$22 fi
+elif {$2==0}
+if {$71==1} -vibrato[1] $72,$73,$74,$75,$76,$77,$78,$79,$80,$81,$82,$83,$84,$85,$86 fi
+fi
+a c
+
+vibrato:
+repeat $! l[$>]
+n 0,255
+f "
+q=($8/100)*w;
+l=($9/100)*h;
+X=(($1?w-x+q:x+q)/w-.5) * 2 * 1/$5 * 1/$7;
+Y=(($2?h-y+l:y+l)/h-.5) * 2 * 1/$6 * 1/$7;
+U=sqrt($3);
+V=sqrt($4);
+Z=((X-Y) * (X-U) * (X+U) * (Y-V) * (Y+V))+ $10;
+C=(Z+((1-i/255)/(($3>1?$3:1/$3)*($4>1?$4:1/$4)))*$14)*(Z+((1-i/255)/(($3>1?$3:1/$3)*($4>1?$4:1/$4)))*$14);
+F=abs(C)>1?C-int(C):C;
+A=$12?F:1-F;
+B=$11?(i*A):A*200;
+E=$13/100*B+(1-$13/100)*i;
+" n 0,255 mul $15 mod 256
+endl done
+
+_fx_vibrato_preview :
+gui_split_preview "fx_vibrato ${1--2}",$-1
+
+#@gui Emboss/Relief : fx_emboss_relief, fx_emboss_relief_preview(0)
+#@gui : sep = separator()
+#@gui : Smoothness = float(0,0,10)
+#@gui : Emboss Angle = float(0,0,360)
+#@gui : Level 1 Depth Boost = float(0,0,1)
+#@gui : Level 2 Depth Boost = float(0,0,1)
+#@gui : Preserve Alpha? = bool(1)
+#@gui : sep = separator(), note = note("Relief Section")
+#@gui : Apply relief? = bool(1)
+#@gui : Blending Mode = choice(0,"Grain Extract","Grain Merge")
+#@gui : Blending Opacity = float(1,0,1)
+#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/1/9</i>.</small>")
+
+fx_emboss_relief :
+if {$6==1} split_opacity
++fx_emboss $1,$2,$3,$4,0
+if {$7==0} blend[0,2] grainextract,$8
+elif {$7==1} blend[0,2] grainmerge,$8 fi
+if {$5==0} rm[1]
+elif {$5==1} a c fi
+elif {$6==0} fx_emboss $1,$2,$3,$4,$5 fi
+
+fx_emboss :
+split_opacity
+emboss_image[0] $1,$2,$3,$4
+if {$5==0} rm[1]
+elif {$5==1} a c fi
+
+emboss_image :
+luminance
+fx_gradient2rgb $1,0,100,0,0
+_hue_rotation $2
++_hue_rotation 180
+_angle_result[0] 0
+_angle_result[1] 1
++fill_color 127.5,127.5,127.5,255
+blend grainmerge
+[0]
+blend grainmerge,$3
+[0]
+blend grainmerge,$4
+
+_angle_result :
+to_rgb
+s c
+rm[1,2]
+if {$1==0} n 128,255
+elif {$1==1} negate n 0,128 fi
+
+_hue_rotation :
+rgb2hsv s c
+local[0]
+f "H=$1;H+i-(floor((H+i)/360)*360)"
+endl
+a c
+hsv2rgb
+
+fx_emboss_relief_preview :
+gui_split_preview "fx_emboss_relief $*",${-3--1}
+#@gui Construction Material Texture : _cons_turb, _cons_turb_preview(0)
+#@gui : note = note("Construction Material Texture filter is based off the following tutorial by <b>theonlychad</b> for Paint.NET software: <a href="https://forums.getpaint.net/topic/16075-concrete-texture-tutorial/">Concrete Texture Tutorial</a>.\n")
+#@gui : sep = separator(), note = note("<b>Turbulance Texture</b>")
+#@gui : 1-3. Background Color = color(0,0,0)
+#@gui : 4. Radius = float(88,1,1024)
+#@gui : 5. Octaves = int(8,1,12)
+#@gui : 6. Damping per Octave = float(2.5,1,10)
+#@gui : 7. Mode = choice(2,"Turbulence","Turbulence 2","Fractal Noise","Fractured Clouds","Stardust","Pea Soup")
+#@gui : 8-10. Color Balance = color(128,128,128)
+#@gui : sep = separator(), note = note("<b>Noise Processing</b>")
+#@gui : 11. Amplitude = float(20,0,200)
+#@gui : 12. Noise Type = choice(3,"Gaussian","Uniform","Salt and Pepper","Poisson")
+#@gui : sep = separator(), 13. Channel(s) = choice(0,"RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]","YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]","YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]","Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]","HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]","CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]")
+#@gui : 14. Value Action = choice(1,"None","Cut","Normalize")
+#@gui : sep = separator(), note = note("<b>Grayscale Processing</b>")
+#@gui : 15. Colour Space = choice("RGB","sRGB")
+#@gui : 15. Channel 1 = float(1,0,3)
+#@gui : 16. Channel 2 = float(1,0,3)
+#@gui : 17. Channel 3 = float(1,0,3)
+#@gui : 18. Normalise = bool(1)
+#@gui : 19. Desaturation (%) = float (100,0,100)
+#@gui : sep = separator(), note = note("<b>Self-Image Processing</b>")
+#@gui : 21. Self-Blending = choice(20,"add","burn","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","linearburn","linearlight","luminance","multiply","negation","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","vividlight")
+#@gui : 22. Self-Blending Opacity (%) = float (100,0,100)
+#@gui : 23. Self-Blending v. Original Blending = choice(15,"add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor")
+#@gui : 24. Self-Blend v. Original Opacity (%) = float (100,0,100)
+#@gui : sep = separator(), note = note("<b>Value Processing</b>")
+#@gui : 25. Value Action = choice(2,"None","Cut","Normalize")
+#@gui : 26. Number #1 = float(0,0,255)
+#@gui : 27. Number #2 = float(188,0,255)
+#@gui : 28. Equalize? = bool(0)
+#@gui : 29. Negate? = bool(0)
+#@gui : sep = separator(), note = note("<b>Warp by Intensity</b>")
+#@gui : 30. X-Factor = float(0.19,-6,6)
+#@gui : 31. Y-Factor = float(0.52,-6,6)
+#@gui : sep = separator()
+#@gui : 32. X-Offset = float(128,0,255)
+#@gui : 34. Y-Offset = float(128,0,255)
+#@gui : sep = separator()
+#@gui : 34. Correlated Channels = bool(0)
+#@gui : 35. Interpolation = choice(1,"Nearest Neighbor","Linear")
+#@gui : 36. Boundary = choice(2,"Transparent","Nearest","Periodic","Mirror")
+#@gui : sep = separator(), 37. Channel(s) = choice("All","RGBA [All]","RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","RGBA [Alpha]","Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]","YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]","YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]","Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]","HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]","CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]")
+#@gui : sep = separator(), note = note("<b>Style Processing</b>")
+#@gui : 38. Blur Original= float(0,0,16)
+#@gui : sep = separator(), note = note("<b>Butterworth Bandpass Processing</b>")
+#@gui : 39. Activate Butterworth Bandpass Processing = bool(0)
+#@gui : 40. Create copy? = bool(0)
+#@gui : 41. LP Frequency Power = float(3,0,16)
+#@gui : 42. LP Order Cube Root = float(2,0,4)
+#@gui : 43. HP Frequency Power = float(4,0,16)
+#@gui : 44. HP Order Cube Root = float(2,0,4)
+#@gui : 45. Colour Space = choice("RGB","sRGB","CMYK","CMY","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YIQ8","YIQ","YUV8","YUV","Bayer","HCY","XYZ8","XYZ")
+#@gui : 46. Absolute = bool(1)
+#@gui : 47. Makeup Gain = bool(1)
+#@gui : sep = separator(), note = note("<b>Relief Processing</b>")
+#@gui : 48. Activate Relief Processing = bool(1)
+#@gui : 49. Smoothness = float(0,0,10)
+#@gui : 50. Emboss Angle = float(0,0,360)
+#@gui : 51. Level 1 Depth Boost = float(1,0,1)
+#@gui : 52. Level 2 Depth Boost = float(0,0,1)
+#@gui : 53. Blending Mode = choice(0,"Grain Extract","Grain Merge")
+#@gui : 54. Blending Opacity (%) = float(100,0,100)
+#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/1/27</i>.</small>")
+
+_cons_turb :
+repeat $! l[$>] cons_turb $* endl done
+
+cons_turb : 
+-m "MergeChoice : $""=_mode" -MergeChoice "add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor","edges","error"
+skip {$23==0},{$25==0},{$26==0},{$29==0},{$48==0}
+fill_color ${1-3}
+turbulence ${4-6},0,$7
+balance_gamma ${8-10}
+remove_opacity
+if  {$13<=4} ac "_fx_noise $11,$12",{$13+2},$14
+else ac "_fx_noise $11,$12",{$13+3},$14 fi
+remove_opacity
++jr_desaturate ${15-19}
+blend normal,$20/100
++cons_self_blend $21,$22
+blend ${_mode{$23+1}},$24/100
+if {$25==1} cut $26,$27
+elif {$25==2} n $26,$27 fi
+if {$28==1} ac "equalize",rgb fi
+if {$29==1} negate fi
+fx_make_seamless 256
+fx_warp_by_intensity ${30-37}
+if {$39==1} if {$40==0} blur $38 fx_butterworth_bp ${41-45},0,${46-47} if {$48==1} +emboss_image ${49-52} fi else +fx_butterworth_bp ${41-45},0,${46-47} blur[0] $38 if {$48==1} emboss_image[1] ${49-52} fi fi
+elif {$39==0} blur $38 if {$48==1} +emboss_image ${49-52} fi fi
+if {$48==1} if {$53} blend grainmerge,$54/100 else blend grainextract,$54/100 fi fi
+
+cons_self_blend :
+-m "MergeChoice : $""=_mode" -MergeChoice "add","burn","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","linearburn","linearlight","luminance","multiply","negation","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","vividlight","edges","error"
+[0]
+blend ${_mode{$1+1}},$2/100
+
+_cons_turb_preview :
+gui_split_preview "_cons_turb $*",${-3--1}
+#@gui Transfer Colors [Reduced Colors] : tcrc, tcrc_preview(0)
+#@gui : sep = separator(), note = note ("<b>Transfer Color Setting<b>")
+#@gui : note = note ("<i>If using all layers as input layer, the layer is the reference layer. If using active and above/below, the layer is the target layer.</i>")
+#@gui : Layer to Use as Reference/Target Image = choice(0,"Top Layer","Bottom Layer")
+#@gui : 1. Is reference image smaller than target image? = bool(0)
+#@gui : 2. Color Count = int(16,2,4096)
+#@gui : 3. Color Dithering (%) = float(50,0,100)
+#@gui : 4. Color Indexing Method = choice(1,"Median Cut","Median Cut and K-Means")
+#@gui : 5. Alpha Value Count = int (2,2,255)
+#@gui : 6. Alpha Dithering (%) = float(50,0,100)
+#@gui : sep = separator(), note = note ("<b>Local Contrast<b>")
+#@gui : 8. Spatial Radius = float(80,2.5,200)
+#@gui : 9. Amount = float(0.5,0,5)
+#@gui : 10. Darkness Level = float(1,0,4)
+#@gui : 11. Lightness Level = float(1,0,4)
+#@gui : sep = separator(), note = note ("<b>RGB Adjustments<b>")
+#@gui : 12. Brightness (%) = float(0,-100,100)
+#@gui : 13. Contrast (%) = float(0,-100,100)
+#@gui : 14. Gamma (%) = float(0,-100,100)
+#@gui : 15. Saturation (%) = float(0,-100,100)
+#@gui : 16. Hue Shift = float(0,-180,180)
+#@gui : sep = separator(), note = note ("<b>LAB Color Adjustment<b>")
+#@gui : 17. Negative A Chroma (%) = float(0,-100,100)
+#@gui : 18. Positive A Chroma (%) = float(0,-100,100)
+#@gui : 19. Negative B Chroma (%) = float(0,-100,100)
+#@gui : 20. Positive B Chroma (%) = float(0,-100,100)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : sep = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2018/2/01</i>.</small>")
+tcrc : if {$1==1} rv fi ac[^0] "tcrc_adjustment ${8-20}",rgb rv[0,{$!-1}] repeat {$!-1} l[{$!-1},$<] tcrc_colormapping[0,1] ${2-7} endl done rv[0,{$!-1}] if {$1==0} rv fi
+
+tcrc_colormapping :
+rv
+split_opacity[1]
+to_rgba[1]
++colormap[0] {$1?$2+1:$2},$4,1
+index[1] [3],{$3/100},1
+l[2] (0) resize[1] {$5},1 f[1] "x" n[1] 0,255 index[0] [1],{$6/100},1 rm[1] endl
+rm[3]
+to_rgb[1] a[1,2] c
+rv
+
+tcrc_adjustment :
+rgb2hsl
+s c
+modf[0] 4,360,{$9/360},0
+a c
+hsl2rgb
+fx_LCE ${1-4},1 adjust_colors ${5-7},0,$8,0,255
+rgb2lab8
+s c
+l[1] (0,255) +index.. .,0,1 rm.. l[0] [0] endl a[1,2] c -.. 128 *.. {exp($10/64)} +.. 128 -. 128 *. {exp($11/64)} +. 128 cut 0,255 blend normal endl
+l[2] (0,255) +index.. .,0,1 rm.. l[0] [0] endl a[1,2] c -.. 128 *.. {exp($12/64)} +.. 128 -. 128 *. {exp($13/64)} +. 128 cut 0,255 blend normal endl
+a c
+lab82rgb
+
+tcrc_preview :
+tcrc $*
+
+######################
+
+# Local Variables:
+# mode: sh
+# End:
+#
+# (End of G'MIC custom commands)
