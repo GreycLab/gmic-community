@@ -46,21 +46,19 @@ _solarize
 _solarize :
 +negate
 blend darken mul 2
-
 #@cli modo :
 #@cli : (eq. to 'modular_operation').
 #@cli : $ modo 1, 255, {128/255}, 1
 modo : modular_operation $*
 #@cli modular_operation : 0>=operation<=5,chan_v>0, 0>value(%)<=1,two_layers=0|two_layers=1
 modular_operation :
-if {$4==0} repeat $! l[$>] split_opacity _modular_formula[0] $1,$2,$3,0 a c -endl done rv
-elif {$4==1} repeat {int($!/2)} l[{$>*2},{$>*2+1}] _modular_blending_pre[0,1] $1,$2,$3,1
-endl done fi
+if {$4==0} repeat $! l[$>] split_opacity _modular_formula $1,$2,$3,0 a c -endl done rv
+elif {$4==1} repeat {int($!/2)} l[{$>*2},{$>*2+1}] _modular_blending_pre $1,$2,$3 endl done fi
 _modular_blending_pre :
-split_opacity rv[1,2] +f[3] "255-i" +f[0] "(i#2/255+i#4/255*i#3/255)*255" rm[2-4] l[0,1] +rv l[0,1] _modular_formula[0,1] $1,$2,$3,1 rm[1] endl l[1,2]  _modular_formula[0,1] $1,$2,$3,1 rm[1] endl
-endl compose_channels[2] max [2] a[0,2] c a[1,2] c rv
++rv
+repeat {int($!/2)} l[{$>*2},{$>*2+1}] modf $1,$2,$3,1 endl done rm[1,3] rv
 #@cli modf:
-#@cli : (eq. to '_modular_formula)
+#@cli : (eq. to '_modular_formula')
 #@cli : $ modf 3,255,{128/255},0
 modf : _modular_formula $*
 #@cli _modular_formula : 0>=operation<=5,chan_v>0, 0>value(%)<=1,two_layers=0|two_layers=1
@@ -71,6 +69,20 @@ elif {$1==2} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;ivp=1/vp;simg=ivp*
 elif {$1==3} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;ivp=1/vp;simg=ivp*img;maxm=$2+eps;f=simg-maxm*floor(simg/maxm);minm=$2*vp;e=ceil((i#0/minm))%2>0?$2:0;cinv=i#0>0?e:$2;cinv>0?f:$2-f"
 elif {$1==4} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;vpi=vp*$2;fimg=img+vpi;maxm=$2+eps;fimg-maxm*floor(fimg/maxm)"
 elif {$1==5} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;vpi=vp*$2;fimg=img+vpi;maxm=$2+eps;f=fimg-maxm*floor(fimg/maxm);cinv=fimg>maxm?$2:0;cinv>0?maxm-f:f" fi
+#@cli em:
+#@cli : (eq. to 'emboss_image')
+#@cli : $ em 0,90,{50/100},0
+em : emboss_image $*
+#@cli emboss_image : 0>=Smoothness>=10, 0>=Angle>=360, 0>= Preliminary Depth >=1,0>=Depth Boost>=1
+emboss_image:
+l[0]
+luminance
+fx_gradient2rgb $1,0,100,0,0
+[0]
+repeat 2 l[$>] rgb2hsv s c l[0] + {$2+($>*180)} % 360 endl a c hsv2rgb to_rgb s c rm[1,2] endl done
+l[0] n 128,255 endl l[1] negate n 0,128 endl
++fill_color[0] 128,128,128,255 rv blend grainmerge,$3 [0] blend grainmerge,$4
+endl
 
 #@gui _<b>Testing</b>
 #@gui <i>Reptorian</i>
@@ -396,64 +408,24 @@ gui_split_preview "fx_vibrato ${1--2}",$-1
 
 #@gui Emboss/Relief : fx_emboss_relief, fx_emboss_relief_preview(0)
 #@gui : sep = separator()
-#@gui : Smoothness = float(0,0,10)
-#@gui : Emboss Angle = float(0,0,360)
-#@gui : Level 1 Depth Boost = float(0,0,1)
-#@gui : Level 2 Depth Boost = float(0,0,1)
-#@gui : Preserve Alpha? = bool(1)
+#@gui : 1. Smoothness = float(0,0,10)
+#@gui : 2. Emboss Angle = float(0,0,360)
+#@gui : 3. Depth = float(1,0,1)
+#@gui : 4. Depth Boost = float(0,0,1)
+#@gui : 5. Preserve Alpha? = bool(1)
 #@gui : sep = separator(), note = note("Relief Section")
-#@gui : Apply relief? = bool(1)
-#@gui : Blending Mode = choice(0,"Grain Extract","Grain Merge")
-#@gui : Blending Opacity = float(1,0,1)
+#@gui : 6. Apply Relief? = bool(1)
+#@gui : 7. Blending Mode = choice(0,"Grain Extract","Grain Merge")
+#@gui : 8. Blending Opacity (%) = float(100,0,100)
 #@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
 #@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/1/9</i>.</small>")
-
 fx_emboss_relief :
-if {$6==1} split_opacity
-+fx_emboss $1,$2,$3,$4,0
-if {$7==0} blend[0,2] grainextract,$8
-elif {$7==1} blend[0,2] grainmerge,$8 fi
-if {$5==0} rm[1]
-elif {$5==1} a c fi
-elif {$6==0} fx_emboss $1,$2,$3,$4,$5 fi
-
-fx_emboss :
-split_opacity
-emboss_image[0] $1,$2,$3,$4
-if {$5==0} rm[1]
-elif {$5==1} a c fi
-
-emboss_image :
-luminance
-fx_gradient2rgb $1,0,100,0,0
-_hue_rotation $2
-+_hue_rotation 180
-_angle_result[0] 0
-_angle_result[1] 1
-+fill_color 127.5,127.5,127.5,255
-blend grainmerge
-[0]
-blend grainmerge,$3
-[0]
-blend grainmerge,$4
-
-_angle_result :
-to_rgb
-s c
-rm[1,2]
-if {$1==0} n 128,255
-elif {$1==1} negate n 0,128 fi
-
-_hue_rotation :
-rgb2hsv s c
-local[0]
-f "H=$1;H+i-(floor((H+i)/360)*360)"
-endl
-a c
-hsv2rgb
-
+-m "MergeChoice : $""=_mode" -MergeChoice "grainextract","grainmerge","error"
+skip {$5==1}
+repeat $! l[$>] split_opacity l[0] if $6 +em ${1-4} blend ${_mode{$7+1}},{$8/100} else em ${1-4} fi endl a c if {$5==0} remove_opacity fi endl done
 fx_emboss_relief_preview :
 gui_split_preview "fx_emboss_relief $*",${-3--1}
+
 #@gui Construction Material Texture : _cons_turb, _cons_turb_preview(0)
 #@gui : note = note("Construction Material Texture filter is based off the following tutorial by <b>theonlychad</b> for Paint.NET software: <a href="https://forums.getpaint.net/topic/16075-concrete-texture-tutorial/">Concrete Texture Tutorial</a>.\n")
 #@gui : sep = separator(), note = note("<b>Turbulance Texture</b>")
