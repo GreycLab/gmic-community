@@ -222,17 +222,18 @@ elif {$1==4} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;vpi=vp*$2;fimg=img
 elif {$1==5} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;vpi=vp*$2;fimg=img+vpi;maxm=$2+eps;f=fimg-maxm*floor(fimg/maxm);cinv=fimg>maxm?$2:0;cinv>0?maxm-f:f" fi
 #@cli em:
 #@cli : (eq. to 'emboss_image')
-#@cli : $ em 0,90,{50/100},0
+#@cli : $ em 90,0,1
 em : emboss_image $*
-#@cli emboss_image : 0>=Smoothness>=10, 0>=Angle>=360, 0>= Preliminary Depth >=1,0>=Depth Boost>=1
-emboss_image:
+#@cli emboss_image : 0>=Angle>=360, 0>= Depth <=2, 0>=Smoothness>=10, 
+#@cli : Default values: depth=1,smoothness=0
+emboss_image: -skip ${2=1},${3=0}
 l[0]
 luminance
-fx_gradient2rgb $1,0,100,0,0
+fx_gradient2rgb $3,0,100,0,0
 [0]
-repeat 2 l[$>] rgb2hsv s c l[0] + {$2+($>*180)} % 360 endl a c hsv2rgb to_rgb s c rm[1,2] endl done
+repeat 2 l[$>] rgb2hsv s c l[0] + {$1+($>*180)} % 360 endl a c hsv2rgb to_rgb s c rm[1,2] endl done
 l[0] n 128,255 endl l[1] negate n 0,128 endl
-+fill_color[0] 128,128,128,255 rv blend grainmerge,$3 [0] blend grainmerge,$4
++fill_color[0] 128,128,128,255 rv blend grainmerge,{$2>1?1:$2} if {$2>1} [0] blend grainmerge,{$2-1} fi
 endl
 
 #@gui _<b>Testing</b>
@@ -557,26 +558,6 @@ endl done
 _fx_vibrato_preview :
 gui_split_preview "fx_vibrato ${1--2}",$-1
 
-#@gui Emboss/Relief : fx_emboss_relief, fx_emboss_relief_preview(0)
-#@gui : sep = separator()
-#@gui : 1. Smoothness = float(0,0,10)
-#@gui : 2. Emboss Angle = float(0,0,360)
-#@gui : 3. Depth = float(1,0,1)
-#@gui : 4. Depth Boost = float(0,0,1)
-#@gui : 5. Preserve Alpha? = bool(1)
-#@gui : sep = separator(), note = note("Relief Section")
-#@gui : 6. Apply Relief? = bool(1)
-#@gui : 7. Blending Mode = choice(0,"Grain Extract","Grain Merge")
-#@gui : 8. Blending Opacity (%) = float(100,0,100)
-#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
-#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/1/9</i>.</small>")
-fx_emboss_relief :
--m "MergeChoice : $""=_mode" -MergeChoice "grainextract","grainmerge","error"
-skip {$5==1}
-repeat $! l[$>] split_opacity l[0] if $6 +em ${1-4} blend ${_mode{$7+1}},{$8/100} else em ${1-4} fi endl a c if {$5==0} remove_opacity fi endl done
-fx_emboss_relief_preview :
-gui_split_preview "fx_emboss_relief $*",${-3--1}
-
 #@gui Construction Material Texture : _cons_turb, _cons_turb_preview(0)
 #@gui : note = note("Construction Material Texture filter is based off the following tutorial by <b>theonlychad</b> for Paint.NET software: <a href="https://forums.getpaint.net/topic/16075-concrete-texture-tutorial/">Concrete Texture Tutorial</a>.\n")
 #@gui : sep = separator(), note = note("<b>Turbulance Texture</b>")
@@ -601,8 +582,8 @@ gui_split_preview "fx_emboss_relief $*",${-3--1}
 #@gui : sep = separator(), note = note("<b>Self-Image Processing</b>")
 #@gui : 21. Self-Blending = choice(20,"add","burn","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","linearburn","linearlight","luminance","multiply","negation","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","vividlight")
 #@gui : 22. Self-Blending Opacity (%) = float (100,0,100)
-#@gui : 23. Self-Blending v. Original Blending = choice(15,"add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor")
-#@gui : 24. Self-Blend v. Original Opacity (%) = float (100,0,100)
+#@gui : 23. Self-Blending V. Original Blending = choice(15,"add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor")
+#@gui : 24. Self-Blend V. Original Opacity (%) = float (100,0,100)
 #@gui : sep = separator(), note = note("<b>Value Processing</b>")
 #@gui : 25. Value Action = choice(2,"None","Cut","Normalize")
 #@gui : 26. Number #1 = float(0,0,255)
@@ -621,32 +602,29 @@ gui_split_preview "fx_emboss_relief $*",${-3--1}
 #@gui : 36. Boundary = choice(2,"Transparent","Nearest","Periodic","Mirror")
 #@gui : sep = separator(), 37. Channel(s) = choice("All","RGBA [All]","RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","RGBA [Alpha]","Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]","YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]","YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]","Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]","HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]","CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]")
 #@gui : sep = separator(), note = note("<b>Style Processing</b>")
-#@gui : 38. Blur Original= float(0,0,16)
+#@gui : 38. Blur Original = float(0,0,16)
 #@gui : sep = separator(), note = note("<b>Butterworth Bandpass Processing</b>")
 #@gui : 39. Activate Butterworth Bandpass Processing = bool(0)
-#@gui : 40. Create copy? = bool(0)
+#@gui : 40. Create Copy? = bool(0)
 #@gui : 41. LP Frequency Power = float(3,0,16)
 #@gui : 42. LP Order Cube Root = float(2,0,4)
 #@gui : 43. HP Frequency Power = float(4,0,16)
 #@gui : 44. HP Order Cube Root = float(2,0,4)
-#@gui : 45. Colour Space = choice("RGB","sRGB","CMYK","CMY","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YIQ8","YIQ","YUV8","YUV","Bayer","HCY","XYZ8","XYZ")
+#@gui : 45. Colour Space = choice("RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","CMY","CMYK","Bayer")
 #@gui : 46. Absolute = bool(1)
 #@gui : 47. Makeup Gain = bool(1)
 #@gui : sep = separator(), note = note("<b>Relief Processing</b>")
 #@gui : 48. Activate Relief Processing = bool(1)
-#@gui : 49. Smoothness = float(0,0,10)
-#@gui : 50. Emboss Angle = float(0,0,360)
-#@gui : 51. Level 1 Depth Boost = float(1,0,1)
-#@gui : 52. Level 2 Depth Boost = float(0,0,1)
-#@gui : 53. Blending Mode = choice(0,"Grain Extract","Grain Merge")
-#@gui : 54. Blending Opacity (%) = float(100,0,100)
+#@gui : 49. Angle = float(0,0,360)
+#@gui : 50. Depth = float(100,0,200)
+#@gui : 51. Smoothness = float(0,0,10)
+#@gui : 52. Blending Mode = choice(0,"Grain Extract","Grain Merge")
+#@gui : 53. Blending Opacity (%) = float(100,0,100)
 #@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
 #@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/1/27</i>.</small>")
-
 _cons_turb :
 repeat $! l[$>] cons_turb $* endl done
-
-cons_turb : 
+cons_turb :
 -m "MergeChoice : $""=_mode" -MergeChoice "add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor","edges","error"
 skip {$23==0},{$25==0},{$26==0},{$29==0},{$48==0}
 fill_color ${1-3}
@@ -666,17 +644,30 @@ if {$28==1} ac "equalize",rgb fi
 if {$29==1} negate fi
 fx_make_seamless 256
 fx_warp_by_intensity ${30-37}
-if {$39==1} if {$40==0} blur $38 fx_butterworth_bp ${41-45},0,${46-47} if {$48==1} +emboss_image ${49-52} fi else +fx_butterworth_bp ${41-45},0,${46-47} blur[0] $38 if {$48==1} emboss_image[1] ${49-52} fi fi
-elif {$39==0} blur $38 if {$48==1} +emboss_image ${49-52} fi fi
-if {$48==1} if {$53} blend grainmerge,$54/100 else blend grainextract,$54/100 fi fi
-
+if {$39==1} if {$40==0} blur $38 fx_butterworth_bp ${41-45},0,${46-47} if {$48==1} +emboss_image $49,{$50/100},$51 fi else +fx_butterworth_bp ${41-45},0,${46-47} blur[0] $38 if {$48==1} emboss_image[1] $49,{$50/100},$51  fi fi
+elif {$39==0} blur $38 if {$48==1} +emboss_image $49,{$50/100},$51  fi fi
+if {$48==1} if $52 blend grainmerge,$53/100 else blend grainextract,$53/100 fi fi
 cons_self_blend :
 -m "MergeChoice : $""=_mode" -MergeChoice "add","burn","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","linearburn","linearlight","luminance","multiply","negation","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","vividlight","edges","error"
 [0]
 blend ${_mode{$1+1}},$2/100
-
 _cons_turb_preview :
 gui_split_preview "_cons_turb $*",${-3--1}
+#@gui Emboss/Relief : fx_emboss_relief, fx_emboss_relief_preview(0)
+#@gui : sep = separator()
+#@gui : 1. Angle = float(0,0,360)
+#@gui : 2. Depth = float(1,0,200)
+#@gui : 3. Smoothness = float(0,0,10)
+#@gui : 4. Invert Embossing? = bool(0)
+#@gui : 5. Preserve Alpha? = bool(1)
+#@gui : sep = separator(), note = note("Relief Section")
+#@gui : 6. Apply Relief? = bool(1)
+#@gui : 7. Blending Opacity (%) = float(100,0,100)
+#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/1/9</i>.</small>")
+fx_emboss_relief : repeat $! l[$>] +em $1,{$2/100},$3 if $4 negate. fi if $6 blend grainmerge,{$7/100} else rm.. fi if {$5==0} remove_opacity fi endl done
+fx_emboss_relief_preview :
+gui_split_preview "fx_emboss_relief $*",${-3--1}
 #@gui Transfer Colors [Reduced Colors] : tcrc, tcrc_preview(0)
 #@gui : sep = separator(), note = note ("<b>Transfer Color Setting<b>")
 #@gui : note = note ("<i>If using all layers as input layer, the top layer is the primarily reference layer. If using active and above/below, the top layer is the primarily target layer.</i>")
