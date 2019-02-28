@@ -46,10 +46,12 @@ _$0 $"*"
 _pal:
 v - mode="$1"
 if {isval("$1")} if {isint("$1")}
+if {$1!=abs($1)} mode="i" else
 mode=${arg\ 1+$1,bw,rgb,b_rgb,bw_rgb,cmy,cmyk,wcmyk,rgbcmy,1bitrgb,aurora,playpal,kens16,kens32,kens54,aap12,aap16,aap64,aap128,db8,db16,db32,db_iso22,edg8,edg16,edg32,edg36,edg64,xaiue,fant16,fant24,tf23,tfp39,faraway48,fleja_m,linearbasic,arq16,blk36,cdbac,cgarne,cpcboy,dimwid23,4l,fzteth16,gzxp,pear36,pineapple32,rosy42,sft15,spec12,starmancer,sup8,sweetie16,taffy16,todayland,zu32,enos16,equpix15,night16,simjpc16,acid15,battery24,crimso11,drz15,eggy15,jewel,polar11,boomboom,g8,matriax8c,au15,au15y,jerrypie22,naji16,blessing,fairy,fuzz4,pastel,tui15,cave,psygnosia,marshmellow32,finlal11,ykb22,graveyard,steamlords,aaprad,daruda,rust6,xaiue_rad,firestorm,supernova7,nyx8,oil6,pixelwave,gb_d_1,gb_d_2,gb_bz,gb_easy,gb_arne,gb_pj,gb_kirokaze,gb_cyber,gb_grapefruit,gb_forest,gb_ice_cream,gb_rb,gb_choco,arne4,hal4,amiga2600ntsc,amiga2600pal,secam,amstrad_cpc,apple2,cga,cga00,cga01,cga10,cga11,cga20,cga21,c64,com_vic_20,jmp,mac2,nes,pico_8,risc,mo5,zx,gnome32,elc22,chip16,msx,lms,msxp,vis}
-fi fi
+fi fi fi
 v + e[^-1] "Create palette '"$mode"' for pixel art or effect."$_gmic_s"." v -
 _pal_$mode
+_pal_i: if {$!==2} +autocrop _ia={w#2*h#2} _ib={w#3*h#3} rm[^0-1] if {$_ia<$_ib} rv fi l[1] fx_extract_objects 0,0,0,0,0,0,1 rm. s y autocrop 0,0,0,0 a x to_rgb if {w>1024} v + error "ERROR: Too much colors in palette! Please reduce colors!" fi endl else v + error "ERROR: Need two layers for command to work!" fi
 _pal_polar11: (10,171,209,245,245,135,153,95,51,45,47^10,41,105,202,241,140,194,148,157,98,43^10,41,31,47,237,129,78,72,181,150,107)
 _pal_rust6: (35,113,165,225,240,255^0,47,73,136,187,226^0,48,50,102,156,198)
 _pal_cave: (0,16,54,68,143,199,156,245^0,0,29,63,86,144,228,245^0,41,35,79,179,101,199,245)
@@ -197,6 +199,29 @@ _pal_jmp:
 _pal_mac2: (255,255,255,220,255,54,0,0,0,0,101,151,185,134,69,0^255,255,101,0,0,0,0,151,168,101,54,101,185,134,69,0^255,0,0,0,151,151,202,255,0,0,0,54,185,134,69,0)
 _pal_secam: (0,33,240,255,127,127,255,255^0,33,60,80,255,255,255,255^0,255,121,255,0,255,63,255)
 _pal_jewel: (50,102,184,210,242,240,223,188,121,86,74,77,115,116,156^30,36,40,106,197,232,183,123,65,96,143,193,227,130,172^45,49,28,18,60,156,127,98,107,148,169,179,123,161,186)
+#@cli lctwp : eq. to 'low_color_transfer_with_palette'
+lctwp: low_color_transfer_with_palette $*
+#@cli : low_color_transfer_with_palette
+#@cli : Transfer Colors to images using a palette. If using negative number or "i" for first variable, there must be exactly two layers. Else, they must be performed per 1 layers in a loop if one were to apply palette transfer among multiple layers! 
+#@cli : For 2 layers where one is a palette - $ low_color_transfer_with_palette -1,0,.5
+#@cli : To apply palette colors to multiple layers - $ repeat $! l[$<] low_color_transfer_with_palette db32,0,.5 endl done
+low_color_transfer_with_palette: 
+_iw={w}
+_ih={h}
+_CI={$2}
+Palette=$1
+if {isval($1)} if {$1<0} Palette=-1 else Palette=1 fi else if {"$1"="i"} Palette=1 else Palette=-1 fi fi
+skip ${4=2},${5=0},${6=.5}
+AlpC=$4 AlpD=$5 SF=$6
+if {$4<2} v + error "Error: 4th input cannot be set to less than 2!" fi
+if {$Palette==-1} pal -1 fi
+split_opacity[0]
+l[^1] if {$Palette!=-1} pal $1 fi if {$_CI==0} index.. .,$3,1 rm.
+elif {$_CI==1} to_rgba ${_iw},${_ih},1,4 noise. {$SF*75} to_graya. blend[^1] difference,1 to_rgb index.. .,$3,1 rm.
+elif {$_CI==2} pal 0 [0] index. ..,1,1 rm.. +blend[^1] interpolation,$4 rm.. index. ..,$3,1 k.
+else if {$CI>2} if {($_CI-3)==0} +f[0] "x%2*255" else +f[0] "y%2*255" fi fi blend[^1] multiply,{$SF/20} index.. .,$3,1 rm. fi 
+endl
+l[1] ${AlpC},1,1,1 f. "x" n. 0,255 index.. .,${AlpD},1 rm. endl a c
 #@cli sol : eq. to '_solarize'.
 sol :
 _solarize
