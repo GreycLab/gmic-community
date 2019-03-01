@@ -51,7 +51,7 @@ mode=${arg\ 1+$1,bw,rgb,b_rgb,bw_rgb,cmy,cmyk,wcmyk,rgbcmy,1bitrgb,aurora,playpa
 fi fi fi
 v + e[^-1] "Create palette '"$mode"' for pixel art or effect."$_gmic_s"." v -
 _pal_$mode
-_pal_i: if {$!==2} +autocrop _ia={w#2*h#2} _ib={w#3*h#3} rm[^0-1] if {$_ia<$_ib} rv fi l[1] fx_extract_objects 0,0,0,0,0,0,1 rm. s y autocrop 0,0,0,0 a x to_rgb if {w>1024} v + error "ERROR: Too much colors in palette! Please reduce colors!" fi endl else v + error "ERROR: Need two layers for command to work!" fi
+_pal_i: if {$!==2} if {h#1!=1 && h#0!=1} +autocrop _ia={w#2*h#2} _ib={w#3*h#3} rm[^0-1] if {$_ia<$_ib} rv fi l[1] fx_extract_objects 0,0,0,0,0,0,1 rm. s y autocrop 0,0,0,0 a x to_rgb if {w>1024} v + error "ERROR: Too much colors in palette! Please reduce colors!" fi endl else +autocrop _ia={w#2*h#2} _ib={w#3*h#3} rm[^0-1] if {$_ia<$_ib} rv fi to_rgb[1] if {w#1>1024} v + error "ERROR: Too much colors in palette! Please reduce colors!" fi fi else v + error "ERROR: Need two layers for command to work!" fi
 _pal_polar11: (10,171,209,245,245,135,153,95,51,45,47^10,41,105,202,241,140,194,148,157,98,43^10,41,31,47,237,129,78,72,181,150,107)
 _pal_rust6: (35,113,165,225,240,255^0,47,73,136,187,226^0,48,50,102,156,198)
 _pal_cave: (0,16,54,68,143,199,156,245^0,0,29,63,86,144,228,245^0,41,35,79,179,101,199,245)
@@ -211,17 +211,19 @@ _ih={h}
 _CI={$2}
 Palette=$1
 if {isval($1)} if {$1<0} Palette=-1 else Palette=1 fi else if {"$1"="i"} Palette=1 else Palette=-1 fi fi
-skip ${4=2},${5=0},${6=.5}
+skip ${4=2},${5=0},${6=.5},${7=0},${8=1},${9=1},${10=0},${11=32},${12=32},${13=1},${14=0}
 AlpC=$4 AlpD=$5 SF=$6
 if {$4<2} v + error "Error: 4th input cannot be set to less than 2!" fi
 if {$Palette==-1} pal -1 fi
+if $7 r[0] {100/$8}%,{100/$9}%,1,4,$7 fi
 split_opacity[0]
-l[^1] if {$Palette!=-1} pal $1 fi if {$_CI==0} index.. .,$3,1 rm.
-elif {$_CI==1} to_rgba ${_iw},${_ih},1,4 noise. {$SF*75} to_graya. blend[^1] difference,1 to_rgb index.. .,$3,1 rm.
-elif {$_CI==2} pal 0 [0] index. ..,1,1 rm.. +blend[^1] interpolation,$4 rm.. index. ..,$3,1 k.
-else if {$CI>2} if {($_CI-3)==0} +f[0] "x%2*255" else +f[0] "y%2*255" fi fi blend[^1] multiply,{$SF/20} index.. .,$3,1 rm. fi 
+l[^1] if {$Palette!=-1} pal $1 fi if {$_CI==0} if {$10>1} l[0] at "autoindex $10,$13,$14"$11,$12 endl index.. .,0,1 else index.. .,$3,1 fi rm.
+elif {$_CI==1} to_rgba ${_iw},${_ih},1,4 noise. {$SF*75} to_graya. blend[^1] difference,1 to_rgb if {$10>1} l[0] at "autoindex $10,$13,$14"$11,$12 endl index.. .,0,1 else index.. .,$3,1 fi rm.
+elif {$_CI==2} pal 0 [0] index. ..,1,1 rm.. +blend[^1] interpolation,$4 rm[0,2] rv if l[0] at "autoindex $10,$13,$14"$11,$12 endl index.. .,0,1 else index.. .,$3,1 fi rm.
+else if {$CI>2} if {($_CI-3)==0} +f[0] "x%2*255" else +f[0] "y%2*255" fi fi blend[^1] multiply,{$SF/20} if {$10>1} l[0] at "autoindex $10,$13,$14"$11,$12 endl index.. .,0,1 else index.. .,$3,1 fi rm. fi 
 endl
 l[1] ${AlpC},1,1,1 f. "x" n. 0,255 index.. .,${AlpD},1 rm. endl a c
+if $7 r {100*$8}%,{100*$9}%,1,4,1 fi
 #@cli sol : eq. to '_solarize'.
 sol :
 _solarize
