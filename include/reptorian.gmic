@@ -208,26 +208,49 @@ _pal_secam: (0,33,240,255,127,127,255,255^0,33,60,80,255,255,255,255^0,255,121,2
 _pal_jewel: (50,102,184,210,242,240,223,188,121,86,74,77,115,116,156^30,36,40,106,197,232,183,123,65,96,143,193,227,130,172^45,49,28,18,60,156,127,98,107,148,169,179,123,161,186)
 #@cli pal_t : eq. to 'palette_transfer'
 pal_t: palette_transfer $*
-#@cli : palette_transfer
+#@cli palette_transfer : palette_id,0>=indexing_style<=4,0>=color_dithering<=1,transfer_rgb [0 = No, 1 = Yes],0>=alpha_count,0>=alpha_dithering<=1,0>=special_effect_factor,activate_upscaling_stimulation [0 = Does not activate | 1 = Stimulate hardware restriction],0>=initial_resize_method<=5,1>=pixel_width,1>=pixel_height,activate_hardware_stimulation [0 = Does not activate | 1 = Stimulate hardware restriction],1>=color_section_of_hardware_restriction_precision_factor,hardware_restriction_by_tile_width,hardware_restriction_by_tile_height,hardware_alpha_precision,hardware_alpha_mapping_method,alpha_precion_factor,alpha_method_for_hardware_stimulation
 #@cli : Transfer Colors to images using a palette. If using negative number or "i" for first variable, there must be exactly two layers. Else, they must be performed per 1 layers in a loop if one were to apply palette transfer among multiple layers! 
 #@cli : For 2 layers where one is a palette - $ palette_transfer -1,0,.5
 #@cli : To apply palette colors to multiple layers - $ repeat $! l[$<] palette_transfer db32,0,.5 endl done
 palette_transfer:
 _iw={w}
 _ih={h}
+skip ${4=0},${5=2},${6=0},${7=.5},${8=0}${9=0},${10=1},${11=1},${12=0},${13=10},${14=5},${15=5},${16=4},${17=1},${18=10},${19=1}
+pw=$10
+ph=$11
+if {$8||$9} if {$pw<=0||$ph<=0} v + error "Invalid input for pixel scale factor(s)!" fi
+r={$pw>$ph?$pw/$ph:$ph/$pw} fi
 _CI={$2}
-skip ${4=2},${5=0},${6=.5},${7=0},${8=1},${9=1},${10=0},${11=32},${12=32},${13=1},${14=0},${15=0}
-AlpC=$4 AlpD=$5 SF=$6
+AlpC=$5 AlpD=$6 SF=$7
 pal $1
-if $7 r[0] {100/$8}%,{100/$9}%,1,4,$7 fi
+if $8 r[0] {$r*100}%,{$r*100}%,1,4,$9 fi
+if $9 r[0] {100/$10}%,{100/$11}%,1,4,$9 fi
 split_opacity[0]
-l[^1] if {$_CI==0} if {$10>1} l[0] at "autoindex $10,$13,$14",$11,$12,,,,,3 endl index.. .,0,1 else index.. .,$3,1 fi rm.
-elif {$_CI==1} to_rgba ${_iw},${_ih},1,4 noise. {$SF*75} to_graya. blend[^1] difference,1 to_rgb if {$10>1} l[0] at "autoindex $10,$13,$14",$11,$12,,,,,3 endl index.. .,0,1 else index.. .,$3,1 fi rm.
-elif {$_CI==2} pal 0 [0] index. ..,1,1 rm.. +blend[^1] interpolation,$4 rm[0,2] rv if l[0] at "autoindex $10,$13,$14",$11,$12,,,,,3 endl index.. .,0,1 else index.. .,$3,1 fi rm.
-else if {$CI>2} if {($_CI-3)==0} +f[0] "x%2*255" else +f[0] "y%2*255" fi fi blend[^1] multiply,{$SF/20} if {$10>1} l[0] at "autoindex $10,$13,$14",$11,$12,,,,,3 endl index.. .,0,1 else index.. .,$3,1 fi rm. fi 
+l[^1] if $4 to_rgb transfer_rgb.. . fi if {$_CI==0} if {$12>0} l[0] ahre_rgb $13,$14,$15,$16,$3,$17 endl index.. .,0,1 else index.. .,$3,1 fi rm.
+elif {$_CI==1} to_rgba ${_iw},${_ih},1,4 noise. {$SF*75} to_graya. blend[^1] difference,1 to_rgb if {$12>0} l[0] ahre_rgb $13,$14,$15,$16,$3,$17 endl index.. .,0,1 else index.. .,$3,1 fi rm.
+elif {$_CI==2} pal 0 [0] index. ..,1,1 rm.. +blend[^1] interpolation,$5 rm[0,2] rv if {$11>0} l[0] ahre_rgb $13,$14,$15,$16,$3,$17 endl index.. .,0,1 else index.. .,$3,1 fi rm.
+else if {$CI>2} if {($_CI-3)==0} +f[0] "x%2*255" else +f[0] "y%2*255" fi fi blend[^1] multiply,{$SF/20} if {$11>0} l[0] ahre_rgb $13,$14,$15,$16,$3,$17 endl index.. .,0,1 else index.. .,$3,1 fi rm. fi
 endl
-if {$4<2} rm. if $7 r {100*$8}%,{100*$9}%,1,3,1 fi else
-l[1] ${AlpC},1,1,1 f. "x" n. 0,255 if {$10>1&&$4>2} l[0] at "autoindex $10,${AlpD},$15",$11,$12,,,,,3 endl index.. .,0,1 else index.. .,${AlpD},1 fi rm. endl a c if $7 r {100*$8}%,{100*$9}%,1,4,1 fi fi
+if {$5<2} rm. if $9 r {100*$10}%,{100*$11}%,1,3,1 fi else
+l[1] ${AlpC},1,1,1 f. "x" n. 0,255 if {$12>0&&$5>2} l[0] ahre_bw $18,${AlpC},$14,$15,$16,${AlpD},$19 endl index.. .,0,1 else index.. .,${AlpD},1 fi rm. endl a c if $9 r {100*$10}%,{100*$11}%,1,4,1 fi fi
+#@cli pal_l :
+#@cli : Convert palettes to layers
+pal_l :
+repeat $! l[$>]
+_iw={w}
+if {h=1} repeat {${_iw}-1} [0] done repeat ${_iw} crop[$>] $>,0,$>,0 done else v + error "This is not a palette!" fi endl done
+#@cli ahre_rgb: (eq. to auto_hardware_restriction_emulation_RGB)
+ahre_rgb : auto_hardware_restriction_emulation_RGB $*
+#@cli auto_hardware_restriction_emulation_RGB : precision_factor>1,tile_size_width>0,tile_size_height>0,colors_per_tiles>0,0>=dithering<=1,color_mapping_method [0 = median-cut | 1 = median-cut and k-means]
+#@cli : Emulates hardware restriction automatically being based on the image.
+auto_hardware_restriction_emulation_RGB :
+repeat $! l[$>] remove_opacity to_rgba repeat $1 [0] done l[$1] +colormap $1,0,0 at[0] "s c f "ia" a c",$2,$3,,,,,3 index.. .,0,1 pal_l. r[1-{$1}] {w#0},{h#0},1,4,1 l[0] repeat {$1-1} [0] done endl repeat $1 l[$>,{$>+$1}] f[0] "i#0==i#1?255:0" endl done k[0-{$1-1}] to_gray endl to_rgb[0-{$1-1}] repeat $1 a[$>,$1] c done repeat $1 l[$>] +solidify 0,0,0,0,0 blend normal endl done ac "autoindex $4,$5,$6",rgb blend alpha to_rgb endl done
+#@cli ahre_bw: (eq. to auto_hardware_restriction_emulation_BW)
+ahre_bw: auto_hardware_restriction_emulation_BW $*
+#@cli auto_hardware_restriction_emulation_BW : precision_factor>1,end_color>1,tile_size_width>0,tile_size_height>0,colors_per_tiles>0,0>=dithering<=1,color_mapping_method [0 = median-cut | 1 = median-cut and k-means]
+#@cli : Emulates hardware restriction automatically being based on the image.
+auto_hardware_restriction_emulation_BW : repeat $! l[$>]
+to_gray _l={im} _h={iM} $1,1,1,1 f. "x" n. 0,255 +at.. "f "ia"",$3,$4,,,,,3 index. ..,0,1 rv[^0] pal_l. r[^0-1] {w#0},{h#0},1,1,1 repeat $1 l[1,{$>+2}] f[1] "i#0==i#1?255:0" endl done rm[1] repeat $1 +a[0,{$>+1}] c done rm[0-5] repeat $1 l[$>] +solidify 0,0,0,0,0 blend normal endl done ac "autoindex $5,$6,$7",rgb blend alpha to_gray n ${_l},${_h} $2,1,1,1 f. "x" n. 0,255 index.. .,0,1 rm. to_gray endl done
 #@cli sol : eq. to '_solarize'.
 sol :
 _solarize
@@ -253,6 +276,7 @@ repeat {int($!/2)} l[{$>*2},{$>*2+1}] modf $1,$2,$3,1 endl done rm[1,3] rv
 modf : _modular_formula $*
 #@cli _modular_formula : 0>=operation<=5,chan_v>0, 0>value(%)<=1,two_layers=0|two_layers=1
 _modular_formula :
+skip ${4=0}
 if {$1==0} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;mv=($2*vp)+eps;f=img-mv*floor(img/mv);f>$2*vp?$2*vp:f"
 elif {$1==1} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;mv=($2*vp)+eps;nf=img-mv*floor(img/mv);minm=$2*vp;e=ceil((i#0/minm))%2>0?$2:0;cinv=i#0>0?e:$2;cinv>0?nf:mv-nf"
 elif {$1==2} f "eps=.0000000000001;img=i#0;vp=$4==1?i#1/$2:$3;ivp=1/vp;simg=ivp*img;maxm=$2+eps;f=simg-maxm*floor(simg/maxm)"
@@ -783,6 +807,73 @@ tcrc $*
 #@gui : sep = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2019/2/22</i>.</small>")
 goof_res: repeat $! l[$>] if $2 s x,$1 repeat {$1/2-1} a[0,{$>+2}] x done a[^0] x if $4 rv fi if $3 a y else a x fi else  $2 s y,$1 repeat {$1/2-1} a[0,{$>+2}] y done a[^0] y if $4 rv fi if $3 a y else a x fi fi endl done
 goof_res_preview: goof_res $*
+
+#@gui Color Modulo Texture: colmt,colmt_preview(0)
+#@gui : note = note("This filter is inspired by <i><a href="https://forums.getpaint.net/topic/7186-madjik-all-plugins-last-updated-2018-04-07/">MadJik's<small><small>.</small></small></a></i> PDN plugin named <i>Color Modulo</i>. This version offers more features than the original plugin for Paint.NET such as channel swapping, color space, and finally, modulo forms."), sep = separator()
+#@gui : Color Space = choice(0,"RGB8","CMY8","CMYK8","HSI8","HSL8","HSV8","LAB8","LCH8","YIQ8","YUV8","XYZ8")
+#@gui : sep = separator(), note = note("<b>Main Section</b>")
+#@gui : Interpolation = choice(2,"None","Nearest","Average","Linear","Grid","Bicubic","Lanczos")
+#@gui : Interpolation Factor = int(5,1,5)
+#@gui : Reverse Diagonal = bool(0)
+#@gui : Maximum Channel Value = float(255,2,255)
+#@gui : Channel #1 Modulo Method = choice(0,"Modulo","Modulo - Continuous","Divisive Modulo","Divisive Modulo - Continuous")
+#@gui : End Value = float(255,2,512)
+#@gui : Negate Channel = bool(0)
+#@gui : Channel #2 Modulo Method = choice(0,"Modulo","Modulo - Continuous","Divisive Modulo","Divisive Modulo - Continuous")
+#@gui : End Value = float(255,2,512)
+#@gui : Negate Channel = bool(0)
+#@gui : Channel #3 Modulo Method = choice(0,"Modulo","Modulo - Continuous","Divisive Modulo","Divisive Modulo - Continuous")
+#@gui : End Value = float(255,2,512)
+#@gui : Negate Channel = bool(0)
+#@gui : Channel #4 Modulo Method = choice(0,"Modulo","Modulo - Continuous","Divisive Modulo","Divisive Modulo - Continuous")
+#@gui : End Value = float(255,2,512)
+#@gui : Negate Channel = bool(0)
+#@gui : sep = separator(), note = note("<i>Channel Order</i>\n\nPick numbers to order the channels")
+#@gui : First Channel = choice(0,"Channel 1","Channel 2","Channel 3","Channel 4")
+#@gui : Second Channel = choice(1,"Channel 1","Channel 2","Channel 3","Channel 4")
+#@gui : Third Channel = choice(2,"Channel 1","Channel 2","Channel 3","Channel 4")
+#@gui : Fourth Channel = choice(3,"Channel 1","Channel 2","Channel 3","Channel 4")
+#@gui : Alpha Channel = bool(1)
+#@gui : note = note("<small>If CMYK is chosen as color space, then there is no alpha channel.</small>")
+colmt: repeat $! l[$>] 
+modulo_texture_pre ${2-21} 
+if {$1==0} a[0-2] c
+elif {$1==1} a[0-2] c cmy2rgb..
+elif {$1==2} a c cmyk2rgb
+elif {$1==3} a[0-2] c hsi82rgb..
+elif {$1==4} a[0-2] c hsl82rgb..
+elif {$1==5} a[0-2] c hsv82rgb..
+elif {$1==6} a[0-2] c lab82rgb..
+elif {$1==7} a[0-2] c lch82rgb..
+elif {$1==8} a[0-2] c yiq82rgb..
+elif {$1==9} a[0-2] c yuv82rgb..
+elif {$1==10} a[0-2] c xyz82rgb..
+fi
+if {$1!=2} if $22 a c else k.. fi fi
+endl done
+colmt_preview:
+colmt $*
+modulo_texture_pre:
+to_gray repeat 3 [0] done
+lcmod_a=$17
+lcmod_b=$18
+lcmod_c=$19
+lcmod_d=$20
+mul 0 +[0] $lcmod_a +[1] $lcmod_b +[2] $lcmod_c +[3] $lcmod_d 
+remove_duplicates
+if {$!<4} v + error "Invalid numbers!" fi
+if {$2<1} v + error "Input 2 cannot be less than 1!" fi
+if {$2!={floor($2)}} v + error "Input 2 must be a integer!" fi
+f "0"
+if $1 r2dx {$2*100}%,1,1 fi
+f[0] "x/$2" modf[0] $5,$4,{$6/$4} if $7 negate[0] fi
+f[1] "y/$2"  modf[1] $8,$4,{$9/$4} if $10 negate[1] fi
+f[2] "(x+y)/$2"  modf[2] $11,$4,{$12/$4} if $13 negate[2] fi
+f[3] "(x+y)/$2"  modf[3] $14,$4,{$15/$4} if $16 negate[3] fi
+if $3 mirror[2] x else mirror[3] x fi
+r2dx[0,1] {(1/$2)*100}%,4,1
+if $1 r2dx[2,3] {(1/$2)*100}%,$1,1 fi
+[$lcmod_a] [$lcmod_b] [$lcmod_c] [$lcmod_d] rm[0-3]
 
 ######################
 
