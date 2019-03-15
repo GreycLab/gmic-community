@@ -53,7 +53,7 @@ Other open-source projects are known to use some of the <b><font color="#000066"
   We collaborate with ["Association LILA (Libre comme l'Art)"](https://libreart.info/en/projects/gmic),
   a French non-profit organization which collects donations to help developing the G'MIC project.
 
-  [Go to the donation page](https://libreart.info/en/projects/gmic)
+  [Visit the donation page](https://libreart.info/en/projects/gmic)
 
 -----------------------
 
