@@ -58,7 +58,7 @@ mode=${arg\ 1+$1,bw,rgb,b_rgb,bw_rgb,cmy,cmyk,wcmyk,rgbcmy,1bitrgb,aurora,playpa
 fi fi fi
 v + e[^-1] "Create palette '"$mode"' for pixel art or effect."$_gmic_s"." v -
 _pal_$mode
-_pal_i: if {$!==2} if {h#1!=1 && h#0!=1} +autocrop _ia={w#2*h#2} _ib={w#3*h#3} rm[^0-1] if {$_ia<$_ib} rv fi l[1] fx_extract_objects 0,0,0,0,0,0,1 rm. s y autocrop 0,0,0,0 a x to_rgb if {w>1024} v + error "ERROR: Too much colors in palette! Please reduce colors!" fi endl else +autocrop _ia={w#2*h#2} _ib={w#3*h#3} rm[^0-1] if {$_ia<$_ib} rv fi to_rgb[1] if {w#1>1024} v + error "ERROR: Too much colors in palette! Please reduce colors!" fi fi else v + error "ERROR: Need two layers for command to work!" fi
+_pal_i: if {$!==2} if {w#1==1||h#1==1} if {w#1>256||h#1>256} v + error "ERROR: There are no palette!" fi to_rgb. elif {w#0==1||h#0==1} if {w#0>256||h#0>256} v + error "ERROR: There are no palette!" fi rv to_rgb. else +autocrop _ia={w#2*h#2}  _ib={w#3*h#3} _ic={$_ia>$_ib} rm[^0-1] if {!$_ic} rv fi fx_extract_objects. 0,0,0,0,0,0,1 rm. if {h#1*w#1>255} v + error "ERROR: There are no palette!" fi if {h#1>w#1} rotate. 90 fi s. y,{h#1} autocrop. 0,0,0,0 a[^0] x to_rgb. fi else v + error "ERROR: You must have use only two images to use this command!" fi
 _pal_polar11: (10,171,209,245,245,135,153,95,51,45,47^10,41,105,202,241,140,194,148,157,98,43^10,41,31,47,237,129,78,72,181,150,107)
 _pal_rust6: (35,113,165,225,240,255^0,47,73,136,187,226^0,48,50,102,156,198)
 _pal_cave: (0,16,54,68,143,199,156,245^0,0,29,63,86,144,228,245^0,41,35,79,179,101,199,245)
@@ -208,7 +208,7 @@ _pal_secam: (0,33,240,255,127,127,255,255^0,33,60,80,255,255,255,255^0,255,121,2
 _pal_jewel: (50,102,184,210,242,240,223,188,121,86,74,77,115,116,156^30,36,40,106,197,232,183,123,65,96,143,193,227,130,172^45,49,28,18,60,156,127,98,107,148,169,179,123,161,186)
 #@cli pal_t : eq. to 'palette_transfer'
 pal_t: palette_transfer $*
-#@cli palette_transfer : palette_id,0>=indexing_style<=4,0>=color_dithering<=1,transfer_rgb [0 = No, 1 = Yes],0>=alpha_count,0>=alpha_dithering<=1,0>=special_effect_factor,activate_upscaling_stimulation [0 = Does not activate | 1 = Stimulate hardware restriction],0>=initial_resize_method<=5,1>=pixel_width,1>=pixel_height,activate_hardware_stimulation [0 = Does not activate | 1 = Stimulate hardware restriction],1>=color_section_of_hardware_restriction_precision_factor,hardware_restriction_by_tile_width,hardware_restriction_by_tile_height,hardware_alpha_precision,hardware_alpha_mapping_method,alpha_precion_factor,alpha_method_for_hardware_stimulation
+#@cli palette_transfer : palette_id,0>=indexing_style<=4,0>=color_dithering<=1,transfer_rgb [0 = No, 1 = Yes],0>=alpha_count,0>=alpha_dithering<=1,0>=special_effect_factor,0>=initial_resize_method<=5,activate_upscaling_stimulation [0 = Does not activate | 1 = Activate Upscale],1>=pixel_width,1>=pixel_height,activate_hardware_stimulation [0 = Does not activate | 1 = Stimulate hardware restriction],1>=color_section_of_hardware_restriction_precision_factor,hardware_restriction_by_tile_width,hardware_restriction_by_tile_height,hardware_alpha_precision,hardware_alpha_mapping_method,alpha_precion_factor,alpha_method_for_hardware_stimulation
 #@cli : Transfer Colors to images using a palette. If using negative number or "i" for first variable, there must be exactly two layers. Else, they must be performed per 1 layers in a loop if one were to apply palette transfer among multiple layers! 
 #@cli : For 2 layers where one is a palette - $ palette_transfer -1,0,.5
 #@cli : To apply palette colors to multiple layers - $ repeat $! l[$<] palette_transfer db32,0,.5 endl done
@@ -223,16 +223,16 @@ r={$pw>$ph?$pw/$ph:$ph/$pw} fi
 _CI={$2}
 AlpC=$5 AlpD=$6 SF=$7
 pal $1
-if $8 r[0] {$r*100}%,{$r*100}%,1,4,$9 fi
-if $9 r[0] {100/$10}%,{100/$11}%,1,4,$9 fi
+if $9 r[0] {$r*100}%,{$r*100}%,1,4,$8 fi
+if $8 r[0] {100/$10}%,{100/$11}%,1,4,$8 fi
 split_opacity[0]
 l[^1] if $4 to_rgb transfer_rgb.. . fi if {$_CI==0} if {$12>0} l[0] ahre_rgb $13,$14,$15,$16,$3,$17 endl index.. .,0,1 else index.. .,$3,1 fi rm.
 elif {$_CI==1} to_rgba ${_iw},${_ih},1,4 noise. {$SF*75} to_graya. blend[^1] difference,1 to_rgb if {$12>0} l[0] ahre_rgb $13,$14,$15,$16,$3,$17 endl index.. .,0,1 else index.. .,$3,1 fi rm.
 elif {$_CI==2} pal 0 [0] index. ..,1,1 rm.. +blend[^1] interpolation,{$5/20} rm[0,2] rv if {$12>0} l[0] ahre_rgb $13,$14,$15,$16,$3,$17 endl index.. .,0,1 else index.. .,$3,1 fi rm.
 else if {$CI>2} if {($_CI-3)==0} +f[0] "x%2*255" else +f[0] "y%2*255" fi fi blend[^1] multiply,{$SF/4} if {$12>0} l[0] ahre_rgb $13,$14,$15,$16,$3,$17 endl index.. .,0,1 else index.. .,$3,1 fi rm. fi
 endl
-if {$5<2} rm. if $9 r {100*$10}%,{100*$11}%,1,3,1 fi else
-l[1] ${AlpC},1,1,1 f. "x" n. 0,255 if {$12>0&&$5>2} l[0] ahre_bw $18,${AlpC},$14,$15,$16,${AlpD},$19 endl index.. .,0,1 else index.. .,${AlpD},1 fi rm. endl a c if $9 r {100*$10}%,{100*$11}%,1,4,1 fi fi
+if {$5<2} rm. if $8 r {100*$10}%,{100*$11}%,1,3,1 fi else
+l[1] ${AlpC},1,1,1 f. "x" n. 0,255 if {$12>0&&$5>2} l[0] ahre_bw $18,${AlpC},$14,$15,$16,${AlpD},$19 endl index.. .,0,1 else index.. .,${AlpD},1 fi rm. endl a c if $8 r {100*$10}%,{100*$11}%,1,4,1 fi fi
 #@cli pal_l :
 #@cli : Convert palettes to layers
 pal_l :
@@ -743,60 +743,66 @@ palgen: repeat $! l[$<] -pal $1 r[1] {$2*100}%,{$2*100}%,1,3,1 to_rgba +f[0] "i#
 palgen_preview: 
 palgen $*
 #@gui Transfer Colors [Reduced Colors] : tcrc, tcrc_preview(0)
-#@gui : sep = separator(), note = note ("<b>Transfer Color Setting<b>")
-#@gui : note = note ("<i>If using all layers as input layer, the top layer is the primarily reference layer. If using active and above/below, the top layer is the primarily target layer.</i>")
-#@gui : 1. Layer/Palette to Use as Reference/Target Image = choice(0,"Top Layer","Bottom Layer","Palette")
-#@gui : 2. Palette to use (If applicable) = choice(10,"BW-2","RGB-3","B-RGB-4","BW-RGB-5","CMY-3","CMYK-4","W-CMYK-5","RGBCMY-6","1-Bit RGB-8","Aurora-256","Playpal-256","Andrew Kensler - 16","Andrew Kensler - 32","Andrew Kensler - 54","AAP-12","AAP-16","AAP-64","AAP-128","DB8","DB16","DB32","DB-ISO22","Endesga-8","Endesga-16","Endesga-32","Endesga-36","Endesga-64","XAIUE-22","Fantasy - 16","Fantasy - 24","Tranquil Fantasy - 23","Tranquility Plus Fantasy - 39","Faraway-48","Fleja Master - 33","Linear Basic - 31","ARQ-16","BLK-36","CD-BAC-16","CG Arne-16","CPC BOY-32","DimWiddy-23","||||-22","FTZ Ethereal - 16","GZXP-11","Pear-36","Pineapple-32","Rosy-42","Softy-15","SPEC-12","Starmancer - 52","Superb-8","Sweetie - 16","Taffy-16","Todayland-25","Zughy - 32","ENOS-16","Equpix-15","Night-16","Simple JPC-16","Acid-15","Battery-24","Crimso-11","DRZ-A-15","Eggy-15","Jewel-15","Polar-11","BoomBoom - 7","Generic-8","Matriax8c","Autum-15","Y-Autum-15","Jerry Pie-22","Naji-16","Blessing - 5","Fairy Tales-8","Fuzz-4","Pastel - 15","TUI-15","Cave-8","Psygnosia-16","Marshmellow-32","Finlal-11","ykb-22","Graveyard - 21","Steam Lords - 16","AAP-Radiant-16","Daruda-22","Rust-6","XAIUE-Radiant-22","Firestorm-9","Supernova-7","NYX8","OIL-6","Pixelwave-12","GB - Default #1 - 4","GB - Default #2 - 4","GB - Black Zero - 4","GB - Easy - 4","GB - Arne - 4","GB - PJ - 4","GB - Kirokaze - 4","GB - Cyber - 4","GB - Grapefruit - 4","GB - Forest - 4","GB - Ice Cream - 4","GB - RB - 4","GB - Chocolate - 4","Arne-4","Halloween Pumpkin - 4","Amiga 2600 NTSC-256","Amiga 2600 PAL-104","Amiga 2600 SECAM-8","Amstrad CPC - 27","Apple II-15","Color/Graphics Adapter - 16","Color/Graphics Adapter Mode 0 Low-4","Color/Graphics Adapter Mode 0 High-4","Color/Graphics Adapter Mode 1 Low-4","Color/Graphics Adapter Mode 1 High-4","Color/Graphics Adapter Mode 2 Low-4","Color/Graphics Adapter Mode 2 High-4","Commodore 64 - 16","Commodore Vic-20 - 16","Japanese MSX - 16","Mac II - 16","NES-55","PICO-8","Risc OS-16","Thomson MO5-16","ZX Spectrum - 15","GNOME-32","Electronic Crayon - 22","CHIP16","MSX-15","LMS-16","XP - 28","Vista - 28")
-#@gui : 3. Is Reference Image Smaller than Target Image? = bool(0)
-#@gui : 4. Color Count (If using palette as reference, this is ignored) = int(16,2,4096)
-#@gui : 5. Color Dithering (%) = float(50,0,100)
-#@gui : 6. Color Indexing Method = choice(1,"Median Cut","Median Cut and K-Means")
-#@gui : 7. Alpha Value Count = int (2,2,255)
-#@gui : 8. Alpha Dithering (%) = float(50,0,100)
-#@gui : sep = separator(), note = note ("<b>Local Contrast<b>")
-#@gui : 9. Spatial Radius = float(80,2.5,200)
-#@gui : 10. Amount = float(0.5,0,5)
-#@gui : 11. Darkness Level = float(1,0,4)
-#@gui : 12. Lightness Level = float(1,0,4)
-#@gui : sep = separator(), note = note ("<b>RGB Adjustments<b>")
-#@gui : 13. Brightness (%) = float(0,-100,100)
-#@gui : 14. Contrast (%) = float(0,-100,100)
-#@gui : 15. Gamma (%) = float(0,-100,100)
-#@gui : 16. Saturation (%) = float(0,-100,100)
-#@gui : 17. Hue Shift = float(0,-180,180)
-#@gui : sep = separator(), note = note ("<b>LAB Color Adjustment<b>")
-#@gui : 18. Negative A Chroma (%) = float(0,-100,100)
-#@gui : 19. Positive A Chroma (%) = float(0,-100,100)
-#@gui : 20. Negative B Chroma (%) = float(0,-100,100)
-#@gui : 21. Positive B Chroma (%) = float(0,-100,100)
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
-#@gui : sep = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2019/2/01</i>.</small>")
-tcrc : if {$1==2} repeat $! l[$<] ac "tcrc_adjustment ${9-21}",rgb split_opacity l[0] pal $2 index[0] [1],{$5/100},$6 rm[1] endl l[1] (0) resize[1] {$7},1 f[1] "x" n[1] 0,255 index[0] [1],{$8/100},1 rm[1] endl a c endl done else if {$1==1} rv fi ac[^0] "tcrc_adjustment ${9-21}",rgb rv[0,{$!-1}] repeat {$!-1} l[{$!-1},$<] tcrc_colormapping[0,1] ${3-8} endl done rv[0,{$!-1}] if {$1==0} rv fi fi
-tcrc_colormapping :
-rv
-split_opacity[1]
-to_rgba[1]
-+colormap[0] {$1?$2+1:$2},$4,1
-index[1] [3],{$3/100},1
-l[2] (0) resize[1] {$5},1 f[1] "x" n[1] 0,255 index[0] [1],{$6/100},1 rm[1] endl
-rm[3]
-to_rgb[1] a[1,2] c
-rv
-tcrc_adjustment :
-rgb2hsl
-s c
-modf[0] 4,360,{$9/360},0
-a c
-hsl2rgb
-fx_LCE ${1-4},1 adjust_colors ${5-7},0,$8,0,255
-rgb2lab8
-s c
-l[1] (0,255) +index.. .,0,1 rm.. l[0] [0] endl a[1,2] c -.. 128 *.. {exp($10/64)} +.. 128 -. 128 *. {exp($11/64)} +. 128 cut 0,255 blend normal endl
-l[2] (0,255) +index.. .,0,1 rm.. l[0] [0] endl a[1,2] c -.. 128 *.. {exp($12/64)} +.. 128 -. 128 *. {exp($13/64)} +. 128 cut 0,255 blend normal endl
-a c
-lab82rgb
-tcrc_preview :
+#@gui : note = note("<b>- Notes -</b> \n\nThis filter is used to stimulate pixel art or can be used for testing palettes. If you picked Auto for method of color transfer, that means palettes are automatically generated from images, and depending on your input layer choices, the top could be the reference image or the target image.\n\nWhen using pre-made palettes, the order of layers don't really matter unless you picked image as a reference for palette.In the case that you picked a image as a reference, you must make sure that the image in question is only 1px vertically, and the width is no more than 256 colors."), sep=separator()
+#@gui : note = note("<b>Color-mapping Preliminary Setup</b>")
+#@gui : 1. Method of Color Transfer = choice(0,"Auto","Palette")
+#@gui : 2. Palette to Use = choice(10,"By Layer","BW-2","RGB-3","B-RGB-4","BW-RGB-5","CMY-3","CMYK-4","W-CMYK-5","RGBCMY-6","1-Bit RGB-8","Aurora-256","Playpal-256","Andrew Kensler - 16","Andrew Kensler - 32","Andrew Kensler - 54","AAP-12","AAP-16","AAP-64","AAP-128","DB8","DB16","DB32","DB-ISO22","Endesga-8","Endesga-16","Endesga-32","Endesga-36","Endesga-64","XAIUE-22","Fantasy - 16","Fantasy - 24","Tranquil Fantasy - 23","Tranquility Plus Fantasy - 39","Faraway-48","Fleja Master - 33","Linear Basic - 31","ARQ-16","BLK-36","CD-BAC-16","CG Arne-16","CPC BOY-32","DimWiddy-23","||||-22","FTZ Ethereal - 16","GZXP-11","Pear-36","Pineapple-32","Rosy-42","Softy-15","SPEC-12","Starmancer - 52","Superb-8","Sweetie - 16","Taffy-16","Todayland-25","Zughy - 32","ENOS-16","Equpix-15","Night-16","Simple JPC-16","Acid-15","Battery-24","Crimso-11","DRZ-A-15","Eggy-15","Jewel-15","Polar-11","BoomBoom - 7","Generic-8","Matriax8c","Autum-15","Y-Autum-15","Jerry Pie-22","Naji-16","Blessing - 5","Fairy Tales-8","Fuzz-4","Pastel - 15","TUI-15","Cave-8","Psygnosia-16","Marshmellow-32","Finlal-11","ykb-22","Graveyard - 21","Steam Lords - 16","AAP-Radiant-16","Daruda-22","Rust-6","XAIUE-Radiant-22","Firestorm-9","Supernova-7","NYX8","OIL-6","Pixelwave-12","GB - Default #1 - 4","GB - Default #2 - 4","GB - Black Zero - 4","GB - Easy - 4","GB - Arne - 4","GB - PJ - 4","GB - Kirokaze - 4","GB - Cyber - 4","GB - Grapefruit - 4","GB - Forest - 4","GB - Ice Cream - 4","GB - RB - 4","GB - Chocolate - 4","Arne-4","Halloween Pumpkin - 4","Amiga 2600 NTSC-256","Amiga 2600 PAL-104","Amiga 2600 SECAM-8","Amstrad CPC - 27","Apple II-15","Color/Graphics Adapter - 16","Color/Graphics Adapter Mode 0 Low-4","Color/Graphics Adapter Mode 0 High-4","Color/Graphics Adapter Mode 1 Low-4","Color/Graphics Adapter Mode 1 High-4","Color/Graphics Adapter Mode 2 Low-4","Color/Graphics Adapter Mode 2 High-4","Commodore 64 - 16","Commodore Vic-20 - 16","Japanese MSX - 16","Mac II - 16","NES-55","PICO-8","Risc OS-16","Thomson MO5-16","ZX Spectrum - 15","GNOME-32","Electronic Crayon - 22","CHIP16","MSX-15","LMS-16","XP - 28","Vista - 28")
+#@gui : 3. Layer to use = choice(0,"Top Layer","Bottom Layer")
+#@gui : 4. Indexing Style = choice(0,"Regular [No Special Effect]","Noise","Luminance-Indexing","Vertical","Horizontal")
+#@gui : 5. Color Count = int(16,2,256)
+#@gui : 6.Color Dithering (%) = float(50,0,100)
+#@gui : 7.Transfer Color to Target Image? = bool(0)
+#@gui : 8. Alpha Count = int(2,1,256)
+#@gui : 9. Alpha Dithering (%) = float(50,0,100)
+#@gui : 10. Special Effect (%) = float(50,0,100)
+#@gui : sep = separator(), note = note("<b>Pixel Ratio and Interpolation</b")
+#@gui : 11. Initial Rescale Method = choice(0,"Disabled","Nearest","Average","Linear","Grid","Bicubic","Lanczos")
+#@gui : 12. Upscale? = bool(0)
+#@gui : 13. Pixel Width = int(2,1,16)
+#@gui : 14. Pixel Height = int(2,1,16)
+#@gui : sep = separator(), note = note("<b>Hardware Restriction Stimulation</b>\nWarning: This is computationally intensive!")
+#@gui : 15. Hardware Stimulation? = bool(0)
+#@gui : 16. Hardware Stimulation Precision Factor = int(2,2,32)
+#@gui : sep = separator(), note = note("<i>Preliminary Processing Area for Hardware Stimulation</i>")
+#@gui : 17. Hardware Restriction Data Size = choice(2,"By Width","By Height","Specified Width and Height")
+#@gui : 18. Row/Column Thickness  = int(1,1,16)
+#@gui : 19. Tile Width = int(16,2,16)
+#@gui : 20. Tile Height = int(16,2,16)
+#@gui : sep = separator()note = note("<i>Color Restrictions Information</i>")
+#@gui : 21. Hardware Color Restriction = int(2,2,16)
+#@gui : 22. Hardware Color Mapping = choice(1,"Median Cut","Median Cut and K-Means")
+#@gui : 23. Alpha Precision = int(2,2,32)
+#@gui : 24. Alpha Mapping = choice(1,"Median Cut","Median Cut and K-Means")
+#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/3/15</i>.</small>")
+tcrc: if {$1==0} if {$3==1} rv fi repeat {$!-1} l[0,{$>+1}] +colormap.. $5,1,1 to_rgb. pal_t[^0] -1,$4,{$6/100},0,$8,{$9/100},{$10/100},$11,$12,$13,$14,$15,$16,{$17==2?$19:($17==0?$18:{w})},{$17==2?$20:($17==0?{h}:$18)},$21,$22,$23,$24 rv endl done if {$!>2} rv[{$!-1},1] fi if {$3==1} rv fi else if {$2!=0} repeat $! l[$>]  pal_t {$2-1},$4,{$6/100},$7,$8,{$9/100},{$10/100},$11,$12,$13,$14,$15,$16,{$17==2?$19:($17==0?$18:{w})},{$17==2?$20:($17==0?{h}:$18)},$21,$22,$23,$24 endl done else if {$3==1} rv fi repeat {$!-1} l[0,{$>+1}] [0] pal_t[^0] -1,$4,{$6/100},$7,$8,{$9/100},{$10/100},$11,$12,$13,$14,$15,$16,{$17==2?$19:($17==0?$18:{w})},{$17==2?$20:($17==0?{h}:$18)},$21,$22,$23,$24 endl done if {$3!=1} rv fi fi fi
+tcrc_preview:
 tcrc $*
+gui_split_preview "tcrc $*",${-3--1}
+u "{$1}"\
+"{$2}_"{$1==1?2:0}\
+"{$3}_"{$1==0||($1==1&&$2==0)?2:1}\
+"{$4}"\
+"{$5}_"{$1==1?0:2}\
+"{$6}"\
+"{$7}_"{$1==1?2:0}\
+"{$8}{$9}"\
+"{$10}_"{$4==0?1:2}\
+"{$11}"\
+"{$12}_"{$11==0?0:2}\
+"{$13}_"{$11==0?0:2}\
+"{$14}_"{$11==0?0:2}\
+"{$15}"\
+"{$16}_"{$15==0?0:2}\
+"{$17}_"{$15==0?0:2}\
+"{$18}_"{$15==0?0:($17==2?0:2)}\
+"{$19}_"{$15==0?0:($17==2?2:0)}\
+"{$20}_"{$15==0?0:($17==2?2:0)}\
+"{$21}_"{$15==0?0:2}\
+"{$22}_"{$15==0?0:2}\
+"{$23}_"{$15==0?0:2}\
+"{$24}_"{$15==0?0:2}\
+"{$25}{$26,$27}"
 
 #@gui Goofy Resampling: goof_res,goof_res_preview(0)
 #@gui : note = note("This filter is inspired by a method to divide images with a pasta maker, and alternate the strips of a picture which was cut using a pasta maker."),sep = separator()
