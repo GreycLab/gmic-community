@@ -311,63 +311,84 @@ if {isval("$1")} if {isint("$1")} mvcma=${arg\ 1+$1,min,max,avg,var,sum,pro,med}
 repeat $! l[$>] v - _rep_bchstatfunc_$mvcma $2 endl done
 _rep_bchstatfunc_im : _rep_bchstatfunc_min $1
 _rep_bchstatfunc_minimum : _rep_bchstatfunc_min $1
-_rep_bchstatfunc_min : s c f "im" a c if $1 r 1,1,1,{s#0},0 fi
+_rep_bchstatfunc_min : s c f "im" a c if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_iM : _rep_bchstatfunc_max $1
 _rep_bchstatfunc_maximum : _rep_bchstatfunc_max $1
-_rep_bchstatfunc_max : s c f "iM" a c if $1 r 1,1,1,{s#0},0 fi
+_rep_bchstatfunc_max : s c f "iM" a c if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_ia : _rep_bchstatfunc_avg $1
 _rep_bchstatfunc_average : _rep_bchstatfunc_avg $1
-_rep_bchstatfunc_avg : s c f "ia" a c if $1 r 1,1,1,{s#0},0 fi
+_rep_bchstatfunc_avg : s c f "ia" a c if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_iv : _rep_bchstatfunc_var $1
 _rep_bchstatfunc_variance : _rep_bchstatfunc_var $1
-_rep_bchstatfunc_var : s c f "iv" a c if $1 r 1,1,1,{s#0},0 fi
+_rep_bchstatfunc_var : s c f "iv" a c if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_is : _rep_bchstatfunc_sum $1
 _rep_bchstatfunc_total : _rep_bchstatfunc_sum $1
-_rep_bchstatfunc_sum : s c f "is" a c if $1 r 1,1,1,{s#0},0 fi
+_rep_bchstatfunc_sum : s c f "is" a c if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_ip : _rep_bchstatfunc_pro $1
 _rep_bchstatfunc_product : _rep_bchstatfunc_pro $1
-_rep_bchstatfunc_pro : s c f "ip" a c if $1 r 1,1,1,{s#0},0 fi
+_rep_bchstatfunc_pro : s c f "ip" a c if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_ic : _rep_bchstatfunc_med $1
 _rep_bchstatfunc_median : _rep_bchstatfunc_med $1
-_rep_bchstatfunc_med : s c f "ic" a c if $1 r 1,1,1,{s#0},0 fi
+_rep_bchstatfunc_med : s c f "ic" a c if $1 r 1,1,1,{s},0 fi
 #@cli rep_lbchstatfunc_to_pal: (eq. to rep_layers_by_channel_statistical_function_to_palette)
 rep_lbchstatfunc_to_pal: rep_layers_by_channel_statistical_function_to_palette $*
 #@cli rep_layers_by_channel_statistical_function_to_palette: variable
 #@cli: Converts layers to palette using statistical function by channels per layers into 1x1 tile, then append them.
 rep_layers_by_channel_statistical_function_to_palette: rep_bchstatfunc $1 a x to_rgb
 #@cli rep_mosaic_gen:
+#@cli: Generates mosaic using multiple pictures using indexing methodology, and uses average to determine the mapping based on colors.
 rep_mosaic_gen:
-v=$1
+skip ${1=0},${2=1},${4=5},${6=0}
+if {$!<=2} v + error "You need to have at least 3 images to generate a mosaic!" fi
+fim_number={$!-1}
+in_a={int($5)}
+in_b={int($6)}
+in_c={$in_a*$in_b}
+v={$in_a+$in_b}
 iw={w}
 ih={h}
-vw={floor(w>h?$v:w/h*$v)}
-vh={floor(h>w?$v:h/w*$v)}
+vw={$in_c==0?floor(w>h?$v:w/h*$v):$in_a}
+vh={$in_c==0?floor(h>w?$v:h/w*$v):$in_b}
 mini_width={ceil(w/$vw)}
 mini_height={ceil(h/$vh)}
 full_width={$mini_width*$vw}
 full_height={$mini_height*$vh}
 
-rr2d[^0] {w#0},{h#0},0,5
 to_a
-+r[0] {$mini_width},{$mini_height},1,4,5
-+rep_lbchstatfunc_to_pal[^0,{$!-1}] ia
-split_opacity[{$!-2}]
-index... .,$2,1
-a[-3,-2] c
-r.. {$full_width},{$full_height},1,4,1
-r.. {$iw},{$ih},1,4,0
-rv[0,-2]
-rm..
-r[^0,{$!-1}] {$vw},{$vh},1,4,5
-r[^0,{$!-1}] {$iw},{$ih},1,4,0,2
-split_opacity[^{$!-1}]
-l[0,{$!-1}] pal_l. r[^0] {w#0},{h#0},1,3,1 endl
-ti={($!+1)/3}
-repeat {($ti-1)} l[0,{$!-$ti+$>+1}] f. "i#0==i#1?255:0" to_gray. endl done
-repeat {($ti-1)} l[{($>*2)+3},{$!-$ti+$>+1}] f.. "i#1" endl done
-rm[^0-{$!-$ti}]
-repeat {($!/2)-1} a[{$>+2},{$>+3}] c done
-blend[^0-1] alpha rv[0,2] rm. split_opacity.. blend[^0] multiply a c
+if $1 autocrop[^0] fi
++rep_lbchstatfunc_to_pal[^0] ia
+rep_aspect_crop_2d[^0,{$!-1}] {$vw},{$vh},,$2
+r[^0,{$!-1}] {$vw},{$vh},1,4,$4
++r[0] {$mini_width},{$mini_height},1,4,$4
+split_opacity.
+index.. ...,$3,1
+a[-1,-2] c
+rv[0,{$!-1}] rm.
+r[0] {$full_width},{$full_height},1,4,1
+r[0-{$fim_number}] {$iw},{$ih},1,4,0,2
+pal_l.
+r[^0-{$fim_number}] {$iw},{$ih},1,3,1
+split_opacity[0-{$fim_number}]
+repeat {$fim_number} l[0,{$!-$fim_number+$>}] f. "i#0==i#1?255:0" to_gray. endl done
+repeat {$fim_number} l[{($>*2)+3},{$!-$fim_number+$>}] +blend multiply rv[0,2] rm. endl done
+rm[{$!-$fim_number}-{$!-1}]
+repeat {$fim_number} a[{$>+2},{$>+3}] c done
+blend[^0-1] alpha
+rv[0,2] rm.
+split_opacity[0]
+blend[^0] multiply
+a c
+#@cli rep_aspect_crop_2d: width_ratio>=1,height_ratio>=1,-100>=shift_factor<=100
+rep_aspect_crop_2d:
+skip ${3=0},${4=1}
+if {abs($3)>100} v + error "Shift factor can only be in ranges [-100,100] inclusive!" fi
+repeat $! l[$>]
+old_ratio={w/h}
+new_ratio={$1/$2}
+shift_factor=$3
+
+if {$old_ratio!=$new_ratio}
+if {$new_ratio>$old_ratio} {w},{w/$new_ratio},{d},{s} shift.. 0,{(h#1-h#0)/2+((-$shift_factor/200)*(h#0-h#1))},0,0,$4 f. "i#0" rm.. else {h*$new_ratio},{h},{d},{s} shift.. {(w#1-w#0)/2+((-$shift_factor/200)*(w#0-w#1))},0,0,0,$4 f. "i#0" rm.. fi fi endl done
 #@gui _<b>Testing</b>
 #@gui <i>Reptorian</i>
 
