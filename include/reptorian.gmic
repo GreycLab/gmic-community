@@ -335,14 +335,15 @@ rep_lbchstatfunc_to_pal: rep_layers_by_channel_statistical_function_to_palette $
 #@cli rep_layers_by_channel_statistical_function_to_palette: variable
 #@cli: Converts layers to palette using statistical function by channels per layers into 1x1 tile, then append them.
 rep_layers_by_channel_statistical_function_to_palette: rep_bchstatfunc $1 a x to_rgb
-#@cli rep_mosaic_gen: autocrop_median_bool[0=Do not autocrop||1=Autocrop by median],aspect_ratio_linear_interpolation[0=Nearest Neighborhood||1=Linear],0>=dithering>=1,image_scale_interpolation,0>=tile_width,0>=tile_height
+#@cli rep_mosaic_gen: 0>=tile_width,0>=tile_height,0>=dithering<=1,1>=interpolation<=6,autocrop-by-median_bool[0=Do not autocrop by median|1=Autocrop by median]
 #@cli: Generates mosaic using multiple pictures using indexing methodology, and uses average to determine the mapping based on colors. Tile_Width and Tile_Height cannot be both zero!
 rep_mosaic_gen:
-skip ${1=0},${2=1},${4=5},${6=0}
+skip ${2=0},${4=5},${5=0}
 if {$!<=2} v + error "You need to have at least 3 images to generate a mosaic!" fi
+if {$4<1} v + error "Interpolation cannot be none or memory-dependent!" fi
 fim_number={$!-1}
-in_a={int($5)}
-in_b={int($6)}
+in_a={int($1)}
+in_b={int($2)}
 in_c={$in_a*$in_b}
 v={$in_a+$in_b}
 iw={w}
@@ -355,9 +356,9 @@ full_width={$mini_width*$vw}
 full_height={$mini_height*$vh}
 
 to_a
-if $1 autocrop[^0] {ic} fi
+if $5 autocrop[^0] {ic} fi
 +rep_lbchstatfunc_to_pal[^0] ia
-rep_aspect_crop_2d[^0,{$!-1}] {$vw},{$vh},,$2
+rep_aspect_crop_2d[^0,{$!-1}] {$vw},{$vh}
 r[^0,{$!-1}] {$vw},{$vh},1,4,$4
 +r[0] {$mini_width},{$mini_height},1,4,$4
 split_opacity.
@@ -380,15 +381,9 @@ blend[^0] multiply
 a c
 #@cli rep_aspect_crop_2d: width_ratio>=1,height_ratio>=1,-100>=shift_factor<=100,interpolation[0=nearest|1=linear]
 rep_aspect_crop_2d:
-skip ${3=0},${4=1}
-if {abs($3)>100} v + error "Shift factor can only be in ranges [-100,100] inclusive!" fi
-repeat $! l[$>]
-old_ratio={w/h}
-new_ratio={$1/$2}
+skip ${3=0}
 shift_factor=$3
-
-if {$old_ratio!=$new_ratio}
-if {$new_ratio>$old_ratio} {w},{w/$new_ratio},{d},{s} shift.. 0,{(h#1-h#0)/2+((-$shift_factor/200)*(h#0-h#1))},0,0,$4 f. "i#0" rm.. else {h*$new_ratio},{h},{d},{s} shift.. {(w#1-w#0)/2+((-$shift_factor/200)*(w#0-w#1))},0,0,0,$4 f. "i#0" rm.. fi fi endl done
+if {($1/$2)>(w/h)} r 100%,{(min($1,$2)/max($1,$2))*(w/h)*100}%,1,100%,0,0,0.5,{.5+$shift_factor/2} else r {(min($1,$2)/max($1,$2))*(w/h)*100}%,100%,1,100%,0,0,{.5+$shift_factor/2},0.5 fi
 #@gui _<b>Testing</b>
 #@gui <i>Reptorian</i>
 
@@ -988,13 +983,12 @@ if $1 r2dx[2,3] {(1/$2)*100}%,$1,1 fi
 #@gui : note = note("<small><i>Must be active if there are only less than 3 layers for input</i></small>"), sep = separator()
 #@gui : note = note("<b>- Mosaic Generation Options -</b>\n\n<small><i>Note: When tile_height is equal to 0, it will automatically create the tile ratio based on which side is smaller.</i></small>")
 #@gui : Target Layer = choice(0,"Top Layer","Bottom Layer")
-#@gui : Autocrop-By-Median = bool(0)
-#@gui : Aspect Ratio Resizing Interpolation = choice(0,"Nearest Neighbor","Linear")
-#@gui : Dithering (%) = float(50,0,100)
-#@gui : Scaling Interpolation = choice(0,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
 #@gui : Tile Width = int(15,2,50)
 #@gui : Tile Height = int(0,0,50)
-fx_rep_pmos: if {$!>2} if $1 repeat $! l[$>] input_glob "$2" rep_mosaic_gen $4,$5,{$6/100},{$7+1},$8,$9 endl done else if $3 rv fi rep_mosaic_gen $4,$5,{$6/100},{$7+1},$8,$9 fi else l[0] input_glob "$2" rep_mosaic_gen $4,$5,{$6/100},{$7+1},$8,$9 endl fi
+#@gui : Dithering (%) = float(50,0,100)
+#@gui : Scaling Interpolation = choice(0,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
+#@gui : Autocrop-By-Median = bool(0)
+fx_rep_pmos: if {$!>2} if $1 repeat $! l[$>] input_glob "$2" rep_mosaic_gen $4,$5,{$6/100},{$7+1},$8 endl done else if $3 rv fi rep_mosaic_gen $4,$5,{$6/100},{$7+1},$8 fi else l[0] input_glob "$2" rep_mosaic_gen $4,$5,{$6/100},{$7+1},$8 endl fi
 _fx_rep_pmos_preview:
 fx_rep_pmos $*
 #@gui Aspect Ratio Cropping: rep_aspect_crop_2d,_rep_aspect_crop_2d_preview(0)
