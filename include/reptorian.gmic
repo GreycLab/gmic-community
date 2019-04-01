@@ -207,10 +207,11 @@ _pal_secam: (0,33,240,255,127,127,255,255^0,33,60,80,255,255,255,255^0,255,121,2
 _pal_jewel: (50,102,184,210,242,240,223,188,121,86,74,77,115,116,156^30,36,40,106,197,232,183,123,65,96,143,193,227,130,172^45,49,28,18,60,156,127,98,107,148,169,179,123,161,186)
 #@cli pal_t : eq. to 'palette_transfer'
 pal_t: palette_transfer $*
-#@cli palette_transfer : palette_id,0>=indexing_style<=4,0>=color_dithering<=1,transfer_rgb [0 = No, 1 = Yes],0>=alpha_count,0>=alpha_dithering<=1,0>=special_effect_factor,0>=initial_resize_method<=5,activate_upscaling_stimulation [0 = Does not activate | 1 = Activate Upscale],1>=pixel_width,1>=pixel_height,activate_hardware_stimulation [0 = Does not activate | 1 = Stimulate hardware restriction],1>=color_section_of_hardware_restriction_precision_factor,hardware_restriction_by_tile_width,hardware_restriction_by_tile_height,hardware_alpha_precision,hardware_alpha_mapping_method,alpha_precion_factor,alpha_method_for_hardware_stimulation
-#@cli : Transfer Colors to images using a palette. If using negative number or "i" for first variable, there must be exactly two layers. Else, they must be performed per 1 layers in a loop if one were to apply palette transfer among multiple layers!
-#@cli : For 2 layers where one is a palette - $ palette_transfer -1,0,.5
-#@cli : To apply palette colors to multiple layers - $ repeat $! l[$<] palette_transfer db32,0,.5 endl done
+#@cli palette_transfer : 0<_palette_id>=136,0>=_indexing_style<=4,0>=_color_dithering[%]<=1,_transfer_rgb={0=No | 1=Yes },0>=_alpha_count,0>=_alpha_dithering<=1,_special_effect_factor>=0,0>=_initial_resize_method<=5,_activate_upscaling_stimulation={ 0=Does not activate | 1=Activate Upscale},_pixel_width>=1,_pixel_height>=1,_activate_hardware_stimulation={ 0=Does not activate | 1= Stimulate hardware restriction },1>=_color_section_of_hardware_restriction_precision_factor,_hardware_restriction_by_tile_width>0,_hardware_restriction_by_tile_height>0,_hardware_color_precision>2,_hardware_color_mapping_method={0=Median Cut | Median Cut and K-Means},alpha_precion_factor>2,alpha_mapping_method_for_hardware_stimulation={0=Median Cut | Median Cut and K-Means}
+#@cli : Transfer Colors to images using a palette. If using negative number or "i" for first variable, there must be exactly two layers. 
+#@cli : Default value: 'transfer_rgb=0', 'alpha_count=0', 'alpha_dithering=0%', 'special_effect_factor=.5', 'initial_resize_method=0','activate_upscaling_stimulation=0','pixel_width=1','pixel_height=1','activate_hardware_stimulation=0','color_section_of_hardware_restriction_precision_factor=10','hardware_restriction_by_tile_width=5','hardware_restriction_by_tile_height=5','_hardware_color_precision=4','hardware_color_mapping_method=1','alpha_precion_factor=10','alpha_mapping_method_for_hardware_stimulation=1'
+#@cli : For 2 layers where one is a palette - $ palette_transfer -1,0,.5 ,
+#@cli : To apply palette colors to multiple layers - $ repeat $! l[$<] palette_transfer db32,0,.5 endl done ,
 palette_transfer:
 _iw={w}
 _ih={h}
@@ -240,14 +241,14 @@ _iw={w}
 if {h=1} repeat {${_iw}-1} [0] done repeat ${_iw} crop[$>] $>,0,$>,0 done else v + error "This is not a palette!" fi endl done
 #@cli ahre_rgb: (eq. to auto_hardware_restriction_emulation_RGB)
 ahre_rgb : auto_hardware_restriction_emulation_RGB $*
-#@cli auto_hardware_restriction_emulation_RGB : precision_factor>1,tile_size_width>0,tile_size_height>0,colors_per_tiles>0,0>=dithering<=1,color_mapping_method [0 = median-cut | 1 = median-cut and k-means]
-#@cli : Emulates hardware restriction automatically being based on the image.
+#@cli auto_hardware_restriction_emulation_RGB : _precision_factor>1,_tile_size_width>0,_tile_size_height>0,_colors_per_tiles>0,dithering[%]>=1,mapping_method={0=median-cut | 1=median-cut and k-means}
+#@cli : Emulates hardware restriction automatically being based on the image using spectrum of 3.
 auto_hardware_restriction_emulation_RGB :
 repeat $! l[$>] remove_opacity to_rgba repeat $1 [0] done l[$1] +colormap $1,0,0 at[0] "s c f "ia" a c",$2,$3,,,,,3 index.. .,0,1 pal_l. r[1-{$1}] {w#0},{h#0},1,4,1 l[0] repeat {$1-1} [0] done endl repeat $1 l[$>,{$>+$1}] f[0] "i#0==i#1?255:0" endl done k[0-{$1-1}] to_gray endl to_rgb[0-{$1-1}] repeat $1 a[$>,$1] c done repeat $1 l[$>] +solidify 0,0,0,0,0 blend normal endl done ac "autoindex $4,$5,$6",rgb blend alpha to_rgb endl done
 #@cli ahre_bw: (eq. to auto_hardware_restriction_emulation_BW)
 ahre_bw: auto_hardware_restriction_emulation_BW $*
-#@cli auto_hardware_restriction_emulation_BW : precision_factor>1,end_color>1,tile_size_width>0,tile_size_height>0,colors_per_tiles>0,0>=dithering<=1,color_mapping_method [0 = median-cut | 1 = median-cut and k-means]
-#@cli : Emulates hardware restriction automatically being based on the image.
+#@cli auto_hardware_restriction_emulation_BW : _precision_factor>1,_tile_size_width>0,_tile_size_height>0,_shades_per_tiles>0,dithering[%]>=1,mapping_method={0=median-cut | 1=median-cut and k-means}
+#@cli : Emulates hardware restriction automatically being based on the image using spectrum of 1.
 auto_hardware_restriction_emulation_BW : repeat $! l[$>]
 to_gray _l={im} _h={iM} $1,1,1,1 f. "x" n. 0,255 +at.. "f "ia"",$3,$4,,,,,3 index. ..,0,1 rv[^0] pal_l. r[^0-1] {w#0},{h#0},1,1,1 repeat $1 l[1,{$>+2}] f[1] "i#0==i#1?255:0" endl done rm[1] repeat $1 +a[0,{$>+1}] c done rm[0-5] repeat $1 l[$>] +solidify 0,0,0,0,0 blend normal endl done ac "autoindex $5,$6,$7",rgb blend alpha to_gray n ${_l},${_h} $2,1,1,1 f. "x" n. 0,255 index.. .,0,1 rm. to_gray endl done
 #@cli sol : eq. to '_solarize'.
@@ -260,20 +261,23 @@ _solarize :
 blend darken mul 2
 #@cli modo :
 #@cli : (eq. to 'modular_operation').
-#@cli : $ modo 1, 255, {128/255}, 1
+#@cli : $ modo 1,255,{128/255},1
 modo : modular_operation $*
-#@cli modular_operation : 0>=operation<=5,chan_v>0, 0>value(%)<=1,two_layers=0|two_layers=1
+#@cli modular_operation : 0>=operation<=5,chan_v>0, 0>value[%]<=1,two_layers={0=Do not use layer as blending mode | two_layers=Use Layers as blending mode}
+#@cli : Default value : 'two_layers=0' 
 modular_operation :
+skip {$4=0}
 if {$4==0} repeat $! l[$>] split_opacity _modular_formula $1,$2,$3,0 a c -endl done rv
 elif {$4==1} repeat {int($!/2)} l[{$>*2},{$>*2+1}] _modular_blending_pre $1,$2,$3 endl done fi
 _modular_blending_pre :
 +rv
 repeat {int($!/2)} l[{$>*2},{$>*2+1}] modf $1,$2,$3,1 endl done rm[1,3] rv
 #@cli modf:
-#@cli : (eq. to '_modular_formula')
-#@cli : $ modf 3,255,{128/255},0
+#@cli : (eq. to '_modular_formula').
+#@cli : $ modf 3,255,{128/255},0 ,
 modf : _modular_formula $*
-#@cli _modular_formula : 0>=operation<=5,chan_v>0, 0>value(%)<=1,two_layers=0|two_layers=1
+#@cli _modular_formula : 0>=operation<=5,chan_v>0, 0>value[%]<=1,two_layers={0=Do not use layer as blending mode | two_layers=Use Layers as blending mode}
+#@cli : Default value : 'two_layers=0' 
 _modular_formula :
 skip ${4=0}
 if {$1==0} f "eps=10^-8;img=i#0;vp=$4==1?i#1/$2:$3;mv=($2*vp)+eps;f=img-mv*floor(img/mv);f>$2*vp?$2*vp:f"
@@ -286,8 +290,9 @@ elif {$1==5} f "eps=10^-8;img=i#0;vp=$4==1?i#1/$2:$3;vpi=vp*$2;fimg=img+vpi;maxm
 #@cli : (eq. to 'emboss_image')
 #@cli : $ em 90,0,1
 em : emboss_image $*
-#@cli emboss_image : 0>=Angle>=360, 0>= Depth <=2, 0>=Smoothness>=10,
-#@cli : Default values: depth=1,smoothness=0
+#@cli emboss_image : 0>=_angle<=360, 0>=_depth<=2, _smoothness>=0,
+#@cli : Default values: 'depth=1','smoothness=0'
+#@cli : $ emboss_image 90,0,1 ,
 emboss_image: -skip ${2=1},${3=0}
 l[0]
 luminance
@@ -299,8 +304,9 @@ l[0] n 128,255 endl l[1] negate n 0,128 endl
 endl
 #@cli rep_bchstatfunc: (eq. to rep_by_channel_statistical_function)
 rep_bchstatfunc : rep_by_channel_statistical_function $*
-#@cli rep_by_channel_statistical_function: variable,resize_bool[0=Do not resize | 1= Resize to 1x1]
+#@cli rep_by_channel_statistical_function: _variable,_resize_bool={ 0=Do not resize | 1= Resize to 1x1 }
 #@cli : Creates 1x1 image based on defined variables that depends on image value (minimum, maximum, average, variance, sum, product and median)
+#@cli : Default value: 'resize_bool=0'
 rep_by_channel_statistical_function:
 v - _gmic_s="$?" v +
 _$0 $"*"
@@ -311,63 +317,91 @@ if {isval("$1")} if {isint("$1")} mvcma=${arg\ 1+$1,min,max,avg,var,sum,pro,med}
 repeat $! l[$>] v - _rep_bchstatfunc_$mvcma $2 endl done
 _rep_bchstatfunc_im : _rep_bchstatfunc_min $1
 _rep_bchstatfunc_minimum : _rep_bchstatfunc_min $1
-_rep_bchstatfunc_min : s c f "im" a c if $1 r 1,1,1,{s#0},0 fi
+_rep_bchstatfunc_min : s c f "im" a c if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_iM : _rep_bchstatfunc_max $1
 _rep_bchstatfunc_maximum : _rep_bchstatfunc_max $1
-_rep_bchstatfunc_max : s c f "iM" a c if $1 r 1,1,1,{s#0},0 fi
+_rep_bchstatfunc_max : s c f "iM" a c if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_ia : _rep_bchstatfunc_avg $1
 _rep_bchstatfunc_average : _rep_bchstatfunc_avg $1
-_rep_bchstatfunc_avg : s c f "ia" a c if $1 r 1,1,1,{s#0},0 fi
+_rep_bchstatfunc_avg : s c f "ia" a c if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_iv : _rep_bchstatfunc_var $1
 _rep_bchstatfunc_variance : _rep_bchstatfunc_var $1
-_rep_bchstatfunc_var : s c f "iv" a c if $1 r 1,1,1,{s#0},0 fi
+_rep_bchstatfunc_var : s c f "iv" a c if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_is : _rep_bchstatfunc_sum $1
 _rep_bchstatfunc_total : _rep_bchstatfunc_sum $1
-_rep_bchstatfunc_sum : s c f "is" a c if $1 r 1,1,1,{s#0},0 fi
+_rep_bchstatfunc_sum : s c f "is" a c if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_ip : _rep_bchstatfunc_pro $1
 _rep_bchstatfunc_product : _rep_bchstatfunc_pro $1
-_rep_bchstatfunc_pro : s c f "ip" a c if $1 r 1,1,1,{s#0},0 fi
+_rep_bchstatfunc_pro : s c f "ip" a c if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_ic : _rep_bchstatfunc_med $1
 _rep_bchstatfunc_median : _rep_bchstatfunc_med $1
-_rep_bchstatfunc_med : s c f "ic" a c if $1 r 1,1,1,{s#0},0 fi
+_rep_bchstatfunc_med : s c f "ic" a c if $1 r 1,1,1,{s},0 fi
 #@cli rep_lbchstatfunc_to_pal: (eq. to rep_layers_by_channel_statistical_function_to_palette)
 rep_lbchstatfunc_to_pal: rep_layers_by_channel_statistical_function_to_palette $*
-#@cli rep_layers_by_channel_statistical_function_to_palette: variable
+#@cli rep_layers_by_channel_statistical_function_to_palette: _variable
 #@cli: Converts layers to palette using statistical function by channels per layers into 1x1 tile, then append them.
 rep_layers_by_channel_statistical_function_to_palette: rep_bchstatfunc $1 a x to_rgb
-#@cli rep_mosaic_gen:
+#@cli rep_mosaic_gen : _tile_width>=0,_tile_height>=0,_dithering<=1,1>=_interpolation<=6,_autocrop-by-median_bool={ 0=Do not autocrop by median | 1=Autocrop by median },_out_original_dimension={ 0=Do not output original dimension | 1= Output Original Dimension },use_folder={ 0=Do not use folder | 1=Use folder },folder_location="location_in_computer"
+#@cli : Generates mosaic using multiple pictures using indexing methodology, and uses average to determine the mapping based on colors. Tile_Width and Tile_Height cannot be both zero!
+#@cli : Default value: 'tile_height=0', 'interpolation=5', 'autocrop-by-median=0','out_original_dimension=1','use_folder=0','folder_location="N/A"'
+#@cli : $ rep_mosaic_gen 10,10,.75,6,1,0 ,
 rep_mosaic_gen:
-v=$1
-iw={w}
-ih={h}
-vw={floor(w>h?$v:w/h*$v)}
-vh={floor(h>w?$v:h/w*$v)}
+if {$4<1} Interpolation cannot be less than 1 fi
+skip ${2=0},${4=5},${5=0},${6=1},${7=0},${8=""}
+in_a={int($1)}
+in_b={int($2)}
+in_c={$in_a*$in_b}
+v={$in_a+$in_b}
+iw={w#0}
+ih={h#0}
+vw={$in_c==0?floor(w>h?$v:w/h*$v):$in_a}
+vh={$in_c==0?floor(h>w?$v:h/w*$v):$in_b}
 mini_width={ceil(w/$vw)}
 mini_height={ceil(h/$vh)}
 full_width={$mini_width*$vw}
 full_height={$mini_height*$vh}
 
-rr2d[^0] {w#0},{h#0},0,5
+if $7 rm[^0] input_glob "$8" fi
+fim_number={$!-1}
+
 to_a
-+r[0] {$mini_width},{$mini_height},1,4,5
-+rep_lbchstatfunc_to_pal[^0,{$!-1}] ia
-split_opacity[{$!-2}]
-index... .,$2,1
-a[-3,-2] c
-r.. {$full_width},{$full_height},1,4,1
-r.. {$iw},{$ih},1,4,0
-rv[0,-2]
-rm..
-r[^0,{$!-1}] {$vw},{$vh},1,4,5
-r[^0,{$!-1}] {$iw},{$ih},1,4,0,2
-split_opacity[^{$!-1}]
-l[0,{$!-1}] pal_l. r[^0] {w#0},{h#0},1,3,1 endl
-ti={($!+1)/3}
-repeat {($ti-1)} l[0,{$!-$ti+$>+1}] f. "i#0==i#1?255:0" to_gray. endl done
-repeat {($ti-1)} l[{($>*2)+3},{$!-$ti+$>+1}] f.. "i#1" endl done
-rm[^0-{$!-$ti}]
-repeat {($!/2)-1} a[{$>+2},{$>+3}] c done
-blend[^0-1] alpha rv[0,2] rm. split_opacity.. blend[^0] multiply a c
+if $5 repeat {$!-1} l[{$>+1}] autocrop {ic} endl done fi
+rep_aspect_crop_2d[^0] {$vw},{$vh}
+r[^0] $iw,$ih,1,4,$5
++rep_lbchstatfunc_to_pal[^0] ia
+l[^0,{$!-1}]
+r $vw,$vh,1,4,$4
+endl
+r[0] $mini_width,$mini_height,1,4,$4
+split_opacity[0]
+index[0] .,$3,1
+repeat 2 l[$>] r $full_width,$full_height,1,{s},1 endl done
+r[2-{$!-2}] $full_width,$full_height,1,4,0,2
+pal_l.
+r[{$!-$fim_number}-{$!-1}] $full_width,$full_height,1,3,1
+split_opacity
+repeat {$fim_number} l[0,{$!-$fim_number+$>}] +eq rm.. n. 0,255 endl done
+repeat {$fim_number} l[{($>*2)+3},{$!-$fim_number+$>}] +blend multiply rv[0,2] rm. to_gray[0] endl done
+rm[{$!-$fim_number}-{$!-1}]
+repeat {$fim_number} a[{$>+2},{$>+3}] c done
+blend[^0-1] alpha
+rv[0,2] rm.
+split_opacity[0]
+blend[^0] multiply
+a c
+if $6 r {$iw},{$ih},1,4,0 fi
+#@cli rep_aspect_crop_2d: _width_ratio>=1,_height_ratio>=1,-100>=_shift_factor<=100,_interpolation={ 0=nearest | 1=linear }
+#@cli : Crop images based on specified aspect ratio.
+#@cli : Default value: 'shift_factor=0'
+rep_aspect_crop_2d:
+skip ${3=0}
+repeat $! l[$>] 
+A=$1
+B=$2
+shift_factor=$3
+if {$A==$B} if {w>h} r {h},100%,1,100%,0,0,{.5+$shift_factor/2},.5 else r 100%,{w},1,100%,0,0,0.5,{.5+$shift_factor/2} fi else 
+if {($A/$B)>(w/h)} r 100%,{$B/$A*(w/h)*100}%,1,100%,0,0,0.5,{.5+$shift_factor/2} else r {$A/$B/(w/h)*100}%,100%,1,100%,0,0,{.5+$shift_factor/2},0.5 fi fi
+endl done
 #@gui _<b>Testing</b>
 #@gui <i>Reptorian</i>
 
@@ -959,6 +993,36 @@ f[3] "(!$3?abs(x-y):x+y)/$2"  modf[3] $14,$4,{$15/$4} if $16 negate[3] fi
 r2dx[0,1] {(1/$2)*100}%,4,1
 if $1 r2dx[2,3] {(1/$2)*100}%,$1,1 fi
 [$lcmod_a] [$lcmod_b] [$lcmod_c] [$lcmod_d] rm[0-3]
+#@gui Picture Mosaic : fx_rep_pmos,_fx_rep_pmos_preview(0)
+#@gui : note = note("<b>- Information -</b>\n\n<b>Do not be alarmed when multiple command prompt shows up when using folder input as it is a normal process!</b>\n\nThis filter is used for generation of mosaic pictures. Also, the mosaic cli command cannot support a number of images that is less than 3, so this gui filter will automatically use folder input option instead. So, you need at least 2 images inside a folder for the mosaic filter to work when using folder input. For more information, see below.\n\n<b>-Software Usage -</b>\n\n<b>For Krita, and GIMP: </b> Set to input layers to <b>All</b> assuming 3 or more layers are in your file to create mosaic using the top image as a mosaic target.If you are using folder input instead, it is recommended to set layer input to <b>Active</b>.\n\n<b>For Paint.NET: </b> Using 3 or more layer is unsupported due to the Paint.NET plugin restriction, so you can only use folder input. This is a workaround as G'MIC itself supports more than 2 layers.\n\nRight now because of certain issues, split_preview is not functional as of now."), sep = separator()
+#@gui : note = note("<b>- Folder Input -<b>")
+#@gui : Folder Input Instead? = bool(0)
+#@gui : Mosaic Tile Pictures = folder()
+#@gui : sep = separator()
+#@gui : note = note("<b>- Mosaic Generation Options -</b>\n\n<small><i>Note: When tile_height is equal to 0, it will automatically create the tile ratio based on which side is smaller.</i></small>")
+#@gui : Target Layer = choice(0,"Top Layer","Bottom Layer")
+#@gui : Tile Width = int(15,2,50)
+#@gui : Tile Height = int(0,0,50)
+#@gui : Dithering (%) = float(50,0,100)
+#@gui : Scaling Interpolation = choice(0,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
+#@gui : Autocrop-By-Median = bool(0)
+#@gui : Preserve Original Dimension = bool(0)
+#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/3/31</i>.</small>")
+fx_rep_pmos: if {$!>2&&$1==0} rep_mosaic_gen $4,$5,{$6/100},{$7+1},$8,$9 elif {$!>2&&$1==1} repeat $! l[$>] rep_mosaic_gen $4,$5,{$6/100},{$7+1},$8,$9,1,$2 rv endl done else rep_mosaic_gen $4,$5,{$6/100},{$7+1},$8,$9,1,$2 fi
+_fx_rep_pmos_preview:
+image={$!}
+fx_rep_pmos $*
+u "{$1}_"{$image>2?2:0}\
+"{$2}_"{$image>2&&$1==0?0:2}\
+"{$3}_"{$image>2&&$1==0?2:0}\
+"{$4}"\
+"{$5}"\
+"{$6}"\
+"{$7}"\
+"{$8}"\
+"{$9}"\
+"{$10}{$11,$12}"
 
 ######################
 
