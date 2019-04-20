@@ -60,6 +60,48 @@ rep_duplicate_by_shift_angle_distance_xy:
 if {$1<2} v + error "Invalid duplicate numbers!" fi
 aang={360/$1}
 repeat $1 +rep_sadxy[0] {$>*$aang+$2},$3,$4,$5 done rm[0]
+#@cli rep_ncee: 0<=_angle<=360,_distance>0,0<=_boundary_conditions<=3,_interpolation={ 0=nearest_neighbor | 1=linear },_contrast>=0,_process_alpha={ 0=do_not_process_alpha | 1=process_alpha },_color_space,_blend_mode,0<=_blend_opacity[%]<=1
+rep_ncee:
+skip ${7=0},${8=1},${9=1}
+-m "MergeChoice : $""=_mode" -MergeChoice "add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor","edges","error"
+to_a
+split_opacity 
+l[0]
+if {$7==1}rgb2ryb
+elif {$7==2} rgb2cmy
+elif {$7==3} rgb2cmyk
+elif {$7==4} rgb2hsi8
+elif {$7==5} rgb2hsl8
+elif {$7==6} rgb2hsv8
+elif {$7==7} rgb2lab8
+elif {$7==8} rgb2lch8
+elif {$7==9} rgb2yiq8
+elif {$7==10} rgb2yuv8
+elif {$7==11} rgb2xyz8
+fi
+[0] l[1]
+rep_dupsadxy 2,$1,$2,$3,$4 tci={$!} f. "255-i"  add / $tci - 127.5 * {2*$5} + 127.5 cut 0,255 
+endl
+if {$7!=3}
+blend ${_mode{$8+1}},$9
+if {$7==1} ryb2rgb
+elif {$7==2} cmy2rgb
+elif {$7==4} hsi82rgb
+elif {$7==5} hsl82rgb
+elif {$7==6} hsv82rgb
+elif {$7==7} lab82rgb
+elif {$7==8} lch82rgb
+elif {$7==9} yiq82rgb
+elif {$7==10} yuv82rgb
+elif {$7==11} xyz82rgb
+fi
+elif {$7==3}
+s c repeat 4 l[$>,{$!-1}] to_rgb blend ${_mode{$8+1}},$9 endl done a c cmyk2rgb
+fi
+endl 
+l[1] 
+if $6 rep_dupsadxy 2,146,3,1,0 tai={$!} add / $tai fi 
+endl a c
 #@cli pal :
 #@cli : Creates pre-made user-made palette or palette that are based off older system.
 pal:
@@ -1039,6 +1081,27 @@ u "{$1}_"{$image>2?2:0}\
 "{$8}"\
 "{$9}"\
 "{$10}{$11,$12}"
+#@gui Non-Convolution Edge Extraction : fx_ncee, fx_ncee_preview(0)
+#@gui : note = note("Based off PS Embossing filtering. The way it works is that you duplicate once and then shift with wrap-around using original image data using an angle and offset. Then finally, you invert one of the layer, and average those values. In this filter, you have several options when it comes to alpha and how the image wrap-around. Also, CMYK mode may be fixed later as I'm trying to avoid the problem with Alpha mode and CMYK mode.")
+#@gui : sep = separator()
+#@gui : 1. Colour Space  = choice(0,"RGB8","RYB8","CMY8","CMYK8","HSI8","HSL8","HSV8","LAB8","LCH8","YIQ8","YUV8","XYZ8")
+#@gui : sep = separator()
+#@gui : 2. Angle = float(0,0,360)
+#@gui : 3. Offset = float(0,0,256)
+#@gui : 4. Contrast Factor [%] = float(100,0,500)
+#@gui : 5. Wraparound Mode = choice(2,"Dirichlet","Neumann","Periodic","Mirror")
+#@gui : 6. Interpolation = bool(0)
+#@gui : sep = separator(), note = note("Alpha Processing")
+#@gui : 7. Alpha Mode = choice(0,"Preserve Original Alpha","Multiply Alphas")
+#@gui : sep = separator(), note = note("Blending Processing\n\n<i>If you're looking for normal blending mode, you do not need to touch this and if you did, set mode to alpha and opacity to 100.</i>")
+#@gui : 8. Blending Mode = choice(1,"add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor")
+#@gui : 9. Blending Opacity = float(100,0,100)
+#@gui :  sep  = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui :  sep  = separator(), note = note("<small>Author: Reptorian      Latest Update: <i>2019/4/19</i>.</small>")
+fx_ncee:
+repeat $! l[$>] rep_ncee $2,$3,$5,$6,{$4/100},$7,$1,$8,{$9/100} endl done
+fx_ncee_preview:
+gui_split_preview "fx_ncee $*",${-3--1}
 
 ######################
 
