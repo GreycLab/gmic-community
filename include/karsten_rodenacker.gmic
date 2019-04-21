@@ -77,6 +77,8 @@ karos_about :
 _wrbytepnk :
   output_pink3d ${1}.pnk
 
+#@cli _xpink : pink_cmd,parameter_string(with spaces)
+#@cli : Splits c channel if necessary and executes "_xpink pink_cmd,parameter_string" to each image
 _xpink :
   na={-1,n}
   filename=${-file_rand}
@@ -93,8 +95,10 @@ _xpink :
         if {${}!=0} v + error "Executable (pink.)"$1" not found in PATH, status = "${}"!! Returning!!\n" fi
       fi
     fi
+    if {if(isval($GMIC_PINK_VERBOSE),0$GMIC_PINK_VERBOSE,0)>0} echo_stdout ${prefix}${1}${suffix}" "${filename}".pnk $2 "${filename}"_o.pnk"$verb fi
     output_pink3d ${filename}.pnk -x ${prefix}${1}${suffix}" "${filename}".pnk $2 "${filename}"_o.pnk"$verb
   else
+    if {if(isval($GMIC_PINK_VERBOSE),0$GMIC_PINK_VERBOSE,0)>0} echo_stdout $1" "${x_filename}".pnk $2 "${x_filename}"_o.pnk" fi
     output_pink3d ${filename}.pnk -x $1" "${x_filename}".pnk $2 "${x_filename}"_o.pnk"
   fi
   status=${}
@@ -104,6 +108,8 @@ _xpink :
   else v + error "Exec error!!"
   fi
 
+#@cli _xpinks : pink_cmd,parameter_string(with spaces)
+#@cli : Splits c channel if necessary and executes "_xpink pink_cmd,parameter_string" to each image
 _xpinks :
   s={s} if {$s>1} s. c fi
   repeat $! l[$>]  _xpink $1,"$2" k. endl done
@@ -157,7 +163,7 @@ pinkxipo :
   $=var
   p=1
   na={n}
-  for {$#>=$p&&${-is_image_arg\ ${var$p}}} pass${var$p} p+=1 done pl=$p-1
+  for {$#>=$p" && "${-is_image_arg\ ${var$p}}} pass${var$p} p+=1 done pl=$p-1
   exec=${var$p} p+=1
   if {$#==$p} pp=${var$p}
   elif {$#>$p} repeat {$#-$p+1} if {$>==0} pp=${var$p} else pp=$pp" "${var$p} fi p+=1 done
@@ -199,14 +205,14 @@ pink : v -
   v + e[^-1] "Call pink package on image$? with cmd: \"$1 [img] "$p" [img]\"." v -
   repeat $! l[$>] _xpinks $1,$p endl done v +
 
-#@cli pink_grayskel : _connectivity={ 4 | 8 | 6 | 26 }, _lambda=0
+#@cli pink_grayskel : _connectivity={ 4 }, _lambda=0
 #@cli : (https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/grayskel_8c.html)
 #@cli : Grayscale homotopic skeleton (requires the PINK library to be installed).
 #@cli : Default values: 'connectivity=4' and 'lambda=0'.
 #@cli : $ image.jpg +pink_grayskel , +pink_grayskel[0] ,10 +pink_grayskel[0] ,100 append_tiles 2
 pink_grayskel : skip ${1=4},${2=0}
-  check "${1=4}==4 || $1==8 || $1==6 || $1==26"
-  repeat $! l[$>] _xpinks "grayskel","null $1 $2" endl done
+  check "${1=4}==4" v -
+  repeat $! l[$>] _xpinks "grayskel","null $1 $2" endl done v +
 
 #@cli pink_heightmaxima : _connectivity={ 4 | 8 | 6 | 26 },_height=1
 #@cli : (https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/heightmaxima_8c.html)
@@ -336,7 +342,7 @@ pink_wshed : check "${1=4}==4 || $1==8 || $1==6 || $1==26" skip ${2=0},${3=0}
 #@cli output_pinklist : _filename (def. $TMPDIR/pink.list)
 #@cli : Write a pink list file from (2,n) or (3,n) coordinate list image
 output_pinklist :
-  check {w<=3&&w>1} skip ${1=$TMPDIR/pink.list}
+  check {w<=3" && "w>1} skip ${1=$TMPDIR/pink.list}
   e[^-1] "Generetate a pink list file $1 from the ("{w}","{h}") image"
   v -
 #  file_rand nn=${}.list
@@ -556,7 +562,7 @@ pseudo_c : v - if {s!=1} to_gray. fi {iM},1,1,3,u(255) round. map.. . rm.  v +
 #@cli : $ sincos , +shift. 50%,0,0,0,2 +shift.. 0,50%,0,0,2 a c
 sincos :
   skip "${1=512},${2=$1},${3=0}" v - l[]
-  if {!!$3&&$_version>=216} $1,$2,1,1,'begin(a=pi*w;b=pi*h);i=sin(a/(x+1))*cos(b/(y+1));if(i<=0,i+=1,i);i*255'
+  if {!(!$3" && "$_version>=216)} $1,$2,1,1,'begin(a=pi*w;b=pi*h);i=sin(a/(x+1))*cos(b/(y+1));if(i<=0,i+=1,i);i*255'
   else
     $1,$2,1,1,'begin(a=pi*w;b=pi*h);sin(a/(x+1))*cos(b/(y+1))'
     +f. 'sign(i)' eq. 1 +neq. 1 *[1] ... *. ... n[-1,-2] 0,255
@@ -685,7 +691,7 @@ karo_segmentarea :
 karo_zerleg :
   e[^1] "Partition of binary image$? with pink watershed" v -
   repeat $! l[$>]
-    +distance. 1 pink_wshed. 8,1 f. j(0,0)!=j(1,1)||j(1,0)!=j(0,1) skeleton. , or[0,-1]
+    +distance. 1 pink_wshed. 8,1 f. "j(0,0)!=j(1,1) || j(1,0)!=j(0,1)" skeleton. , or[0,-1]
   endl done v +
 
 #@cli karo_threshold : _method={ triangle | yen | otsu | _otsu | bgt | intermeans | intera | rats | fixnnn | huang | huang2 | li },_delclass>0,_smooth>0
@@ -733,7 +739,7 @@ _karo_triangle : skip "${1=0} ${2=1}"
   v -
   repeat $! l[$>]
     ac=${-autocrop_coords.} wd={w}
-    min={${-arg\ 1,$ac}} if {$min==1&&{@0}!=0} min=0 fi # corr autocrop_coords
+    min={${-arg\ 1,$ac}} if {$min==1" && "{@0}!=0} min=0 fi # corr autocrop_coords
     if {$min>0} min={$min-1} fi
     min2={${-arg\ 4,$ac}} if {$min2<{$wd-1}} min2={$min2+1} fi
     dmax={iM} max={xM}
@@ -811,7 +817,7 @@ _karo_bgt: skip "${1=0} ${2=1}" v - fact=1.5
 #@cli : from last selected data and store it in status
 _karo_intermeans : skip "${1=0} ${2=1}"
   e[^-1] "Calculate intermeans threshold from last selected (1d) histogram$? in range ["$1","{$1+(w-1)*$2}"]." v -
-  l. if {h>1||d>1||s>1} u "?" else
+  l. if {h>1" || "d>1" || "s>1} u "?" else
     split={"
       min=0; while(i(min)==0,min++);
       max=w; while(i(max)==0,max--);
@@ -821,7 +827,7 @@ _karo_intermeans : skip "${1=0} ${2=1}"
         for(id=min,id<=mvI,id++,sum1+=id*i(id);sum2+=i(id));
         for(id=mvI+1,id<=max,id++,sum3+=id*i(id);sum4+=i(id));
         res=(sum1/sum2+sum3/sum4)/2.0;mvI++,
-        (mvI+1)<=res&&mvI<(max-1)));
+        (mvI+1)<=res" && "mvI<(max-1)));
       round(res)"} rm
     u {$1+$split*$2} fi
   endl v +
@@ -869,12 +875,12 @@ _karo_huang : skip "${1=0} ${2=1}"
              ent = 0.0;
              for (ih = 0,ih<=it,
                mu_x = 1.0 / ( 1.0 + term * abs(ih - mu_0[it]));
-               if (!((mu_x  < 1e-06)||(mu_x > 0.999999)),
+               if (!((mu_x  < 1e-06) || (mu_x > 0.999999)),
                  ent += i(ih) * ( -mu_x * log ( mu_x ) - ( 1.0 - mu_x ) * log ( 1.0 - mu_x )));
                ih++);
              for (ih = it + 1, ih < w,
                mu_x = 1.0 / ( 1.0 + term * abs (ih - mu_1[it]));
-               if (!((mu_x  < 1e-06)||(mu_x > 0.999999)),
+               if (!((mu_x  < 1e-06) || (mu_x > 0.999999)),
                  ent += i(ih) * ( -mu_x * log ( mu_x ) - ( 1.0 - mu_x ) * log ( 1.0 - mu_x )));
                ih++);
              if (ent < min_ent, min_ent = ent; threshold = it; _(print(min_ent,threshold)));
@@ -889,8 +895,8 @@ _karo_huang2 : skip "${1=0} ${2=1}"
 #	// Huang L.-K. and Wang M.-J.J. (1995) "Image Thresholding by Minimizing
 #	// the Measures of Fuzziness" Pattern Recognition, 28(1): 41-51
 #	// Reimplemented (to handle 16-bit efficiently) by Johannes Schindelin Jan 31, 2011
-           for(first=0,first<w&&i(first)==0,first++);
-           for(last=w-1,last>first&&i(last)==0,last--);
+           for(first=0,first<w" && "i(first)==0,first++);
+           for(last=w-1,last>first" && "i(last)==0,last--);
            if(first==last,break());
            S=["{^}"]; W=S;
            S[0]=i(0);
@@ -982,7 +988,7 @@ hist_percentile :
   e[^-1] "Calculate $1 percentile from 1d histogram$?."
   v - repeat $!
     l[$>]
-      if {h>1||d>1||s>1} v + e[^-1] "Image "$>" seemingly not 1d!" v - continue fi
+      if {h>1" || "d>1" || "s>1} v + e[^-1] "Image "$>" seemingly not 1d!" v - continue fi
   # Delete class zero
       if {$2!=0} set. 0,0 fi
   # Calculate features
@@ -1017,13 +1023,13 @@ hist_percentile :
 #@cli : Updated 100817 (percent parameter and iqr,loq,hiq feature added)
 #@cli : $ image.jpg luminance +histogram 256,0,255 dh.. ,,256,0,255 hist_feature , repeat 8 t={_arg($>+1${})} text $t,40,{$>*25+5},23,1,128 done rm.
 hist_feature :
-  check "${1=-2}>=-2&&$1<=8&&isint($1)&&isint(${2=1})&&$2>0"
+  check ${1=-2}>=-2" && "$1<=8" && "isint($1)" && "isint(${2=1})" && "$2>0
   skip ${3=0},${4=0},${5=1},${6=25%}
   e[^-1] "Calculate md,m0,m1,m2,$2.min,$2.max,med,iqr,loq,hiq from 1d histogram$?."
   v -
   repeat $!
     l[$>]
-      if {h>1||d>1||s>1} v + e[^-1] "Data["$>"] seemingly not 1d!" v - continue fi
+      if {h>1" || "d>1" || "s>1} v + e[^-1] "Data["$>"] seemingly not 1d!" v - continue fi
   # Delete class zero
       if {$3!=0} =. 0,0 fi
   # Calculate features
@@ -1032,10 +1038,10 @@ hist_feature :
       +*. 'x*$5+$4' m1={is/$m0} rm.
       +*. '(x*$5+$4)^2' m2={sqrt(is/$m0-$m1^2)} rm.
   # nth-min, nth-max, Median
-      mn={"l=0; su=i(0); while(su<"$2"&&l<w, l++; su+=i(l)); l*"$5"+"$4}
-      mx={"l=w; su=0; while(su<"$2"&&l>=0,l--; su+=i(l)); l*"$5"+"$4}
-      med1={"l=0; su=0; while(su<=(is/2)&&l<w, su+=i(l); l++); l"}
-      med2={"l=w; su=0; while(su<=(is/2)&&l>=0, l--; su+=i(l)); l"}
+      mn={"l=0; su=i(0); while(su<"$2" && l<w, l++; su+=i(l)); l*"$5"+"$4}
+      mx={"l=w; su=0; while(su<"$2" && l>=0,l--; su+=i(l)); l*"$5"+"$4}
+      med1={"l=0; su=0; while(su<=(is/2) && l<w, su+=i(l); l++); l"}
+      med2={"l=w; su=0; while(su<=(is/2) && l>=0, l--; su+=i(l)); l"}
       med={($med1+$med2)/2*$5+$4}
   # iqr
       hist_percentile. $6,$3,$4,$5 qu=${}
@@ -1055,7 +1061,7 @@ hist_feature :
 #@cli : (Plot) of features in blue into the histogram with Gaussian in green
 #@cli : $ sp 0 luminance +threshold 40 * histogram 256,0,255 = 0,0 hist_feature_demo , dg 600,300,3
 hist_feature_demo :
-  check "${1=-2}>=-2&&$1<=8&&isint($1)&&isint(${2=1})&&$2>0"
+  check ${1=-2}>=-2" && "$1<=8" && "isint($1)" && "isint(${2=1})" && "$2>0
   skip ${3=0},${4=0},${5=1},${6=25%}
   e[^-1] "Plot features from hist_feature into 1d histogram$?." v -
   l.
@@ -1075,7 +1081,7 @@ hist_feature_demo :
 #@cli karo_nth_max : _n(1),_ind(=0)
 #@cli : Return in the status the _n-th max or the index of the n-th max of an image
 #@cli : Possibility to fetch the index instead of the value (_ind=1)
-karo_nth_max : check "isint(${1=1}) && $1>0" skip ${2=0}
+karo_nth_max : check isint(${1=1})" && "$1>0 skip ${2=0}
   e[^-1] "Return in the status the $1-th max of image$?."
   v - repeat $! l[$>]
 #     [0] repeat {$1-1} set. {im},{[xM,yM,zM,cM]} done
@@ -1087,7 +1093,7 @@ karo_nth_max : check "isint(${1=1}) && $1>0" skip ${2=0}
 #@cli karo_nth_min : _n(1),_ind(=0)
 #@cli : Return in the status the _n-th min of an image or the index of the _n-th min of an image
 #@cli : Possibility to fetch the index instead of the value (_ind!=1)
-karo_nth_min : check "isint(${1=1}) && $1>0" skip ${2=0}
+karo_nth_min : check isint(${1=1})" && "$1>0 skip ${2=0}
   e[^-1] "Return in the status the $1-th min of image$?."
   v - repeat $! l[$>]
 #     [0] repeat {$1-1} set. {iM},{[xm,ym,zm,cm]} done
