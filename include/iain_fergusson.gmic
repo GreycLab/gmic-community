@@ -1975,6 +1975,169 @@ nm name($nm)
 
 #@gui Iain Fergusson
 
+
+#@gui iain_nr_2019: iain_nr_2019,iain_nr_2019(0)
+
+#@gui : HF recover = float(1,0,2)
+#@gui : MF Smooth = float(2,0,10)
+#@gui : LF Smooth = float(0,0,10)
+#@gui : chroma = float(.3,0,1)
+#@gui : Recovery amount = float(1,0,2)
+#@gui : gamma = float(1.5,0,2)
+iain_nr_2019:
+-remove_opacity
+
+detail_recovery={2-$5}
+gamma=$6
+chroma={1-$4}
+size={3^3}
+cropwidth={w}
+cropheight={h}
+
+-resize {w+($size-w%$size)},{h+($size-h%$size)},{d},{s},0,1
+
+-repeat 3
+-l[-1]
+
+	-if {{$>}==0} strength=$1 patch_smooth=1 -elif {{$>}==1} strength=$2 patch_smooth=0 -elif {{$>}==2} strength=$3 patch_smooth=0 -endif
+	patch_smooth=0
+## --guided[0] [1],3,{$strength^1.5}
+## --bilateral[0] [1],3,$strength
+-if {{$>}==0} 
+--median[0] 5
+-else 
+## --denoise[0] 10,$strength,3,7,$patch_smooth,1
+	--l[0]
+	-blur 0.5
+	-rgb2lab
+	-split c
+	-mul[1,2] $chroma
+	-append c
+	-lab2rgb
+	-apply_gamma {1/$gamma}
+	-endl
+--bilateral[0] [-1],3,$strength
+-rm[-2]
+## ## -k[0,-1]
+-endif
+-sub[0] [1]
+## -if {$5>0}
+ -l[0]
+-l[0]  -split c -mul[0] 0.2126 -mul[1] 0.7125 -mul[2] 0.0722 -add -endl
+	--abs[-1]
+		-blur[-1] 5
+	-max[-1] 0.00001
+	-fill[-1] 5/i
+	-mul[0] [-1]
+		-l[0] 
+			-add 128
+			-resize[0] {w+256},{h+256},1,1,0,2,0.5,0.5
+			-if {{$>}==0} 
+-iain_tiletest4[0] {2-$1},0.5
+-else 
+			-iain_tiletest4[0] $detail_recovery,0.5
+			-endif
+			-crop[0] 128,128,{w-129},{h-129}
+			-sub 128
+			--blur 10
+			-sub
+		-endl
+	-div[0] [-1]
+	-rm[-1]
+
+-endl
+## -to_rgb
+-reverse
+ -add
+ ## -else -k[-1]
+ ## -endif
+
+
+
+
+-l[-1]
+--resize[0] 33.33333%,33.33333%,{d},{s},2
+
+--l[-1]
+-resize[0] {(w*3)-2},{(h*3)-2},{d},{s},5,0
+-resize[0] {w+2},{h+2},{d},{s},0,1,0.5,0.5
+-endl
+-blur[-1] 1
+-sub[0,-1] 
+-endl
+-endl
+-done
+
+
+
+-repeat {$!-1}
+
+-l[-1]
+-resize[0] {(w*3)-2},{(h*3)-2},{d},{s},5,0
+-resize[0] {w+2},{h+2},{d},{s},0,1,0.5,0.5
+-endl
+-blur[-1] 1
+-add[-1,-2]
+-done
+-c 0,255
+ -crop 0,0,{$cropwidth-1},{$cropheight-1} # crop to original
+## -apply_gamma $gamma
+ 
+ time=$|
+-name. name($time)
+
+iain_tiletest4:
+-remove_opacity
+-luminance
+
+cropwidth={w}
+cropheight={h}
+
+size={64}
+-resize {w+($size-w%$size)},{h+($size-h%$size)},{d},{s},0,1
+tilew={w/64}
+tileh={h/64}
+-split_tiles $tilew,$tileh
+-apply_parallel "
+-fftpolar
+-append z
+-k[0]
+"
+--blend_median
+
+-mul[-1] $1
+## -circle[-1] 50%,50%,1,1,1
+-repeat {$!-1}
+-l[$>,-1]
+
+-split z
+--circle[0] 50%,50%,1,1,0
+-blur[-1] 1
+-mul[-1] {$1*$2}
+-lt[-1] [2]
+-circle[-1] 50%,50%,1,1,0
+-mul[-1] [2]
+-sub[0] [-1]
+-c[0] 0,999999999999999
+-k[0,1,2,3]
+-append[0,1] z
+-append[1,2] z
+-endl
+-done
+-rm[-1]
+-apply_parallel "
+-split z
+-ifftpolar
+"
+
+
+-append_tiles $tilew,$tileh
+-c 0,255
+-crop 0,0,{$cropwidth-1},{$cropheight-1} 
+
+
+
+
 #@gui PNG Processing: iain_png_processing,iain_png_processing(0)
 #@gui : Number of Colours = int (4,2,256)
 #@gui : Refine Palette = bool(0)
