@@ -996,19 +996,29 @@ vesselness : -skip ${1=1},${2=1},${3=1},${4=1}
       -f 'if(i(x,y,z,1)<0,exp(-0.5/($2)^2*(i(x,y,z,0)/i(x,y,z,1))^2)*(1-exp(-0.5/($3)^2*i(x,y,z,2)^2)),0)'
     -endif
   -endl -done -a c
--endl -done -v +
+  -endl -done -v +
 
-#@cli smurf: iter,scale,strenght
-#@cli : smear along ridges
-#@cli : $ sp duck +smurf 4,1,10
+#@cli _hessian_eigen_min: scale
+#@cli compute the min eigen value of the Hessian matrix
+_hessian_eigen_min: -skip ${1==1}
+e[^-1] "compute Hessian min eigen value"
+ v - repeat $! l[$>] b $1 s c repeat $! l[$>]
+   hessian a c eigen k[0] channels {s-1}
+ endl done a c
+endl done v +
+
+#@cli smurf: zoom,iter,scale,strength
+#@cli : enhance linear structures
+#@cli : $  1024,1024 fibers 20,2000,50 gt 0 dilate_circ 3 +dilate_circ 3 -- n 0,255 negate +b 3 r. 50%,50% +smurf. 2,8,0.25,5 r[0,1] [2]
+#@cli : sp duck +smurf. 1,1,1,10 c 0,255
 smurf:
   e[^-1] "smurf"
-  v - repeat $! l[$>] avg={is}
-    repeat $1
-       +_hessian_eigen_min $2  -*. {-$3/$1}
-	factor={exp(log(4)/$1)}
-	-+[-1,-2]
-	resize. {w*$factor},{h*$factor},100%,100%,6 max. 0 -*. {$avg/ia}
+  v - repeat $! l[$>]  factor={exp(log($1)/($2*$3))} sigma=$3 avg={ia}
+    repeat {$2*$3}
+       +l _hessian_eigen_min $sigma +_hessian_eigen_min {3*$sigma} --
+       threshold {0.1*sqrt(iv)},1 mul {-$4}  endl add
+       r. {round(w*$factor)},{round(h*$factor)},100%,100%,6 max 0 mul {$avg/ia}
+       sigma={$sigma*$factor}
      done
   endl done v +
 
