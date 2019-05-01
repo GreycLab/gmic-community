@@ -678,29 +678,32 @@ whiten_frequency : -check "${1=.25}>=0"
 #-* {$E/sqrt(iv)}
 -endl -done -v +
 
-#@cli deblur_goldmeinel2 : sigma>=0, _nb_iter>=0, _acceleration>=0, _kernel_type={ 0=quasi-gaussian (faster) | 1=gaussian }.
+#@cli deblur_upscale_goldmeinel : sigma>=0, _nb_iter>=0, _acceleration>=0, _kernel_type={ 0=quasi-gaussian (faster) | 1=gaussian },zoom=2
 #@cli : Deblur and zoom x2 selected images using Gold-Meinel algorithm
 #@cli : Default values: 'nb_iter=8', 'acceleration=1' and 'kernel_type=1'.
-#@cli : $ image.jpg --blur 1 --deblur_goldmeinel2[-1] 1
-deblur_goldmeinel2 : -check "$1>=0 && ${2=8}>=0 && ${3=1}>=0" -skip ${4=1} -skip ${5=1}
-  -e[^-1] "Deblur image$? using Gold-Meinel algorithm, with sigma $1, $2 iterations, acceleration $3 and "${-arg\ 1+!$4,"",quasi-}"gaussian kernel."
-  -v - -repeat $! -l[$>]
-    [0] -r[-1] 200%,200%,200%,100%,5 -repeat $2
-      --b[-1] $1,1,$4 -r[-1] 50%,50%,50% --/[0,-1] -rm[-2] -^[-1] $3 -r[-1] 200%,200%,200%,100%,5 -*[-1,-2] # u *= f / Hu
+#@cli : $ sp ? +blur 2 r. 50%,50% +deblur_upscale_goldmeinel[-1] 1,10,1.3,0,2 r[1] [0] print_psnr
+deblur_upscale_goldmeinel : -check "$1>=0 && ${2=8}>=0 && ${3=1}>=0" -skip ${4=1} skip ${5=1} skip ${6=2} skip ${7=0}
+  e[^-1] "Deblur image$? using Gold-Meinel algorithm, with sigma $1, $2 iterations, acceleration $3 and "${-arg\ 1+!$4,"",quasi-}"gaussian kernel, zoom $5 and regularization $6"
+  v - repeat $! l[$>]
+    ux={if(w>1,round($5*w),1)} uy={if(h>1,round($5*h),1)} uz={if(d>1,round($5*d),1)}  # bg={im} sub $bg avg={ia}
+    +r. $ux,$uy,$uz,100%,6 max 0
+    repeat $2
+      +b[-1] {$1*$5},1,{$4!=0} r[-1] [0] +div[0,-1] rm[-2] -^[-1] $3 r[-1]  $ux,$uy,$uz,100%,6 mul[-1,-2] max 0 # u *= f / Hu
+    done rm[0] # add $bg
+  endl done v +
 
-    -done -rm[0]
-  -endl -done -v +
 
-
-#@cli deblur_richardsonlucy2 : sigma>=0, nb_iter>=0, _kernel_type={ 0=quasi-gaussian (faster) | 1=gaussian }.
+#@cli deblur_upscale_richardsonlucy : sigma>=0, nb_iter>=0, _kernel_type={ 0=quasi-gaussian (faster) | 1=gaussian }, zoom=2
 #@cli : Deblur and zoom selected images using Richardson-Lucy algorithm.
 #@cli : Default values: 'nb_iter=50' and 'kernel_type=1'.
-#@cli : $ image.jpg --blur 1 --deblur_richardsonlucy2[-1] 1
-deblur_richardsonlucy2 : -check "$1>=0 && ${2=50}>=0" -skip ${3=1} -skip ${4=1}
-  -e[^-1] "Deblur image$? using Richardson-Lucy algorithm, with sigma $1, $2 iterations and "${-arg\ 1+!$3,"",quasi-}"gaussian kernel."
-    -v - -repeat $! -l[$>]
-    [0] -r[-1] 200%,200%,200%,100%,5 -repeat $2
-    --b[-1] $1,1,{$3!=0} -r[-1] 50%,50%,50%,100%,5 --/[0,-1] -rm[-2] -r[-1] 200%,200%,200%,100%,5 -b[-1] $1,1,{$3!=0}  -*[-1,-2] # u *= H ( f / Hu )
+#@cli : $ sp ? +blur 2 r. 50%,50% +deblur_upscale_richardsonlucy. 1,30,0,2 r[1] [0] print_psnr
+deblur_upscale_richardsonlucy : -check "$1>=0 && ${2=50}>=0" -skip ${3=1} -skip ${4=1}
+  e[^-1] "Deblur image$? using Richardson-Lucy algorithm, with sigma $1, $2 iterations and "${-arg\ 1+!$3,"",quasi-}"gaussian kernel, zoom=$4"
+    v - repeat $! l[$>]
+    ux={if(w>1,round($4*w),1)} uy={if(h>1,round($4*h),1)} uz={if(d>1,round($4*d),1)}  #bg={im} sub $bg avg={ia}
+    +r $ux,$uy,$uz,100%,6
+    repeat $2
+      +b[-1] {$1*$5},1,{$3!=0} r[-1] [0] +div[0,-1] rm[-2] r[-1] $ux,$uy,$uz,100%,6 b[-1] $1,1,{$3!=0} mul[-1,-2] max 0 # u *= H ( f / Hu )
     -done -rm[0]
   -endl -done -v +
 
@@ -995,6 +998,19 @@ vesselness : -skip ${1=1},${2=1},${3=1},${4=1}
   -endl -done -a c
 -endl -done -v +
 
+#@cli smurf: iter,scale,strenght
+#@cli : smear along ridges
+#@cli : $ sp duck +smurf 4,1,10
+smurf:
+  e[^-1] "smurf"
+  v - repeat $! l[$>] avg={is}
+    repeat $1
+       +_hessian_eigen_min $2  -*. {-$3/$1}
+	factor={exp(log(4)/$1)}
+	-+[-1,-2]
+	resize. {w*$factor},{h*$factor},100%,100%,6 max. 0 -*. {$avg/ia}
+     done
+  endl done v +
 
 #@cli bgsubstract : _length>0
 #@cli : Substract the background using a temporal top-hat filter
@@ -1715,6 +1731,21 @@ jeje_whiten_frequency :
 
 jeje_whiten_frequency_preview :
   -gui_split_preview "-jeje_whiten_frequency $1,$2",$-1
+
+#@gui Sharpen [Hessian] : jeje_hessian_bloom, jeje_hessian_bloom_preview(0)
+#@gui : Number of scales = int(3,1,7)
+#@gui : Strength = float(1,0,10)
+#@gui : Cut = bool(false)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse")
+#@gui : sep = separator(), note = note("<small>Author : <i>J&#233;r&#244;me Boulanger</i>.      Latest update: <i>2019/04/30</i>.</small>")
+jeje_hessian_sharpen:
+  repeat $! l[$>]
+    split_opacity l[0] hessian_bloom $1,$2 endl a c
+    if $3 c 0,255 n 0,255 else n 0,255 endif
+  endl done
+
+jeje_hessian_sharpen_preview:
+  gui_split_preview "jeje_hessian_sharpen $1,$2,$3",$-1
 
 #@gui _<b>Repair</b>
 #@gui Smooth [Block PCA]: jeje_denoise_patch_dict, jeje_denoise_patch_dict_preview(0)
