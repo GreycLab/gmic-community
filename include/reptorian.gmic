@@ -529,6 +529,69 @@ shift_factor=$3
 if {$A==$B} if {w>h} r {h},100%,1,100%,0,0,{.5+$shift_factor/2},.5 else r 100%,{w},1,100%,0,0,0.5,{.5+$shift_factor/2} fi else
 if {($A/$B)>(w/h)} r 100%,{$B/$A*(w/h)*100}%,1,100%,0,0,0.5,{.5+$shift_factor/2} else r {$A/$B/(w/h)*100}%,100%,1,100%,0,0,{.5+$shift_factor/2},0.5 fi fi
 endl done
+#@cli rep_reversespiralbwcoordinatemap:
+#@cli : Creates a coordinate map which contains values that can be converted into coordinate for reverse spiral transformation
+rep_reversespiralbwcoordinatemap:
+channels 0
+repeat 3 1 done
+f... "w#0"
+f.. "h#0"
+eval ${-math_lib}"
+width=iM#1;
+height=iM#2;
+nw=width-1;
+nh=height;
+sv=0;
+while(nh>-1,
+for(k=0,k<=nw,k++,
+dar_insert(#3,sv);
+sv++;
+);
+sv--;
+nh--;
+for(k=0,k<=nh-1,k++,
+sv+=width;
+dar_insert(#3,sv);
+);
+nw--;
+sv--;
+for(k=0,k<=nw,k++,
+dar_insert(#3,sv);
+sv--;
+);
+nh--;
+sv++;
+for(k=0,k<=nh-1,k++,
+sv-=width;
+dar_insert(#3,sv);
+);
+nw--;
+sv++;
+);
+"
+
+f[0] "i(#3,0,(x+(y*w)))"
+k[0]
+#@cli rep_spiral_trb: (eq. to 'rep_spiral_transform_basic')
+rep_spiral_trb: rep_spiral_transform_basic $*
+#@cli rep_spiral_transform_basic: _direction_bool { 0 = reverse_spiral_transform | 1 = spiral_transform }
+#@cli : Transform image based on spiral matrix coordinate
+rep_spiral_transform_basic:
+repeat $! l[$>] is={s-1}
+if $1
++spiralbw
+repeat $is . done
+a[^0] c
+f[0] "i(i#1%w,floor(i#1/w))"
+k..
+else
++rep_reversespiralbwcoordinatemap
+repeat $is . done
+a[^0] c
+f[0] "i(int(i#1)%w,floor(int(i#1)/w))"
+k..
+fi
+endl done
 #@gui _<b>Testing</b>
 #@gui <i>Reptorian</i>
 
@@ -1183,6 +1246,14 @@ gui_split_preview "fx_ncee $*",${-3--1}
 #@gui :  sep = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2019/4/26</i>.</small>")
 rep_frblur_preview:
 rep_frblur $*
+#@gui Spiral Matrix Transform : fx_spiralmatrixtransform,fx_spiralmatrixtransform_preview(0)
+#@gui : note = note("Transform image using numbers generated on a spiral matrix.\n\nAs of current version, it only goes clockwise-direction, and reverse based on clock-wise direction.")
+#@gui : Direction = choice(0,"Spiral Transform","Reverse Spiral Transform")
+#@gui :  sep  = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui :  sep  = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/5/1</i>.</small>")
+fx_spiralmatrixtransform: rep_spiral_trb !$1
+fx_spiralmatrixtransform_preview:
+gui_split_preview "fx_spiralmatrixtransform $*",${-3--1}
 
 ######################
 
