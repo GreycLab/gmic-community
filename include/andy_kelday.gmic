@@ -620,6 +620,55 @@ gcd_unstereo_preview :
 #@gui _<b>Testing</b>
 #@gui <i>Garagecoder</i>
 
+#@gui Local F-Mean : gcd_fx_local_fmean, gcd_fx_local_fmean(1)
+#@gui : note = note("<i>Map local f-mean to match global or target</i>"), sep = separator()
+#@gui : Radius = float(15,0,100)
+#@gui : Bright = float(0,0,1)
+#@gui : Mean = choice(0,"Harmonic","Geometric","Arithmetic","Quadratic")
+#@gui : Channels = choice(5,"HSI","HSV","Lab","Linear RGB","RGB","Luminance","YCbCr")
+#@gui : Normalize = bool(0)
+#@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2019/05/11</i>.</small>")
+#@gui : note = link("https://en.wikipedia.org/wiki/Quasi-arithmetic_mean")
+#@gui : note = note("\n<small><b><u>Notes</u></b></small>")
+#@gui : note = note("<small>Set bright to zero to auto match global f-mean</small>")
+#@gui : note = note("<small>Normalize will disable bright control for arithmetic and quadratic</small>")
+gcd_fx_local_fmean : skip ${1=15},${2=0},${3=0},${4=5},${5=0}
+  mode=${arg\ 1+$4,hsi_i,hsv_v,lab_l,lrgb,rgb,gcd_luminance,ycbcr_y}
+  if $5 ac "r={[im,iM]} n 0.002,0.998 gcd_fmean_local $1%,{$3-1},$2 n $r",$mode,2
+  else ac "div 255 gcd_fmean_local $1%,{$3-1},$2 mul 255",$mode,1
+  fi u "{$1}{$2}_"{2-($3>1" && "$5==1)}"{$3}{$4}{$5}"
+
+#@cli gcd_fmean_local : std_deviation>=0[%],-1<=_mean_type<=2,_target>=0
+#@cli : Map local f-mean to match global or target.
+#@cli : Value range is assumed to be 0 <= input <= 1.
+#@cli : When target is zero, it will be set to the global f-mean.
+#@cli : Default values: 'std_deviation=1', '_mean_type=0' and '_target=0'.
+#@cli : $ image.jpg n 0,1 gcd_fmean_local 1%
+gcd_fmean_local : check "${1=1}>=0 && isint(${2=0}) && $2>=-1 && $2<=2 && ${3=0}>=0"
+  e[^-1] "Do something to image$?, with great effect."
+  v - func=${arg\ 2+$2,hmean,gmean,mean,qmean}
+  _gcd_$func m _gcd_func:$_gcd_f m _gcd_finv:$_gcd_i
+  repeat $! l[$>] # [1]=nz [2]=(1-G(iz))
+    +neq. 0 +eq. 0 +[0] . zs={is} b. $1 *. .. *. -1 +. 1 ($3)
+    _gcd_func[0,-1] mul[0] [1] # x = f(x), f(0) = 0
+    d={0,$3==0?is/(whds-$zs):i#-1} rm. # d = global(f(X))
+    +b[0] $1 +eq. 0 add[-2,-1] div[-2,-1] # (1 - z) / b
+    mul[0] $d mul[0,-1] # x = x * d / local(f(X))
+    _gcd_finv[0] mul # x = f^-1(x), restore zeros
+  endl done
+  uncommand _gcd_func,_gcd_finv v +
+
+_gcd_qmean : _gcd_f="sqr" _gcd_i="sqrt"
+_gcd_mean : _gcd_f="skip 0" _gcd_i="skip 0"
+_gcd_gmean : _gcd_f="log" _gcd_i="exp"
+_gcd_hmean : _gcd_f="pow -1 sub 1" _gcd_i="add 1 pow -1"
+
+_ac_gcd_luminance : # not strictly correct due to gamut losses
+  _p="to_color"
+  _f="srgb2rgb rgb2xyz8 sh 1 a c"
+  _b="s c,{1-s} sh.. 1 +eq. 0 +[-2,-1] /[-2,-1] * xyz82rgb rgb2srgb"
+  _s=3
+
 #@gui CRMT Tiles : fx_gcd_crmt_tile, fx_gcd_crmt_tile(1)
 #@gui : note = note("<i>Tiling by Clone, Rotate, Mirror, Translate method.</i>"), sep = separator()
 #@gui : Constants = text{"t_w=[w] t_h=[round(1/2*sqrt(3)*$t_w)]"}
