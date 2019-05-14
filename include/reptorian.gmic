@@ -654,7 +654,7 @@ if $iw>$ih r $iw,$ih,1,{s},{$16+2}
 else r $iw,$ih,1,{s},{$16+2} fi
 #@cli rep_sptbwgp: (eq. to rep_shift_pixel_to_boundary_with_group_pixels)
 rep_sptbwgp: rep_shift_pixel_to_boundary_with_group_pixels $*
-#@cli rep_shift_pixel_to_boundary_with_group_pixels: 0<=_position<=1, _axis={ 0=Horizontal | 1=Vertical }, 0<=influence_factor<=1, 0<_threshold<=255
+#@cli rep_shift_pixel_to_boundary_with_group_pixels: 0<=_position<=1, _axis={ 0=Horizontal | 1=Vertical }, 0<=influence_factor<=0, _threshold
 #@cli : Shifts pixels to boundary by percentage using grouped pixels. position less than .5 means shift will be negative, and position greater than .5 means shift will be positive.
 rep_shift_pixel_to_boundary_with_group_pixels:
 repeat $! l[$>]
@@ -662,54 +662,28 @@ skip ${4=0}
 iw={w}
 ih={h}
 is={s}
-shift_var={($1+1)/2}
+axis=$2
+num=$1
+threshold=$4
+influence=$3
+shift_var={($num+1)/2}
 
 if $3!=0
 if s==1||s>5 v + error "Spectrum depth cannot be less than 2 or greater than 5!" fi
 if $shift_var<0||$shift_var>1 v + error "Exceed the boundaries!" fi
 if $3<0||$3>1 v + error "Influence Factor cannot be greater than 1 or less than 0!" fi
 
-f "s==2?(i1<=$4?0:i):(s==3?(i2<=$4?0:i):s==4?(i3<=$4?0:i):s==5?(i4<=$4?0:i))"
+f s==2?(i1<=$threshold?0:i):(s==3?(i2<=$threshold?0:i):s==4?(i3<=$threshold?0:i):s==5?(i4<=$threshold?0:i))
 
-if $3<1
-
-.
-
-l[1] 
-axis=$2
-
-angle={$axis?90:0}
-channels {$is-1}
-r 100%,100%,100%,4
-f "fa=i3;fa<255?0:255" 
-rep_dupsdaxy 0,2,1,$angle,0,0 ac. "f "255-i"",rgb blend alpha,.5
-f "[i,i,i,fa=i3;fa<255/2?0:255]" 
-if $angle
-{w},1,1,4,[255,255,255,255]
-{w},1,1,4,[0,0,0,255]
-else
-1,{h},1,4,[255,255,255,255]
-1,{h},1,4,[0,0,0,255]
-fi
-rv[0,1]
-if $angle a y else a x fi
-fx_streak 0,0,0,0,0,$angle,3
-channels 1
-r 100%,100%,100%,$is
-if $shift_var<0.5&&$axis==1 f "255-i"
-elif $shift_var>0.5&&$axis==0 f "255-i" 
-fi 
-r $iw,$ih,100%,100%,0,0,.5,.5
-f "i>(1-$3)*255?0:i"
-* -1
-endl
+if $influence!=1
++rep_sptbwgp_backdrop $axis,$num,$influence,1
 s c
-l[{$is-1},{$is*2-1}] f.. "i#0==0?i#1:i" endl
-rm[$is-{$is*2-1}]
+l[-2,-1] f.. "i==0?i#1:i" endl
+rm.
 a c
 fi
 
-if $2>0
+if $axis>0
 s x
 repeat $! l[$>] r 1,{h+1},100%,100%,0,0,.5,1 autocrop_components ,,,, a y r 1,$ih,100%,100%,0,0,.5,{1-$shift_var} endl done
 a x
@@ -717,10 +691,48 @@ else
 s y
 repeat $! l[$>] r {w+1},1,100%,100%,0,0,1,.5 autocrop_components ,,,, a x r $iw,1,100%,100%,0,0,$shift_var,.5 endl done
 a y
-fi
 f "s==2?[i0,i1<0?0:i1]:(s==3?[i0,i1,i2<0?0:i2]:s==4?[i0,i1,i2,i3<0?0:i3]:s==5?[i0,i1,i2,i3,i4<0?0:i4])"
 fi
+fi
 endl done
+rep_sptbwgp_backdrop:
+iw={w}
+ih={h}
+is={s}
+axis=$1
+dir=$2
+angle={$axis?($dir<0?90:270):($dir<0?180:0)}
+
+channels {$is-1}
+
+vm={im}
+vM={iM}
+n 0,255
+.
+rep_dupsdaxy. 0,2,.5,$angle,0,0  negate.
+add[-1,-2] /. 2 f. "i==127.5?127.5:(i<127.5?0:255)" f.. "i==0?0:255" rv a c
+
++select_color 0,127.5,0
+
+f.. "
+const step = max(1,0%*min(w,h));
+const angle = ($1*90)*pi/180;
+const dx = step*cos(angle);
+const dy = step*sin(angle);
+if (!i(#-1),I,
+ixf = xf = x; iyf = yf = y; lf = 0;
+while (i(#-1,ixf=round(xf),iyf=round(yf)), ++lf; xf-=dx; yf-=dy);
+ixb = xb = x; iyb = yb = y; lb = 0;
+while (i(#-1,ixb=round(xb),iyb=round(yb)), ++lb; xb+=dx; yb+=dy);
+(lb*lb*I(ixf,iyf) + lf*lf*I(ixb,iyb))/(lb^2+lf^2);
+)"
+channels 0
+rm.
+n $vm,$vM
+
+f i>(1-$3)*$vM?0:i
+if $4 * -1 fi
+
 #@gui _<b>Testing</b>
 #@gui <i>Reptorian</i>
 
@@ -1440,14 +1452,14 @@ fx_rep_nebulous $*
 #@gui Grouped Pixel Axis-Based Shift: fx_rep_sptbwgp,fx_rep_sptbwgp_preview
 #@gui : note = note("Based off MadJik's Paint.NET Gravity Plugin. New feature are shift position, and influence factor."), sep = separator()
 #@gui : Shift Position (%) = float(0,-100,100)
-#@gui : Influence Factor (%) = float(0,0,100)
+#@gui : Influence Factor = float(0,0,1000)
 #@gui : Threshold (%) = float(0,0,100)
 #@gui : Axis = choice(0,"Horizontal","Vertical")
 #@gui :  sep  = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui :  sep  = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/5/13</i>.</small>")
 fx_rep_sptbwgp:
 to_rgba
-rep_sptbwgp {$1/100},$4,{$2/100},{($3/100)*(255-10^-8)}
+rep_sptbwgp {$1/100},$4,{$2/1000},{($3/100)*(255-10^-8)}
 fx_rep_sptbwgp_preview:
 gui_split_preview "fx_rep_sptbwgp $*",${-3--1}
 
