@@ -615,21 +615,21 @@ f[0] "i(int(i#1)%w,floor(int(i#1)/w))"
 k..
 fi
 endl done
-#@cli rep_nebulous: main_surf_xy_factor>0,main_surf_x_factor>0,main_surf_y_fact>0,-100<=x_center[%]<=100,-100<=y_center[%]<=100,0<=_fxyangle<=360,_wave,0<=_lighting_angle<=360,_disturbance>=0,_distx,_disty,0<=_distangle<=360,_color={ 0=gray | 1=color },0<=_alpha_base<=2,_subpixelevel,0<=_subpixelprocessingmethod<=4
+#@cli rep_nebulous: main_surf_xy_factor>0,main_surf_x_factor>0,main_surf_y_fact>0,-100<=x_center[%]<=100,-100<=y_center[%]<=100,0<=_fxyangle<=360,_wave,0<=_lighting_angle<=360,_disturbance>=0,_distmult,_distx,_disty,0<=_distangle<=360,_disturbance_mode={ 0= do_not_scale | 1=scale_by_axisfact },_color={ 0=gray | 1=color },0<=_alpha_base<=2,_subpixelevel,0<=_subpixelprocessingmethod<=4
 #@cli : Creates a nebulous texture inspired by its PDN equivalent. 
 #@cli : Default value: 'fxyangle=0','wave=1','lighting_angle=0','disturbance=0','distx=0','disty=0','distangle=0','subpixellevel=2','subpixelprocessing=3','alpha_base=0'
 #@cli : rep_nebulous 1,,,,,45,2,0,,,,,1 n 0,255
 rep_nebulous:
-skip ${2=20},${3=20},${4=0},${5=0},${6=0},${7=0},${8=0},${9=0},${10=5},${11=5},${12=0},${13=0},${14=0},${15=2},${16=3},
 if $1==0||$2==0||$3==0 v + error "Variable 1 to 3 cannot be zero!" fi
 if $9<0 v + error "Disturbance factor cannot be less than 0!" fi
 iw={w}
 ih={h}
-if !$13 channels 0
+if !$15 channels 0
 else to_rgb fi
-if $14 r $iw,$ih,1,{s+1} fi
-if $iw>$ih r {$iw*$15},{$ih*$15},1,{s}
-else r {$iw*$15},{$ih*$15},1,{s} fi
+if $16 r $iw,$ih,1,{s+1} fi
+if $17>1
+if $iw>$ih r {$iw*$17},{$ih*$17},1,{s}
+else r {$iw*$17},{$ih*$17},1,{s} fi fi
 f "
 sd=w/h;
 shx=($4*w)/2;
@@ -641,17 +641,17 @@ IX=ix*cos(ang)-iy*sin(ang);
 IY=ix*sin(ang)+iy*cos(ang);
 IX*=$2*4;
 IY*=$3*4;
-distlvl=$9*$1*100;
+distlvl=$9*$1*($10>=1?$10:1);
 dist=pi/(distlvl/100);
-disth=$10;
-distv=$11;
-dang=pi*$12/180;
+disth=$12;
+distv=$13;
+dang=pi*$14/180;
 dix=(x/w-.5)*2/(h>w?1/sd:1);
 diy=(y/h-.5)*2/(w>h?sd:1);
 DIX=dix*cos(dang)-diy*sin(dang);
 DIY=dix*sin(dang)+diy*cos(dang);
-cx=DIX*$2;
-cy=DIY*$3;
+cx=DIX*($11?$2:1);
+cy=DIY*($11?$3:1);
 IX+=distlvl>0?(disth*(sin(((cx+cy)/2)/dist)-cos(((cy-cx)/2)/dist)));
 IY+=distlvl>0?(-distv*(sin(((cx+cy)/2)/dist)+cos(((cy-cx)/2)/dist)));
 k=pi+((-pi+(pi*$7))*10)/10;
@@ -662,12 +662,11 @@ r/=100;
 ti=sin(t)*cos(r)*k+r+ang+ld;
 g=(sin(ti)+sin(pi/2+ti)+sin(pi+ti));
 cg=[sin(pi+ti),sin(pi/2+ti),sin(ti)];
-ft=!$13?g:cg;
-alp=$14?($14>2?($14==3?g:g*-1):($14==2?(g*-1<0?-1:1):(g<0?-1:1)));
-$14?(!$13?[g,alp]:[sin(pi+ti),sin(pi/2+ti),sin(ti),alp]):ft;
+ft=!$15?g:cg;
+alp=$16?($16>2?($16==3?g:g*-1):($16==2?(g*-1<0?-1:1):(g<0?-1:1)));
+$16?(!$15?[g,alp]:[sin(pi+ti),sin(pi/2+ti),sin(ti),alp]):ft;
 "
-if $iw>$ih r $iw,$ih,1,{s},{$16+2}
-else r $iw,$ih,1,{s},{$16+2} fi
+if $17>1 r $iw,$ih,1,{s},{$18+2} fi
 #@cli rep_sptbwgp: (eq. to rep_shift_pixel_to_boundary_with_group_pixels)
 rep_sptbwgp: rep_shift_pixel_to_boundary_with_group_pixels $*
 #@cli rep_shift_pixel_to_boundary_with_group_pixels: 0<=_position<=1, _axis={ 0=Horizontal | 1=Vertical }, 0<=influence_factor<=1, 0<=_threshold<=1
@@ -1454,7 +1453,9 @@ gui_split_preview "fx_spiralmatrixtransform $*",${-3--1}
 #@gui : Angle of Main Nebulous Surface = float(0,-180,180)
 #@gui : Wave(s) = float(1,-25,25)
 #@gui : Lighting Angle = float(0,-180,180)
-#@gui : Surface Disturbance = float(0,0,1000)
+#@gui : Surface Disturbance = float(0,0,2000)
+#@gui : Surface Disturbance Multiplier = float(1,1,500)
+#@gui : Disturbance Scale-By-Factor=bool(0)
 #@gui : Disturbance X = float(0,0,1000)
 #@gui : Disturbance Y = float(0,0,1000)
 #@gui : Angle of Disturbance Surface = float(0,-180,180)
@@ -1464,11 +1465,11 @@ gui_split_preview "fx_spiralmatrixtransform $*",${-3--1}
 #@gui : note = note("<b>Subpixel Processing</b>\n\n You do not need to touch this unless you want higher amount of precision, but the difference is small. If you are using a very small surface or hard alpha mode, then it makes sense to touch subpixel processing variables.")
 #@gui : Subpixel Level = int(1,0,4)
 #@gui : Subpixel Interpolation = choice(3,"Average","Linear","Grid","Bicubic","Lanczos")
-#@gui :  sep  = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2019/5/18</i>.</small>")
+#@gui : sep = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2019/5/11</i>.</small>")
 fx_rep_nebulous:
 repeat $! l[$>]
-rep_nebulous ${2-15},{$16+1},$17 + 1 * 127.5
-if $15&&$1&&$14
+rep_nebulous ${2-19} + 1 * 127.5
+if $17&&$1&&$16
 split_opacity
 if {$1==1} ryb2rgb..
 elif {$1==2} hsi82rgb..
@@ -1481,7 +1482,7 @@ elif {$1==8} yuv82rgb..
 elif {$1==9} xyz82rgb..
 fi
 a c
-elif $1&&$14
+elif $1&&$16
 if {$1==1} ryb2rgb
 elif {$1==2} hsi82rgb
 elif {$1==3} hsl82rgb
