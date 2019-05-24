@@ -620,42 +620,90 @@ gcd_unstereo_preview :
 #@gui _<b>Testing</b>
 #@gui <i>Garagecoder</i>
 
+#@gui Local F-Mean : gcd_fx_local_fmean, gcd_fx_local_fmean(1)
+#@gui : note = note("<i>Map local f-mean to match global or target</i>"), sep = separator()
+#@gui : Radius = float(15,0,100)
+#@gui : Bright = float(0,0,1)
+#@gui : Mean = choice(0,"Harmonic","Geometric","Arithmetic","Quadratic")
+#@gui : Channels = choice(5,"HSI","HSV","Lab","Linear RGB","RGB","Luminance","YCbCr")
+#@gui : Normalize = bool(0)
+#@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2019/05/11</i>.</small>")
+#@gui : note = link("https://en.wikipedia.org/wiki/Quasi-arithmetic_mean")
+#@gui : note = note("\n<small><b><u>Notes</u></b></small>")
+#@gui : note = note("<small>Set bright to zero to auto match global f-mean</small>")
+#@gui : note = note("<small>Normalize will disable bright control for arithmetic and quadratic</small>")
+gcd_fx_local_fmean : skip ${1=15},${2=0},${3=0},${4=5},${5=0}
+  mode=${arg\ 1+$4,hsi_i,hsv_v,lab_l,lrgb,rgb,gcd_luminance,ycbcr_y}
+  if $5 ac "r={[im,iM]} n 0.002,0.998 gcd_fmean_local $1%,{$3-1},$2 n $r",$mode,2
+  else ac "div 255 gcd_fmean_local $1%,{$3-1},$2 mul 255",$mode,1
+  fi u "{$1}{$2}_"{2-($3>1" && "$5==1)}"{$3}{$4}{$5}"
+
+#@cli gcd_fmean_local : std_deviation>=0[%],-1<=_mean_type<=2,_target>=0
+#@cli : Map local f-mean to match global or target.
+#@cli : Value range is assumed to be 0 <= input <= 1.
+#@cli : When target is zero, it will be set to the global f-mean.
+#@cli : Default values: 'std_deviation=1', '_mean_type=0' and '_target=0'.
+#@cli : $ image.jpg n 0,1 gcd_fmean_local 1%
+gcd_fmean_local : check "${1=1}>=0 && isint(${2=0}) && $2>=-1 && $2<=2 && ${3=0}>=0"
+  e[^-1] "Map local f-mean of image$?."
+  v - func=${arg\ 2+$2,hmean,gmean,mean,qmean}
+  _gcd_$func m _gcd_func:$_gcd_f m _gcd_finv:$_gcd_i
+  repeat $! l[$>] # [1]=nz [2]=(1-G(iz))
+    +neq. 0 +eq. 0 +[0] . zs={is} b. $1 *. .. *. -1 +. 1 ($3)
+    _gcd_func[0,-1] mul[0] [1] # x = f(x), f(0) = 0
+    d={0,$3==0?is/(whds-$zs):i#-1} rm. # d = global(f(X))
+    +b[0] $1 +eq. 0 add[-2,-1] div[-2,-1] # (1 - z) / b
+    mul[0] $d mul[0,-1] # x = x * d / local(f(X))
+    _gcd_finv[0] mul # x = f^-1(x), restore zeros
+  endl done
+  uncommand _gcd_func,_gcd_finv v +
+
+_gcd_qmean : _gcd_f="sqr" _gcd_i="sqrt"
+_gcd_mean : _gcd_f="skip 0" _gcd_i="skip 0"
+_gcd_gmean : _gcd_f="log" _gcd_i="exp"
+_gcd_hmean : _gcd_f="pow -1 sub 1" _gcd_i="add 1 pow -1"
+
+_ac_gcd_luminance : # not strictly correct due to gamut losses
+  _p="to_color"
+  _f="srgb2rgb rgb2xyz8 sh 1 a c"
+  _b="s c,{1-s} sh.. 1 +eq. 0 +[-2,-1] /[-2,-1] * xyz82rgb rgb2srgb"
+  _s=3
+
 #@gui CRMT Tiles : fx_gcd_crmt_tile, fx_gcd_crmt_tile(1)
 #@gui : note = note("<i>Tiling by Clone, Rotate, Mirror, Translate method.</i>"), sep = separator()
 #@gui : Constants = text{"t_w=[w] t_h=[round(1/2*sqrt(3)*$t_w)]"}
-#@gui : Image Size = text("[3*$t_w,2*$t_h]")
+#@gui : Render Size = text("[3*$t_w,2*$t_h]")
 #@gui : Command List = text{1,"C0 T0 C0 Fo R-60 T[-1/2*$t_w,0]"}
 #@gui : Inpaint = bool(0)
-#@gui : sep = separator(), note = note("<small>Implementation : <i>Garagecoder</i>.     Latest update : <i>2018/12/06</i>.</small>")
+#@gui : sep = separator(), note = note("<small>Implementation : <i>Garagecoder</i>.     Latest update : <i>2019/05/10</i>.</small>")
 #@gui : note = note("<small>Author: <i>G. Bachelier</i></small>")
 #@gui : note = note("\n<b>Warning</b>: alpha version, don't expect perfection!")
 fx_gcd_crmt_tile :
+  to_a
   m "_crmt_tile_C : [$""1]"
   m "_crmt_tile_R : rotate. $""1 autocrop."
   m "_crmt_tile_Fo : mirror. x"
   m "_crmt_tile_Fi : mirror. y"
-  ({'"_crmt_tiling_command : $1 {``$2},1,4 $3"'})
+  macros="sind(A)=sin(A/180*pi);cosd(A)=cos(A/180*pi);tand(A)=tan(A/180*pi);"
+  string "_crmt_tiling_command : $1 {``$2},1,4 nm. _crmt_render $3"
   replace_str. "C","_crmt_tile_C "
   replace_str. "Fo","_crmt_tile_Fo "
   replace_str. "Fi","_crmt_tile_Fi "
   replace_str. "R","_crmt_tile_R "
   replace_str. "T","_crmt_tile_T "
-  replace_str. "[","{["
+  replace_str. "[","{"$macros"["
   replace_str. "]","]}"
   m {t}
   rm.
-  repeat $! l[$>]
-    _crmt_tiling_command k[1]
+    _crmt_tiling_command k[_crmt_render]
     if $4
       +channels[0] 100% negate. dilate. 3
       inpaint[0] .,0,0 rm.
     fi
-  endl done
   uncommand _crmt_tiling_command
 
-_crmt_tile_T : skip ${1=0},${2=0} # this command actually renders as well
-  #split_opacity. n. 0,1 j[1] ..,$1,$2,0,0,1,. rm[-2,-1]
-  f. ':i3>0?I(#1,$1+x,$2+y)=I;i' rm.
+_crmt_tile_T : skip ${1=0},${2=0} # this command renders the tile
+  f. ":i3>0?I(#"{``${_crmt_render}}",$1+x,$2+y)=I;i" rm.
 
 #@gui Deblur Texture : fx_gcd_blur_deblur_texture, fx_gcd_blur_deblur_texture_preview(0)
 #@gui : note = note("<i>Variance-based edge preserving deblur or smooth</i>"), sep = separator()
@@ -664,8 +712,8 @@ _crmt_tile_T : skip ${1=0},${2=0} # this command actually renders as well
 #@gui : Edges = float(0.5,0,1)
 #@gui : Action = choice("Deblur","Smooth")
 #@gui : Channels = choice(2,"RGB","Linear RGB","Luma","Chroma")
-#@gui : Percentage sigma = bool(0)
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : Percentage Sigma = bool(0)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2018/09/02</i>.</small>")
 #@gui : note = note("\n<small><b><u>Notes</u></b></small>")
 #@gui : note = note("<small>Iters: overall amount, increases computation time.</small>")
@@ -770,14 +818,14 @@ gcd_scale_noise : skip ${1=16},${2=2}
 gcd_random : skip ${1=1},"${2=?}"
   f "begin(a=int(255*u);b=int(64000*u+999);q=int(255*u+255));
      n=xor(a,a<<13);a=b;b=q;q=xor(xor(q,q>>15),xor(n,n>>10))"
-  if {isval("$2")} n $1,$2 else n 0,$1 fi
+  if {isnum("$2")} n $1,$2 else n 0,$1 fi
 
 #@gui Smooth [Geometric-Median] : fx_gcd_geometric_median, fx_gcd_geometric_median_preview(0)
 #@gui : note = note("<i>Smooth using windowed geometric median of vectors</i>"), sep = separator()
 #@gui : Radius = int(3,1,9)
 #@gui : Iters = int(12,1,20)
 #@gui : sep = separator(), Channel(s) = choice("All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
-#@gui : sep = separator(), Preview type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : sep = separator(), Preview type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2018/07/18</i>.</small>")
 #@gui : note = note("\n<small><b><u>Notes</u></b></small>")
 #@gui : note = note("<small>This prototype filter can be extremely slow to compute!</small>")
@@ -1481,7 +1529,7 @@ gcd_unquantize : -skip ${1=6},${2=1},${3=1},${4=5},${5=15}
 
 #@gui Warp Map: gcd_warpmap, gcd_warpmap(1)
 #@gui : note = note("<i>Warp an image using another as a surface</i>"), sep = separator()
-#@gui : Depth = float(5,0,20)
+#@gui : Depth = float(5,0,100)
 #@gui : Detail = float(0,0,10)
 #@gui : Smoothness = float(0,0,10)
 #@gui : Blend Mode = choice("Warp","Multiply","Softlight","None")
@@ -1986,6 +2034,18 @@ gcd_poisson_disk : check "${1=8}>0 && ${3=30}>0" skip ${2=1}
         if (attempts == max_sample_attempts, dar_remove(#4,R));
       );
     " k[0]
+  endl done v +
+
+#@cli gcd_blur_masked : std_deviation>=0[%],_boundary_conditions,_kernel
+#@cli : Blur selected images using a binary inclusion mask.
+#@cli : See 'help blur' for full parameters description.
+#@cli : $ image.jpg to_rgb +to_a circle 50%,50%,80,1,0 gcd_blur_masked 2%
+gcd_blur_masked :
+  e[^-1] "Blur image$? with binary inclusion masking."
+  v - repeat $! l[$>] # b / (1 - z)
+    to_a split_opacity mo={iM}
+    ge. 1 *[0] . +eq. 0 b[0,-1] $* *. .. *. -1 +. 1 /[0,-1] *[0] .
+    *. $mo a c
   endl done v +
 
 #@gui _

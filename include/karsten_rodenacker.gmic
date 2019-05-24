@@ -77,34 +77,46 @@ karos_about :
 _wrbytepnk :
   output_pink3d ${1}.pnk
 
-_xpink :
+#@cli _xpink : pink_cmd,p1, ... ,pn
+#@cli : Packs the list of parameters to a string with spaces,
+#@cli : generates the pink input image in tmp and executes the pink command and reads the result image
+#@cli : If $GMIC_PINK_VERBOSE is true, the command and sysout is printed
+#@cli : If $GMIC_PINK_NO_RM is true, the temporary files are not removed
+_xpink : v -
   na={-1,n}
   filename=${-file_rand}
   x_filename={/$filename}
-  if {if(isval($GMIC_PINK_VERBOSE),0$GMIC_PINK_VERBOSE,0)>0} verb=" 2>&1" else verb=" >/dev/null 2>&1" fi
-  if {if(isval($GMIC_PINK_NO_RM),0$GMIC_PINK_NO_RM,0)>0} no_rm=1 else no_rm=0 fi
-  prefix=pink.
+  if {if(isnum($GMIC_PINK_VERBOSE),0$GMIC_PINK_VERBOSE,0)>0} verb=" 2>&1" else verb=" >/dev/null 2>&1" fi
+  if {if(isnum($GMIC_PINK_NO_RM),0$GMIC_PINK_NO_RM,0)>0} no_rm=1 else no_rm=0 fi
+  prefix=pink. suffix=""
   if {!${-is_windows}}
     -x "which "${prefix}${1}$verb
     if {${}!=0} prefix=""
       -x "which "$1$verb
-      if {${}!=0} v + error "Executable (pink.)"$1" not found in PATH, status = "${}"!! Returning!!\n" fi
+      if {${}!=0} suffix=".exe"
+        -x "which "$1$suffix$verb
+        if {${}!=0} v + error "Executable (pink.)"$1" not found in PATH, status = "${}"!! Returning!!\n" v - fi
+      fi
     fi
-    output_pink3d ${filename}.pnk -x ${prefix}${1}" "${filename}".pnk $2 "${filename}"_o.pnk"$verb
+    if {if(isnum($GMIC_PINK_VERBOSE),0$GMIC_PINK_VERBOSE,0)>0} echo_stdout ${prefix}${1}${suffix}" "${filename}".pnk $2 "${filename}"_o.pnk"$verb fi
+    output_pink3d ${filename}.pnk -x ${prefix}${1}${suffix}" "${filename}".pnk $2 "${filename}"_o.pnk"$verb
   else
+    if {if(isnum($GMIC_PINK_VERBOSE),0$GMIC_PINK_VERBOSE,0)>0} echo_stdout $1" "${x_filename}".pnk $2 "${x_filename}"_o.pnk" fi
     output_pink3d ${filename}.pnk -x $1" "${x_filename}".pnk $2 "${x_filename}"_o.pnk"
   fi
   status=${}
   if {!$no_rm} file_rm ${x_filename}.pnk fi
-  if {$status!=0" && "['"$1"']!='seuilauto'} v + error "Exec status is "${status}"."
-  elif ${filename}_o.pnk i ${filename}_o.pnk file_rm ${x_filename}_o.pnk k. nm. $na
-  else v + error "Exec error!!"
-  fi
+  if {$status!=0" && "['"$1"']!='seuilauto'} v + error "Exec status is "${status}"." v -
+  elif {isfile(['${filename}_o.pnk'])} i ${filename}_o.pnk file_rm ${x_filename}_o.pnk k. nm. $na
+  else v + error "Exec error!!" v -
+  fi v +
 
-_xpinks :
+#@cli _xpinks : pink_cmd,parameter_string(with spaces)
+#@cli : Splits c channel if necessary and executes "_xpink pink_cmd,parameter_string" to each image
+_xpinks : v -
   s={s} if {$s>1} s. c fi
   repeat $! l[$>]  _xpink $1,"$2" k. endl done
-  if {$s>1} a[-$s--1] c fi
+  if {$s>1} a[-$s--1] c fi v +
 
 _xframe :
   line 0%,0%,100%,0% line 0%,100%,100%,100% line 0%,0%,0%,100% line 100%,0%,100%,100%
@@ -154,14 +166,14 @@ pinkxipo :
   $=var
   p=1
   na={n}
-  for {$#>=$p&&${-is_image_arg\ ${var$p}}} pass${var$p} p+=1 done pl=$p-1
+  for {$#>=$p" && "${-is_image_arg\ ${var$p}}} pass${var$p} p+=1 done pl=$p-1
   exec=${var$p} p+=1
   if {$#==$p} pp=${var$p}
   elif {$#>$p} repeat {$#-$p+1} if {$>==0} pp=${var$p} else pp=$pp" "${var$p} fi p+=1 done
   else pp="" fi
   filename=${-file_rand}
-  if {if(isval($GMIC_PINK_VERBOSE),0$GMIC_PINK_VERBOSE,0)>0} verb=" 2>&1" else verb=" >/dev/null 2>&1" fi
-  if {if(isval($GMIC_PINK_NO_RM),0$GMIC_PINK_NO_RM,0)>0} no_rm=1 else no_rm=0 fi
+  if {if(isnum($GMIC_PINK_VERBOSE),0$GMIC_PINK_VERBOSE,0)>0} verb=" 2>&1" else verb=" >/dev/null 2>&1" fi
+  if {if(isnum($GMIC_PINK_NO_RM),0$GMIC_PINK_NO_RM,0)>0} no_rm=1 else no_rm=0 fi
   echo_stdout $verb
   if {!${-is_windows}}
     prefix=pink.
@@ -181,7 +193,7 @@ pinkxipo :
   status=${}
   if {!$no_rm} repeat $ni file_rm ${-arg\ {$>+1},$il} done fi
   if {$status!=0" && "['$exec']!='seuilauto'} v + error $exec" Status is "$status"." return
-  elif ${filename}_o.pnk i ${filename}_o.pnk file_rm ${filename}_o.pnk k. nm $na~
+  elif {isfile(['${filename}_o.pnk'])} i ${filename}_o.pnk file_rm ${filename}_o.pnk k. nm $na~
   else error "exec Error!!" fi
   v +
 
@@ -196,14 +208,13 @@ pink : v -
   v + e[^-1] "Call pink package on image$? with cmd: \"$1 [img] "$p" [img]\"." v -
   repeat $! l[$>] _xpinks $1,$p endl done v +
 
-#@cli pink_grayskel : _connectivity={ 4 | 8 | 6 | 26 }, _lambda=0
+#@cli pink_grayskel : _connectivity={ 4 }, _lambda=0
 #@cli : (https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/grayskel_8c.html)
 #@cli : Grayscale homotopic skeleton (requires the PINK library to be installed).
 #@cli : Default values: 'connectivity=4' and 'lambda=0'.
 #@cli : $ image.jpg +pink_grayskel , +pink_grayskel[0] ,10 +pink_grayskel[0] ,100 append_tiles 2
 pink_grayskel : skip ${1=4},${2=0}
-  check "${1=4}==4 || $1==8 || $1==6 || $1==26"
-  repeat $! l[$>] _xpinks "grayskel","null $1 $2" endl done
+  check "${1=4}==4" v - repeat $! l[$>] pink grayskel,null,$1,$2 endl done v +
 
 #@cli pink_heightmaxima : _connectivity={ 4 | 8 | 6 | 26 },_height=1
 #@cli : (https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/heightmaxima_8c.html)
@@ -333,7 +344,7 @@ pink_wshed : check "${1=4}==4 || $1==8 || $1==6 || $1==26" skip ${2=0},${3=0}
 #@cli output_pinklist : _filename (def. $TMPDIR/pink.list)
 #@cli : Write a pink list file from (2,n) or (3,n) coordinate list image
 output_pinklist :
-  check {w<=3&&w>1} skip ${1=$TMPDIR/pink.list}
+  check {w<=3" && "w>1} skip ${1=$TMPDIR/pink.list}
   e[^-1] "Generetate a pink list file $1 from the ("{w}","{h}") image"
   v -
 #  file_rand nn=${}.list
@@ -441,7 +452,7 @@ follic :
 follic_ :
   e[^-1] "Load thyroid follicle nuclei and mask example image"
   v - l[] follic
-    base642img "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"
+    base642img "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"
     decompress_rle.
     nm follic,follic_
   endl v +
@@ -493,12 +504,9 @@ gwyddionread : skip "${1=gwyddion_Example.asc}"
       file_tmp=${-file_rand}
       if {$!>1} o.. raw:$file_tmp,uchar rm.. i dlm:$file_tmp nm. $nm
         o.. raw:${file_tmp}_,uchar rm.. i dlm:${file_tmp}_ nm. ${nm}_ file_rm ${file_tmp}_
-      else o raw:$file_tmp,uchar rm i dlm:$file_tmp nm. $nm
-      fi
+      else o raw:$file_tmp,uchar rm i dlm:$file_tmp nm. $nm fi
       file_rm $file_tmp
-    else
-      rm
-    fi
+    else rm fi
     u [$len_x,$len_y,$offs_x,$offs_y,$bit2nm]
   endl
   v +
@@ -545,9 +553,7 @@ wykoread : skip "${1=Wyko_Example.ASC}"
       fi
       file_rm $file_tmp
       rotate -90,0
-    else
-      rm
-    fi
+    else rm fi
   endl v +
 
 #@cli pseudo_c : Pseudo coloring of greyscale image
@@ -558,7 +564,7 @@ pseudo_c : v - if {s!=1} to_gray. fi {iM},1,1,3,u(255) round. map.. . rm.  v +
 #@cli : $ sincos , +shift. 50%,0,0,0,2 +shift.. 0,50%,0,0,2 a c
 sincos :
   skip "${1=512},${2=$1},${3=0}" v - l[]
-  if {!!$3&&$_version>=216} $1,$2,1,1,'begin(a=pi*w;b=pi*h);i=sin(a/(x+1))*cos(b/(y+1));if(i<=0,i+=1,i);i*255'
+  if {!(!$3" && "$_version>=216)} $1,$2,1,1,'begin(a=pi*w;b=pi*h);i=sin(a/(x+1))*cos(b/(y+1));if(i<=0,i+=1,i);i*255'
   else
     $1,$2,1,1,'begin(a=pi*w;b=pi*h);sin(a/(x+1))*cos(b/(y+1))'
     +f. 'sign(i)' eq. 1 +neq. 1 *[1] ... *. ... n[-1,-2] 0,255
@@ -687,7 +693,7 @@ karo_segmentarea :
 karo_zerleg :
   e[^1] "Partition of binary image$? with pink watershed" v -
   repeat $! l[$>]
-    +distance. 1 pink_wshed. 8,1 f. j(0,0)!=j(1,1)||j(1,0)!=j(0,1) skeleton. , or[0,-1]
+    +distance. 1 pink_wshed. 8,1 f. "j(0,0)!=j(1,1) || j(1,0)!=j(0,1)" skeleton. , or[0,-1]
   endl done v +
 
 #@cli karo_threshold : _method={ triangle | yen | otsu | _otsu | bgt | intermeans | intera | rats | fixnnn | huang | huang2 | li },_delclass>0,_smooth>0
@@ -704,7 +710,7 @@ karo_threshold : skip ${1="triangle"} skip ${2=0} skip ${3=0}
   else meth=$1 fi
   if {['$meth']=='otsu'} otsu 256
   elif {['$meth']=='rats'} karo_rats ,
-  elif {['$meth']=='intera'} threshold
+  elif {['$meth']=='intera'} st={[im,iM]} x_threshold u {st=[$st];round(${}*(st[1]-st[0])+st[0])}
   else repeat $!
     l[$>]
       if {['$meth']=='fix'} _karo_fix ,,$1
@@ -735,7 +741,7 @@ _karo_triangle : skip "${1=0} ${2=1}"
   v -
   repeat $! l[$>]
     ac=${-autocrop_coords.} wd={w}
-    min={${-arg\ 1,$ac}} if {$min==1&&{@0}!=0} min=0 fi # corr autocrop_coords
+    min={${-arg\ 1,$ac}} if {$min==1" && "{@0}!=0} min=0 fi # corr autocrop_coords
     if {$min>0} min={$min-1} fi
     min2={${-arg\ 4,$ac}} if {$min2<{$wd-1}} min2={$min2+1} fi
     dmax={iM} max={xM}
@@ -813,7 +819,7 @@ _karo_bgt: skip "${1=0} ${2=1}" v - fact=1.5
 #@cli : from last selected data and store it in status
 _karo_intermeans : skip "${1=0} ${2=1}"
   e[^-1] "Calculate intermeans threshold from last selected (1d) histogram$? in range ["$1","{$1+(w-1)*$2}"]." v -
-  l. if {h>1||d>1||s>1} u "?" else
+  l. if {h>1" || "d>1" || "s>1} u "?" else
     split={"
       min=0; while(i(min)==0,min++);
       max=w; while(i(max)==0,max--);
@@ -823,7 +829,7 @@ _karo_intermeans : skip "${1=0} ${2=1}"
         for(id=min,id<=mvI,id++,sum1+=id*i(id);sum2+=i(id));
         for(id=mvI+1,id<=max,id++,sum3+=id*i(id);sum4+=i(id));
         res=(sum1/sum2+sum3/sum4)/2.0;mvI++,
-        (mvI+1)<=res&&mvI<(max-1)));
+        (mvI+1)<=res" && "mvI<(max-1)));
       round(res)"} rm
     u {$1+$split*$2} fi
   endl v +
@@ -871,12 +877,12 @@ _karo_huang : skip "${1=0} ${2=1}"
              ent = 0.0;
              for (ih = 0,ih<=it,
                mu_x = 1.0 / ( 1.0 + term * abs(ih - mu_0[it]));
-               if (!((mu_x  < 1e-06)||(mu_x > 0.999999)),
+               if (!((mu_x  < 1e-06) || (mu_x > 0.999999)),
                  ent += i(ih) * ( -mu_x * log ( mu_x ) - ( 1.0 - mu_x ) * log ( 1.0 - mu_x )));
                ih++);
              for (ih = it + 1, ih < w,
                mu_x = 1.0 / ( 1.0 + term * abs (ih - mu_1[it]));
-               if (!((mu_x  < 1e-06)||(mu_x > 0.999999)),
+               if (!((mu_x  < 1e-06) || (mu_x > 0.999999)),
                  ent += i(ih) * ( -mu_x * log ( mu_x ) - ( 1.0 - mu_x ) * log ( 1.0 - mu_x )));
                ih++);
              if (ent < min_ent, min_ent = ent; threshold = it; _(print(min_ent,threshold)));
@@ -891,8 +897,8 @@ _karo_huang2 : skip "${1=0} ${2=1}"
 #	// Huang L.-K. and Wang M.-J.J. (1995) "Image Thresholding by Minimizing
 #	// the Measures of Fuzziness" Pattern Recognition, 28(1): 41-51
 #	// Reimplemented (to handle 16-bit efficiently) by Johannes Schindelin Jan 31, 2011
-           for(first=0,first<w&&i(first)==0,first++);
-           for(last=w-1,last>first&&i(last)==0,last--);
+           for(first=0,first<w" && "i(first)==0,first++);
+           for(last=w-1,last>first" && "i(last)==0,last--);
            if(first==last,break());
            S=["{^}"]; W=S;
            S[0]=i(0);
@@ -984,7 +990,7 @@ hist_percentile :
   e[^-1] "Calculate $1 percentile from 1d histogram$?."
   v - repeat $!
     l[$>]
-      if {h>1||d>1||s>1} v + e[^-1] "Image "$>" seemingly not 1d!" v - continue fi
+      if {h>1" || "d>1" || "s>1} v + e[^-1] "Image "$>" seemingly not 1d!" v - continue fi
   # Delete class zero
       if {$2!=0} set. 0,0 fi
   # Calculate features
@@ -1019,13 +1025,13 @@ hist_percentile :
 #@cli : Updated 100817 (percent parameter and iqr,loq,hiq feature added)
 #@cli : $ image.jpg luminance +histogram 256,0,255 dh.. ,,256,0,255 hist_feature , repeat 8 t={_arg($>+1${})} text $t,40,{$>*25+5},23,1,128 done rm.
 hist_feature :
-  check "${1=-2}>=-2&&$1<=8&&isint($1)&&isint(${2=1})&&$2>0"
+  check ${1=-2}>=-2" && "$1<=8" && "isint($1)" && "isint(${2=1})" && "$2>0
   skip ${3=0},${4=0},${5=1},${6=25%}
   e[^-1] "Calculate md,m0,m1,m2,$2.min,$2.max,med,iqr,loq,hiq from 1d histogram$?."
   v -
   repeat $!
     l[$>]
-      if {h>1||d>1||s>1} v + e[^-1] "Data["$>"] seemingly not 1d!" v - continue fi
+      if {h>1" || "d>1" || "s>1} v + e[^-1] "Data["$>"] seemingly not 1d!" v - continue fi
   # Delete class zero
       if {$3!=0} =. 0,0 fi
   # Calculate features
@@ -1034,10 +1040,10 @@ hist_feature :
       +*. 'x*$5+$4' m1={is/$m0} rm.
       +*. '(x*$5+$4)^2' m2={sqrt(is/$m0-$m1^2)} rm.
   # nth-min, nth-max, Median
-      mn={"l=0; su=i(0); while(su<"$2"&&l<w, l++; su+=i(l)); l*"$5"+"$4}
-      mx={"l=w; su=0; while(su<"$2"&&l>=0,l--; su+=i(l)); l*"$5"+"$4}
-      med1={"l=0; su=0; while(su<=(is/2)&&l<w, su+=i(l); l++); l"}
-      med2={"l=w; su=0; while(su<=(is/2)&&l>=0, l--; su+=i(l)); l"}
+      mn={"l=0; su=i(0); while(su<"$2" && l<w, l++; su+=i(l)); l*"$5"+"$4}
+      mx={"l=w; su=0; while(su<"$2" && l>=0,l--; su+=i(l)); l*"$5"+"$4}
+      med1={"l=0; su=0; while(su<=(is/2) && l<w, su+=i(l); l++); l"}
+      med2={"l=w; su=0; while(su<=(is/2) && l>=0, l--; su+=i(l)); l"}
       med={($med1+$med2)/2*$5+$4}
   # iqr
       hist_percentile. $6,$3,$4,$5 qu=${}
@@ -1057,7 +1063,7 @@ hist_feature :
 #@cli : (Plot) of features in blue into the histogram with Gaussian in green
 #@cli : $ sp 0 luminance +threshold 40 * histogram 256,0,255 = 0,0 hist_feature_demo , dg 600,300,3
 hist_feature_demo :
-  check "${1=-2}>=-2&&$1<=8&&isint($1)&&isint(${2=1})&&$2>0"
+  check ${1=-2}>=-2" && "$1<=8" && "isint($1)" && "isint(${2=1})" && "$2>0
   skip ${3=0},${4=0},${5=1},${6=25%}
   e[^-1] "Plot features from hist_feature into 1d histogram$?." v -
   l.
@@ -1077,7 +1083,7 @@ hist_feature_demo :
 #@cli karo_nth_max : _n(1),_ind(=0)
 #@cli : Return in the status the _n-th max or the index of the n-th max of an image
 #@cli : Possibility to fetch the index instead of the value (_ind=1)
-karo_nth_max : check "isint(${1=1}) && $1>0" skip ${2=0}
+karo_nth_max : check isint(${1=1})" && "$1>0 skip ${2=0}
   e[^-1] "Return in the status the $1-th max of image$?."
   v - repeat $! l[$>]
 #     [0] repeat {$1-1} set. {im},{[xM,yM,zM,cM]} done
@@ -1089,7 +1095,7 @@ karo_nth_max : check "isint(${1=1}) && $1>0" skip ${2=0}
 #@cli karo_nth_min : _n(1),_ind(=0)
 #@cli : Return in the status the _n-th min of an image or the index of the _n-th min of an image
 #@cli : Possibility to fetch the index instead of the value (_ind!=1)
-karo_nth_min : check "isint(${1=1}) && $1>0" skip ${2=0}
+karo_nth_min : check isint(${1=1})" && "$1>0 skip ${2=0}
   e[^-1] "Return in the status the $1-th min of image$?."
   v - repeat $! l[$>]
 #     [0] repeat {$1-1} set. {iM},{[xm,ym,zm,cm]} done
@@ -1187,7 +1193,7 @@ karo_rndbit0 :
 #@cli : with _bit0 != 0 bit level 1 is extracted as binary mask
 #@cli :   and bit level 1 in the gray image is randomized with karo_rndbit0
 #@cli : Ex.: karo_dtpread Images/Beispiele/tra005.cel,1
-karo_dtpread : check $1 check "${2=0}>=0"
+karo_dtpread : check isfile(['$1']) check "${2=0}>=0"
   e[^-1] "Read dtp image file from $1." v -
   i raw:$1,uchar
   ({@22-24}) x={t} rm.
@@ -1204,7 +1210,7 @@ karo_dtpread : check $1 check "${2=0}>=0"
 #@cli : return alpha channel mode string from number in status
 #@cli : Ex. v - repeat 51 _kr_ch2ach $> echo_stdout $>,${} done v +
 _kr_ch2ch :
-  if {isval("$1")} if {isint("$1")}
+  if {isnum("$1")} if {isint("$1")}
   u ${-arg\ 1+$1,all,rgba,rgba_r,rgba_g,rgba_b,rgba_a,rgb,rgb_r,rgb_g,rgb_b,\
   lrgb,lrgb_r,lrgb_g,lrgb_b,ycbcr,ycbcr_y,ycbcr_cbcr,ycbcr_cb,ycbcr_cr,ycbcr_cg,\
   lab,lab_l,lab_ab,lab_a,lab_b,lch,lch_l,lch_ch,lch_c,lch_h,\
@@ -1276,15 +1282,15 @@ mmorpho :
   v +
 
 #@gui CImg Skeleton : fx_karo_cimg_skel, fx_karo_cimg_skel_preview(0)
-#@gui : Auto-threshold = bool(1)
+#@gui : Auto-Threshold = bool(1)
 #@gui : Threshold \% = float(50,0,100)
 #@gui : Size Median = int(0,0,15)
 #@gui : Invert = bool(false)
-#@gui : Threshold on flux = float(-0.3,-5,5)
-#@gui : Medial curve = bool(false)
-#@gui : Torsello correction =bool(false)
-#@gui : Discrete step = int(1,1,15)
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : Threshold on Flux = float(-0.3,-5,5)
+#@gui : Medial Curve = bool(false)
+#@gui : Torsello Correction =bool(false)
+#@gui : Discrete Step = int(1,1,15)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui : sep = separator(), note = note(Skeleton using CImg example plugin use_skeleton.)
 #@gui : note = note{"CImg Skeleton: <i>use_skeleton</i> in search PATH"}
 #@gui : sep = separator(), note = note("<small>Author : <i>KaRo</i>. Latest update : <i>2012/10/26</i>.</small>")
@@ -1298,16 +1304,16 @@ fx_karo_cimg_skel :
 fx_karo_cimg_skel_preview :
   gui_split_preview "-fx_karo_cimg_skel ${1-8}",${-3--1}
 
-#@gui CImg nlmeans : fx_karo_cimg_nlmeans, fx_karo_cimg_nlmeans_preview(0)
-#@gui : Add Gauss noise = float(0.0,0.0,30.0)
-#@gui : Add uniform noise = float(0.0,0.0,30.0)
-#@gui : Add Salt &amp; Pepper noise = float(0.0,0.0,30.0)
-#@gui : Half size of patch = int(1,1,15)
-#@gui : Band width lambda = float(-1,-1,25)
-#@gui : Noise SD sigma = float(-1,-1,25)
-#@gui : Neighborhood size alpha = int(3,1,15)
-#@gui : Sampling step size = int(2,1,5)
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui CImg NL-Means : fx_karo_cimg_nlmeans, fx_karo_cimg_nlmeans_preview(0)
+#@gui : Add Gauss Noise = float(0.0,0.0,30.0)
+#@gui : Add Uniform Noise = float(0.0,0.0,30.0)
+#@gui : Add Salt &amp; Pepper Noise = float(0.0,0.0,30.0)
+#@gui : Half Size of Patch = int(1,1,15)
+#@gui : Band Width Lambda = float(-1,-1,25)
+#@gui : Noise SD Sigma = float(-1,-1,25)
+#@gui : Neighborhood Size Alpha = int(3,1,15)
+#@gui : Sampling Step Size = int(2,1,5)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui : sep = separator(), note = note(Smoothing using CImg example plugin use_nlmeans.)
 #@gui : note = note{"CImg nlmeans: <i>use_nlmeans</i> in search PATH"}
 #@gui : sep = separator(), note = note("<small>Author : <i>KaRo</i>. Latest update : <i>2012/10/26</i>.</small>")
@@ -1332,7 +1338,7 @@ fx_karo_cimg_nlmeans_preview :
 #cmy,cmy_c,cmy_m,cmy_y,cmyk,cmyk_c,cmyk_m,cmyk_y,cmyk_k
 #@gui : Channel(s) = choice(0,"all","rgba","rgba_r","rgba_g","rgba_b","rgba_a","rgb","rgb_r","rgb_g","rgb_b","lrgb","lrgb_r","lrgb_g","lrgb_b","ycbcr","ycbcr_y","ycbcr_cbcr","ycbcr_cb","ycbcr_cr","ycbcr_cg","lab","lab_l","lab_ab","lab_a","lab_b","lch","lch_l","lch_ch","lch_c","lch_h","hsv","hsv_h","hsv_s","hsv_v","hsi","hsi_h","hsi_s","hsi_i","hsl","hsl_h","hsl_s","hsl_l","cmy","cmy_c","cmy_m","cmy_y","cmyk","cmyk_c","cmyk_m","cmyk_y","cmyk_k")
 #@gui : Scale = bool(true)
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 ##@gui : Best with odd sizes!
 #@gui : sep = separator(), note = note("Arithmetical difference of a morphological operation of <i>size</i> and <i>size2</i>.")
 #@gui : sep = separator(), note = note("<small>Author : <i>KaRo</i>. Latest update : <i>2012/10/26</i>.</small>")
@@ -1356,12 +1362,12 @@ fx_karo_mm_diff :
 fx_karo_mm_diff_preview :
   gui_split_preview "-fx_karo_mm_diff ${1-6}",${-3--1}
 
-#@gui oC Differences : fx_karo_oc_diff, fx_karo_oc_diff_preview
+#@gui OC Differences : fx_karo_oc_diff, fx_karo_oc_diff_preview
 #@gui : Size = int(5,2,25)
 #@gui : Shape = choice(1,"Square","Octagon","Circle")
 #@gui : Channel(s) = choice(0,"All","RGBA","RGB","Luminance","Blue/red chrominances","Blue chrominance","Red chrominance","Lightness","ab-components","a-component","b-component","Hue","Saturation","Value","Key","Green chrominance","ch-components","c-component","h-component","Red","Green","Blue","Alpha")
 #@gui : Scale =bool(true)
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 ##@gui : Best with odd sizes!
 #@gui : sep = separator(), note = note("Difference of mean of morphological opening and closing with original.")
 #@gui : sep = separator(), note = note("<small>Author : <i>KaRo</i>.           Latest update : <i>2013/07/04</i>.</small>")
@@ -1391,13 +1397,13 @@ fx_karo_oc_diff_preview :
 #@cli : _channel = 0..22 ("All","RGBA","RGB","Luminance","Blue/red chrominances","Blue chrominance","Red chrominance","Lightness","ab-components","a-component","b-component","Hue","Saturation","Value","Key","Green chrominance","ch-components","c-component","h-component","Red","Green","Blue","Alpha")
 #@cli : $ image.jpg +fx_pink , +-
 #@cli : $ image.jpg +fx_pink. 12,1,0.582524,10,0,0 +fx_pink.. 12,0,0.582524,10,0,0 +[-1,-2] # asflin in x and y
-#@gui Pink operator : fx_pink, fx_pink_preview(1)
-#@gui : Pink operator = choice("wshedtopo","wshedtopo inv","minima","maxima","heightminima","heightmaxima","grayskel","htkern","htkernu","lvkern","lvkernu","asf","asflin","asfr","asft","asftmed","asftndg","dilatballnum","erosballnum","lintophat")
+#@gui Pink Operator : fx_pink, fx_pink_preview(1)
+#@gui : Pink Operator = choice("wshedtopo","wshedtopo inv","minima","maxima","heightminima","heightmaxima","grayskel","htkern","htkernu","lvkern","lvkernu","asf","asflin","asfr","asft","asftmed","asftndg","dilatballnum","erosballnum","lintophat")
 #@gui : Connectivity / Dir = choice("Four/x","Eight/y")
 #@gui : Smoothness = float(0,0,5)
 #@gui : Height/Rep = int(5,0,25)
 #@gui : Channel(s) = choice(0,"All","RGBA","RGB","Luminance","Blue/red chrominances","Blue chrominance","Red chrominance","Lightness","ab-components","a-component","b-component","Hue","Saturation","Value","Key","Green chrominance","ch-components","c-component","h-component","Red","Green","Blue","Alpha")
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui : note = link("https://perso.esiee.fr/~coupriem/Pink/doc/html/files.html")
 fx_pink :
   skip ${1=11},${2=0},${3=0},${4=5},${5=0} v -
@@ -1429,15 +1435,15 @@ fx_pink :
 fx_pink_preview :
   gui_split_preview "-fx_pink ${1-5}",${-3--1}
 
-#@gui Pink operator binary: fx_karo_pink_bin, fx_karo_pink_bin_preview(1)
-#@gui : Auto-threshold = bool(1)
+#@gui Pink Operator Binary: fx_karo_pink_bin, fx_karo_pink_bin_preview(1)
+#@gui : Auto-Threshold = bool(1)
 #@gui : Threshold \% = int(50,0,100)
-#@gui : Pink operator = choice(3,"skelpar","skelend","skelcurv","skeleton","barycentre","border","closeball","openball","convexhull","dist","distc","label pla","Lantuejoul")
+#@gui : Pink Operator = choice(3,"skelpar","skelend","skelcurv","skeleton","barycentre","border","closeball","openball","convexhull","dist","distc","label pla","Lantuejoul")
 #@gui : Connectivity / Dir = choice("Four/x","Eight/y")
 #@gui : Height/Rep = int(5,-1,25)
 #@gui : Algorithm = int(4,0,29)
 #@gui : Channel(s) = choice(0,"All","RGBA","RGB","Luminance","Blue/red chrominances","Blue chrominance","Red chrominance","Lightness","ab-components","a-component","b-component","Hue","Saturation","Value","Key","Green chrominance","ch-components","c-component","h-component","Red","Green","Blue","Alpha")
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui : sep = separator(), note = note(Binary operations with Pink externals.)
 #@gui : note = note{"Diverse Pink executables in search PATH"}
 #@gui : sep = separator(), note = note("<small>Author : <i>KaRo</i>.           Latest update : <i>2014/02/05</i>.</small>")
@@ -1463,14 +1469,14 @@ fx_karo_pink_bin :
 fx_karo_pink_bin_preview :
   gui_split_preview "-fx_karo_pink_bin ${1-7}",${-3--1}
 
-#@gui Pink test operator bianca: fx_karo_pink_bianca, fx_karo_pink_bianca_preview(0)
-#@gui : ASF smooth size = int(5,1,10)
+#@gui Pink Test Operator Bianca: fx_karo_pink_bianca, fx_karo_pink_bianca_preview(0)
+#@gui : ASF Smooth Size = int(5,1,10)
 #@gui : Threshold \% = int(60,0,100)
-#@gui : Watershed height min = int(5,0,20)
-#@gui : Opening radius = int(1,0,10)
+#@gui : Watershed Height Min = int(5,0,20)
+#@gui : Opening Radius = int(1,0,10)
 #@gui : Invert = bool(0)
-#@gui : Use G instead of B = bool(0)
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview split = point(50,50,0,0,200,200,200,0,10,0)
+#@gui : Use G Instead of B = bool(0)
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui : sep = separator(), note = note(Pink test operator Bianca for RGB image; only B used.)
 #@gui : note = note{"Pink executables in search PATH or C:\\Pink\\bin\\ for Windows"}
 #@gui : sep = separator(), note = note("<small>Author : <i>KaRo</i>.           Latest update : <i>2012/10/26</i>.</small>")
