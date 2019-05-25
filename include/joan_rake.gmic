@@ -1187,24 +1187,38 @@ gui_split_preview "fx_jr_deform $*",${-3--1}
 #@gui : note = note("<small>Resizes an image without changing the positions of pixels in a simulated image buffer.</small>")
 #@gui : 1. Width = float(50,0,200)
 #@gui : 2. Height = float(50,0,200)
-#@gui : 3. Shift = float(0,0,200)
-#@gui : 4. Repeat for larger sizes = bool(1)
+#@gui : 3. Buffer Start = float(0,0,400)
+#@gui : 4. Buffer End = float(100,0,400)
+#@gui : 5. Buffer Shift = float(0,0,200)
+#@gui : 6. Repeat Buffer = bool(1)
 #@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 
 _fx_virtual_buffer :
+r {wh},1,100%,100%,-1,0
+
+_fx_virtual_buffer_resize :
 wwhh={int(wh)}
 dimx={int($1)}
 dimy={int($2)}
-shift={int($3)}
-s c s z
-unroll x shift $3,0,0,0,2 if $4 resize {$dimx*$dimy},1,1,1,0,2 fi resize {$dimx},{$dimy},100%,100%,-1,3
-a c a z
+cs={int($3)}
+ce={int($4)}
+shift={int($5)}
+bound=$6
+# transform image to buffer
+_fx_virtual_buffer crop $ce,$cs,2 shift {$shift},0,0,0,2  if $bound resize {$dimx*$dimy},1,100%,100%,0,2 fi
+# transform buffer into new image
+$dimx,$dimy,100%,100%
+f. ">begin(index=-1);index+=1;I[#0,index]"
+k.
 fx_buffer_error :
 repeat $! l[$>]
 dimx={int($1/100*w)}
 dimy={int($2/100*h)}
-shift={$3/100*wh}
-_fx_virtual_buffer $dimx,$dimy,$shift,$4
+cs={$3/100*wh}
+ce={$4/100*wh}
+shift={$5/100*wh}
+bound=$6
+_fx_virtual_buffer_resize $dimx,$dimy,$cs,$ce,$shift,$bound
 
 endl done
 fx_buffer_error_preview :
@@ -1215,21 +1229,23 @@ gui_split_preview "fx_buffer_error $*",${-3--1}
 #@gui : sep = separator(), note = note("<b>Buffer Error</b>")
 #@gui : 1. Width = float(50,0,200)
 #@gui : 2. Height = float(50,0,200)
-#@gui : 3. Shift = float(0,0,200)
-#@gui : 4. Repeat for larger sizes = bool(1)
+#@gui : 3. Buffer Start = float(0,0,400)
+#@gui : 4. Buffer End = float(100,0,400)
+#@gui : 5. Buffer Shift = float(0,0,200)
+#@gui : 6. Repeat Buffer = bool(1)
 #@gui : sep = separator(), note = note("<b>Pixel Sort</b>")
 #@gui : note = note{"<small><b>Sorting parameters:</b></small>"}
-#@gui : 5. Order = choice(1,"Decreasing","Increasing")
-#@gui : 6. Axis = choice("X-axis","Y-axis","X-axis Then Y-axis","Y-axis Then X-axis")
-#@gui : 7. Sorting Criterion = choice(3,"Red","Green","Blue","Intensity","Luminance","Lightness","Hue",
+#@gui : 7. Order = choice(1,"Decreasing","Increasing")
+#@gui : 8. Axis = choice("X-axis","Y-axis","X-axis Then Y-axis","Y-axis Then X-axis")
+#@gui : 9. Sorting Criterion = choice(3,"Red","Green","Blue","Intensity","Luminance","Lightness","Hue",
 #@gui : "Saturation","Minimum","Maximum","Random")
 #@gui : note = note{"<small><b>Masking parameters:</b></small>"}
-#@gui : 8. Mask By = choice("Criterion","Contours","Random")
-#@gui : 9. Lower Mask Threshold (%) = float(50,0,100)
-#@gui : 10. Higher Mask Threshold (%) = float(100,0,100)
-#@gui : 11. Mask Smoothness (%) = float(0,0,5)
-#@gui : 12. Invert Mask = bool(0)
-#@gui : 13. Preview Mask = bool(0)
+#@gui : 10. Mask By = choice("Criterion","Contours","Random")
+#@gui : 11. Lower Mask Threshold (%) = float(50,0,100)
+#@gui : 12. Higher Mask Threshold (%) = float(100,0,100)
+#@gui : 13. Mask Smoothness (%) = float(0,0,5)
+#@gui : 14. Invert Mask = bool(0)
+#@gui : 15. Preview Mask = bool(0)
 #@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 
 fx_buffer_error_sort :
@@ -1238,11 +1254,14 @@ ow={w}
 oh={h}
 dimx={int($1/100*w)}
 dimy={int($2/100*h)}
-shift={$3/100*wh}
-crit={1+$8}
-_fx_virtual_buffer $dimx,$dimy,$shift,$4
-_fx_pixelsort ${5-7},{$crit},${9-13}
-_fx_virtual_buffer $ow,$oh,{-$shift},$4
+cs={$3/100*wh}
+ce={$4/100*wh}
+shift={$5/100*wh}
+bound=$6
+crit={1+$10}
+_fx_virtual_buffer_resize $dimx,$dimy,$ce,$cs,$shift,$bound
+_fx_pixelsort ${7-9},{$crit},${11-15}
+_fx_virtual_buffer_resize $ow,$oh,0,{wh},{-$shift},$bound
 endl done
 fx_buffer_error_sort_preview :
 gui_split_preview "fx_buffer_error_sort $*",${-3--1}
