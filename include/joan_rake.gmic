@@ -374,14 +374,14 @@ gui_split_preview "-fx_hard_painting $*",${-3--1}
 #@gui : note = note("Turns bright image outlines into bright, neon-like lines.")
 #@gui : sep = separator(), note = note("Lines")
 #@gui : 1. Norm Mode = choice("Gradient norm","Hessian","Laplacian","Rotation-invariant gradient")
-#@gui : 2. Smoothness = float(0,0,10)
-#@gui : 3. Contrast = float(0.45,0,1.5)
-#@gui : 4. Min Threshold = float(40,0,100)
-#@gui : 5. Max Threshold = float(60,0,100)
-#@gui : 6. Negative = bool(0)
-#@gui : 7. Opacity = float(1,0,1)
-#@gui : 8. Saturation = float(1.15,0,4)
-#@gui : 9. Blur Original = float(2,0,20)
+#@gui : 2. Blur Original = float(2,0,20)
+#@gui : 3. Smoothness = float(0,0,10)
+#@gui : 4. Contrast = float(0.45,0,1.5)
+#@gui : 5. Min Threshold = float(40,0,100)
+#@gui : 6. Max Threshold = float(60,0,100)
+#@gui : 7. Negative = bool(0)
+#@gui : 8. Opacity = float(1,0,1)
+#@gui : 9. Saturation = float(1.15,0,4)
 #@gui : sep = separator(), note = note("Antialias")
 #@gui : 10. Amplitude = float(3,0,100)
 #@gui : 11. Edge Threshold (%) = float(0,0,100)
@@ -408,32 +408,32 @@ gui_split_preview "-fx_hard_painting $*",${-3--1}
 #@gui : sep = separator(), 27-29. Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 fx_neon :
 repeat $! l[$>]
-if $9
-b $9
+if $2
+b $2
 fi
 +fc 0,0,0 rv blend alpha
 to_rgb rgb2hsl s c
-*.. {$8^2.5}
+*.. {$9^2.5}
 a[0-2] c hsl2rgb
-if $7
+if $8
 [0] l[1]
 if {$1==1}
-b $2
+b $3
 +hessian xx sqr.
 +hessian.. yy sqr. +[-2,-1]
 hessian.. zz sqr.. +[-2,-1] b $2
 s={s} s. c +[-$s--1] sqrt.
 elif {$1==2}
-b $2 laplacian abs to_gray to_rgb
+b $3 laplacian abs to_gray to_rgb
 elif {$1==3}
-b $2 gradient xyz abs blend add to_gray to_rgb
+b $3 gradient xyz abs blend add to_gray to_rgb
 else
-b $2 gradient_norm
+b $3 gradient_norm
 fi
 c 0,255
-^ $3
-c $4%,$5%
-if $6 negate fi
+^ $4
+c $5%,$6%
+if $7 negate fi
 n 0,255
 if {$10!=0||$11!=100}
 fx_smooth_antialias ${10-12}
@@ -442,7 +442,7 @@ endl
 if $9
 b.. $9
 fi
-blend multiply,$7
+blend multiply,$8
 fi
 +b[0] {$13%*100},1 *[1] {$14*sqrt($13%)*10} -[1] {(($14*sqrt($13%)*128)-1)^(sqrt($15))}
 +b[0] {$17%*100},1 *[2] {$18*sqrt($17%)*10} -[2] {(($18*sqrt($17%)*128)-1)^(sqrt($19))}
@@ -452,7 +452,7 @@ rgb2hsl[1-3] s[1-3] c
 *[5] {$20^2.5}
 *[8] 0
 a[1-3] c a[2-4] c a[3-5] c hsl2rgb[1-3]
-blend add,$7
+blend add,$8
 if $23
 rgb2ycbcr s c b[1,2] {$23%*100} a c ycbcr2rgb
 fi
@@ -1184,12 +1184,12 @@ fx_jr_deform_preview :
 gui_split_preview "fx_jr_deform $*",${-3--1}
 
 #@gui Buffer Error: fx_buffer_error, fx_buffer_error_preview(0)
-#@gui : note = note("<small>Resizes an image without changing the positions of pixels in a simulated image buffer.</small>")
+#@gui : note = note("<small>Resizes an image without changing the positions of pixels in a specified selection of a simulated image buffer. Buffer shift scales with the buffer length.</small>")
 #@gui : 1. Width = float(50,0,200)
 #@gui : 2. Height = float(50,0,200)
-#@gui : 3. Buffer Start = float(0,0,400)
-#@gui : 4. Buffer End = float(100,0,400)
-#@gui : 5. Buffer Shift = float(0,0,200)
+#@gui : 3. Buffer Selection Start (%) = float(0,0,100)
+#@gui : 4. Buffer Selection Length (%) = float(100,0,400)
+#@gui : 5. Buffer Selection Shift (%) = float(0,0,100)
 #@gui : 6. Repeat Buffer = bool(1)
 #@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 
@@ -1197,15 +1197,15 @@ _fx_virtual_buffer :
 r {wh},1,100%,100%,-1,0
 
 _fx_virtual_buffer_resize :
-wwhh={int(wh)}
-dimx={int($1)}
-dimy={int($2)}
+owh={int(wh)}
+dimx={max(1,int($1))}
+dimy={max(1,int($2))}
 cs={int($3)}
-ce={int($4)}
+cl={int($4)}
 shift={int($5)}
 bound=$6
 # transform image to buffer
-_fx_virtual_buffer crop $ce,$cs,2 shift {$shift},0,0,0,2  if $bound resize {$dimx*$dimy},1,100%,100%,0,2 fi
+_fx_virtual_buffer shift {-$cs},0,0,0,2 crop 0,$cl,2 shift {$shift},0,0,0,2  if $bound resize {$dimx*$dimy},1,100%,100%,0,2 fi
 # transform buffer into new image
 $dimx,$dimy,100%,100%
 f. ">begin(index=-1);index+=1;I[#0,index]"
@@ -1215,97 +1215,143 @@ repeat $! l[$>]
 dimx={int($1/100*w)}
 dimy={int($2/100*h)}
 cs={$3/100*wh}
-ce={$4/100*wh}
-shift={$5/100*wh}
+cl={$4/100*wh}
+shift={$5/100*$cl}
 bound=$6
-_fx_virtual_buffer_resize $dimx,$dimy,$cs,$ce,$shift,$bound
+_fx_virtual_buffer_resize $dimx,$dimy,$cs,$cl,$shift,$bound
 
 endl done
 fx_buffer_error_preview :
 gui_split_preview "fx_buffer_error $*",${-3--1}
 
-#@gui Buffer Error Sort: fx_buffer_error_sort, fx_buffer_error_sort(0)
-#@gui : note = note("<small>Buffer error, pixel sort and reverse buffer error.</small>")
-#@gui : sep = separator(), note = note("<b>Buffer Error</b>")
-#@gui : 1. Width = float(50,0,200)
-#@gui : 2. Height = float(50,0,200)
-#@gui : 3. Buffer Start = float(0,0,400)
-#@gui : 4. Buffer End = float(100,0,400)
-#@gui : 5. Buffer Shift = float(0,0,200)
-#@gui : 6. Repeat Buffer = bool(1)
+#@gui Buffer Destroyer: fx_buffer_destroyer, fx_buffer_destroyer_preview(0)
+#@gui : note = note("<small>A preset combo of filters which rip images apart through simulated buffer manipulation and warping.</small>")
+#@gui : 0. Recompute = button(0)
+#@gui : 1. Alpha = bool(1)
+#@gui : sep = separator(), note = note("<b>Buffer Error 1</b>")
+#@gui : 2. Width = float(75,0,200)
+#@gui : 3. Height = float(40,0,200)
+#@gui : 4. Buffer Selection Start (%) = float(0,0,100)
+#@gui : 5. Buffer Selection Length (%) = float(100,0,400)
+#@gui : 6. Buffer Selection Shift (%) = float(0,0,100)
+#@gui : 7. Repeat Buffer = bool(1)
+#@gui : sep = separator(), note = note("<b>Shredder</b>")
+#@gui : 8. Randomised Start = bool(1)
+#@gui : 9. Channels = choice("Correlated","RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","RYB","CMY","CMYK","Bayer")
+#@gui : 10. Min Gap = float(50,0,100)
+#@gui : 11. Max Gap = float(100,0,100)
+#@gui : 12. Strength = float(0.5,0,1)
 #@gui : sep = separator(), note = note("<b>Pixel Sort</b>")
 #@gui : note = note{"<small><b>Sorting parameters:</b></small>"}
-#@gui : 7. Order = choice(1,"Decreasing","Increasing")
-#@gui : 8. Axis = choice("X-axis","Y-axis","X-axis Then Y-axis","Y-axis Then X-axis")
-#@gui : 9. Sorting Criterion = choice(3,"Red","Green","Blue","Intensity","Luminance","Lightness","Hue",
+#@gui : 13. Order = choice(1,"Decreasing","Increasing")
+#@gui : 14. Axis = choice("X-axis","Y-axis","X-axis Then Y-axis","Y-axis Then X-axis")
+#@gui : 15. Sorting Criterion = choice(3,"Red","Green","Blue","Intensity","Luminance","Lightness","Hue",
 #@gui : "Saturation","Minimum","Maximum","Random")
 #@gui : note = note{"<small><b>Masking parameters:</b></small>"}
-#@gui : 10. Mask By = choice("Criterion","Contours","Random")
-#@gui : 11. Lower Mask Threshold (%) = float(50,0,100)
-#@gui : 12. Higher Mask Threshold (%) = float(100,0,100)
-#@gui : 13. Mask Smoothness (%) = float(0,0,5)
-#@gui : 14. Invert Mask = bool(0)
-#@gui : 15. Preview Mask = bool(0)
+#@gui : 16. Mask By = choice("Criterion","Contours","Random")
+#@gui : 17. Lower Mask Threshold (%) = float(50,0,100)
+#@gui : 18. Higher Mask Threshold (%) = float(100,0,100)
+#@gui : 19. Mask Smoothness (%) = float(0,0,5)
+#@gui : 20. Invert Mask = bool(0)
+#@gui : 21. Preview Mask = bool(0)
+#@gui : sep = separator(), note = note("<b>Shifter</b>")
+#@gui : note = note("<small>Amplitudes are cubed to tame the distortion a little bit.</small>")
+#@gui : 22. Channels = choice("Correlated","RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","RYB","CMY","CMYK","Bayer")
+#@gui : 23. X Amplitude = float(2.5,0,10)
+#@gui : 24. X Iterations = int(20,0,400)
+#@gui : 25. Y Amplitude = float(2.5,0,10)
+#@gui : 26. Y Iterations = int(20,0,400)
+#@gui : 27. Matrix Warp Multiplier = float(1,0,5)
+#@gui : 28. Matrix Boundary = choice(5,"Random","Random [non-transparent]","Transparent","Nearest","Periodic", "Mirror")
+#@gui : 29. Warp Boundary = choice(5,"Random","Random [non-transparent]","Transparent","Nearest","Periodic", "Mirror")
+#@gui : sep = separator(), note = note("<b>Buffer Error 2</b>")
+#@gui : 30. Inverse Of BE1 = bool(1)
+#@gui : 31. Width = float(120,0,200)
+#@gui : 32. Height = float(80,0,200)
+#@gui : 33. Buffer Selection Start (%) = float(0,0,100)
+#@gui : 34. Buffer Selection Length (%) = float(100,0,100)
+#@gui : 35. Buffer Selection Shift (%) = float(0,0,100)
+#@gui : 36. Repeat Buffer = bool(1)
 #@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 
-fx_buffer_error_sort :
+_fx_buffer_destroyer :
 repeat $! l[$>]
+to_rgba split_opacity
+if $1 a c fi
+l[0]
 ow={w}
 oh={h}
-dimx={int($1/100*w)}
-dimy={int($2/100*h)}
-cs={$3/100*wh}
-ce={$4/100*wh}
-shift={$5/100*wh}
-bound=$6
-crit={1+$10}
-_fx_virtual_buffer_resize $dimx,$dimy,$ce,$cs,$shift,$bound
-_fx_pixelsort ${7-9},{$crit},${11-15}
-_fx_virtual_buffer_resize $ow,$oh,0,{wh},{-$shift},$bound
+dimx1={int($2/100*w)}
+dimy1={int($3/100*h)}
+cs1={$4/100*wh}
+cl1={$5/100*wh}
+shift1={$6/100*$cl1}
+bound1=$7
+crit={1+$16}
+_fx_virtual_buffer_resize {$dimx1*$dimy1},1,$cs1,$cl1,$shift1,$bound1
+_fx_shredder $8,$9,$1,${10-12},0,0,0,0,0
+$dimx1,$dimy1,100%,100%
+f. ">begin(index=-1);index+=1;I[#0,index]"
+k.
+_fx_pixelsort ${13-15},{$crit},${17-21}
+_fx_shifter $22,$1,{(($23/10)^3)*10},$24,{(($25/10)^3)*10},${26-29}
+if $30
+_fx_virtual_buffer_resize $ow,$oh,0,{wh},{-$shift1},$bound1
+else
+dimx2={int($31/100*w)}
+dimy2={int($32/100*h)}
+cs2={$33/100*wh}
+cl2={$34/100*wh}
+shift2={$35/100*$cl2}
+bound2=$36
+_fx_virtual_buffer_resize $dimx2,$dimy2,$cs2,$cl2,$shift2,$bound2
+fi
+endl a c
 endl done
-fx_buffer_error_sort_preview :
-gui_split_preview "fx_buffer_error_sort $*",${-3--1}
+fx_buffer_destroyer:
+_fx_buffer_destroyer ${2-37}
+fx_buffer_destroyer_preview :
+gui_split_preview "fx_buffer_destroyer $*",${-3--1}
 
 #@gui UltraWarp 2 : fx_ultrawarptwo, fx_ultrawarptwo_preview(1)
-#@gui : 1. Recompute = button(0)
+#@gui : 0. Recompute = button(0)
 #@gui : sep = separator(), note = note("<b>Warping</b>")
-#@gui : 2. Iterations = int(3,1,30)
-#@gui : 3. From RGB To = choice(1,"Random","RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","RYB","CMY","CMYK","Bayer")
-#@gui : 4. X-Factor Centre = float(0,-30,30)
-#@gui : 5. X-Factor Range = float(3,0,30)
-#@gui : 6. Y-Factor Centre = float(0,-30,30)
-#@gui : 7. Y-Factor Range = float(3,0,30)
-#@gui : 8. X-Offset Centre = float(0,-30,30)
-#@gui : 9. X-Offset Range = float(3,0,30)
-#@gui : 10. Y-Offset Centre = float(0,-30,30)
-#@gui : 11. Y-Offset Range = float(3,0,30)
-#@gui : 12. Correlated Channels = choice(2,"On","Off","Random")
-#@gui : 13. Interpolation = choice(2,"Nearest","Linear","Random")
-#@gui : 14. Boundary = choice(5,"Transparent","Nearest","Periodic","Mirror","Random","Random &#40;non-transparent&#41;")
-#@gui : 15. Warp Channel(s) = choice(3,"None","Random","All","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
-#@gui : 16. Include Alpha = bool(0)
-#@gui : 17. To RGB From = choice(1,"Random","RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","RYB","CMY","CMYK","Bayer")
-#@gui : 18. Random Negation = bool(1)
+#@gui : 1. Iterations = int(3,1,30)
+#@gui : 2. From RGB To = choice(1,"Random","RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","RYB","CMY","CMYK","Bayer")
+#@gui : 3. X-Factor Centre = float(0,-30,30)
+#@gui : 4. X-Factor Range = float(3,0,30)
+#@gui : 5. Y-Factor Centre = float(0,-30,30)
+#@gui : 6. Y-Factor Range = float(3,0,30)
+#@gui : 7. X-Offset Centre = float(0,-30,30)
+#@gui : 8. X-Offset Range = float(3,0,30)
+#@gui : 9. Y-Offset Centre = float(0,-30,30)
+#@gui : 10. Y-Offset Range = float(3,0,30)
+#@gui : 11. Correlated Channels = choice(2,"On","Off","Random")
+#@gui : 12. Interpolation = choice(2,"Nearest","Linear","Random")
+#@gui : 13. Boundary = choice(5,"Transparent","Nearest","Periodic","Mirror","Random","Random &#40;non-transparent&#41;")
+#@gui : 14. Warp Channel(s) = choice(3,"None","Random","All","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
+#@gui : 15. Include Alpha = bool(0)
+#@gui : 16. To RGB From = choice(1,"Random","RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","RYB","CMY","CMYK","Bayer")
+#@gui : 17. Random Negation = bool(1)
 #@gui : sep = separator(), note = note("<b>Post-warping HSX8 mixing</b>")
-#@gui : 19. Repeat For Each Iteration = bool(1)
-#@gui : 20. X Channel = choice("Value","Intensity","Lightness")
-#@gui : 21. Hue Factor Centre = float(1,-20,20)
-#@gui : 22. Hue Factor Range = float(0.5,0,20)
-#@gui : 23. Saturation Factor Centre = float(2.5,-20,20)
-#@gui : 24. Saturation Factor Range = float(5,0,20)
-#@gui : 25. X Channel Factor Centre = float(1,-20,20)
-#@gui : 26. X Channel Factor Range = float(0,0,20)
-#@gui : 27. Alpha Factor Centre = float(1,-20,20)
-#@gui : 28. Alpha Factor Range = float(0,0,20)
-#@gui : 29. Hue Shift Centre = float(0,-255,255)
-#@gui : 30. Hue Shift Range = float(255,0,255)
-#@gui : 31. Saturation Shift Centre = float(0,-255,255)
-#@gui : 32. Saturation Shift Range = float(255,0,255)
-#@gui : 33. X Channel Shift Centre = float(0,-255,255)
-#@gui : 34. X Channel Shift Range = float(0,0,255)
-#@gui : 35. Alpha Shift Centre = float(0,-255,255)
-#@gui : 36. Alpha Shift Range = float(0,0,255)
-#@gui : sep = separator(), note = note("<b>Custom code</b>")
+#@gui : 18. Repeat For Each Iteration = bool(1)
+#@gui : 19. X Channel = choice("Value","Intensity","Lightness")
+#@gui : 20. Hue Factor Centre = float(1,-20,20)
+#@gui : 21. Hue Factor Range = float(0.5,0,20)
+#@gui : 22. Saturation Factor Centre = float(2.5,-20,20)
+#@gui : 23. Saturation Factor Range = float(5,0,20)
+#@gui : 24. X Channel Factor Centre = float(1,-20,20)
+#@gui : 25. X Channel Factor Range = float(0,0,20)
+#@gui : 26. Alpha Factor Centre = float(1,-20,20)
+#@gui : 27. Alpha Factor Range = float(0,0,20)
+#@gui : 28. Hue Shift Centre = float(0,-255,255)
+#@gui : 29. Hue Shift Range = float(255,0,255)
+#@gui : 30. Saturation Shift Centre = float(0,-255,255)
+#@gui : 31. Saturation Shift Range = float(255,0,255)
+#@gui : 32. X Channel Shift Centre = float(0,-255,255)
+#@gui : 33. X Channel Shift Range = float(0,0,255)
+#@gui : 34. Alpha Shift Centre = float(0,-255,255)
+#@gui : 35. Alpha Shift Range = float(0,0,255)
 ultrawarptwo :
 
 repeat $! l[$>] to_rgba split_opacity
@@ -1325,8 +1371,8 @@ inter=$12
 bound=$13
 chann=$14
 alpha=$15
-cs=$18
-rn=$19
+cs=$16
+rn=$17
 
 rpo=$18
 vil=$19
@@ -1428,6 +1474,7 @@ hoff={$hoffc+u(-$hoffr,$hoffr)}
 soff={$soffc+u(-$soffr,$soffr)}
 viloff={$viloffc+u(-$viloffr,$viloffr)}
 aoff={$aoffc+u(-$aoffr,$aoffr)}
+
 l[0] if {$vil==1} rgb2hsi8 elif {$vil==2} rgb2hsl8 else rgb2hsv8 fi
 s c
 *[0] $hf +[0] {$hoff*max(1,abs($hf))} %[0] 255
@@ -1655,6 +1702,8 @@ done
 
 #@gui Shifter : fx_shifter, fx_shifter_preview(1)
 #@gui : Recompute = button(0)
+#@gui : Channels = choice("Correlated","RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","RYB","CMY","CMYK","Bayer")
+#@gui : Alpha = bool(1)
 #@gui : X Amplitude = float(1,0,10)
 #@gui : X Iterations = int(20,0,400)
 #@gui : Y Amplitude = float(1,0,10)
@@ -1663,28 +1712,41 @@ done
 #@gui : Matrix Boundary = choice(5,"Random","Random [non-transparent]","Transparent","Nearest","Periodic", "Mirror")
 #@gui : Warp Boundary = choice(5,"Random","Random [non-transparent]","Transparent","Nearest","Periodic", "Mirror")
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-_shifter:
+_fx_shifter:
+repeat $! l[$>]
+to_rgba split_opacity
+if $2 a c fi
+l[0]
+if $1
+csswap 0,{$1-1} s c
+fi
 repeat $! l[$>]
 100%,100%,1,3 [1] fc[1,2] 0
-rectexture[1] $2,0,$5,$6,2,0
-rectexture[2] $4,0,$5,$6,2,0
+rectexture[1] $4,0,$7,$8,2,0
+rectexture[2] $6,0,$7,$8,2,0
 to_gray[^0]
-f[1] "$1*510*(0.25-abs(0.5-i/255))"
-f[2] "$3*510*(0.25-abs(0.5-i/255))"
+f[1] "$3*510*(0.25-abs(0.5-i/255))"
+f[2] "$5*510*(0.25-abs(0.5-i/255))"
 a[^0] c
-if {$7==0}
+if {$9==0}
 f={u(0,3)}
-elif {$7==1}
+elif {$9==1}
 f={u(0,2)+1}
 else
-f={($7)-2}
+f={($9)-2}
 fi
-
 warp.. .,1,0,{int($f)}
 rm.
 endl done
+endl
+a c
+if $1
+csswap {$1-1},0
+fi
+endl done
+
 fx_shifter:
-_shifter ${2-8}
+_fx_shifter ${2-10}
 fx_shifter_preview:
 gui_split_preview "fx_shifter $*",${-3--1}
 
@@ -1866,16 +1928,24 @@ gui_split_preview "csswap $*",${-3--1}
 #@gui : Hue Intensity = float(1,0,5)
 #@gui : Gamma Power = float(0,-4,4)
 #@gui : sep = separator()
-#@gui : Scale Hues = float(-0.5,-2,2)
-#@gui : note = note("-2 = hyper, -1 = normal, 0 = flattened, 1 = anti, 2 = hyper-anti)
+#@gui : Scale Colour Variations = float(1,-4,4)
+#@gui : note = note("<small>Scales the colour variations to reflect the difference between the start and end colours. For example, a value of 0 when going from black to yellow will flatten the helix so that only the red and green channels vary.</small>")
+#@gui : sep = separator()
+#@gui : Red Cos = float(-0.14861,-4.00000,4.00000)
+#@gui : Red Sin = float(1.78277,-4.00000,4.00000)
+#@gui : Green Cos = float(-0.29227,-4.00000,4.00000)
+#@gui : Green Sin = float(-0.90649,-4.00000,4.00000)
+#@gui : Blue Cos = float(1.97294,-4.00000,4.00000)
+#@gui : Blue Sin = float(0.00000,-4.00000,4.00000)
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 fx_cubehelix :
+scv={-$15}
 repeat $! l[$>]
 if $1 to_gray fi to_rgb abs c 0,255 c $2%,$3% if $4 n 0,255 fi *. {1/255}
 f "angle=(2*pi*(($11/3)+1+$12*I));fract=(I^(2^($14^2)));amp=($13*fract*(1-fract)/2);
-helix=(amp*[-0.14861*cos(angle[0])+1.78277*sin(angle[0]),-0.29227*cos(angle[1])-0.90649*sin(angle[1]),1.97294*cos(angle[2])]);
+helix=(amp*[$16*cos(angle[0])+$17*sin(angle[0]),$18*cos(angle[1])+$19*sin(angle[1]),$20*cos(angle[2]+$21*sin(angle[2]))]);
 scale=([${8-10}]-[${5-7}])/255;
-([${5-7}]/255)-$15*(fract*scale+helix)+(1+$15)*(fract+(helix*sign(scale)))*scale"
+([${5-7}]/255)-"$scv"*(fract*scale+helix)+(1+"$scv")*(fract+(helix*sign(scale)))*scale"
 c 0,1
 *. 255
 endl done
@@ -1934,108 +2004,70 @@ fx_bitplane8 $*
 #@gui _<b>Degradations</b>
 
 #@gui Shredder : fx_shredder, fx_shredder_preview(0)
-#@gui : note = note("<small>Re-fills an image with its own values but makes random jumps in the relative positions where the lookup for the values takes place. Can be channel-independent.</small>")
-#@gui : Recompute = button(0)
-#@gui : Randomised Start = bool(1)
-#@gui : Channels = choice("Correlated","RGB","sRGB","HSV","HSI","HSL","CMY","CMYK","YCbCr","Lab","LCH","XYZ","HCY")
-#@gui : Alpha = bool(1)
-#@gui : X Chance = float(0.15,0,1)
-#@gui : Y Chance = float(0.15,0,1)
-#@gui : X Strength = float(0.5,0,1)
-#@gui : Y Strength = float(0.5,0,1)
-#@gui : Mirror = choice("None","X","Y","XY")
-#@gui : Rotate = choice("None,"90 clockwise","180","90 anticlockwise")
-_shredder :
+#@gui : note = note("<small>Re-fills an image with its own values but makes random jumps in the relative positions where the lookup for the values takes place. Can be channel-independent. Relative gap sizes are cubed to make it easier to use small gaps between jumps.</small>")
+#@gui : 0. Recompute = button(0)
+#@gui : 1. Randomised Start = bool(1)
+#@gui : 2. Channels = choice("Correlated","RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","RYB","CMY","CMYK","Bayer")
+#@gui : 3. Alpha = bool(1)
+#@gui : 4. X Min Gap = float(0,0,100)
+#@gui : 5. X Max Gap = float(100,0,100)
+#@gui : 6. X Strength = float(0.5,0,1)
+#@gui : 7. Y Min Gap = float(0,0,100)
+#@gui : 8. Y Max Gap = float(100,0,100)
+#@gui : 9. Y Strength = float(0.5,0,1)
+#@gui : 10. Mirror = choice("None","X","Y","XY")
+#@gui : 11. Rotate = choice("None,"90 clockwise","180","90 anticlockwise")
+_fx_shredder :
 repeat $! l[$>]
-chancex=(1-$4^7)
-chancey=(1-$5^7)
-strengthx=($6^4)
-strengthy=($7^4)
+xming={$4/100}
+xmaxg={$5/100}
+strengthx={($6^4)}
+yming={$7/100}
+ymaxg={$8/100}
+strengthy={($9^4)}
 to_rgba split_opacity to_rgb.. to_gray.
 l[0]
-if {$2==2}
-rgb2srgb
-elif {$2==3}
-rgb2hsv8
-elif {$2==4}
-rgb2hsi8
-elif {$2==5}
-rgb2hsl8
-elif {$2==6}
-rgb2cmy
-elif {$2==7}
-rgb2cmyk
-elif {$2==8}
-rgb2ycbcr
-elif {$2==9}
-rgb2lab8
-elif {$2==10}
-rgb2lch8
-elif {$2==11}
-rgb2xyz8
-elif {$2==12}
-rgb2hcy
+if $2
+csswap 0,{($2)-1}
 fi
 endl
 if $3 a c fi
 l[0]
-if {$8==1}
+if {$10==1}
 mirror[0] x
-elif {$8==2}
+elif {$10==2}
 mirror[0] y
-elif {$8==3}
+elif {$10==3}
 mirror[0] xy
 fi
-if $9
-rotate[0] {$9*90},0
+if $11
+rotate[0] {$11*90},0
 fi
 [0]
-f[0] "begin(switchx=0;switchy=0;(!$1)?(col=0;row=0):(col=u*w^2;row=u*h^2));
-u>="$chancex"?switchx=1;
-u>="$chancey"?switchy=1;
-switchx==1?col=(u*w^2);
-switchy==1?row=(u*h^2);
-switchx=0;
-switchy=0;
+f[0] ">begin((!$1)?(col=0;row=0):(col=u*w^2;row=u*h^2);countx=(u("$xming","$xmaxg")^3)*wh+1;county=(u("$yming","$ymaxg")^3)*wh+1);
+countx-=1;
+county-=1;
+countx<=0?(col=(u*w);countx=(u("$xming","$xmaxg")^3)*wh+1);
+county<=0?(row=(u*h);county=(u("$yming","$ymaxg")^3)*wh+1);
 (!$2)?J(#-1,"$strengthx"*col,"$strengthy"*row,0,0,2)
 :j(#-1,"$strengthx"*col,"$strengthy"*row,0,0,0,2)"
 rm[1]
-if $9
-rotate[0] {-$9*90},0
+if $11
+rotate[0] {-$11*90},0
 fi
-if {$8==1}
+if {$10==1}
 mirror[0] x
-elif {$8==2}
+elif {$10==2}
 mirror[0] y
-elif {$8==3}
+elif {$10==3}
 mirror[0] xy
 fi
 if {$2>=1}
 s[0] c
 if {$3} a[^-1] c else a c fi
 l[0]
-if {$2==2}
-srgb2rgb
-elif {$2==3}
-hsv82rgb
-elif {$2==4}
-hsi82rgb
-elif {$2==5}
-hsl82rgb
-elif {$2==6}
-cmy2rgb
-elif {$2==7}
-cmyk2rgb
-elif {$2==8}
-ycbcr2rgb
-elif {$2==9}
-lab82rgb
-elif {$2==10}
-lch82rgb
-elif {$2==11}
-xyz82rgb
-elif {$2==12}
-hcy2rgb
+if $2
+csswap {($2)-1},0
 fi
 endl
 fi
@@ -2044,7 +2076,7 @@ a c
 endl done
 
 fx_shredder :
-_shredder ${2--1}
+_fx_shredder ${2--1}
 fx_shredder_preview :
 fx_shredder $*
 
