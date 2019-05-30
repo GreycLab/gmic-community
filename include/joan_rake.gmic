@@ -43,6 +43,20 @@
 #  knowledge of the CeCILL license and that you accept its terms.
 #
 
+gcd_spiralbw_warp :
+to_graya.
+sh. 0
+eval. "
+begin(P=[0,0];M=0;LX=w-1;LY=h-1;D=[1,0];R=[0,-1,1,0];off=0);
+if(
+(P[0]==LX && (P[1]==M || P[1]==LY)) || (P[0]==M && P[1]==LY), D=R*D);
+if((P[0]==M && P[1]==M+1), D=R*D;M++;LX--;LY--);
+P+=D;
+I(#-2,P[0],P[1])=[off%w,int(off/w)];
+++off;
+"
+rm.
+
 #@cli invert_rgb
 #@cli : Inverts images in the RGB colour space.
 invert_rgb:
@@ -1477,6 +1491,7 @@ gui_split_preview "fx_shifter $*",${-3--1}
 #@gui : Spiral Rotation = choice("Clockwise","Anticlockwise")
 #@gui : Direction = choice("Down","Up")
 #@gui : Starting Axis = choice("X","Y")
+#@gui : Spiral Start = choice("Outside","Inside")
 #@gui : sep  = separator(), note = note("<small>Author: Reptorian, Joan Rake and Garagecoder. Latest Update: <i>2019/5/28</i>.</small>")
 fx_jr_spiral_transform:
 repeat $! l[$>]
@@ -1484,6 +1499,7 @@ if $4 permute yxzc fi
 +spiralbw
 if $2 mirror[1] x fi
 if $3 mirror[1] y fi
+if $5 f[1] "iM-i" fi
 if $1
 [0]
 f[2] "I(#0,i0#1%w,floor(i0#1/w),0)=I"
@@ -1944,8 +1960,12 @@ gui_split_preview "csswap $*",${-3--1}
 #@gui : End Colour = color(255,255,255)
 #@gui : Start Hue = float(1,0,3)
 #@gui : Rotations = float(-1.5,-20,20)
-#@gui : Hue Intensity = float(1,0,5)
+#@gui : sep = separator()
+#@gui : Global Saturation Start = float(1,0,5)
+#@gui : Global Saturation End = float(1,0,5)
 #@gui : Gamma Power = float(0,-4,4)
+#@gui : Gamma Start = float(0,0,1)
+#@gui : Gamma End = float(1,0,1)
 #@gui : sep = separator()
 #@gui : Scale Colour Variations = float(1,-4,4)
 #@gui : note = note("<small>Scales the colour variations to reflect the difference between the start and end colours. For example, a value of 0 when going from black to yellow will flatten the helix so that only the red and green channels vary.</small>")
@@ -1958,18 +1978,20 @@ gui_split_preview "csswap $*",${-3--1}
 #@gui : Blue Phase Shift = float(0,0,360))
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 fx_cubehelix :
-scv={-$15}
-rang={($17/360)*2*pi}
-gang={($19/360)*2*pi}
-bang={($21/360)*2*pi}
+scv={-$18}
+rang={($18/360)*2*pi}
+gang={($20/360)*2*pi}
+bang={($22/360)*2*pi}
 repeat $! l[$>]
-if $1==1 luminance elif $1==2 f "(i1+i2+i3)/3" fi to_rgb abs c 0,255 c $2%,$3% if $4 n 0,255 fi *. {1/255}
-f "angle=(2*pi*(((1-$11)/3)+1+$12*I));fract=(I^(2^($14^2)));amp=($13*fract*(1-fract)/2);
-helix=(amp*[$16*-1.7889532707703687*sin(0.083166763586-angle[0]+"$rang"),$18*-0.952442057555209*sin(2.8296965485317932-angle[1]+"$gang"),$20*1.97294*sin((pi/2)-angle[2]+"$bang")]);
-scale=([${8-10}]-[${5-7}])/255;
+if $1==1 luminance elif $1==2 f "(i0+i1+i2)/3" fi if {s}==4 split_opacity fi l[0]
+abs c 0,255 c $2%,$3% if $4 n 0,255 fi *. {1/255}
+f "begin(scale=([${8-10}]-[${5-7}])/255;gs=$16^2;ge=$17^2);
+angle=(2*pi*(((1-$11)/3)+1+$12*I));fract=gs+(I^(2^($15^2)))*(ge-gs);amp=(($13+($14-$13)*I)*fract*(1-fract)/2);
+helix=(amp*[$19*-1.7889532707703687*sin(0.083166763586-angle[0]+"$rang"),$21*-0.952442057555209*sin(2.8296965485317932-angle[1]+"$gang"),$23*1.97294*sin((pi/2)-angle[2]+"$bang")]);
 ([${5-7}]/255)-"$scv"*(fract*scale+helix)+(1+"$scv")*(fract+(helix*sign(scale)))*scale"
 c 0,1
 *. 255
+endl if $!==2 a c fi
 endl done
 fx_cubehelix_preview :
 gui_split_preview "fx_cubehelix $*",${-3--1}
@@ -3136,12 +3158,18 @@ gui_split_preview "fx_qam_glitch $*",${-3--1}
 #@gui : Colour Space= choice("RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","RYB","CMY","CMYK","Bayer")
 #@gui : Alpha = bool(0)
 #@gui : Absolute = bool(1)
-#@gui : Makeup Gain = bool(1)YZ8","XYZ")
+#@gui : Makeup Gain = bool(1)
+#@gui : Preview Frequency Response = bool(0)
+
+_bwbp_prepare :
+
+f. "scale=max(w,h,d);vx=(x-w/2)/scale;vy=(y-h/2)/scale;vz=(z-d/2)/scale;rad=(vx^2+vy^2+vz^2)^0.5;func=(1/((1+((rad/(2^$1))*scale*log2(scale))^($2^3))^0.5))*(1/((1+(((rad/(2^$3)*scale*log2(scale))^($4^3))^-1))^0.5));func"
 
 _butterworth_bp :
 v -
-100%,100%,100% f. "scale=max(w,h,d);vx=(x-w/2)/scale;vy=(y-h/2)/scale;vz=(z-d/2)/scale;rad=(vx^2+vy^2+vz^2)^0.5;func=(1/((1+((rad/(2^$1))*scale*log2(scale))^($2^3))^0.5))*(1/((1+(((rad/(2^$3)*scale*log2(scale))^($4^3))^-1))^0.5));func"
-shift. {int(w/2)},{int(h/2)},{int(d/2)},0,2 *. 2
+100%,100%,100%
+_bwbp_prepare ${1-4}
+shift. {int(w/2)},{int(h/2)},{int(d/2)},0,2
 fft.. *... . *[-2,-1] ifft rm[-1]
 v +
 fx_butterworth_bp:
@@ -3156,7 +3184,20 @@ if {!$6} a c fi
 endl done
 
 fx_butterworth_bp_preview :
-fx_butterworth_bp $*
+if $9
+gain={iM}
+rm
+4000,1,1 _bwbp_prepare ${1-4}
+*. {$gain*log2(w)/(iM*wh)}
+columns 50%,100%
+1000,500,1,1
+f. "cut((i(#-2,2^(x*log2(w)/w-1),0,0,0,2,1)*(255)-y)*127.5,0,255)"
+mirror y
+r. 50%,100%
+k[-1]
+else
+fx_butterworth_bp ${1-8}
+fi
 
 #@gui Broken Texture_Afre: fx_texture_afre_broken, fx_texture_afre_broken_preview(0)
 #@gui : note = note("This shouldn't have happened.")
