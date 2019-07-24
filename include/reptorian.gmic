@@ -1062,6 +1062,44 @@ i(vx,vy,z,c,$17,($16?3:2));
 "
 
 if $11 shift 50%,50%,0,0,3,1 fi
+#@cli rep_stitch: _intensity,_thickness,_modulo,_interpolation,_boundary,0<_sublevel,randomize_stitching,0<=_angle<=360..._angle
+#@cli: Multiple angles are permitted.
+rep_stitch: 
+repeat $! l[$>]
+is={s}
+iw={w}
+ih={h}
+l[0] ($*) rv endl
+if i(#0,3,0)<0 v + error "Interpolation cannot be less than zero!" v - fi 
+f[0] "x==3?i+1:i"
+if w#0<8 v + error "There must be angle input!" v - fi
+if w#0==8 _rep_stitch. {i(#0,0,0)},{i(#0,7,0)},{crop(#0,1,0,6,1)} rm[0] 
+else
+interpolation={i(#0,3,0)}
+repeat {w#0-8} . done
+repeat {w#0-7} _rep_stitch[{$<+1}] {i(#0,0,0)},{i(#0,{7+$<},0)},{crop(#0,1,0,6,1)},0,1 done
+repeat {w#0-8} add[2,{4+$>}] done
+f[2] i%{w#0-7} +[2] 1 rv[0,2] rm[2] r[0] 100%,100%,100%,$is f[0] i(#i0) k[0]
+r $iw,$ih,100%,100%,$interpolation
+fi
+endl done
+_rep_stitch:
+#Warning! _rep_stitch is a local command! Remove the _ in left side to make it nonlocal! angle is $2 #
+skip ${3=1},${4=20},${5=3},${6=1},${7=1},${8=0},${9=1},${10=0}
+if $7<0 v + error "Sublevel cannot be zero!" v - fi
+ang={pi*($2/180)}
+ang2={pi*(($2+90)/180)}
+iw={w}
+ih={h}
+if $5>0 r {($7+1)*100}%,{($7+1)*100}%,100%,100%,1 fi
+{w},{h},1,1,sur=x*cos($ang)+y*sin($ang);res=floor(sur/($3*($7+1)));$4?abs(res)%$4:abs(res)
+{max(1,round(iM,1,1))},1,1,1,u(-1,1) map.. . rm.
+repeat s#0 
+    sh[0] $>
+    f. "sx=($7+1)*$1*cos("$ang2")*i#1;sy=($7+1)*$1*sin("$ang2")*i#1;sx+=x;sy+=y;i(sx,sy,z,c,$5,$6)" rm.
+done
+if !$10 k[0] else k[0,1] if !$8 f. sur=x*cos($ang)+y*sin($ang);res=floor(sur/($3*($7+1)));abs(res)%2 fi fi
+if $5>0 if $9 r[0] {$iw},{$ih},100%,100%,$5 fi fi
 #@gui _<b>Testing</b>
 #@gui <i>Reptorian</i>
 
@@ -2080,6 +2118,70 @@ rep_sqrlogpindis_gui:
 rep_sqrlogpindis $1,{(($2/100)-.5)*2},{(($3/100)-.5)*-2},{(($4/100)-.5)*2},{(($5/100)-.5)*-2},${6-18}
 rep_sqrlogpindis_gui_preview:
 gui_split_preview "rep_sqrlogpindis_gui $*",${-3--1}
+#@gui Stitch : rep_stitch_gui, rep_stitch_gui_preview(0)
+#@gui : note = note("This is a extended version of a existing filter within the Paint.NET software named <a href="https://forums.getpaint.net/topic/5936-stitch/">Stitch</a> which was made by pyrochild. The extension would be that it supports 1 angle, and it can support more than 2 angles. Anti-aliasing via interpolation and subpixel processing, along with boundary options are also supported.\n\n<i>Warning!Preview is only for giving a idea on the result!</i>"), sep = separator()
+#@gui : 1.Pixel Offset of Hypothenuse (%) = float(5,0,100)
+#@gui : 2.Thickness of Stitches = float(3,1,20)
+#@gui : 3.Stitches Repeat Pattern (0 means no repeat) = int(10,0,500)
+#@gui : 4.Interpolation = choice(4,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
+#@gui : 5.Boundary = choice(1,"None","Neumann","Repeat","Mirror")
+#@gui : 6.Subpixel Processing Level = float(1,0,5)
+#@gui : 7.Randomize Stitching? = bool(0), sep = separator()
+#@gui : note = note("<b>Angle Inputs</b>\n\nOnly numbers are accepted!")
+#@gui : 8.Angle Count = int(2, 1, 12)
+#@gui : 9.Angle#1 = float(45,-180,180)
+#@gui : 10.Angle#2 = float(-45,-180,180)
+#@gui : 11.Angle#3 = float(90,-180,180)
+#@gui : 12.Angle#4 = float(0,-180,180)
+#@gui : 13.Angle#5 = float(60,-180,180)
+#@gui : 14.Angle#6 = float(-60,-180,180)
+#@gui : 15.Angle#7 = float(15,-180,180)
+#@gui : 16.Angle#8 = float(-15,-180,180)
+#@gui : 17.Angle#9 = float(30,-180,180)
+#@gui : 18.Angle#10 = float(-30,-180,180)
+#@gui : 19.Angle#11 = float(5,-180,180)
+#@gui : 20.Angle#12 = float(-5,-180,180)
+#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui :  sep  = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/7/24</i>.</small>")
+rep_stitch_gui:
+hypo={sqrt(w^2+h^2)*($1/100)}
+if $8==1 rep_stitch $hypo,${2-7},$9
+elif $8==2 rep_stitch $hypo,${2-7},${9-10}
+elif $8==3 rep_stitch $hypo,${2-7},${9-11}
+elif $8==4 rep_stitch $hypo,${2-7},${9-12}
+elif $8==5 rep_stitch $hypo,${2-7},${9-13}
+elif $8==6 rep_stitch $hypo,${2-7},${9-14}
+elif $8==7 rep_stitch $hypo,${2-7},${9-15}
+elif $8==8 rep_stitch $hypo,${2-7},${9-16}
+elif $8==9 rep_stitch $hypo,${2-7},${9-17}
+elif $8==10 rep_stitch $hypo,${2-7},${9-18}
+elif $8==11 rep_stitch $hypo,${2-7},${9-19}
+elif $8==12 rep_stitch $hypo,${2-7},${9-20}
+fi
+rep_stitch_gui_preview:
+gui_split_preview "rep_stitch_gui $*",${-3--1}
+u "{$1}"\
+"{$2}"\
+"{$3}"\
+"{$4}"\
+"{$5}"\
+"{$6}"\
+"{$7}"\
+"{$8}"\
+"{$9}"\
+"{$10}_"{$8>=2?2:0}\
+"{$11}_"{$8>=3?2:0}\
+"{$12}_"{$8>=4?2:0}\
+"{$13}_"{$8>=5?2:0}\
+"{$14}_"{$8>=6?2:0}\
+"{$15}_"{$8>=7?2:0}\
+"{$16}_"{$8>=8?2:0}\
+"{$17}_"{$8>=9?2:0}\
+"{$18}_"{$8>=10?2:0}\
+"{$19}_"{$8>=11?2:0}\
+"{$20}_"{$8>=12?2:0}\
+"{$21}"\
+"{$22}"
 ######################
 
 # Local Variables:
