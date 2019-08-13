@@ -1975,116 +1975,395 @@ nm name($nm)
 
 #@gui Iain Fergusson
 
+#@gui Iain Denoise 2019 beta: iain_denoise_2019_beta,iain_denoise_2019_beta_preview(0)
+## #@gui : note = note("Adjust guide")
+#@gui : Gamma = float (1,.05,2)
+#@gui : Shadows = float (0,-1,1)
+#@gui : Light = float (0,-1,1)
+#@gui : Chroma = float(0.5,0,1)
+#@gui : Recover detials = bool(0)
+## #@gui : note = note("denoise")
+#@gui : Fine = float (5,0,30)
+#@gui : Mid = float (3,0,30)
+#@gui : Large = float (0,0,30)
+#@gui : Lookup = int (7,3,15)
+## #@gui : note = note("recover")
+#@gui : Recover = float (0,0,4)
+#@gui : Test Patience = bool (0)
+#@gui : Show noise = choice (4,"All","Fine","Mid","Large","none")
+iain_denoise_2019_beta_preview:
+images={$!}
 
-#@gui iain_nr_2019: iain_nr_2019,iain_nr_2019(0)
+-if {$12==0}
+--iain_denoise_2019_beta $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
+-k[0,-1]
+-sub
+-c -64,64
+-n 0,255
+-elif {$12==1}
+--iain_denoise_2019_beta $1,$2,$3,$4,$5,$6,0,0,$9,$10,$11,$12
+-k[0,-1]
+-sub
+-c -64,64
+-n 0,255
+-elif {$12==2}
+--iain_denoise_2019_beta $1,$2,$3,$4,$5,0,$7,0,$9,$10,$11,$12
+-k[0,-1]
+-sub
+-c -64,64
+-n 0,255
+-elif {$12==3}
+--iain_denoise_2019_beta $1,$2,$3,$4,$5,0,0,$8,$9,$10,$11,$12
+-k[0,-1]
+-sub
+-c -64,64
+-n 0,255
 
-#@gui : HF recover = float(1,0,2)
-#@gui : MF Smooth = float(2,0,10)
-#@gui : LF Smooth = float(0,0,10)
-#@gui : chroma = float(.3,0,1)
-#@gui : Recovery amount = float(1,0,2)
-#@gui : gamma = float(1.5,0,2)
-iain_nr_2019:
+-elif {$12==4}
+-iain_denoise_2019_beta $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
+-endif
+-if {$images==1}
+-text "internal guide",10,10,20,1,255
+-text "internal guide",12,12,20,1,0  
+-elif {$images==2}
+-text "external guide",10,10,20,1,255 
+-text "external guide",12,12,20,1,0 
+-elif {$images>2}
+-text "too many input images",10,10,20,1,255 
+-text "too many input images",12,12,20,1,0
+-endif
+
+iain_denoise_2019_beta:
+gamma=$1
+shadow=$2
+light=$3
+chroma=$4
+median=$5
+std_deviation_s=10
+fine=$6
+mid={$7/3}
+large={$8/9}
+
+patch_size=5
+patch_size_b=3
+lookup_size=$9
+smoothness_fine=0
+smoothness=0
+fast_approx=0 
+
+recover=$10
+slow=$11
+
 -remove_opacity
 
-detail_recovery={2-$5}
-gamma=$6
-chroma={1-$4}
-size={3^3}
+-if {$!==1}
+[0]
+-endif
+
+-l[-1]
+#process guide image
+	# adjust chroma to increase chroma denoising. Use faster approximation of Ycbcr.
+
+	-if {$chroma>0}
+	redmul=.299
+	greenmul=.587
+	bluemul=.114
+	--split[0] c
+	-mul[1] $redmul -mul[2] $greenmul -mul[3] $bluemul
+	-add[1-3]
+	-if {$chroma==1} # if chroma equals one just keep the lumanance image else desaturate image by scaling the chroma channels
+	-keep[1]
+	-else
+	
+	-split[0] c -name[0] red -name[1] green -name[2] blue -name[3] luma
+
+	--sub[blue] [luma] -name[-1] cb
+	--sub[red] [luma] -name[-1] cr
+	-keep[luma,cb,cr]
+
+	# adjust chroma
+	-mul[cb,cr] {1-$chroma}
+
+	--add[cb] [luma] -name[-1] blueout
+	--add[cr] [luma] -name[-1] redout
+
+	-remove[1,2]
+
+	--mul[redout] $redmul --mul[blueout] $bluemul
+	-sub[luma] [-1] -sub[luma] [-2]
+	-div[luma] $greenmul
+	-remove[-1,-2]
+	-move[2] 0
+	-append c
+	-endif
+	-endif
+
+# adjust gamma and cruves to target differnt ranges for noise reducation
+
+-sub 127
+-div 128
+-if {$gamma!=1}
+-add 1
+-pow $gamma
+-sub 1
+-endif
+--c[0] 0,100
+-c[0] -100,0
+-l[0]
+-if {$shadow>0}
+-fill i+($shadow*abs(i)*0.75)^2
+-elif {$shadow<0}
+-fill i-(abs(i)^3)*(abs($shadow))
+-endif
+-endl
+-l[1]
+-if {$light>0}
+
+max={iM}
+-div[0] $max
+-fill i-($light*abs(i)*0.75)^2
+-mul[0] $max
+-elif {$light<0}
+max={iM}
+-div[0] $max
+-fill i+(abs(i)^3)*(abs($light))
+-mul[0] $max
+-endif
+-endl
+-add
+-mul 128
+-add 127
+-endl
+
+#denoise
+
+--l[0,1]
+levels=2
+size={3^$levels}
 cropwidth={w}
 cropheight={h}
 
+-to_rgb
 -resize {w+($size-w%$size)},{h+($size-h%$size)},{d},{s},0,1
 
--repeat 3
--l[-1]
-
-	-if {{$>}==0} strength=$1 patch_smooth=1 -elif {{$>}==1} strength=$2 patch_smooth=0 -elif {{$>}==2} strength=$3 patch_smooth=0 -endif
-	patch_smooth=0
-## --guided[0] [1],3,{$strength^1.5}
-## --bilateral[0] [1],3,$strength
--if {{$>}==0} 
---median[0] 5
--else 
-## --denoise[0] 10,$strength,3,7,$patch_smooth,1
-	--l[0]
-	-blur 0.5
-	-rgb2lab
-	-split c
-	-mul[1,2] $chroma
-	-append c
-	-lab2rgb
-	-apply_gamma {1/$gamma}
-	-endl
---bilateral[0] [-1],3,$strength
--rm[-2]
-## ## -k[0,-1]
--endif
--sub[0] [1]
-## -if {$5>0}
- -l[0]
--l[0]  -split c -mul[0] 0.2126 -mul[1] 0.7125 -mul[2] 0.0722 -add -endl
-	--abs[-1]
-		-blur[-1] 5
-	-max[-1] 0.00001
-	-fill[-1] 5/i
-	-mul[0] [-1]
-		-l[0] 
-			-add 128
-			-resize[0] {w+256},{h+256},1,1,0,2,0.5,0.5
-			-if {{$>}==0} 
--iain_tiletest4[0] {2-$1},0.5
--else 
-			-iain_tiletest4[0] $detail_recovery,0.5
-			-endif
-			-crop[0] 128,128,{w-129},{h-129}
-			-sub 128
-			--blur 10
-			-sub
-		-endl
-	-div[0] [-1]
-	-rm[-1]
-
--endl
-## -to_rgb
--reverse
- -add
- ## -else -k[-1]
- ## -endif
-
-
-
-
--l[-1]
---resize[0] 33.33333%,33.33333%,{d},{s},2
-
---l[-1]
--resize[0] {(w*3)-2},{(h*3)-2},{d},{s},5,0
--resize[0] {w+2},{h+2},{d},{s},0,1,0.5,0.5
--endl
+	-if {$fine>0}
+	-denoise[0] [1],$std_deviation_s,$fine,$patch_size,$lookup_size,$smoothness_fine,$fast_approx
+	-endif
+--resize[0,1] 33.33333%,33.33333%,{d},{s},2
+-rm[1]
+--iain_resize_x3[-2]
 -blur[-1] 1
 -sub[0,-1] 
--endl
--endl
--done
-
-
-
--repeat {$!-1}
-
--l[-1]
--resize[0] {(w*3)-2},{(h*3)-2},{d},{s},5,0
--resize[0] {w+2},{h+2},{d},{s},0,1,0.5,0.5
--endl
+	-if {$mid>0}
+	-denoise[1] [2],$std_deviation_s,$mid,$patch_size,$lookup_size,$smoothness_fine,$fast_approx
+	-endif
+	-l[1,2]
+	--resize[0,1] 33.33333%,33.33333%,{-1,d},{-1,s},2
+	-rm[1]
+	--iain_resize_x3[-2]
+	-blur[-1] 1
+	-sub[0,-1] 
+		-if {$large>0}
+		-denoise[1] [2],$std_deviation_s,$large,$patch_size,$lookup_size,$smoothness_fine,$fast_approx
+		-endif
+	-endl
+-rm[-1]
+-repeat 2
+-iain_resize_x3[-1]
 -blur[-1] 1
 -add[-1,-2]
 -done
+-crop 0,0,{$cropwidth-1},{$cropheight-1} # crop to original
 -c 0,255
- -crop 0,0,{$cropwidth-1},{$cropheight-1} # crop to original
-## -apply_gamma $gamma
+-endl
+
+# recover
+-rm[1]
+ -if {$recover>0&&$5}
+-sub[0] [1]
+ -l[0]
+	-l[-1] -split c -mul[0] 0.2126 -mul[1] 0.7125 -mul[2] 0.0722 -add -endl
+	--blur[-1] 10
+	-sub[-2] [-1]
+	-rm[-1]
+	--abs[-1]
+	-blur[-1] 3
+	-bilateral[-1] [0],10,10
+	-fill[-1] 5/i
+	-mul[-2] [-1]
+	-l[-2]
+		-add 128
+		-resize[0] {w+256},{h+256},1,1,0,2,0.5,0.5
+			-if $slow
+			-iain_tiletest4_stack[0] {2-$recover},0.5
+			-else
+			-iain_tiletest4[0] {2-$recover},0.5
+			-endif
+		-crop[0] 128,128,{w-129},{h-129}
+		-sub 128
+		--blur 10
+		-sub
+	-endl
+-endl
+-div[0] [1]
+-rm[1]
+-to_rgb[0]
+-add
+-else
+-k[-1]
+-endif
+-c 0,255
+
+time=$|
+-name name($time)
+
+iain_resize_x3:
+-resize[0] {(w*3)-2},{(h*3)-2},{d},{s},5,0
+-resize[0] {w+2},{h+2},{d},{s},0,1,0.5,0.5
+
+## #@gui iain_tiletest4_stack: iain_tiletest4_stack,iain_tiletest4_stack(0)
+## #@gui : threshold = float (1,0,5)
+## #@gui : threshold = float (.5,0,5)
+iain_tiletest4_stack:
+-resize {w+128},{h+128},1,1,0,2,0.5,0.5
+offset1x=24
+offset1y=4
+offset2x=-10
+offset2y=21
+offset3x=27
+offset3y=27
+offset4x=6
+offset4y=38
+--shift[0] $offset1x,$offset1y,0,0
+--shift[0] $offset2x,$offset2y,0,0
+--shift[0] $offset3x,$offset3y,0,0
+--shift[0] $offset4x,$offset4y,0,0
+
+-iain_tiletest4[0] $1,$2
+-iain_tiletest4[1] $1,$2
+-iain_tiletest4[2] $1,$2
+-iain_tiletest4[3] $1,$2
+-iain_tiletest4[4] $1,$2
+
+
+-shift[1] {$offset1x*-1},{$offset1y*-1},0,0
+-shift[2] {$offset2x*-1},{$offset2y*-1},0,0
+-shift[3] {$offset3x*-1},{$offset3y*-1},0,0
+-shift[4] {$offset4x*-1},{$offset4y*-1},0,0
+
+-blend_median
+
+-crop 64,64,{w-65},{h-65}
+
+# #@gui iain_nr_2019: iain_nr_2019,iain_nr_2019(0)
+
+# #@gui : HF recover = float(1,0,2)
+# #@gui : MF Smooth = float(2,0,10)
+# #@gui : LF Smooth = float(0,0,10)
+# #@gui : chroma = float(.3,0,1)
+# #@gui : Recovery amount = float(1,0,2)
+# #@gui : gamma = float(1.5,0,2)
+# iain_nr_2019:
+# -remove_opacity
+
+# detail_recovery={2-$5}
+# gamma=$6
+# chroma={1-$4}
+# size={3^3}
+# cropwidth={w}
+# cropheight={h}
+
+# -resize {w+($size-w%$size)},{h+($size-h%$size)},{d},{s},0,1
+
+# -repeat 3
+# -l[-1]
+
+	# -if {{$>}==0} strength=$1 patch_smooth=1 -elif {{$>}==1} strength=$2 patch_smooth=0 -elif {{$>}==2} strength=$3 patch_smooth=0 -endif
+	# patch_smooth=0
+# ## --guided[0] [1],3,{$strength^1.5}
+# ## --bilateral[0] [1],3,$strength
+# -if {{$>}==0} 
+# --median[0] 5
+# -else 
+# ## --denoise[0] 10,$strength,3,7,$patch_smooth,1
+	# --l[0]
+	# -blur 0.5
+	# -rgb2lab
+	# -split c
+	# -mul[1,2] $chroma
+	# -append c
+	# -lab2rgb
+	# -apply_gamma {1/$gamma}
+	# -endl
+# --bilateral[0] [-1],3,$strength
+# -rm[-2]
+# ## ## -k[0,-1]
+# -endif
+# -sub[0] [1]
+# ## -if {$5>0}
+ # -l[0]
+# -l[0]  -split c -mul[0] 0.2126 -mul[1] 0.7125 -mul[2] 0.0722 -add -endl
+	# --abs[-1]
+		# -blur[-1] 5
+	# -max[-1] 0.00001
+	# -fill[-1] 5/i
+	# -mul[0] [-1]
+		# -l[0] 
+			# -add 128
+			# -resize[0] {w+256},{h+256},1,1,0,2,0.5,0.5
+			# -if {{$>}==0} 
+# -iain_tiletest4[0] {2-$1},0.5
+# -else 
+			# -iain_tiletest4[0] $detail_recovery,0.5
+			# -endif
+			# -crop[0] 128,128,{w-129},{h-129}
+			# -sub 128
+			# --blur 10
+			# -sub
+		# -endl
+	# -div[0] [-1]
+	# -rm[-1]
+
+# -endl
+# ## -to_rgb
+# -reverse
+ # -add
+ # ## -else -k[-1]
+ # ## -endif
+
+
+
+
+# -l[-1]
+# --resize[0] 33.33333%,33.33333%,{d},{s},2
+
+# --l[-1]
+# -resize[0] {(w*3)-2},{(h*3)-2},{d},{s},5,0
+# -resize[0] {w+2},{h+2},{d},{s},0,1,0.5,0.5
+# -endl
+# -blur[-1] 1
+# -sub[0,-1] 
+# -endl
+# -endl
+# -done
+
+
+
+# -repeat {$!-1}
+
+# -l[-1]
+# -resize[0] {(w*3)-2},{(h*3)-2},{d},{s},5,0
+# -resize[0] {w+2},{h+2},{d},{s},0,1,0.5,0.5
+# -endl
+# -blur[-1] 1
+# -add[-1,-2]
+# -done
+# -c 0,255
+ # -crop 0,0,{$cropwidth-1},{$cropheight-1} # crop to original
+# ## -apply_gamma $gamma
  
- time=$|
--name. name($time)
+ # time=$|
+# -name. name($time)
 
 iain_tiletest4:
 -remove_opacity
