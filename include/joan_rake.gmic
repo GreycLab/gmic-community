@@ -422,7 +422,7 @@ gui_split_preview "-fx_hard_painting $*",${-3--1}
 #@gui : 20. Saturation = float(1,0,4)
 #@gui : sep = separator(), note = note("Boost Glow")
 #@gui : 21. Size = float(2,0,5)
-#@gui : 22. Intensity = float(1,0,2)
+#@gui : 22. Intensity = float(1,0,3)
 #@gui : sep = separator()
 #@gui : 23. Smooth Hues = float(0,0,20)
 #@gui : sep = separator()
@@ -433,11 +433,10 @@ gui_split_preview "-fx_hard_painting $*",${-3--1}
 fx_neon :
 repeat $! l[$>]
 +fc 0,0,0 rv blend alpha
-
-to_rgb rgb2hsl s c
+to_rgb rgb2hsl8 s c
 *.. {$8^2.5} c 0,255
-a[0-2] c hsl2rgb
-if $8
+a[0-2] c hsl82rgb
+if $7
 [0] l[1]
 b $2
 if {$1==1}
@@ -468,12 +467,13 @@ blend multiply,$7
 fi
 +b[0] {$13%*100},1 *[1] {$14*sqrt($13%)*10} -[1] {(($14*sqrt($13%)*128)-1)^(sqrt($15))}
 +b[0] {$17%*100},1 *[2] {$18*sqrt($17%)*10} -[2] {(($18*sqrt($17%)*128)-1)^(sqrt($19))}
-+b[0] $21,1 *[3] {($14+$18)*$21*$22}
++b[0] $21,1 *[3] {($14+$18)*$21*($22^2.5)}
 rgb2hsl[1-3] s[1-3] c
 *[2] {$16^2.5}
 *[5] {$20^2.5}
 *[8] 0
 a[1-3] c a[2-4] c a[3-5] c hsl2rgb[1-3]
+replace_inf 1 replace_nan 0
 blend add,$7
 if $23
 rgb2ycbcr s c b[1,2] {$23%*100} a c ycbcr2rgb
@@ -825,6 +825,22 @@ fx_crazy_texture $*
 
 #@gui _<b>Deformations</b>
 
+#@cli symmetrize_jr : _x[%],_y[%],_angle,_boundary_conditions={ 0=dirichlet | 1=neumann | 2=periodic | 3=mirror },_is_antisymmetry={ 0 | 1 },_swap_sides={ 0 | 1 },_interpolation={ 0=none | 1=linear | 2=bicubic }
+#@cli : Symmetrize selected images regarding specified axis.
+#@cli : Default values: 'x=y=50%', 'angle=90', 'boundary_conditions=3', 'is_antisymmetry=0', 'swap_sides=0' and 'interpolation=1'.
+#@cli : $ image.jpg +symmetrize 50%,50%,45 +symmetrize[-1] 50%,50%,-45
+symmetrize_jr : skip ${1=50%},${2=50%},${3=90},${4=3},${5=0},${6=0},${7=1}
+e[^-1] "Symmetrize image$?, regarding axis ($1,$2,$3 deg.)."
+v -
+theta={$3*pi/180} u={cos($theta)} v={sin($theta)}
+if $6 symmetry_cond=A<0 else symmetry_cond=A>0 fi
+repeat $! l[$>]
+x0={if(${is_percent\ $1},w*$1,$1)}
+y0={if(${is_percent\ $2},h*$2,$2)}
+if $5 f 'A=($y0-y)*$u-($x0-x)*$v;X=x+2*($x0-x);Y=y+2*($y0-y);if($symmetry_cond,i(X,Y,z,c,$7,$4),i)'
+else f 'A=($y0-y)*$u-($x0-x)*$v;X=x-2*$v*A;Y=y+2*$u*A;if($symmetry_cond,i(X,Y,z,c,$7,$4),i)'
+fi
+endl done
 #@cli jr_deform : _amplitude>=0,_interpolation,_matrix_density[%]>=0,_matrix_interpolation,_mode,-100<=_character<=100,_boundary
 #@cli : Apply random smooth deformation on selected images. An upgrade to the existing deform command.
 #@cli : 'interpolation' can be { 0=none | 1=linear | 2=bicubic }.
@@ -860,7 +876,7 @@ endl done v +
 #@gui : Edge Threshold (%) = float(0,0,100)
 #@gui : Smoothness = float(3,0,10)
 #@gui : Output Layers = choice("Off","Hollow","Filled")
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)
 fx_layer_cake :
 repeat $! l[$>]
 iter=$1
@@ -897,6 +913,112 @@ done
 fx_layer_cake_preview:
 if {!$13} gui_split_preview "fx_layer_cake $*",${-3--1} else fx_layer_cake ${1-12},0 fi
 
+#@gui Layer Cake 2 : fx_layer_cake_2, fx_layer_cake_2_preview(1)
+#@gui : Layer Density = float(4,1,100)
+#@gui : Angle Value = float(360,-2880,2880)
+#@gui : Angle Mode = choice("Divided by Density","Per Layer")
+#@gui : Centre = point(50,50,0,1,255,255,255,175)
+#@gui : Interpolation = choice(2,"None","Linear","Bicubic")
+#@gui : Boundary = choice(3,"None","Nearest","Periodic","Mirror")
+#@gui : Blur = float(50,0,100)
+#@gui : Blur Mode = choice("Anti-Alias","Layer Smoothing")
+#@gui : Output Mode = choice("Full","Filled Layers","Hollow Layers")
+fx_layer_cake_2 :
+num=$1
+inter=$6
+bound=$7
+if $3
+ang={$2*2*pi/360}
+else
+ang={$2*2*pi/(($num)*360)}
+fi
+repeat $! l[$>]
+xc=$4%
+yc=$5%
+if $9
+aa={$8*norm(w,h)/100}
+else
+aa={$8/25*$num}
+fi
+if $10
+to_rgba
+#repeat {ceil($num*(1+max(norm(w/2-$xc,h/2-$yc)/norm(w,h)*2,1))}
+100%,100%,100%,100%,(0)
+repeat {ceil($num*(1+max(norm(w/2-$xc,h/2-$yc)/norm(w,h)*2,1)))}
+[1]
+done
+inuma=0
+inumb=0
+eval[0] "begin(ang=("$ang");xoff=w*"$xc";yoff=h*"$yc";num="$num";aa="$aa";inter="$inter";bound="$bound");
+vx=x-xoff+0.5;vy=y-yoff+0.5;
+lnum=max((norm(vx,vy))/norm(w,h)*2*num-(0.5*aa/norm(w,h)),0);
+lnumint=floor(lnum);
+ext
+inuma=lnumint+1;
+inumb=lnumint+2;
+angle=((ang*lnumint)%(2*pi));
+pa=I(#0,vx*cos(angle)+vy*sin(angle)+xoff-0.5,vy*cos(angle)-vx*sin(angle)+yoff-0.5,z,inter,bound);
+pb=I(#0,vx*cos(angle+ang)+vy*sin(angle+ang)+xoff-0.5,vy*cos(angle+ang)-vx*sin(angle+ang)+yoff-0.5,z,inter,bound);
+func=min((lnumint+1-lnum)*norm(w,h)/aa,1);
+
+I(#"$3")=(pb*(1-func));
+I(#"{$3+2}")=(pa*(func))"
+#done
+else
+f "begin(ang=("$ang");xoff=w*"$xc";yoff=h*"$yc";num="$num";aa="$aa";inter="$inter";bound="$bound");
+vx=x-xoff+0.5;vy=y-yoff+0.5;
+lnum=max((norm(vx,vy))/norm(w,h)*2*num-(0.5*aa/norm(w,h)),0);
+lnumint=floor(lnum);
+angle=((ang*lnumint)%(2*pi));
+pa=I(vx*cos(angle)+vy*sin(angle)+xoff-0.5,vy*cos(angle)-vx*sin(angle)+yoff-0.5,z,inter,bound);
+pb=I(vx*cos(angle+ang)+vy*sin(angle+ang)+xoff-0.5,vy*cos(angle+ang)-vx*sin(angle+ang)+yoff-0.5,z,inter,bound);
+func=min((lnumint+1-lnum)*norm(w,h)/aa,1);
+I=(pa*(func)+pb*(1-func))"
+fi
+endl done
+fx_layer_cake_2_preview :
+fx_layer_cake_2 $*
+
+#@gui PowerTwirl : fx_powertwirl, fx_powertwirl_preview(1)
+#@gui : Amplitude = float(1,-20,20)
+#@gui : Offset = float(0,-180,180)
+#@gui : Center (%) = point(50,50,0,1)
+#@gui : Power = float(1,-20,20)
+#@gui : Interpolation = choice(2,"None","Linear","Bicubic")
+#@gui : Boundary = choice(3,"Transparent","Nearest","Periodic","Mirror")
+#@gui : Mode = choice(0,"Polar","Cartesian")
+fx_powertwirl:
+if $8
+f "begin(amp=$1;offset=$2;xoff=$3*w/100;yoff=$4*h/100;power=$5;interpolation=$6;boundary=$7);
+vx=x-xoff+0.5;vy=y-yoff+0.5;
+ang=(2*pi*((offset/360)+(amp*((norm(vx,vy)/(norm(w,h)/2))^power))))%(2*pi);
+I=I(vx*cos(ang)+vy*sin(ang)+xoff-0.5,vy*cos(ang)-vx*sin(ang)+yoff-0.5,z,interpolation,boundary)"
+else
+euclidean2polar $3%,$4%,$6,$7 repeat $!
+[$>],[$>],1,1,$1*0.75*(((x/w)^$5))*w channels. -1,0 warp[$>] .,1,1,2 rm.
+done polar2euclidean $3%,$4%,$6,$7
+fi
+fx_powertwirl_preview:
+fx_powertwirl $*
+
+#@gui Kaleidoscope : fx_jr_kaleidoscope, fx_jr_kaleidoscope_preview(1)
+#@gui : Number = int(6,2,32)
+#@gui : Mirror Rotation = float(0,-180,180)
+#@gui : Center (%) = point(50,50,0,1)
+fx_jr_kaleidoscope:
+num=$1
+rrot={$2/180*pi}
+cx=$3*w/100
+cy=$4*h/100
+symmetrize_jr $cx,$cy,(-180/$num+$2),3,0,0,0
+f "begin(rrot="$rrot";cx="$cx";cy="$cy");
+vx=x-cx+0.5;vy=y-cy+0.5;num="$num";
+amult=round(atan2(vy,vx)-rrot,2*pi/num,1);ang=(amult)%(pi*2);
+xwarp=vx*cos(ang)+vy*sin(ang)+cx;
+ywarp=vy*cos(ang)-vx*sin(ang)+cy;
+I=I(xwarp,ywarp,z,0,3)"
+fx_jr_kaleidoscope_preview:
+fx_jr_kaleidoscope $*
 
 #@gui Random Deformations (JR's Mod) : fx_jr_deform, fx_jr_deform_preview(1)
 #@gui : Recompute = button(0)
@@ -907,7 +1029,7 @@ if {!$13} gui_split_preview "fx_layer_cake $*",${-3--1} else fx_layer_cake ${1-1
 #@gui : Mode = choice("Noise","Spread noise")
 #@gui : Character = float(0,-100,100)
 #@gui : Boundary = choice(1,"Dirichlet","Neumann","Periodic","Mirror")
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)
 fx_jr_deform :
 repeat $! l[$>]
 jr_deform ${2-8}
@@ -923,7 +1045,7 @@ gui_split_preview "fx_jr_deform $*",${-3--1}
 #@gui : 4. Buffer Selection Length (%) = float(100,0,400)
 #@gui : 5. Buffer Selection Shift (%) = float(0,0,100)
 #@gui : 6. Repeat Buffer = bool(1)
-#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)
 
 _fx_virtual_buffer :
 r {wh},1,100%,100%,-1,0
@@ -1004,7 +1126,7 @@ gui_split_preview "fx_buffer_error $*",${-3--1}
 #@gui : 34. Buffer Selection Length (%) = float(100,0,100)
 #@gui : 35. Buffer Selection Shift (%) = float(0,0,100)
 #@gui : 36. Repeat Buffer = bool(1)
-#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)
 
 _fx_buffer_destroyer :
 repeat $! l[$>]
@@ -1450,7 +1572,7 @@ done
 #@gui : Matrix Warp Multiplier = float(1,0,5)
 #@gui : Matrix Boundary = choice(5,"Random","Random [non-transparent]","Transparent","Nearest","Periodic", "Mirror")
 #@gui : Warp Boundary = choice(5,"Random","Random [non-transparent]","Transparent","Nearest","Periodic", "Mirror")
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)
 _fx_shifter:
 repeat $! l[$>]
 to_rgba split_opacity
@@ -1529,7 +1651,7 @@ fx_jr_spiral_transform $*
 #@gui : Scale Y = float(1,0,5)
 #@gui : Interpolation = choice(2,"Nearest","Average","Bilinear","Bicubic")
 #@gui : Alpha = bool(0)
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)
 #@gui : sep = separator(), note = note("<small>Author: <i><a href="http://ow.ly/wpsV30fzhdI">David Tschumperl&#233;</a></i>.      Latest update: <i>2010/29/12</i>.</small>")
 
 jr_dir2rgb :
@@ -1630,7 +1752,7 @@ fx_frequency_representation $*
 #@gui : Normalise Higher Threshold = float(255,0,255)
 #@gui : To sRGB = bool(0)
 #@gui : Preview Colour Scheme = bool(0)
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)
 fx_satellite :
 c 0,255
 luminance
@@ -1953,7 +2075,7 @@ fi
 #@gui : Channel 2 = float(1,0,3)
 #@gui : Channel 3 = float(1,0,3)
 #@gui : Normalize = bool(1)
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)
 jr_desaturate :
 repeat $! l[$>] split_opacity l[0] to_rgb if $1 srgb2rgb fi
 f "avg(i0*$2,i1*$3,i2*$4)" if $5 n 0,255 fi c 0,255
@@ -1980,7 +2102,7 @@ endl a c
 #@gui Colour Space Swap: csswap, csswap_preview()
 #@gui : To RGB From = choice("RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","RYB","CMY","CMYK","Bayer")
 #@gui : From RGB To = choice("RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","RYB","CMY","CMYK","Bayer")
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)
 csswap:
 repeat $! l[$>] split_opacity l[0] to_rgb
 cs=$1
@@ -2072,7 +2194,7 @@ gui_split_preview "csswap $*",${-3--1}
 #@gui : Blue Phase Shift = float(0,0,360))
 #@gui : sep = separator()
 #@gui : Preview Colour Scheme = bool(0)
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)
 fx_cubehelix :
 scv={-$20}
 rang={($22/360)*2*pi}
@@ -2349,7 +2471,7 @@ fx_jfif_bomb $*
 #@gui : Noise Type = choice("Gaussian","Uniform","Salt and pepper","Poisson","Rice")
 #@gui : sep = separator(), Channel(s) = choice("All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
 #@gui : Value Action = choice(1,"None","Cut","Normalize")
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)
 #@gui : sep = separator(), note = note("<small>Author: <i><a href="http://ow.ly/wpsV30fzhdI">David Tschumperl&#233;</a></i>.      Latest update: <i>2010/29/12</i>.</small>")
 jr_fx_noise :
 ac "_fx_noise $1,$2",$3,$4
@@ -3132,7 +3254,7 @@ sawtoother_lab8 $*
 #@gui : Self-Blend Opacity = float(1,0,1)
 #@gui : sep = separator(), note = note("<b>Multilayer processing</b>\n\n<small><b>Warning:</b>All layer must be of same size for expected result!</small>"), Apply to all layers? = bool(0)
 #@gui : Boundary Condition = choice(0,"Neumann","Periodic","Mirror")
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)
 #@gui : sep = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2018/12/30</i>.</small>")
 pseudo_ecb:
 ww={w+4}
@@ -3209,7 +3331,7 @@ gui_split_preview "pseudo_ecb $*",${-3--1}
 #@gui : 18. Blur = float(2,0,10)
 #@gui : 19. Amplitude Modulation = float(0.6,0,1)
 #@gui : 20. Phase Modulation = float(0.05,0,1)
-#@gui : sep = separator(), 21-23. Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), 21-23. Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)
 
 _scanlines : skip ${1=60},${2=2},${3=0},${4=0},${5=0}
 v -
@@ -3472,7 +3594,7 @@ fx_row_shift $*
 #@gui : Colour Distortion = float(1.25,0,10)
 #@gui : Max Tile Error Length = int(5,1,10)
 #@gui : Persistent Tile Error Power = float(0.25,0,1)
-#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)
 #@gui : sep = separator(), note = note("<small>Author: Joan Rake, \'borrowed\' from <i><a href="https://goo.gl/Ryf7Cv">David Tschumperl&#233;</a></i>.      Latest Update: <i>2017/05/07</i>.</small>")
 fx_jfif_fake :
 glitch=(0.25^(10-$3))*$3/4
@@ -3541,7 +3663,7 @@ gui_split_preview "fx_jfif_fake $*",${-3--1}
 #@gui : 21. Interpolation = choice(0,"None","Nearest","Average","Bilinear","Grid","Bicubic")
 #@gui : 22. Normalise = bool(0)
 #@gui : 23. Output Mesh = bool(0)
-#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)
 #@gui : sep = separator(), note = note("<small>Author: Joan Rake, \'borrowed\' from <i><a href="https://goo.gl/Ryf7Cv">David Tschumperl&#233;</a></i>.      Latest Update: <i>2017/05/07</i>.</small>")
 fx_jfif :
 cd={$4^2.5}
@@ -3630,22 +3752,58 @@ rm[$dct,$idct,$Q]
 fx_jfif_preview :
 gui_split_preview "fx_jfif $*",${-3--1}
 
+#@gui JFIF Effects Extended : fx_jfif_xt, fx_jfif_xt_preview(0)
+#@gui : note = note("<small>A poorly-implemented JFIF encoder with extras, all designed to screw with images. Quite slow and very aggressive.</small>")
+#@gui : 1. Quality (%) = float(50,0,100)
+#@gui : 2. Size X = int(8,1,100)
+#@gui : 3. Size Y = int(8,1,100)
+fx_jfif_xt:
+ww={w}
+hh={h}
+qu=$1/100
+sx=$2
+sy=$3
+to_rgb
+csswap 0,14
+minl=0.05*wh
+maxl=0.1*wh
+diffx={-w%$sx}
+diffy={-h%$sy}
+w,h={[w,h]} r {w+$diffx},{h+$diffy},1,100%,0,3
+www={w}
+hhh={h}
+split_tiles -$sx,-$sy
+dct f "I*cut(1+(("$sx"+"$sy")*"$qu"-(x+y)),0,1)"
+append_tiles {$www/$sx}
+f ">begin(const minl="$minl";const maxl="$maxl";cd=round(u(minl,maxl)));
+cd-=1;
+(cd<=0)?(cd=round(u(minl,maxl));J[0]=[u*50000,u*50000,u*50000]):(J[0])"
+split_tiles -$sx,-$sy
+idct
+append_tiles {$www/$sx}
+r {w-$diffx},{h-$diffy},1,100%,0,3
+csswap 14,0
+
+fx_jfif_xt_preview:
+fx_jfif_xt $*
+
 #@gui DCT FSU: fx_dct_fsu, fx_dct_fsu_preview(0)
 #@gui : 1. Operation = choice("Low Pass 1","Low Pass 2","High Pass 1","High Pass 2","Isolate","Plaid","Plaid LP", "Plaid HP","Randomised Spread","Randomised Spread [intense]")
 #@gui : 2. X (%) = float(50,0,100)
 #@gui : 3. Y (%) = float(50,0,100)
-#@gui : 4. Shift X (%) = float(0,0,100)
-#@gui : 5. Shift Y (%) = float(0,0,100)
-#@gui : 6. Absolute = bool(0)
-#@gui : 7. Normalise (%) = bool(1)
-#@gui : 8. Colour Space = choice("RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","RYB","CMY","CMYK","Bayer")
-#@gui : 9. Alpha = bool(0)
-#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : 4-5. Shift Before = point(0,0,0,-1,255,127,0,175)
+#@gui : 6-7. Shift After = point(100,100,0,-1,127,255,0,175)
+#@gui : 8. Absolute = bool(0)
+#@gui : 9. Normalise = bool(1)
+#@gui : 10. Colour Space = choice("RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","RYB","CMY","CMYK","Bayer")
+#@gui : 11. Alpha = bool(0)
+#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)
 fx_dct_fsu:
 repeat $! l[$>]
-if !$9 split_opacity fi
+if !$11 split_opacity fi
 l[0]
-csswap $8,0 dct
+csswap $10,0 dct
+shift $4%,$5%,0,0,2
 f "
 begin(op="$1"; ox=round("$2"*w/100); oy=round("$3"*h/100));
 (op==0)?(((x<=ox)&&(y<=oy))?i:0):
@@ -3659,16 +3817,18 @@ begin(op="$1"; ox=round("$2"*w/100); oy=round("$3"*h/100));
 (op==8)?(j(round(ox*u(-1,1)^45),round(oy*u(-1,1)^45),0,0,0,2)):
 (op==9)?(j(round(ox*u(-1,1)^5),round(oy*u(-1,1)^5),0,0,0,2))
 "
-shift $4%,$5%,0,0,2
+shift $6%,$7%,0,0,2
 idct
-csswap 0,$8
-if $6 abs fi
-if $7 n 0,255 fi
+csswap 0,$10
+if $8 abs fi
+if $9 n 0,255 fi
 endl
-if !$9 a c fi
+if !$11 a c fi
 endl done
 fx_dct_fsu_preview:
 gui_split_preview "fx_dct_fsu $*",${-3--1}
+
+
 
 
 
