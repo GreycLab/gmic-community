@@ -64,10 +64,19 @@
 #@gui : sep = separator()
 #@gui : note = note{"\nThe functions defined are quite <i>experimental</i> and subject to changes.
 #@gui : Please do not rely on the fact that they will perform equally forever."}
-karos_about : 	  osteo gui_print_preview "G'MIC version "$_version,32,"KaRo's tests",22 
+karos_about : v -
+  if $_version<270 osteo gui_print_preview "G'MIC version "$_version,32,"KaRo's tests",22 
 # some poor replacement of missing fx_logo!
-#  fx_logo_version{round(u(0.5,3.49))} $_version [0] *. 0 text. "KaRo's",10%,22%,57,1,255 text. "Tests",40%,60%,57,1,200
-#  +to_gray. skeleton. , n[-1--2] 0,255 dilate.. 2 -[-1--2] + n 0,255
+# fx_logo_version{round(u(0.5,3.49))} $_version 
+  else
+    osteo r. 400,400,1,3
+    [0] *. 0
+    text. "g'mic",0.5~,0.15~,36,1,255,255,0
+    text. "\n\nversion "$_version,0.5~,0.2~,18,1,255,255,0 
+    text. "KaRo's",0.5~,0.4~,57,1,255,0,255 
+    text. "Tests",0.5~,0.6~,57,1,200,0,200
+    +to_gray. skeleton. , n[-1--2] 0,255 dilate.. 2 -[-1--2] + n 0,255
+  fi v +
 
 #------------------------------------
 #
@@ -444,10 +453,12 @@ osteo_ :
     decompress_rle. nm osteo,osteo_
   endl v +
 
-#@cli follic : Load follicle cells image from thyroid (transmitted light)
+#@cli follic : Load follicle cells sample image from thyroid (transmitted light)
+#@cli : For frequent usage do "gmic follic o ${_path_rc}follic.pgm" for local storage
 follic :
-  e[^-1] "Load thyroid follicle nuclei example image from http://karo03.bplaced.net/gmic/Repo/follic.pgm"
-  v - l[] i http://karo03.bplaced.net/gmic/Repo/follic.pgm nm follic endl v +
+  e[^-1] "Load thyroid follicle nuclei example image"
+  v - l[] if isfile(['${_path_rc}follic.pgm']) i ${_path_rc}follic.pgm 
+  else i http://karo03.bplaced.net/gmic/Repo/follic.pgm endif nm follic endl v +
 
 #@cli follic_ : Load follicle cells image from thyroid (transmitted light)
 follic_ :
@@ -594,32 +605,35 @@ karo_luminance : skip ${1=itur1990}
   if {['"$1"']=='gmic'" || "['"$1"']=='gmic-2'} rgb2srgb fi
   v +
 
-#@cli karo_close : '_size>0','_shape=0|1|2' (square|octagon|circle),'_invert=0|1','_scale=0|1',
-#@cli : '_channel=0..33' ("All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
+#@cli karo_close : '_size>0','_shape=0|1|2' (square|octagon|circle),'_invert=0|1',
+#@cli : '_scale=0|1|2', Value action none | cut | normalize
+#@cli : '_channel=>0' see color_channels in apply_channels
 #@cli : Morphological closing (dilate and erode) of given size (only 2d)
 #@cli :  with fx_morpho_v2 and implicitly apply_channels!
 #@cli : $ image.jpg  +karo_close 15 +karo_close[0] 15,1 +karo_close[0] 15,2 rm[0]
 karo_close :
   e "Compute closing image$?, with size $1 (only 2d)."
   skip ${1=5},${2=0},${3=0},${4=0},${5=0} check $2<3 v -
-  if {$_version<175} fx_morpho 3,$1,$3,$2,$5,$4
-  else fx_morpho_v2 3,$2,$1,"1,0,1; 0,1,0; 1,0,1",$3,1,$5,$4
-  fi v +
+	if $4 negate fi
+  ac "-karo_morpho 3,$2,$1",$5,$4
+	if $4 negate fi
+  v +
 
-#@cli karo_open : '_size>0', '_shape=0|1|2' (square|octagon|circle), '_invert=0|1', '_scale=0|1',
-#@cli : '_channel=0..33 ("All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
+#@cli karo_open : '_size>0', '_shape=0|1|2' (square|octagon|circle), '_invert=0|1', 
+#@cli : '_scale=0|1|2','_channel' see value action, color_channels in 'apply_channels'
 #@cli : Morphological opening (erode and dilate) of given size (only 2d)
 #@cli :  with fx_morpho_v2 and implicitly apply_channels!
 #@cli : $ image.jpg  +karo_open 15 +karo_open[0] 15,1 +karo_open[0] 15,2 rm[0]
 karo_open :
   e "Compute opening image$?, with size $1 (only 2d)."
   skip ${1=5},${2=0},${3=0},${4=0},${5=0} check $2<3 v -
-  if {$_version<175} fx_morpho 2,$1,$3,$2,$5,$4
-  else fx_morpho_v2 2,$2,$1,"1,0,1; 0,1,0; 1,0,1",$3,1,$5,$4
-  fi v +
+	if $4 negate fi
+  ac "-karo_morpho 2,$2,$1",$5,$4
+	if $4 negate fi
+  v +
 
 #@cli karo_doc : '_size>0','_shape=0|1|2' (square|octagonal|circular),
-#@cli : '_channel=0..33' ("All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
+#@cli : '_channel' see color_channels in 'apply_channels'
 #@cli : compute difference of open+close and original (only 2d)
 #@cli : $ image.jpg +karo_doc 15,2,5
 karo_doc :
@@ -632,17 +646,19 @@ karo_doc :
 
 
 #@cli karo_doo : _size1>0,_size2>0,_type=0..3 (ero/dil/open/close),_shape=0|1|2 (sqaure|octagon|circle),'_scale=0|1',
-#@cli : '_channel=0..33' ("All","RGBA [all]","RGB [all]","RGB [red]","RGB [green]","RGB [blue]","RGBA [alpha]","Linear RGB [all]","Linear RGB [red]","Linear RGB [green]","Linear RGB [blue]","YCbCr [luminance]","YCbCr [blue-red chrominances]","YCbCr [blue chrominance]","YCbCr [red chrominance]","YCbCr [green chrominance]","Lab [lightness]","Lab [ab-chrominances]","Lab [a-chrominance]","Lab [b-chrominance]","Lch [ch-chrominances]","Lch [c-chrominance]","Lch [h-chrominance]","HSV [hue]","HSV [saturation]","HSV [value]","HSI [intensity]","HSL [lightness]","CMYK [cyan]","CMYK [magenta]","CMYK [yellow]","CMYK [key]","YIQ [luma]","YIQ [chromas]")
-#@cli : Compute difference of math. morph operation on selected images (only 2d).
+#@cli : '_scale','_channel' see value action, color_channels in 'apply_channels'
+#@cli : Compute difference of math. morph operation type on selected images (only 2d).
 #@cli : $ image.jpg +karo_doo 10,15,2,2,0,3
 karo_doo : skip ${1=5},${2=7},${3=2},${4=1},${5=0},${6=0}
   e[^-1] "Compute difference of mm op on image$?, with sizes $1 and $2 (only 2d)." v -
   repeat $! l[$<]
-    +fx_morpho. $3,$1,0,$4,$6,0
-     fx_morpho.. $3,$2,0,$4,$6,0
+    +ac. "-karo_morpho $3,$4,$1",$6,0
+#    +fx_morpho. $3,$1,0,$4,$6,0
+    ac.. "-karo_morpho $3,$4,$2",$6,0
+#     fx_morpho.. $3,$2,0,$4,$6,0
     if {{${3}&1}==0} rv[-2,-1] fi
     -[-2,-1]
-    if {$5==1} n. 0,255 fi
+    if $5 n. 0,255 fi
   endl done v +
 
 #@cli karo_label_sort :
@@ -1244,14 +1260,14 @@ descriptive_feature :
       if {$>==0} sres=$res else sres=$sres\,$res fi
   endl done u $sres v +
 
-#@cli mmorpho : action, _kernel(0), _size(5), _ckernel("1,0,1; 0,1,0; 1,0,1")
+#@cli karo_morpho : action, _kernel(0), _size(5), _ckernel("1,0,1; 0,1,0; 1,0,1")
 #@cli : Mathematical morphology filter
 #@cli : action={0=Ero | 1=Dil | 2=Open | 3=Close | 4=Ori-Ero | 5=Dil-Ori | 6=Ori-Open | 7=Close-Ori | 8=(Ori*2-(Open+Close))*0.5 | 9=Close-Open}
 #@cli : _kernel={0=Square | 1=Octogon | 2=Circle | 3=Custom}
 #@cli : _size>=2(5)
 #@cli : _ckernel (custom kernel only if _kernel==3)
-#@cli : Derived from D Tschumperle's fx_morpho_v2 (gmic_stdlib.gmic)
-mmorpho :
+#@cli : Derived from D Tschumperle's older fx_morpho (formerly gmic_stdlib) and extended by action 4..9
+karo_morpho :
   skip "${2=0} ${3=5} ${4=1,0,1; 0,1,0; 1,0,1}"
   v - ac=Ero,Dil,Open,Close,"Ori-Ero","Dil-Ori","Ori-Open","Close-Ori","(Ori*2-(Open+Close))*0.5","Close-Open"
   ke=Square,Octagon,Circle,Custom v +
@@ -1337,7 +1353,13 @@ fx_karo_cimg_nlmeans_preview :
 #lab,lab_l,lab_ab,lab_a,lab_b,lch,lch_l,lch_ch,lch_c,lch_h,\
 #hsv,hsv_h,hsv_s,hsv_v,hsi,hsi_h,hsi_s,hsi_i,hsl,hsl_h,hsl_s,hsl_l,\
 #cmy,cmy_c,cmy_m,cmy_y,cmyk,cmyk_c,cmyk_m,cmyk_y,cmyk_k
-#@gui : Channel(s) = choice(0,"all","rgba","rgba_r","rgba_g","rgba_b","rgba_a","rgb","rgb_r","rgb_g","rgb_b","lrgb","lrgb_r","lrgb_g","lrgb_b","ycbcr","ycbcr_y","ycbcr_cbcr","ycbcr_cb","ycbcr_cr","ycbcr_cg","lab","lab_l","lab_ab","lab_a","lab_b","lch","lch_l","lch_ch","lch_c","lch_h","hsv","hsv_h","hsv_s","hsv_v","hsi","hsi_h","hsi_s","hsi_i","hsl","hsl_h","hsl_s","hsl_l","cmy","cmy_c","cmy_m","cmy_y","cmyk","cmyk_c","cmyk_m","cmyk_y","cmyk_k")
+#@gui : Channel(s) = choice("All","RGBA [All]","RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","RGBA [Alpha]",
+#@gui : "Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]",
+#@gui : "YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]",
+#@gui : "YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]",
+#@gui : "Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]",
+#@gui : "HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]",
+#@gui : "CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]","RYB [All]","RYB [Red]","RYB [Yellow]","RYB [Blue]")
 #@gui : Scale = bool(true)
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 ##@gui : Best with odd sizes!
@@ -1349,7 +1371,13 @@ fx_karo_cimg_nlmeans_preview :
 #@cli : _size2 = int(7,1,25)
 #@cli : _operation = choice(2,"Erosion","Dilation","Open","Close")
 #@cli : _shape = choice(1,"Square","Octagon","Circle")
-#@cli : _channel = choice(0,"All","RGBA","RGB","Luminance","Blue/red chrominances","Blue chrominance","Red chrominance","Lightness","ab-components","a-component","b-component","Hue","Saturation","Value","Key","Green chrominance","ch-components","c-component","h-component","Red","Green","Blue","Alpha")
+#@cli : _channel = choice(0,"All","RGBA [All]","RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","RGBA [Alpha]",\
+"Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]",\
+"YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]",\
+"YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]",\
+"Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]",\
+"HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]",\
+"CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]","RYB [All]","RYB [Red]","RYB [Yellow]","RYB [Blue]")
 #@cli : _scale = bool(true)
 ##@cli : Best with odd sizes!
 #@cli : Arithmetical difference of a morphological operation of <i>size</i> and <i>size2</i>.
@@ -1366,7 +1394,13 @@ fx_karo_mm_diff_preview :
 #@gui OC Differences : fx_karo_oc_diff, fx_karo_oc_diff_preview
 #@gui : Size = int(5,2,25)
 #@gui : Shape = choice(1,"Square","Octagon","Circle")
-#@gui : Channel(s) = choice(0,"All","RGBA","RGB","Luminance","Blue/red chrominances","Blue chrominance","Red chrominance","Lightness","ab-components","a-component","b-component","Hue","Saturation","Value","Key","Green chrominance","ch-components","c-component","h-component","Red","Green","Blue","Alpha")
+#@gui : Channel(s) = choice("All","RGBA [All]","RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","RGBA [Alpha]",
+#@gui : "Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]",
+#@gui : "YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]",
+#@gui : "YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]",
+#@gui : "Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]",
+#@gui : "HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]",
+#@gui : "CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]","RYB [All]","RYB [Red]","RYB [Yellow]","RYB [Blue]")
 #@gui : Scale =bool(true)
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 ##@gui : Best with odd sizes!
@@ -1376,7 +1410,13 @@ fx_karo_mm_diff_preview :
 #@cli : Compute difference of math. morph opening and closing on selected images.
 #@cli : _size = int(5,1,25)
 #@cli : _shape = choice(1,"Square","Octagon","Circle")
-#@cli : _channel = choice(0,"All","RGBA","RGB","Luminance","Blue/red chrominances","Blue chrominance","Red chrominance","Lightness","ab-components","a-component","b-component","Hue","Saturation","Value","Key","Green chrominance","ch-components","c-component","h-component","Red","Green","Blue","Alpha")
+#@cli : _channel = choice(0,"All","RGBA [All]","RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","RGBA [Alpha]",\
+"Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]",\
+"YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]",\
+"YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]",\
+"Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]",\
+"HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]",\
+"CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]","RYB [All]","RYB [Red]","RYB [Yellow]","RYB [Blue]")
 #@cli : _scale = bool(true)
 ##@cli : Best with odd sizes!
 #@cli : Arithmetical difference of a morphological operation of <i>size</i> and <i>size2</i>.
@@ -1395,7 +1435,7 @@ fx_karo_oc_diff_preview :
 #@cli : _connect = 0..1 ("Four/x","Eight/y")
 #@cli : _smooth = 0..
 #@cli : _param = 0..25
-#@cli : _channel = 0..22 ("All","RGBA","RGB","Luminance","Blue/red chrominances","Blue chrominance","Red chrominance","Lightness","ab-components","a-component","b-component","Hue","Saturation","Value","Key","Green chrominance","ch-components","c-component","h-component","Red","Green","Blue","Alpha")
+#@cli : _channel = choice(0,"All","RGBA [All]","RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","RGBA [Alpha]","Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]","YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]","YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]","Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]","HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]","CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]","RYB [All]","RYB [Red]","RYB [Yellow]","RYB [Blue]")
 #@cli : $ image.jpg +fx_pink , +-
 #@cli : $ image.jpg +fx_pink. 12,1,0.582524,10,0,0 +fx_pink.. 12,0,0.582524,10,0,0 +[-1,-2] # asflin in x and y
 #@gui Pink Operator : fx_pink, fx_pink_preview(1)
@@ -1403,7 +1443,13 @@ fx_karo_oc_diff_preview :
 #@gui : Connectivity / Dir = choice("Four/x","Eight/y")
 #@gui : Smoothness = float(0,0,5)
 #@gui : Height/Rep = int(5,0,25)
-#@gui : Channel(s) = choice(0,"All","RGBA","RGB","Luminance","Blue/red chrominances","Blue chrominance","Red chrominance","Lightness","ab-components","a-component","b-component","Hue","Saturation","Value","Key","Green chrominance","ch-components","c-component","h-component","Red","Green","Blue","Alpha")
+#@gui : Channel(s) = choice("All","RGBA [All]","RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","RGBA [Alpha]",
+#@gui : "Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]",
+#@gui : "YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]",
+#@gui : "YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]",
+#@gui : "Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]",
+#@gui : "HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]",
+#@gui : "CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]","RYB [All]","RYB [Red]","RYB [Yellow]","RYB [Blue]")
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui : note = link("https://perso.esiee.fr/~coupriem/Pink/doc/html/files.html")
 fx_pink :
@@ -1443,7 +1489,13 @@ fx_pink_preview :
 #@gui : Connectivity / Dir = choice("Four/x","Eight/y")
 #@gui : Height/Rep = int(5,-1,25)
 #@gui : Algorithm = int(4,0,29)
-#@gui : Channel(s) = choice(0,"All","RGBA","RGB","Luminance","Blue/red chrominances","Blue chrominance","Red chrominance","Lightness","ab-components","a-component","b-component","Hue","Saturation","Value","Key","Green chrominance","ch-components","c-component","h-component","Red","Green","Blue","Alpha")
+#@gui : Channel(s) = choice("All","RGBA [All]","RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","RGBA [Alpha]",
+#@gui : "Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]",
+#@gui : "YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]",
+#@gui : "YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]",
+#@gui : "Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]",
+#@gui : "HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]",
+#@gui : "CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]","RYB [All]","RYB [Red]","RYB [Yellow]","RYB [Blue]")
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui : sep = separator(), note = note(Binary operations with Pink externals.)
 #@gui : note = note{"Diverse Pink executables in search PATH"}

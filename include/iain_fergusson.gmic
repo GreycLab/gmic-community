@@ -517,6 +517,87 @@ iain_hue_light_dark:
 ##################### Filter End ########################
 
 #@gui _<b>Details</b>
+
+#@gui Pyramid Processing: iain_pyramid_processing,iain_pyramid_processing(0)
+#@gui : 1 Levels = int(4,1,6)
+#@gui : 2 Noise = float(50,1,100)
+#@gui : 3 Mix = float(.5,0,1)
+#@gui : Type = choice(0,"Mix","Add")
+#@gui : Channels = choice(0,"Lightness","Luma","RGB")
+#@gui : note = note("<small>Author : <i>Iain Fergusson</i>. 20 Aug 2019 - Update</small>")
+#@gui : note = note(" <small>14 June 2017 - First release</small>")
+iain_pyramid_processing:
+-repeat $! -l[$>]
+-remove_opacity
+-if {$5==0}
+colorspace="lab_l"
+-elif {$5==1}
+colorspace="ycbcr_y"
+-elif {$5==2}
+colorspace="rgb"
+-endif
+
+-ac[0] "
+	--l
+	dilate=1
+	blur=1
+	mix=$3
+	noise=$2
+	levels=$1
+	size={3^$levels}
+	cropwidth={w}
+	cropheight={h}
+	-resize {w+($size-w%$size)},{h+($size-h%$size)},{d},{s},0,1
+
+		-repeat $levels # number of pyramid levels.
+			-l[-1]
+			--resize[0] 33.33333%,33.33333%,{d},{s},2
+			--iain_resize_x3[-1]
+			-blur[-1] 1
+			-sub[0,-1]
+			-endl
+		-done
+		-repeat {$!-1}
+		-l[{$>}]
+			--abs
+			max={iM}
+			-dilate[-1] $dilate
+			-blur[-1] $blur
+			-max[-1] 0.00000000000000001
+			--fill[-1] $max
+			-div[-1] [-2]
+			-cut[-1] -1000000000,$noise
+			-mul[0,-1]
+			-k[0]
+		-endl
+		-done
+	-to_rgb
+		-repeat {$!-1}
+		-iain_resize_x3[-1]
+		-blur[-1] 1
+		-add[-1,-2]
+		-done
+	 -crop 0,0,{$cropwidth-1},{$cropheight-1} # crop to original
+	-replace_nan 0
+	-replace_inf 255
+	-n 0,255
+	-endl
+-if $4
+-sub[-1] {-1,ia}
+-mul[-1] $mix
+-add
+-c 0,255
+-else
+-mul[0] {1-$mix}
+-mul[1] $mix
+-add
+-endif
+-c 0,255
+",$colorspace
+-endl -done
+
+
+
 #@gui Constrained Sharpen: iain_constrained_sharpen, iain_constrained_sharpen(0)
 #@gui : Sharpen Radius = float(.75,0,10)
 #@gui : Amount = float(2,0,10)
@@ -1975,116 +2056,505 @@ nm name($nm)
 
 #@gui Iain Fergusson
 
+#@gui Anisotropic_tutorial: iain_smooth_tutorial,iain_smooth_tutorial(0)
+#@gui : Amplitude = float (1000,0,2000)
+#@gui : sep = separator ()
+#@gui : note = note("Edge Sensitivity")
+#@gui : Sharpness  = float (0.5,0,2)
+#@gui : sep = separator ()
+#@gui : note = note("Directionality")
+#@gui : Anisotropy = float (1,0,1)
+#@gui : sep = separator ()
+#@gui : note = note("Swirl")
+#@gui : Gradient Smoothness = float (0.6,0,20)
+#@gui : sep = separator ()
+#@gui : note = note("Align")
+#@gui : Tensor Smoothness = float (1.1,0,20)
+#@gui : sep = separator()
+#@gui : Show Tensor Field = choice (0,"hidden","overlay","exclusive")
+#@gui : Show Gradient Blur = bool(0)
 
-#@gui iain_nr_2019: iain_nr_2019,iain_nr_2019(0)
 
-#@gui : HF recover = float(1,0,2)
-#@gui : MF Smooth = float(2,0,10)
-#@gui : LF Smooth = float(0,0,10)
-#@gui : chroma = float(.3,0,1)
-#@gui : Recovery amount = float(1,0,2)
-#@gui : gamma = float(1.5,0,2)
-iain_nr_2019:
+
+# Compute diffusion tensors for image$?, with sharpness $1, anisotropy $2, alpha $3 and sigma $4
+
+iain_smooth_tutorial:
+amplitude=$1
+sharpness=$2
+anisotropy=$3
+gradient_smoothness=$4
+tensor_smoothness=$5
+quiver=$6
+
+-remove_opacity
+--l[0] # quiver
+p1={if(0,0.5,1)*max($sharpness,1e-2)}
+p2={$p1/(1e-7+1-$anisotropy)}
+b $gradient_smoothness n 0,255 structuretensors 0 b $tensor_smoothness
+
+eigen max.. 0
+if s==2 s.. c +[-3,-2] +.. 1 +^.. -$p1 ^... -$p2 a[-3,-1] c
+else s.. c +[-4--2] +.. 1 +^.. -$p1 r. 100%,100%,100%,2 ^... -$p2 a[-3,-1] c
+fi
+--l #quiver
+-l[-1]
+-split[-1] c
+--abs[0]
+-fill[0] acos(i)
+-add[0] {pi/2}
+-mod[0] {pi}
+-fill[0] cos(i)
+-rm[1]
+--fill[0] 0
+-append c
+-endl
+-l[-2] 
+-split c 
+-add  
+-pow $sharpness #-add 0.1 -c[0] 0.06,255 
+-endl
+-to_rgb
+-mul
+-resize[0] 400%,400%
+100%,100%,1,1,255 
+--quiver[1] [0],24,3,0,1
+-k[-1]
+-resize 25%,25%,100%,100%,2
+-endl
+-l[-3]
+-split[0] c
+-fill[0] 0
+-c[1] 1,10
+-append[0,1] c
+-endl
+-l[-2,-3]
+-eigen2tensor
+-endl
+-smooth[-1] [-2],5
+-rm[-2]
+-luminance
+-negate
+[0]
+-blur[-1] 3
+-max[-1] 0.1
+-fill[-1] 10/i
+-mul[0] [1]
+-negate
+-n 0,255
+-c 120,255
+-n 0,255
+-k[0]
+-endl
+
+-if $7
+-blur[0] $gradient_smoothness
+-n[0] 0,255
+-else
+-smooth[0] $amplitude,$sharpness,$anisotropy,$gradient_smoothness,$tensor_smoothness
+-endif
+
+-if {$quiver==1}
+-ac[0] " -sub 128 -mul 0.5 -add 128",ycbcr_y
+-n[1] 0,1
+-mul
+-elif {$quiver==2}
+-k[1]
+-else
+-k[0]
+-endif
+-c 0,255
+
+
+
+#@gui Iain Denoise 2019 beta: iain_denoise_2019_beta,iain_denoise_2019_beta_preview(0)
+## #@gui : note = note("Adjust guide")
+#@gui : Gamma = float (1,.05,2)
+#@gui : Shadows = float (0,-1,1)
+#@gui : Light = float (0,-1,1)
+#@gui : Chroma = float(0.5,0,1)
+#@gui : Recover detials = bool(0)
+## #@gui : note = note("denoise")
+#@gui : Fine = float (5,0,30)
+#@gui : Mid = float (3,0,30)
+#@gui : Large = float (0,0,30)
+#@gui : Lookup = int (7,3,15)
+## #@gui : note = note("recover")
+#@gui : Recover = float (0,0,4)
+#@gui : Test Patience = bool (0)
+#@gui : Show noise = choice (4,"All","Fine","Mid","Large","none")
+iain_denoise_2019_beta_preview:
+images={$!}
+
+-if {$12==0}
+--iain_denoise_2019_beta $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
+-k[0,-1]
+-sub
+-c -64,64
+-n 0,255
+-elif {$12==1}
+--iain_denoise_2019_beta $1,$2,$3,$4,$5,$6,0,0,$9,$10,$11,$12
+-k[0,-1]
+-sub
+-c -64,64
+-n 0,255
+-elif {$12==2}
+--iain_denoise_2019_beta $1,$2,$3,$4,$5,0,$7,0,$9,$10,$11,$12
+-k[0,-1]
+-sub
+-c -64,64
+-n 0,255
+-elif {$12==3}
+--iain_denoise_2019_beta $1,$2,$3,$4,$5,0,0,$8,$9,$10,$11,$12
+-k[0,-1]
+-sub
+-c -64,64
+-n 0,255
+
+-elif {$12==4}
+-iain_denoise_2019_beta $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
+-endif
+-if {$images==1}
+-text "internal guide",10,10,20,1,255
+-text "internal guide",12,12,20,1,0
+-elif {$images==2}
+-text "external guide",10,10,20,1,255
+-text "external guide",12,12,20,1,0
+-elif {$images>2}
+-text "too many input images",10,10,20,1,255
+-text "too many input images",12,12,20,1,0
+-endif
+
+iain_denoise_2019_beta:
+gamma=$1
+shadow=$2
+light=$3
+chroma=$4
+median=$5
+std_deviation_s=10
+fine=$6
+mid={$7/3}
+large={$8/9}
+
+patch_size=5
+patch_size_b=3
+lookup_size=$9
+smoothness_fine=0
+smoothness=0
+fast_approx=0
+
+recover=$10
+slow=$11
+
 -remove_opacity
 
-detail_recovery={2-$5}
-gamma=$6
-chroma={1-$4}
-size={3^3}
+-if {$!==1}
+[0]
+-endif
+
+-l[-1]
+#process guide image
+	# adjust chroma to increase chroma denoising. Use faster approximation of Ycbcr.
+
+	-if {$chroma>0}
+	redmul=.299
+	greenmul=.587
+	bluemul=.114
+	--split[0] c
+	-mul[1] $redmul -mul[2] $greenmul -mul[3] $bluemul
+	-add[1-3]
+	-if {$chroma==1} # if chroma equals one just keep the lumanance image else desaturate image by scaling the chroma channels
+	-keep[1]
+	-else
+
+	-split[0] c -name[0] red -name[1] green -name[2] blue -name[3] luma
+
+	--sub[blue] [luma] -name[-1] cb
+	--sub[red] [luma] -name[-1] cr
+	-keep[luma,cb,cr]
+
+	# adjust chroma
+	-mul[cb,cr] {1-$chroma}
+
+	--add[cb] [luma] -name[-1] blueout
+	--add[cr] [luma] -name[-1] redout
+
+	-remove[1,2]
+
+	--mul[redout] $redmul --mul[blueout] $bluemul
+	-sub[luma] [-1] -sub[luma] [-2]
+	-div[luma] $greenmul
+	-remove[-1,-2]
+	-move[2] 0
+	-append c
+	-endif
+	-endif
+
+# adjust gamma and cruves to target differnt ranges for noise reducation
+
+-sub 127
+-div 128
+-if {$gamma!=1}
+-add 1
+-pow $gamma
+-sub 1
+-endif
+--c[0] 0,100
+-c[0] -100,0
+-l[0]
+-if {$shadow>0}
+-fill i+($shadow*abs(i)*0.75)^2
+-elif {$shadow<0}
+-fill i-(abs(i)^3)*(abs($shadow))
+-endif
+-endl
+-l[1]
+-if {$light>0}
+
+max={iM}
+-div[0] $max
+-fill i-($light*abs(i)*0.75)^2
+-mul[0] $max
+-elif {$light<0}
+max={iM}
+-div[0] $max
+-fill i+(abs(i)^3)*(abs($light))
+-mul[0] $max
+-endif
+-endl
+-add
+-mul 128
+-add 127
+-endl
+
+#denoise
+
+--l[0,1]
+levels=2
+size={3^$levels}
 cropwidth={w}
 cropheight={h}
 
+-to_rgb
 -resize {w+($size-w%$size)},{h+($size-h%$size)},{d},{s},0,1
 
--repeat 3
--l[-1]
-
-	-if {{$>}==0} strength=$1 patch_smooth=1 -elif {{$>}==1} strength=$2 patch_smooth=0 -elif {{$>}==2} strength=$3 patch_smooth=0 -endif
-	patch_smooth=0
-## --guided[0] [1],3,{$strength^1.5}
-## --bilateral[0] [1],3,$strength
--if {{$>}==0} 
---median[0] 5
--else 
-## --denoise[0] 10,$strength,3,7,$patch_smooth,1
-	--l[0]
-	-blur 0.5
-	-rgb2lab
-	-split c
-	-mul[1,2] $chroma
-	-append c
-	-lab2rgb
-	-apply_gamma {1/$gamma}
-	-endl
---bilateral[0] [-1],3,$strength
--rm[-2]
-## ## -k[0,-1]
--endif
--sub[0] [1]
-## -if {$5>0}
- -l[0]
--l[0]  -split c -mul[0] 0.2126 -mul[1] 0.7125 -mul[2] 0.0722 -add -endl
-	--abs[-1]
-		-blur[-1] 5
-	-max[-1] 0.00001
-	-fill[-1] 5/i
-	-mul[0] [-1]
-		-l[0] 
-			-add 128
-			-resize[0] {w+256},{h+256},1,1,0,2,0.5,0.5
-			-if {{$>}==0} 
--iain_tiletest4[0] {2-$1},0.5
--else 
-			-iain_tiletest4[0] $detail_recovery,0.5
-			-endif
-			-crop[0] 128,128,{w-129},{h-129}
-			-sub 128
-			--blur 10
-			-sub
-		-endl
-	-div[0] [-1]
-	-rm[-1]
-
--endl
-## -to_rgb
--reverse
- -add
- ## -else -k[-1]
- ## -endif
-
-
-
-
--l[-1]
---resize[0] 33.33333%,33.33333%,{d},{s},2
-
---l[-1]
--resize[0] {(w*3)-2},{(h*3)-2},{d},{s},5,0
--resize[0] {w+2},{h+2},{d},{s},0,1,0.5,0.5
--endl
+	-if {$fine>0}
+	-denoise[0] [1],$std_deviation_s,$fine,$patch_size,$lookup_size,$smoothness_fine,$fast_approx
+	-endif
+--resize[0,1] 33.33333%,33.33333%,{d},{s},2
+-rm[1]
+--iain_resize_x3[-2]
 -blur[-1] 1
--sub[0,-1] 
--endl
--endl
--done
-
-
-
--repeat {$!-1}
-
--l[-1]
--resize[0] {(w*3)-2},{(h*3)-2},{d},{s},5,0
--resize[0] {w+2},{h+2},{d},{s},0,1,0.5,0.5
--endl
+-sub[0,-1]
+	-if {$mid>0}
+	-denoise[1] [2],$std_deviation_s,$mid,$patch_size,$lookup_size,$smoothness_fine,$fast_approx
+	-endif
+	-l[1,2]
+	--resize[0,1] 33.33333%,33.33333%,{-1,d},{-1,s},2
+	-rm[1]
+	--iain_resize_x3[-2]
+	-blur[-1] 1
+	-sub[0,-1]
+		-if {$large>0}
+		-denoise[1] [2],$std_deviation_s,$large,$patch_size,$lookup_size,$smoothness_fine,$fast_approx
+		-endif
+	-endl
+-rm[-1]
+-repeat 2
+-iain_resize_x3[-1]
 -blur[-1] 1
 -add[-1,-2]
 -done
+-crop 0,0,{$cropwidth-1},{$cropheight-1} # crop to original
 -c 0,255
- -crop 0,0,{$cropwidth-1},{$cropheight-1} # crop to original
-## -apply_gamma $gamma
- 
- time=$|
--name. name($time)
+-endl
+
+# recover
+-rm[1]
+ -if {$recover>0&&$5}
+-sub[0] [1]
+ -l[0]
+	-l[-1] -split c -mul[0] 0.2126 -mul[1] 0.7125 -mul[2] 0.0722 -add -endl
+	--blur[-1] 10
+	-sub[-2] [-1]
+	-rm[-1]
+	--abs[-1]
+	-blur[-1] 3
+	-bilateral[-1] [0],10,10
+	-fill[-1] 5/i
+	-mul[-2] [-1]
+	-l[-2]
+		-add 128
+		-resize[0] {w+256},{h+256},1,1,0,2,0.5,0.5
+			-if $slow
+			-iain_tiletest4_stack[0] {2-$recover},0.5
+			-else
+			-iain_tiletest4[0] {2-$recover},0.5
+			-endif
+		-crop[0] 128,128,{w-129},{h-129}
+		-sub 128
+		--blur 10
+		-sub
+	-endl
+-endl
+-div[0] [1]
+-rm[1]
+-to_rgb[0]
+-add
+-else
+-k[-1]
+-endif
+-c 0,255
+
+time=$|
+-name name($time)
+
+iain_resize_x3:
+-resize[0] {(w*3)-2},{(h*3)-2},{d},{s},5,0
+-resize[0] {w+2},{h+2},{d},{s},0,1,0.5,0.5
+
+## #@gui iain_tiletest4_stack: iain_tiletest4_stack,iain_tiletest4_stack(0)
+## #@gui : threshold = float (1,0,5)
+## #@gui : threshold = float (.5,0,5)
+iain_tiletest4_stack:
+-resize {w+128},{h+128},1,1,0,2,0.5,0.5
+offset1x=24
+offset1y=4
+offset2x=-10
+offset2y=21
+offset3x=27
+offset3y=27
+offset4x=6
+offset4y=38
+--shift[0] $offset1x,$offset1y,0,0
+--shift[0] $offset2x,$offset2y,0,0
+--shift[0] $offset3x,$offset3y,0,0
+--shift[0] $offset4x,$offset4y,0,0
+
+-iain_tiletest4[0] $1,$2
+-iain_tiletest4[1] $1,$2
+-iain_tiletest4[2] $1,$2
+-iain_tiletest4[3] $1,$2
+-iain_tiletest4[4] $1,$2
+
+
+-shift[1] {$offset1x*-1},{$offset1y*-1},0,0
+-shift[2] {$offset2x*-1},{$offset2y*-1},0,0
+-shift[3] {$offset3x*-1},{$offset3y*-1},0,0
+-shift[4] {$offset4x*-1},{$offset4y*-1},0,0
+
+-blend_median
+
+-crop 64,64,{w-65},{h-65}
+
+# #@gui iain_nr_2019: iain_nr_2019,iain_nr_2019(0)
+
+# #@gui : HF recover = float(1,0,2)
+# #@gui : MF Smooth = float(2,0,10)
+# #@gui : LF Smooth = float(0,0,10)
+# #@gui : chroma = float(.3,0,1)
+# #@gui : Recovery amount = float(1,0,2)
+# #@gui : gamma = float(1.5,0,2)
+# iain_nr_2019:
+# -remove_opacity
+
+# detail_recovery={2-$5}
+# gamma=$6
+# chroma={1-$4}
+# size={3^3}
+# cropwidth={w}
+# cropheight={h}
+
+# -resize {w+($size-w%$size)},{h+($size-h%$size)},{d},{s},0,1
+
+# -repeat 3
+# -l[-1]
+
+	# -if {{$>}==0} strength=$1 patch_smooth=1 -elif {{$>}==1} strength=$2 patch_smooth=0 -elif {{$>}==2} strength=$3 patch_smooth=0 -endif
+	# patch_smooth=0
+# ## --guided[0] [1],3,{$strength^1.5}
+# ## --bilateral[0] [1],3,$strength
+# -if {{$>}==0}
+# --median[0] 5
+# -else
+# ## --denoise[0] 10,$strength,3,7,$patch_smooth,1
+	# --l[0]
+	# -blur 0.5
+	# -rgb2lab
+	# -split c
+	# -mul[1,2] $chroma
+	# -append c
+	# -lab2rgb
+	# -apply_gamma {1/$gamma}
+	# -endl
+# --bilateral[0] [-1],3,$strength
+# -rm[-2]
+# ## ## -k[0,-1]
+# -endif
+# -sub[0] [1]
+# ## -if {$5>0}
+ # -l[0]
+# -l[0]  -split c -mul[0] 0.2126 -mul[1] 0.7125 -mul[2] 0.0722 -add -endl
+	# --abs[-1]
+		# -blur[-1] 5
+	# -max[-1] 0.00001
+	# -fill[-1] 5/i
+	# -mul[0] [-1]
+		# -l[0]
+			# -add 128
+			# -resize[0] {w+256},{h+256},1,1,0,2,0.5,0.5
+			# -if {{$>}==0}
+# -iain_tiletest4[0] {2-$1},0.5
+# -else
+			# -iain_tiletest4[0] $detail_recovery,0.5
+			# -endif
+			# -crop[0] 128,128,{w-129},{h-129}
+			# -sub 128
+			# --blur 10
+			# -sub
+		# -endl
+	# -div[0] [-1]
+	# -rm[-1]
+
+# -endl
+# ## -to_rgb
+# -reverse
+ # -add
+ # ## -else -k[-1]
+ # ## -endif
+
+
+
+
+# -l[-1]
+# --resize[0] 33.33333%,33.33333%,{d},{s},2
+
+# --l[-1]
+# -resize[0] {(w*3)-2},{(h*3)-2},{d},{s},5,0
+# -resize[0] {w+2},{h+2},{d},{s},0,1,0.5,0.5
+# -endl
+# -blur[-1] 1
+# -sub[0,-1]
+# -endl
+# -endl
+# -done
+
+
+
+# -repeat {$!-1}
+
+# -l[-1]
+# -resize[0] {(w*3)-2},{(h*3)-2},{d},{s},5,0
+# -resize[0] {w+2},{h+2},{d},{s},0,1,0.5,0.5
+# -endl
+# -blur[-1] 1
+# -add[-1,-2]
+# -done
+# -c 0,255
+ # -crop 0,0,{$cropwidth-1},{$cropheight-1} # crop to original
+# ## -apply_gamma $gamma
+
+ # time=$|
+# -name. name($time)
 
 iain_tiletest4:
 -remove_opacity
@@ -2133,7 +2603,7 @@ tileh={h/64}
 
 -append_tiles $tilew,$tileh
 -c 0,255
--crop 0,0,{$cropwidth-1},{$cropheight-1} 
+-crop 0,0,{$cropwidth-1},{$cropheight-1}
 
 
 
@@ -2517,91 +2987,7 @@ iain_remove_pattern_fft:
 
 
 
-#@gui Pyramid Processing: iain_pyramid_processing,iain_pyramid_processing(0)
-#@gui : 1 Levels = int(4,1,6)
-#@gui : 2 Noise = float(50,1,100)
-#@gui : 3 Mix = float(.5,0,1)
-#@gui : note = note("<small>Author : <i>Iain Fergusson</i>. 14 June 2017 - First release</small>")
-iain_pyramid_processing:
--repeat $! -l[$>]
--remove_opacity
--ac[0] "
-	--l
-	dilate=1
-	blur=1
-	mix=$3
-	noise=$2
-	levels=$1
-	size={3^$levels}
 
-	cropwidth={w}
-	cropheight={h}
-
-	#-resize {w+($size-w%$size)},{h+($size-h%$size)},{d},{s},0,1,0.5,0.5
-	-resize {w+($size-w%$size)},{h+($size-h%$size)},{d},{s},0,1
-
-		-repeat $levels # number of pyramid levels.
-			-l[-1]
-			--resize[0] 33.33333%,33.33333%,{d},{s},2
-
-			--iain_resize_x3[-1]
-			-blur[-1] 1
-			-sub[0,-1]
-			-endl
-		-done
-
-		-repeat {$!-1}
-
-		-l[{$>}]
-
-
-
-			--abs
-			max={iM}
-			-dilate[-1] $dilate
-			-blur[-1] $blur
-
-			-max[-1] 0.00000000000000001
-			--fill[-1] $max
-			-div[-1] [-2]
-			-cut[-1] -1000000000,$noise
-			-mul[0,-1]
-			-k[0]
-
-		-endl
-
-		-done
-
-
-
-
-
-	-to_rgb
-		-repeat {$!-1}
-
-		-iain_resize_x3[-1]
-		-blur[-1] 1
-		-add[-1,-2]
-		-done
-	 -crop 0,0,{$cropwidth-1},{$cropheight-1} # crop to original
-
-
-	-replace_nan 0
-	-replace_inf 255
-
-	-n 0,255
-	-endl
-
--mul[0] {1-$mix}
--mul[1] $mix
--add
--c 0,255
-
-
-",lab_l
-
-
--endl -done
 
 
 
@@ -8336,12 +8722,13 @@ $tsize,$tsize
 -iain_turbulent_halftone $1,$2,$3,$4,{0,w},$6,$7,$8
 
 #@gui Halftone Shapes: iain_halftone_shapes, iain_halftone_shapes(0)
-#@gui : Scale = float(100,10,200)
+#@gui : Scale = float(100,5,200)
 #@gui : Negative=bool(0)
 #@gui : Shape = choice("Circle","Star","Triangle","Heart")
 #@gui : Oversample = bool(0)
 #@gui : Rotate = float(0,0,180)
 #@gui : Twirl = float(0,0,2)
+#@gui : Turn on rotate and twirl = bool(0)
 #@gui : sep = separator()
 #@gui : note = note("Oversample gives smoother results but takes much longer.")
 #@gui : note = note("Twirl distorts the hafltone grid. The preview is not accurate. For best results use with oversample.")
@@ -8349,6 +8736,7 @@ $tsize,$tsize
 #@gui : note = note("<small>Author : <i>Iain Fergusson</i>.</small>")
 
 iain_halftone_shapes:
+warp_it=$7
 -remove_opacity
 scale=$1
 -luminance
@@ -8618,8 +9006,10 @@ total_tiles=$h_tiles*$w_tiles
 -append_tiles[1--1] $w_tiles,$h_tiles
 ## -blur[-1] {5*($scale/100)}
 -equalize[-1] 256
+-if $warp_it
 -rotate[-1] $5,1,2,50%,50%
 -twirl[-1] $6,.5,.5,2
+-endif
 -blend alpha,0.5,1
 -gt 128
 -mul 255
