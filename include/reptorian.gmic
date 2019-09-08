@@ -1134,6 +1134,56 @@ ys=$7?1-ys:ys;
 i(xs*w,ys*h,z,c,2,1);
 "
 r2dx {(1/($12+1))*100}%,$13
+#@cli rep_objvf: (eq. to rep_objvolumefilt)
+rep_objvf: rep_objvolumefilt $*
+#@cli rep_objvolumefilt: 0<=_v1<=1,0<=_v2<=1,_mode= { 0=preserve || 1=eliminate },_colour1...
+#@cli:_v1 and _v2 refers to boundary in percent. By default, this command use alpha as reference unless all channel values are specified next to mode.
+#@cli: Default value: '_mode=1'
+rep_objvolumefilt:
+skip ${3=1}
+repeat $! l[$>]
+if $#>3
++f [${4--1}]
++eq
+compose_channels. *
+f. 1-i
+rm..
+a c
+fi
+val_a=$1
+val_b=$2
+minv={min($val_a,$val_b)}
+maxv={max($val_a,$val_b)}
+if ($1<-1||$1>1)&&($2<-1||$2>1) v + error "Invalid numbers for Variable 1 and/or 2." v - fi
+if $1==$2 v + error "Variable 1 and 2 can't be the same" v - fi
+ek=$3
+vv=0
+repeat s#0
+sh[0] $>
+vv+={iv#-1}
+rm.
+done
+if $vv!=0
++channels {s-1}
+f. i==0?0:1 .
+f[2] "begin(A = resize([ 0,(s#0-1)],s,s#0-1));I+A" norm[2] round[2] 0.01 label[2] 0 {iM+1},1,1,{0,1}
+f[1] ">i(#3,i(#2,x,y,z,0),0,0,c)+=i;i" n. 0,1 map[2] . 
+f. i==im#-1?1:i
+min_pas_zero={im#-1}
+tmm={1-$min_pas_zero}
+new_minv={$minv*$tmm+$min_pas_zero}
+sh[0] {s#0-1}
+rm[1,3]
+f. i#-2<$new_minv||i#-2>$maxv?($ek?0:i):($ek?i:0)
+rm[1,2]
+fi
+if $#>3
+s c,-{s-1}
++f.. [${4--1}]
+f... i0#-2?i#-1:i
+rm[1,2]
+fi
+endl done
 #@gui _<b>Testing</b>
 #@gui <i>Reptorian</i>
 
@@ -2233,6 +2283,51 @@ u "{$1}"\
 #@gui : Interpolation = choice(2,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
 #@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/9/7</i>.</small>")
 gui_rep_polkal: rep_polkal ${1-3},{($4-50)*2}%,{($5-50)*-2}%,${6--1}
+#@gui Object Size Filtering: gui_rep_objvf,gui_rep_objvf_preview(0)
+#@gui : note = note("The purpose of this filter is to filter objects based on their volume. It is based on the principle of the <a href="https://forums.getpaint.net/topic/113962-object-pruner/">Object Pruner plugin</a> for Paint.NET made by <b>MJW</b>."), sep = separator()
+#@gui : Mode of Object Filtering = choice(0,"Alpha-Based","Colour - 3 Channels","Colour - 4 Channels")
+#@gui : sep = separator(), note = note("<b>Object Filtering Options</b>")
+#@gui : Volume 1 = float(0,0,100)
+#@gui : Volume 2 = float(100,0,100)
+#@gui : Eliminate Objects? = bool(1)
+#@gui : Colour = color(0,0,0)
+#@gui : Colour = color(0,0,0,0)
+#@gui : sep = separator(), note = note("<b>Preview Settings</b>")
+#@gui : Reveal Erased Objects? = bool(1)
+#@gui : Colour of Erased Object = color(0,0,0)
+#@gui : sep  = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/9/8</i>.</small>")
+gui_rep_objvf:
+if $1==0 rep_objvf {$2/100},{$3/100},$4
+elif $1==1 rep_objvf {$2/100},{$3/100},$4,${5-7}
+else rep_objvf {$2/100},{$3/100},$4,${8-11}
+fi
+gui_rep_objvf_preview:
+if $12
+    if $1==0 +rep_objvf {$2/100},{$3/100},$4
+    elif $1==1 +rep_objvf {$2/100},{$3/100},$4,${5-7}
+    else +rep_objvf {$2/100},{$3/100},$4,${8-11} fi
+    +eq compose_channels. * *. 255 negate. rm.. {w#0},{h#0},1,3,[${13-15}]
+    rv[-2,-1] a[-2,-1] c
+    blend normal
+else
+    if $1==0 +rep_objvf {$2/100},{$3/100},$4
+    elif $1==1 +rep_objvf {$2/100},{$3/100},$4,${5-7}
+    else +rep_objvf {$2/100},{$3/100},$4,${8-11} fi
+fi
+#TODO: Get Colour options to hide based $1#
+u "{$1}"\
+"{$2}"\
+"{$3}"\
+"{$4}"\
+"{$5}_"{$1==1?2:0}\
+"{$6}_"{$1==1?2:0}\
+"{$7}_"{$1==1?2:0}\
+"{$8}_"{$1==2?2:0}\
+"{$9}_"{$1==2?2:0}\
+"{$10}_"{$1==2?2:0}\
+"{$11}_"{$1==2?2:0}\
+"{$12}"\
+"{$13}{$14,$15}"
 ######################
 
 # Local Variables:
