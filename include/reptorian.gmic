@@ -1101,7 +1101,7 @@ if !$10 k[0] else k[0,1] if !$8 f. sur=x*cos($ang)+y*sin($ang);res=floor(sur/($3
 if $5>0 if $9 r[0] {$iw},{$ih},100%,100%,$5 fi fi
 #@cli rep_polkal: (eq. to rep_polar_kaleidoscope)
 rep_polkal:rep_polar_kaleidoscope $*
-#@cli rep_polar_kaleidoscope: _angle_cut_repeat>0,_radial_cut_repeat>0,_angle,-1<=_shift_x<=1,-1<=_shift_y<=1,_flip_x= { 0=Original | 1=Flipped },_flip_y= { 0=Original | 1=Flipped },_edge_x= { 0=Repeat | 1=Alternating },_edge_y= { 0=Repeat | 1=Alternating },_radial_fit_dimension= { 0=Minimum | 1=Maximum },_conical_start_ang= { 0=90 | 1=0 },_sublevel>0,0<_interpolation<=5
+#@cli rep_polar_kaleidoscope: _angle_cut_repeat>0,_radial_cut_repeat>0,_angle,-1<=_shift_x<=1,-1<=_shift_y<=1,_flip_x= { 0=Original | 1=Flipped },_flip_y= { 0=Original | 1=Flipped },_edge_x= { 0=Repeat | 1=Alternating },0<=_edge_y<=2,_radial_fit_dimension= { 0=Minimum | 1=Maximum },_conical_start_ang= { 0=90 | 1=0 },_sublevel>0,0<_interpolation<=5
 #@cli : Default value: '_angle_cut_repeat=2','_radial_cut_repeat=1','_angle=0','_shift_x=0','_shift_y=0','_flip_x=0','_flip_y=0','_edge_x=1','_edge_y=1','_radial_fit_dimension=0','_conical_start_ang=0','_sublevel=.5','_interpolation=2'
 rep_polar_kaleidoscope:
 skip ${1=2},${2=1},${3=0},${4=0},${5=0},${6=0},${7=0},${8=1},${9=1},${10=0},${11=0},${12=.5},${13=2}
@@ -1128,15 +1128,17 @@ xs*=$1;
 ys=sqrt(xx^2+yy^2)/($10?dr/1:1);
 ys*=$2;
 xs=$8?(int(xs)%2!=0?1-(xs-floor(xs)):xs-floor(xs)):xs-floor(xs);
-ys=$9?(int(ys)%2!=0?1-(ys-floor(ys)):ys-floor(ys)):ys-floor(ys);
+ys=$9?($9-1?(int(ys)%2!=0?1-(ys-floor(ys)):ys-floor(ys)):ys-floor(ys)):ys;
 xs=$6?1-xs:xs;
 ys=$7?1-ys:ys;
-i(xs*w,ys*h,z,c,2,1);
+polkal_a=i(abs(xs*w),ys*h,z,c,0,0);
+polkal_b=i(xs*w,ys*h,z,c,1,1);
+$9?polkal_b:polkal_a;
 "
 r2dx {(1/($12+1))*100}%,$13
 #@cli rep_objvf: (eq. to rep_objvolumefilt)
 rep_objvf: rep_objvolumefilt $*
-#@cli rep_objvolumefilt: 0<=_v1<=1,0<=_v2<=1,_mode= { 0=preserve || 1=eliminate },_colour1...
+#@cli rep_objvolumefilt: 0<=_v1<=1,0<=_v2<=1,_mode= { 0=eliminate_interior || 1=eliminate_exterior },_colour1...
 #@cli:_v1 and _v2 refers to boundary in percent. By default, this command use alpha as reference unless all channel values are specified next to mode.
 #@cli: Default value: '_mode=1'
 rep_objvolumefilt:
@@ -1156,7 +1158,7 @@ minv={min($val_a,$val_b)}
 maxv={max($val_a,$val_b)}
 if ($1<-1||$1>1)&&($2<-1||$2>1) v + error "Invalid numbers for Variable 1 and/or 2." v - fi
 if $1==$2 v + error "Variable 1 and 2 can't be the same" v - fi
-ek=$3
+ek={$#<4?$3:!$3}
 vv=0
 repeat s#0
 sh[0] $>
@@ -1184,6 +1186,120 @@ f... i0#-2?i#-1:i
 rm[1,2]
 fi
 endl done
+#@cli rep_form_pixel: _form_id<24,_form_quad_lx!=0,_form_quad_ly!=0,_form_ratio[%]!=0,_angle,0<=_reflect_dir<=2,_sublevel,_interpolation<6,_shape_option_1..._shape_option_n
+#@cli: If _form_id is a negative number, then it will use the layer number 0 as form reference. Forms that supports dynamic options are fern,gear,polygon,snowflake,star. Dynamic options corresponds to _shape_option_n.
+#@cli: _shape_option_1 can be empty. n refers to corresponding shape option.
+#@cli: Default value: '_form_ratio=1','_ang=0','_reflect_dir=0','_sublevel=.5','_interpolation=2'
+#@cli: $ rep_form_pixel star,35,35,,,,,,8
+#@cli: $ rep_form_pixel cupid,35,35,,24,1
+rep_form_pixel:
+sid="$1"
+isnum_sid={isnum($sid)}
+isint_sid={isint($sid)}
+isnis={$isnum_sid&&$isint_sid}
+if $isnis if $sid>=0 sid=${"-arg "1+$sid"","australia,barbedwire,circle,crosshair,cupid,diamond,dragonfly,fern,flip,gear,gumleaf,heart,information,kookaburra,mail,mapleleaf,paint_splat,paw,phone,polygon,rooster,shopping_cart,snowflake,star"} fi fi
+isnum_sid={isnum($sid)}
+isint_sid={isint($sid)}
+isnis={$isnum_sid&&$isint_sid}
+img2var[0] shape_reference
+if $isnis
+    r[0] {ceil(w/abs($2))*abs($2)},{ceil(h/abs($3))*abs($3)},100%,100%,0,0,.5,.5
+    r[^0] {ceil(w/abs($2))*abs($2)},{ceil(h/abs($3))*abs($3)},100%,100%,0,1,.5,.5
+else
+    r {ceil(w/abs($2))*abs($2)},{ceil(h/abs($3))*abs($3)},100%,100%,0,1,.5,.5
+fi
+if $isnis 
+    if $!>1 apply_parallel[^0] "var2img shape_reference rv _rep_form_pixel $*" 
+    else apply_parallel "var2img shape_reference rv _rep_form_pixel $*" 
+    fi
+else 
+    apply_parallel "_rep_form_pixel $*" 
+fi
+_rep_form_pixel:
+skip ${4=},${5=},${6=},${7=},${8=}
+if narg($4) form_ratio={abs($4)} else form_ratio=1 fi
+if narg($5) ang=$5 else ang=0 fi
+if narg($6) mi={abs($6)} else mi=0 fi
+if narg($7) sub={abs($7)} else sub=.5 fi
+if narg($8) interpolation={abs($8)} else interpolation=5 fi
+
+
+sid="$1"
+isnum_sid={isnum($sid)}
+isint_sid={isint($sid)}
+isnis={$isnum_sid&&$isint_sid}
+
+tw=abs($2)
+th=abs($3)
+if !{$tw||$th} v + error "Invalid Dimension!" v - fi
+tw={!$tw?$th:$tw}
+th={!$th?$tw:$th}
+sub+=1
+interpolation+=1
+if $form_ratio==0||$form_ratio>1 v + error "Invalid Form Ratio Number!" v - fi
+
+if $isnis if $sid>=0 sid=${"-arg "1+$sid"","australia,barbedwire,circle,crosshair,cupid,diamond,dragonfly,fern,flip,gear,gumleaf,heart,information,kookaburra,mail,mapleleaf,paint_splat,paw,phone,polygon,rooster,shopping_cart,snowflake,star"} fi fi
+
+isnum_sid={isnum($sid)}
+isint_sid={isint($sid)}
+isnis={$isnum_sid&&$isint_sid}
+
+l[0] 
+    if !$isnis
+        if $#>8 shape_$sid {max($tw,$th)*$sub},${9--1} 
+        else shape_$sid {max($tw,$th)*$sub} 
+        fi 
+        rv 
+    fi 
+endl
+
+if $mi==1 mirror[0] x elif $mi==2 mirror[0] y fi
+if abs($ang)%360!=0 rotate[0] $ang,1 fi
+n[0] 0,1
+if $isnis
+    if s#0<=4&&s#0>1 l[0] s c,{if(s==4,-3,if(s==2,-1,-s))} if $!==2 to_gray.. *[-2,-1] else to_gray fi endl 
+    elif s#0==5 l[0] s c,-4 cmyk2rgb.. to_gray.. *[-2,-1] endl fi
+fi
+autocrop[0] 0
+shape_image_ratio={w#0/h#0}
+target_image_ratio={$tw/$th}
+resize_width={$target_image_ratio>$shape_image_ratio?w#0*($th/h#0):$tw}
+resize_height={$target_image_ratio>$shape_image_ratio?$th:h#0*($tw/w#0)}
+r[0] {$resize_width*$form_ratio},{$resize_height*$form_ratio},1,1,{$interpolation},0,.5,.5
+r[0] {$tw},{$th},1,1,0,0,.5,.5
+cut[0] 0,1 n[0] 0,1
+ti_l={$!-1}
+repeat $!-1 l[0,{$>+1}]
+    s. x,{w#1/w#0}
+    ti_w={$!-1}
+    s[^0] y,{h#1/h#0}
+    ti_h={($!-1)/$ti_w}
+    repeat $!-1 l[0,{$>+1}] 
+        .
+        repeat s#-1
+            sh. $>
+            if iv#-1!=0
+                sh... $>
+                f. i*i0#0
+                f.. i*(1-i0#0)
+                f.. is/((1-ia#0)*w*h)
+                f. is/(ia#0*w*h)
+                f.. i#-1*i0#0+i*(1-i0#0)
+                rm[^0-2]
+            else
+                rm.
+            fi
+        done
+        rm..
+    endl done
+    l[^0]
+        repeat $ti_w
+            a[{$<*$ti_h}-{($<+1)*$ti_h-1}] y
+        done
+        a x
+    endl
+endl done
+rm[0]
 #@gui _<b>Testing</b>
 #@gui <i>Reptorian</i>
 
@@ -2274,7 +2390,7 @@ u "{$1}"\
 #@gui : Flip Angle Direction? = bool(0)
 #@gui : Flip Radial Direction? = bool(0)
 #@gui : Angle Edge Behaviour = choice(1,"Repeat","Alternating")
-#@gui : Radial Edge Behaviour = choice(1,"Repeat","Alternating")
+#@gui : Radial Edge Behaviour = choice(2,"None","Repeat","Alternating")
 #@gui : Fit Radial End to Min/Max Dimension = choice(0,"Minimum Dimension","Maximum Dimension")
 #@gui : Conical Start at 0? = bool(1)
 #@gui : note = note("<small>Conical start is only used for matching other software filter behavior with conical gradients</small>")
@@ -2289,7 +2405,7 @@ gui_rep_polkal: rep_polkal ${1-3},{($4-50)*2}%,{($5-50)*-2}%,${6--1}
 #@gui : sep = separator(), note = note("<b>Object Filtering Options</b>")
 #@gui : Volume 1 (%) = float(0,0,100)
 #@gui : Volume 2 (%) = float(100,0,100)
-#@gui : Eliminate Objects? = bool(1)
+#@gui : Boundary Elimination = choice(0,"Eliminate Inclusive","Eliminate Exclusive")
 #@gui : Colour = color(0,0,0)
 #@gui : Colour = color(0,0,0,0)
 #@gui : sep = separator(), note = note("<b>Preview Settings</b>")
@@ -2328,6 +2444,111 @@ u "{$1}"\
 "{$11}_"{$1==2?2:0}\
 "{$12}"\
 "{$13}{$14,$15}"
+#@gui Tiled Form : gui_rep_form_pixel, gui_rep_form_pixel_preview(0)
+#@gui : note = note("Original idea comes from <a href="https://forums.getpaint.net/topic/26758-trs-tiled-pixels-v12/">TR's Tiled Pixels V1.2</a> plugin by <b>TechnoRobbo</b> for Paint.NET. This version is a extended version utilizing average sampling per area per tile. Dynamic shapes are also supported by this filter.\n\nDynamic Shapes - Fern, Gear, Polygon, Snowflake, Star\n\nShape that are dynamic are labeled with -[D] next to their name.\n\n<small>Note - You may want to sharp your picture due to the average sampling per area per tile algorithm applied by this filter. The reason being is that the contour of the shape would be more discernible after filter is processed.</small>"), sep = separator()
+#@gui : note = note("<b>Color Space Processing</b>")
+#@gui : Colour Space  = choice(0,"RGB","RYB","CMYK","HCY","HSI","HSL","HSV","LAB","LCH")
+#@gui : sep = separator(), note = note("<b>Shape Option</b>")
+#@gui : Tiled Shape = choice(1,"By Layer","Australia","Barbedwire","Circle","Crosshair","Cupid","Diamond","Dragonfly","Fern-[D]","Flip","Gear-[D]","Gumleaf","Heart","Information","Kookaburra","Mail","Mapleleaf","Paint Splat","Paw","Phone","Polygon-[D]","Rooster","Shopping Cart","Snowflake-[D]","Star-[D]")
+#@gui : Reverse Layer = bool(0)
+#@gui : note = note("<small>For the first option, you must use at least 2 layer to use layer as shape reference, else it'll use the only image itself as shape reference. Reverse Layer option might have to be used to generate the proper result when using first option.</small>")
+#@gui : sep = separator(), note = note("<b>Tile Options</b>")
+#@gui : Shape Width (px) = int(30,4,100)
+#@gui : Shape Height (px) = int(30,4,100)
+#@gui : Shape Ratio (%) = float(100,5,100)
+#@gui : Shape Rotation = float(0,-180,180)
+#@gui : Shape Mirror Axis = choice(0,"None","X","Y")
+#@gui : Subpixel Level = float(.5,0,2)
+#@gui : Interpolation = choice(5,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
+#@gui : sep = separator(), note = note("<b>Dynamic Options</b>")
+#@gui : Fern Type = choice("Asplenium Adiantum-Nigrum","Thelypteridaceae")
+#@gui : Fern Density (%) = float(100,0,300)
+#@gui : Gear Teeth Count = int(8,3,32)
+#@gui : Gear Height (%) = float(25,0.1,100)
+#@gui : Gear Offset Teeth (%) = float(0,0,100)
+#@gui : Gear Inner Ratio (%) = float(50,0.1,100)
+#@gui : Polygon Vertices = int(5,3,100)
+#@gui : Snowflake Recursion = int(5,1,6)
+#@gui : Star Branches = int(3,5,100)
+#@gui : Star Thickness (%) = float(38,.1,100)
+#@gui : note = note("<small>Options are only visible for dynamic shapes!</small>")
+#@gui :  sep  = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui :  sep  = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/5/18</i>.</small>")
+gui_rep_form_pixel:
+if $3&&!$2 rv fi
+if $1!=2&&$1!=0
+    repeat {!$2&&$!>1?$!-1:$!} l[{!$2&&$!>1?$>+1:$>}]
+        sh 0,2
+        if $1==1 rgb2ryb.
+        elif $1==3 rgb2hcy.
+        elif $1==4 rgb2hsi.
+        elif $1==5 rgb2hsl.
+        elif $1==6 rgb2hsv.
+        elif $1==7 rgb2lab.
+        elif $1==8 rgb2lch.
+        fi
+        rm.
+    endl done
+elif $1==2
+    repeat {!$2&&$!>1?$!-1:$!} l[{!$2&&$!>1?$>+1:$>}]
+        if s==3 rgb2cmyk
+        elif s==4 s c,-3 rgb2cmyk.. a c
+        fi
+    endl done
+fi
+if $2==8 rep_form_pixel {$2-1},${4-5},{$6%},${7-10},$12%,0,{100%},$11
+elif $2==10 rep_form_pixel {$2-1},${4-5},{$6%},${7-10},${13-16}
+elif $2==20 rep_form_pixel {$2-1},${4-5},{$6%},${7-10},{$17}
+elif $2==23 rep_form_pixel {$2-1},${4-5},{$6%},${7-10},{$18}
+elif $2==24 rep_form_pixel {$2-1},${4-5},{$6%},${7-10},{$19},{$20%}
+else rep_form_pixel {$2-1},${4-5},{$6%},${7-10}
+fi
+if $1!=2&&$1!=0
+    repeat {!$2&&$!>1?$!-1:$!} l[{!$2&&$!>1?$>+1:$>}]
+        sh 0,2
+        if $1==1 ryb2rgb.
+        elif $1==3 hcy2rgb.
+        elif $1==4 hsi2rgb.
+        elif $1==5 hsl2rgb.
+        elif $1==6 hsv2rgb.
+        elif $1==7 lab2rgb.
+        elif $1==8 lch2rgb.
+        fi
+        rm.
+    endl done
+elif $1==2
+    repeat {!$2&&$!>1?$!-1:$!} l[{!$2&&$!>1?$>+1:$>}]
+        if s==4 cmyk2rgb
+        elif s==5 s c,-4 cmyk2rgb.. a c
+        fi
+    endl done
+fi
+if $3 rv fi
+gui_rep_form_pixel_preview:
+if $2 gui_split_preview "gui_rep_form_pixel $*",${-3--1}
+else gui_rep_form_pixel $* fi
+u "{$1}"\
+"{$2}"\
+"{$3}_"{!$2?2:0}\
+"{$4}"\
+"{$5}"\
+"{$6}"\
+"{$7}"\
+"{$8}"\
+"{$9}"\
+"{$10}"\
+"{$11}_"{$2==8?2:0}\
+"{$12}_"{$2==8?2:0}\
+"{$13}_"{$2==10?2:0}\
+"{$14}_"{$2==10?2:0}\
+"{$15}_"{$2==10?2:0}\
+"{$16}_"{$2==10?2:0}\
+"{$17}_"{$2==20?2:0}\
+"{$18}_"{$2==23?2:0}\
+"{$19}_"{$2==24?2:0}\
+"{$20}_"{$2==24?2:0}\
+"{$21}"\
+"{$22}"
 ######################
 
 # Local Variables:
