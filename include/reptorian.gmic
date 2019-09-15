@@ -44,6 +44,56 @@
 #
 #-------------------------------
 
+#@cli rep_gen_ncn:
+rep_gen_ncn: rep_generate_nonexistent_color_noise $*
+#@cli rep_generate_nonexistent_color_noise: _nonexistent_color_count>0,_alpha= { 0= none, 1= non-binary alpha, 2= binary }, \
+# _value_left_chan_1,_value_right_chan_1, \
+# _value_left_chan_2,_value_right_chan_2, \
+# _value_left_chan_3,_value_right_chan_3, \
+# _value_alpha
+#@cli: The purpose of this filter is to generate non-existent colors noise. It is used only for odd cases where it is necessary to find values that does not exist yet.
+#@cli: Default values: '_value_left_chan_1=0','_value_right_chan_1=255','_value_left_chan_2=0','_value_right_chan_2=255','_value_left_chan_3=0','_value_right_chan_3=255','_value_alpha=255'
+rep_generate_nonexistent_color_noise:
+skip ${3=0},${4=255},${5=0},${6=255},${7=0},${8=255},${9=255}
+if $#>9 v + error "Only 9 variables are accepted!" v - fi 
+repeat $! l[$>]
+    ww={w}
+    hh={h}
+    if w>1 s x fi if h>1 s y fi remove_duplicates a x
+    ww_t={w}
+    repeat=$1
+    if $repeat<=1 v + error "Repeat Value must be at least 2!" v - fi
+    repeat+=1
+    alpha=$2
+    if $alpha<0||$alpha>2 v + error "Alpha setting cannot be less than 0 or greater than 2" v - fi
+    rn=0
+    equality=0
+    if !$alpha to_rgb fi
+    do
+        do
+            chan_v1={round(u($3,$4))}
+            chan_v2={round(u($5,$6))}
+            chan_v3={round(u($7,$8))}
+            chan_v4={$2==2?round(u(0,1))*$9:round(u(0,$9))}
+            {w},{h},100%,100%,$alpha?[$chan_v1,$chan_v2,$chan_v3,$chan_v4]:[$chan_v1,$chan_v2,$chan_v3]
+            +eq
+            compose_channels. *
+            equality={iM#-1} rm. r. 1,1
+            if !$equality a x else rm. fi
+        while $equality
+        rn+=1
+    while $rn<$repeat
+    to_rgba
+    s x,-{$ww_t+1}
+    rm[0]
+    s x,-$ww
+    s. x,-{w-1}
+    a[^-1] y
+    hh={h#-2>$hh?h#-2:$hh}
+    r. {$ww},$hh,100%,100%,1
+    r.. {w#-1},{h#-1},100%,100%,0,0
+    rv blend alpha
+endl done
 #@cli rep_sdaxy: (eq. to rep_shift_angle_distance)
 rep_sdaxy: rep_shift_distance_angle_xy $*
 #@cli rep_shift_angle_distance_xy: _distance>0,0<=_angle<=360,0<=_boundary_conditions<=3,_interpolation={ 0=nearest_neighbor | 1=linear }
@@ -2549,6 +2599,11 @@ u "{$1}"\
 "{$20}_"{$2==24?2:0}\
 "{$21}"\
 "{$22}"
+#@gui Nonexistent Color Noise: rep_gen_ncn,rep_gen_ncn
+#@gui : note = note("<b>This is a computationally intensive filter, so preview may not always be observable!</b>\n\nThe reason for being computationally intensive is that it attempts to find duplicate colors within the entire images, and erase all duplicates.\n\n The purpose of this filter is to find colors that does not exist in the image and to create noises of colors that don't exist in the images."), sep = separator()
+#@gui : Number of non-existence color = int(300,2,1000)
+#@gui : Alpha Mode = choice(0,"3 Channels","Non-Binary Alpha Included","Binary Alpha Included")
+#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/9/14</i>.</small>")
 ######################
 
 # Local Variables:
