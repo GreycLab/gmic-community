@@ -44,6 +44,36 @@
 #
 #-------------------------------
 
+#@cli rep_isprime:
+#@cli: Checks if all values are prime number. The fill function rounds float number to nearest value.
+rep_isprime:
+f "isP=1;
+for(in=2,in<=int(round(abs(i)))/2,++in,isP=round(abs(i))%in==0?0:1;if(isP==0,break()));
+isP=round(abs(i))>1?isP:0;
+"
+#@cli rep_prime_surface: _width,_height,_negate= { 0=do_not_negate | 1=negate },_mirror
+#@cli: Creates a simple prime surface by combining rep_isprime and spiralbw. Due to the time-consuming nature, this command will only create a new prime surface once. 
+#@cli: Default values: '_width=last_image_width','_height=last_image_height'
+rep_prime_surface:
+skip ${1=w},${2=h},${3=1},${4=0}
+spiralbw {abs($1)},{abs($2)}
+if $3 negate. fi
+if abs($4)==1 mirror. x
+elif abs($4)==2 mirror. y
+fi
+rep_isprime.
+#@cli rep_ced8: (eq. to rep_color_existence_distribution_rgb8)
+rep_ced8: rep_color_existence_distribution_rgb8 $*
+#@cli rep_color_existence_distribution_rgb8: _bool_found= { 0=colour_nonexistence | colour_existence }
+#@cli: This cli command is used to find which colors exist within the color lookup table generated from 8-bit positive-only colors that ranges from 0-255. Millions of colors that does not exist within a image can be picked from a image generated with this command.
+rep_color_existence_distribution_rgb8:
+nk=$1
+nk_1={$nk?255:0}
+nk_2={$nk?0:255}
+repeat $! l[$>]
+    256,256,256 eval.. "++i(#-1,R,G,B)" k.
+    4096,4096,1,4,[x%256,y%256,floor(x/256)+(floor(y/256)*16),i(#-1,x%256,y%256,floor(x/256)+(floor(y/256)*16))?$nk_1:$nk_2] k.
+endl done
 #@cli rep_sdaxy: (eq. to rep_shift_angle_distance)
 rep_sdaxy: rep_shift_distance_angle_xy $*
 #@cli rep_shift_angle_distance_xy: _distance>0,0<=_angle<=360,0<=_boundary_conditions<=3,_interpolation={ 0=nearest_neighbor | 1=linear }
@@ -733,11 +763,11 @@ rm.
 a c
 if $axis>0
 s x
-repeat $! l[$>] r 1,{h+1},100%,100%,0,0,.5,1 autocrop_components ,,,, a y r 1,$ih,100%,100%,0,0,.5,{1-$shift_var} endl done
+repeat $! l[$>] r 1,{h+1},100%,100%,0,0,.5,1 autocrop_components 100,0 a y r 1,$ih,100%,100%,0,0,.5,{1-$shift_var} endl done
 a x
 else
 s y
-repeat $! l[$>] r {w+1},1,100%,100%,0,0,1,.5 autocrop_components ,,,, a x r $iw,1,100%,100%,0,0,$shift_var,.5 endl done
+repeat $! l[$>] r {w+1},1,100%,100%,0,0,1,.5 autocrop_components 100,0 a x r $iw,1,100%,100%,0,0,$shift_var,.5 endl done
 a y
 f "s==2?[i0,i1<0?0:i1]:(s==3?[i0,i1,i2<0?0:i2]:s==4?[i0,i1,i2,i3<0?0:i3]:s==5?[i0,i1,i2,i3,i4<0?0:i4])"
 fi
@@ -1201,7 +1231,7 @@ if $isnis if $sid>=0 sid=${"-arg "1+$sid"","australia,barbedwire,circle,crosshai
 isnum_sid={isnum($sid)}
 isint_sid={isint($sid)}
 isnis={$isnum_sid&&$isint_sid}
-img2var[0] shape_reference
++store[0] shape_reference
 if $isnis
     r[0] {ceil(w/abs($2))*abs($2)},{ceil(h/abs($3))*abs($3)},100%,100%,0,0,.5,.5
     r[^0] {ceil(w/abs($2))*abs($2)},{ceil(h/abs($3))*abs($3)},100%,100%,0,1,.5,.5
@@ -1209,8 +1239,8 @@ else
     r {ceil(w/abs($2))*abs($2)},{ceil(h/abs($3))*abs($3)},100%,100%,0,1,.5,.5
 fi
 if $isnis 
-    if $!>1 apply_parallel[^0] "var2img shape_reference rv _rep_form_pixel $*" 
-    else apply_parallel "var2img shape_reference rv _rep_form_pixel $*" 
+    if $!>1 apply_parallel[^0] "restore shape_reference rv _rep_form_pixel $*"
+    else apply_parallel "restore shape_reference rv _rep_form_pixel $*"
     fi
 else 
     apply_parallel "_rep_form_pixel $*" 
@@ -1252,9 +1282,8 @@ l[0]
         rv 
     fi 
 endl
-
-if $mi==1 mirror[0] x elif $mi==2 mirror[0] y fi
 if abs($ang)%360!=0 rotate[0] $ang,1 fi
+if $mi==1 mirror[0] x elif $mi==2 mirror[0] y fi
 n[0] 0,1
 if $isnis
     if s#0<=4&&s#0>1 l[0] s c,{if(s==4,-3,if(s==2,-1,-s))} if $!==2 to_gray.. *[-2,-1] else to_gray fi endl 
@@ -2549,6 +2578,11 @@ u "{$1}"\
 "{$20}_"{$2==24?2:0}\
 "{$21}"\
 "{$22}"
+#@gui Color Existence Distribution [RGB-8]: rep_color_existence_distribution_rgb8,rep_color_existence_distribution_rgb8
+#@gui : note = note("This filter is used to find colors that does or does not exist within a image.\n\n For <b>Paint.NET users</b>, please refer to this tutorial named <a href="https://forums.getpaint.net/topic/115124-finding-millions-of-colors-that-does-or-does-not-exist-gmic-qt-tutorial/?tab=comments#comment-562927">Finding millions of colors that does or does not exist - G'MIC QT Tutorial</a>")
+#@gui : sep = separator()
+#@gui : Search for existence of color? = bool(0)
+#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/9/15</i>.</small>")
 ######################
 
 # Local Variables:
