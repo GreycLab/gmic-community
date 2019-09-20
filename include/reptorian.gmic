@@ -44,6 +44,37 @@
 #
 #-------------------------------
 
+#@cli rep_regm: (eq. to rep_reverse_engineer_gradient_map)
+rep_regm: rep_reverse_engineer_gradient_map $*
+#@cli rep_reverse_engineer_gradient_map: _array_size>0
+#@cli: The array size is used to define the depth of gradient map, if you're using float, then you need to scale image to something higher than 256. The only instruction is to have two images of same width and height dimension with the first one being a grayscale image.
+#@cli: Default values: '_array_size=256'
+rep_reverse_engineer_gradient_map:
+skip ${1=256}
+if $!!=2 v + e "Only 2 images are acceptable!" v - fi
+if w#0!=w#1||h#0!=h#1 v + e "Dimensions do not match!" v - fi
+if s#0==3||s#0==4 if !{(i0==i1)&&(i1==i2)} rgb2hsl8.. channels.. 2 else to_gray.. fi #Lightness is at least continuous all-around within RGB model, hence why this is used.#
+elif s#0==5 s c.. -3 rm.. cmyk2rgb.. rgb2hsl8.. channels.. 2 #Extracting Lightness from CMYKA model#
+elif s#0==2||s#0>5 channels.. 0
+fi
+if im#-2<0 -.. {im#-2} fi
+f.. round(i)
+$1,1,1,{s#-1}
+eval ${-math_lib}"
+    const ar = $1 ;
+    for(v=0,v<ar,v++,
+            p=0;
+            for(xx=0,xx<w#0,xx++,
+                for(yy=0,yy<h#0,yy++,
+                    if(i(#0,xx,yy)==v,
+                        I(#2,v)+=I(#1,xx,yy);
+                        p+=1;
+                    );
+                );
+            );
+            if(p,I(#2,v)/=p);
+        );
+"
 #@cli rep_isprime:
 #@cli: Checks if all values are prime number. The fill function rounds float number to nearest value.
 rep_isprime:
@@ -2581,8 +2612,89 @@ u "{$1}"\
 #@gui Color Existence Distribution [RGB-8]: rep_color_existence_distribution_rgb8,rep_color_existence_distribution_rgb8
 #@gui : note = note("This filter is used to find colors that does or does not exist within a image.\n\n For <b>Paint.NET users</b>, please refer to this tutorial named <a href="https://forums.getpaint.net/topic/115124-finding-millions-of-colors-that-does-or-does-not-exist-gmic-qt-tutorial/?tab=comments#comment-562927">Finding millions of colors that does or does not exist - G'MIC QT Tutorial</a>")
 #@gui : sep = separator()
-#@gui : Search for existence of color? = bool(0)
-#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/9/15</i>.</small>")
+#@gui : Set of Color(s) = choice(1,"Nonexistent Colors","Existing Colors")
+#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/9/20</i>.</small>")
+#@gui Gradient Mapping Reverse Engineering : gui_rep_regm, gui_rep_regm_preview(0)
+#@gui : note=note("<b>Instruction:</b>\n\nFor <b>GIMP</b> and <b>Krita</b> Users: If you're not using Autocrop Components, you need to paste grayscale image for every first layer per 2 layer. <u>You must have a even amount of layers</u> when using <u>Per Two Layers</u> option.\n\nFor <b>Paint.NET Users</b>: It is recommended that you set autocrop components on for ease of usage with this filter, otherwise you would have to use Active and Below.\n\n<i>Warning!</i> Result will <u>not resize</u> in Paint.NET, so apply this filter into a image where both dimensions are bigger than 256!\n\nIn the case of using Active and Below: The Reverse Layer option is used to determine the result given by the preview, pick the one which leads into the reverse-engineered gradient."), sep=separator()
+#@gui : note = note("<b>Processing Setting</b>")
+#@gui : Background Color = color(0,0,0)
+#@gui : Layer Processing Mode = choice(0,"Per Two layers","Autocrop components","Split Width into 2","Split Height into 2")
+#@gui : Gradient Thickness = int(10,1,100)
+#@gui : Reverse Layers? = bool(0)
+#@gui : sep = separator(), note = note("<b>Preview Setting</b>")
+#@gui : Preview all gradient at once? = bool(1)
+#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/9/20</i>.</small>")
+gui_rep_regm:
+to_a
+ww={w}
+hh={h}
+portrait_mode={h>w}
+if $4==0
+    if $!%2 v + error "Odd number of layers are not accepted!" fi
+    repeat $!/2 l[{$>*2},{$>*2+1}]
+        if $6 rv fi
+        rep_regm 256
+        r. 256,$5,100%,100%,1
+        if $portrait_mode rotate. 90 fi
+        f.. x>(w#-1-1)||y>(h#-1-1)?[${1-3},255]:I#-1
+        rm.
+        if $6 rv fi
+    endl done
+    rv #To avoid layer ordering changes using All Layer as option!#
+else
+    repeat $! l[$>]
+        if $4==1
+            r {w+1},{h+1},100%,100%,0,0,1,1
+            autocrop_components 100,,1,1
+        elif $4==2
+            s x,2
+        elif $4==3
+            s y,2
+        fi
+        if $6 rv fi
+        rep_regm 256
+        r. 256,$5,100%,100%,1
+        if $portrait_mode rotate. 90 fi
+        r.. $ww,$hh,100%,100%,0,0,1,1
+        f.. x>(w#-1-1)||y>(h#-1-1)?[${1-3},255]:I#-1
+        k..
+        if $6 rv fi
+    endl done
+fi
+gui_rep_regm_preview:
+if $7
+    to_a
+    ww={w}
+    hh={h}
+    if $4==0
+        if $!%2 v + error "Odd number of layers are not accepted!" fi
+        repeat $!/2 l[{$>*2},{$>*2+1}]
+            if $6 rv fi
+            rep_regm 256
+            r. 256,$5,100%,100%,1
+            rm..
+        endl done
+        repeat $!/2 rm[$>] done a y       
+    else
+        repeat $! l[$>]
+            if $4==1
+                r {w+1},{h+1},100%,100%,0,0,1,1
+                autocrop_components 100,,1,1
+            elif $4==2
+                s x,2
+            elif $4==3
+                s y,2
+            fi
+            if $6 rv fi
+            rep_regm 256
+            r. 256,$5,100%,100%,1
+            k.
+        endl done
+        a y
+    fi
+else
+    gui_rep_regm ${1--2}
+fi
 ######################
 
 # Local Variables:
