@@ -107,7 +107,9 @@ repeat $! l[$>]
 endl done
 #@cli rep_sdaxy: (eq. to rep_shift_angle_distance)
 rep_sdaxy: rep_shift_distance_angle_xy $*
-#@cli rep_shift_angle_distance_xy: _distance>0,0<=_angle<=360,0<=_boundary_conditions<=3,_interpolation={ 0=nearest_neighbor | 1=linear }
+#@cli rep_shift_distance_angle_xy: _offset>0,_angle,_boundary_condition = { 0=None | 1=Neumann | 2=Periodic | 3=Mirror },_interpolation={ 0=nearest_neighbor | 1=linear }
+#@cli : Offset images at angle and distance.\n
+#@cli : _offset refers to the displacement of image.\n
 #@cli : Default value: 'boundary_conditions=3','interpolation=1'
 rep_shift_distance_angle_xy:
 skip ${3=3},${4=1}
@@ -118,13 +120,118 @@ DisY={sin($rad_ang)*$Dis}
 shift $DisX,$DisY,0,0,$3,$4
 #@cli rep_dupsdaxy: (eq. to rep_duplicate_by_shift_angle_distance_xy)
 rep_dupsdaxy: rep_duplicate_by_shift_distance_angle_xy $*
-#@cli rep_duplicate_by_shift_distance_angle_xy: keep_original={ 0 = remove_original | 1 = keep_original },_duplicates_count>=2,_distance>0,0<=_angle<=360,0<=_boundary_conditions<=3,_interpolation={ 0=nearest_neighbor | 1=linear }
-#@cli : Default value: 'keep_original=0','boundary_conditions=3','interpolation=1'
+#@cli rep_duplicate_by_shift_distance_angle_xy: duplicates_count>=2,_radius_offset>0,_offset_angle,_keep_original = { 0=remove_original | 1=keep_original },_boundary_condition = { 0=None | 1=Neumann | 2=Periodic | 3=Mirror },_interpolation={ 0=nearest_neighbor | 1=linear }
+#@cli : Creates copies of image at a distance from original point.\n
+#@cli : _radius_offset refers to the distance the duplicates are from the original image. Each circular duplicates are of the same distance. radius_offset can be in percentage form, or in integer form. When it is in percentage form, the length of each duplicates offset is equal to the percentage of hypotenuse of image.
+#@cli : _offset_angle refers to the starting angle the original duplicate is at. The primary duplicate starts from the right.\n
+#@cli : Default value: '_radius_offset={sqrt(w^2+h^2)*.05}','_offset_angle=0','_keep_original=0','_boundary_condition=0','_interpolation=1'
 rep_duplicate_by_shift_distance_angle_xy:
-skip ${1=0},${5=3},${6=1}
-if {$2<2} v + error "Invalid duplicate numbers!" fi
-aang={360/$2}
-repeat $2 +rep_sdaxy[0] $3,{$>*$aang+$4},$5,$6 done if {$1==0} rm[0] fi
+skip ${2={sqrt(w^2+h^2)*.05}},${3=0},${4=0},${5=1},${6=1}
+if {$1<2} v + error "Invalid duplicate numbers!" fi
+aang={360/$1}
+repeat $1 +rep_sdaxy[0] $2,{$>*$aang+$3},$5,$6 done if {$4==0} rm[0] fi
+#@cli rep_frblur: (eq. to rep_fragment_blur)
+rep_frblur: rep_fragment_blur $*
+#@cli rep_fragment_blur: duplicates_count>=2,_radius_offset>0,_offset_angle,_keep_original = { 0=remove_original | 1=keep_original },_boundary_condition = { 0=None | 1=Neumann | 2=Periodic | 3=Mirror },_interpolation={ 0=nearest_neighbor | 1=linear },_color_space = { 0=RGB | 1=SRGB | 2=RYB | 3=CMYK | 4=HCY | 5=HSI | 6=HSL | 7=HSV | 8=LAB | 9=LCH } 
+#@cli : Fragment Blur is a effect that originated from the Windows software named Paint.NET. Copies or "fragments" of images are superimposed over their respective images. Copies are redrawn at a distance, and starting copy starts from the right at 0. \n
+#@cli : _radius_offset refers to the distance the duplicates are from the original image. Each circular duplicates are of the same distance. radius_offset can be in percentage form, or in integer form. When it is in percentage form, the length of each duplicates offset is equal to the percentage of hypotenuse of image.
+#@cli : _offset_angle refers to the starting angle the original duplicate is at. The primary duplicate starts from the right.
+#@cli : _keep_original options is to keep the original image as a duplicate without offsetting it.\n
+#@cli : Default values: '_radius_offset=5%','_offset_angle=0','_keep_original=0','_boundary_condition=1','_interpolation=1','_color_space=0'
+rep_fragment_blur:
+skip ${2=5%},${3=0},${4=0},${5=1},${6=1},${7=0}
+repeat $! l[$>]
+    if ${is_percent\ $2} dist={abs($2)*(sqrt(w^2+h^2))} 
+    else dist=abs($2) fi
+    tcr=3
+    convert_back=0
+    if (s==3||s==4)&&$7
+        convert_back=1
+        if $7!=3 
+            sh 0,2
+            if $7==1 rgb2srgb.
+            elif $7==2 rgb2ryb.
+            elif $7==4 rgb2hcy.
+            elif $7==5 rgb2hsi.
+            elif $7==6 rgb2hsl.
+            elif $7==7 rgb2hsv.
+            elif $7==8 rgb2lab.
+            elif $7==9 rgb2lch.
+            elif $7>9 v + error "Color Space ID not found!" v -
+            fi
+            rm.
+        else
+            if s==3 tcr+=1 rgb2cmyk
+            elif s==4 s c,-3 rgb2cmyk.. a c
+            fi
+        fi
+    fi
+    if !(s==1||s==$tcr)
+        sh {s-1}
+        vv={iv#-1}
+        rm.
+        if $vv
+            rep_frblur_1 $1,$dist,${3-6}
+        else
+            sh 0,{s-2}
+            rep_frblur_2. $1,$dist,${3-6}
+            rm.
+        fi
+    else 
+        rep_frblur_2 $1,$dist,${3-6}
+    fi
+    if $convert_back
+        if $7!=3
+            sh 0,2
+            if $7==1 srgb2rgb.
+            elif $7==2 ryb2rgb.
+            elif $7==4 hcy2rgb.
+            elif $7==5 hsi2rgb.
+            elif $7==6 hsl2rgb.
+            elif $7==7 hsv2rgb.
+            elif $7==8 lab2rgb.
+            elif $7==9 lch2rgb.
+            elif $7>9 v + error "Color Space ID not found!" v -
+            fi
+            rm.
+        else
+            if s==4 cmyk2rgb
+            elif s==5 s c,-4 cmyk2rgb.. a c
+            fi
+        fi
+    fi
+endl done
+rep_frblur_1:
+skip ${2={sqrt(w^2+h^2)*.05}},${3=0},${4=0},${5=1},${6=1}
+sh {s-1}
+mina={im#-1}
+vr={iv#-1}
+maxa={iM#-1}
+rm.
+if $mina<=0 
+    if ($vr==0)&&($mina==0)
+        v + error "Cannot be used on empty alpha!" v -
+    elif $mina<0
+        v + error "Last channel is cannot contain values less than zero!" v - 
+    fi
+fi
+f i{s-1}?i:0
++channels {s-1}
+f. i?1
+a c
+rep_dupsdaxy $1,$2,$3,$4,{abs($5)},$6
+add
+s c,-{s-1}
+sh[0] 0,{s#0-2}
+sh[0] {s}
+f.. i/(i0#1?i0#1:1)
+f. i/iM*$maxa
+rm[1-3]
+rep_frblur_2:
+skip ${2={sqrt(w^2+h^2)*.05}},${3=0},${4=0},${5=1},${6=1}
+rep_dupsdaxy $1,$2,$3,$4,{$5!=0?abs($5):1},$6
+ti=$!
+add / $ti
 #@cli rep_ncee: _distance>0,0<=_angle<=360,0<=_boundary_conditions<=3,_interpolation={ 0=nearest_neighbor | 1=linear },_contrast>=0,_process_alpha={ 0=do_not_process_alpha | 1=process_alpha },_color_space,_blend_mode,0<=_blend_opacity[%]<=1
 #@cli : Default value: 'boundary_conditions=3','interpolation=1','contrast=1','process_alpha=1','color_space=0','blend_mode=1','blend_opacity=100%'
 rep_ncee:
@@ -146,7 +253,7 @@ elif {$7==10} rgb2yuv8
 elif {$7==11} rgb2xyz8
 fi
 [0] l[1]
-rep_dupsdaxy 0,2,$1,$2,$3,$4 tci={$!} f. "255-i"  add / $tci - 127.5 * {2*$5} + 127.5 cut 0,255
+rep_dupsdaxy 2,$1,$2,0,$3,$4 tci={$!} f. "255-i"  add / $tci - 127.5 * {2*$5} + 127.5 cut 0,255
 endl
 if {$7!=3}
 blend ${_mode{$8+1}},$9
@@ -168,70 +275,6 @@ endl
 l[1]
 if $6 rep_dupsdaxy 0,2,$1,$2,$3,$4 tai={$!} add / $tai fi
 endl a c
-#@cli rep_frblur : (eq. to rep_fragment_blur)
-rep_frblur : rep_fragment_blur $*
-#@cli rep_fragment_blur: color_space,keep_original={ 0 = remove_original | 1 = keep_original },_duplicates_count>=2,_distance>0,0<=_angle<=360,0<=_boundary_conditions<=3,_interpolation={ 0=nearest_neighbor | 1=linear }
-#@cli : Default value: 'keep_original=0','boundary_conditions=3','interpolation=1'
-rep_fragment_blur:
-Op_F=$1
-Op_SIO=$2
-Op_D=$3
-Op_Di={$4/100}
-Op_A=$5
-Op_B={$6+1}
-Op_I=$7
-
-repeat $! l[$>]
-iw={w}
-ih={h}
-hypo={sqrt($iw*$iw+$ih*$ih)}
-Op_NDi={($Op_Di*$hypo)/4}
-
-to_a
-
-split_opacity .
-
-l[0-1]
-
-if {$Op_F==1} rgb2ryb..
-elif {$Op_F==2} rgb2cmyk..
-elif {$Op_F==3} rgb2hsi8..
-elif {$Op_F==4} rgb2hsl8..
-elif {$Op_F==5} rgb2hsv8..
-elif {$Op_F==6} rgb2lab8..
-elif {$Op_F==7} rgb2lch8..
-fi
-
-/. {$Op_SIO+$Op_D} rv +f "0" rv
-
-
-a[0,1] c
-a[1,2] c
-
-rep_dupsdaxy[1] $Op_SIO,$Op_D,$Op_NDi,$Op_A,$Op_B,$Op_I
-
-ti=$!
-
-rv
-repeat {$ti-1} l[0,1] / 255 is={s} l[1] s c a[0-{$!-2}] c endl l[0] s c a[0-{$!-2}] c endl repeat 2 l[{$>*2+1}] repeat {$is-2} . done a c endl done f[2] "srcC=i#2;srcA=i#3;dstC=i#0;dstA=i#1;outA=srcA+dstA*(1-srcA);(!outA==0)?(srcC*srcA+dstC*dstA*(1-srcA))/outA:0" f[3] "srcA=i#3;dstA=i#1;srcA+dstA*(1-srcA)" to_gray[3] a[2,3] c k[2] * 255 endl
-done
-
-if {$Op_F==1} split_opacity ryb2rgb.. a c
-elif {$Op_F==2} s c a[0-3] c  cmyk2rgb.. a c
-elif {$Op_F==3} split_opacity hsi82rgb.. a c
-elif {$Op_F==4} split_opacity hsl82rgb.. a c
-elif {$Op_F==5} split_opacity hsv82rgb.. a c
-elif {$Op_F==6} split_opacity lab82rgb.. a c
-elif {$Op_F==7} split_opacity lch82rgb.. a c
-fi
-
-endl
-
-l[1] rep_dupsdaxy $Op_SIO,$Op_D,$Op_NDi,$Op_A,$Op_B,$Op_I tai=$! add / $tai endl
-
-split_opacity..
-a[0,2] c k..
-endl done
 #@cli pal :
 #@cli : Creates pre-made user-made palette or palette that are based off older system.
 pal:
@@ -2028,18 +2071,20 @@ fx_ncee:
 repeat $! l[$>] rep_ncee $3,$2,$5,$6,{$4/100},$7,$1,$8,{$9/100} endl done
 fx_ncee_preview:
 gui_split_preview "fx_ncee $*",${-3--1}
-#@gui Fragment Blur: rep_frblur,rep_frblur_preview(0)
-#@gui : note = note("Inspired by the Paint.NET Fragment Blur filter, this implementation improves upon it by adding color space options, preservation of original image as a option, boundary condition option, and interpolation option."), sep = separator()
-#@gui : Color Space = choice(0,"RGB","RYB","CMYK","HSI","HSL","HSV","LAB","LCH")
+#@gui Fragment Blur : gui_rep_frblur,gui_rep_frblur_preview(0)
+#@gui : note = note("Inspired by the Paint.NET Fragment Blur filter, this implementation improves upon it by adding color space options, preservation of original image as a option, boundary condition option, and interpolation option.\n\n<b>Warning -</b> Preview may not be accurate with image with completely opaque images. The output will not show any transparency regardless."), sep = separator(), note = note("<b>Main Setting</b>")
+#@gui : Color Space = choice(0,"RGB","sRGB","RYB","CMYK","HCY","HSI","HSL","HSV","LAB","LCH")
+#@gui : Additional Duplicates Count = int(10,2,100)
+#@gui : Percent of image hypotenuse (%) = float(5,0,100)
+#@gui : Angle = float(0,-180,180)
 #@gui : Superimpose with Original? = bool(0)
-#@gui : Additional Duplicates Count = int(10,2,200)
-#@gui : Distance (%) = float(50,0,100)
-#@gui : Angle = float(0,0,360)
-#@gui : Boundary = choice(2,"Neumann","Periodic","Mirror")
-#@gui : Shift Linear Interpolation? = bool(0)
-#@gui :  sep = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2019/4/26</i>.</small>")
-rep_frblur_preview:
-rep_frblur $*
+#@gui : sep = separator(), note = note("<b>Secondary Setting</b>")
+#@gui : Boundary = choice(1,"None","Neumann","Periodic","Mirror")
+#@gui : Shift Linear Interpolation?  = bool(0)
+#@gui :  sep  = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2019/9/26</i>.</small>")
+gui_rep_frblur: rep_frblur $2,$3%,$4,$5,$6,$7,$1
+gui_rep_frblur_preview: gui_split_preview "gui_rep_frblur $*",${-3--1}
 #@gui Nebulous : fx_rep_nebulous,fx_rep_nebulous_preview
 #@gui : note = note("Based off <a href="https://forums.getpaint.net/topic/111774-nebulous-texture-update-ymd20170922/?tab=comments#comment-535865">MadJik's PDN Nebulous plugin</a>. This G'MIC version allows you to manipulate the result by angle within the main surface and the distortion surface, and allows you to shift the positioning of the Nebulous surface. Furthermore, the G'MIC version of Nebulous doesn't use integer on the output of surface."), sep = separator()
 #@gui : note = note("<b>Surface Theme</b>"), Colour Space Mode = choice (0,"RGB8","RYB8","HSI8","HSL8","HSV8","LAB8","LCH8","YIQ8","YUV8","XYZ8"), sep = separator()
