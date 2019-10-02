@@ -44,6 +44,69 @@
 #
 #-------------------------------
 
+#@cli rep_acb: (eq. to rep_autofill_coloring_book)
+rep_acb: rep_autofill_coloring_book $*
+#@cli rep_autofill_coloring_book: 0<threshold<1,_dilate_erode>=0,_color_mode={ 0=hard | 1= soft },0<=_alpha_threshold<1,_seed
+#@cli : rep_autofill_coloring_book is used for automatically coloring pictures with lines.\n
+#@cli : _threshold defines the value that is to be split into binary values. If it over _threshold, then it becomes 1.
+#@cli : _dilate_erode defines the increase/decrease in line. Values over 0 implies increase in thickness while values less than 1 implies decrease in thickness.
+#@cli : _color_mode defines whether the black line is going to be black or smooth.
+#@cli : _alpha threshold defines the value of alpha to be cutoff by percentage
+#@cli : _seed can be seen as premade random result.\n
+#@cli : Default values: '_threshold=128','_dilate_erode=0','_color_mode=1','_alpha_threshold=0','_seed='
+rep_autofill_coloring_book:
+skip ${2=0},${3=1},${4=0},${5=}
+if narg($5) srand $5 fi
+repeat $! l[$>]
+    sh 0,2
+    if s#0==4 sh.. {s} vv={iv#-1} fi
+    rep_acb_color[1] ${1-3}
+    if s#0==4 
+        if ($4>0&&$4<1)&&$vv f. i>(iM*$4)?255:0 fi 
+    fi
+    k[0]
+endl done
+rep_acb_color:
+if $1<=0 v + error "threshold must be greater than 0" v - fi
+if $1>=1 v + error "threshold must be less than 1" v - fi
+to_gray n 0,1
+if !iv#-1 v + error "Invalid Image!" v - fi
+if $3 +store line fi
+f i>=$1?1:0
+if abs($2) 
+    if $2<0 dilate {abs($2)}
+    else erode {abs($2)}
+fi fi
+label_fg 0,1
+cv={iM}
+min_t=1
+max_t={round(16777215/$cv)}
+nt={$min_t}
+ntt={$max_t}
+1
+repeat $cv
+    1,1,1,1,round(u($nt,$ntt))
+    nt={iM#-1+1}
+    ntt={$nt+$max_t}
+    a[-2,-1] x
+done
+repeat $cv
+    temp_1={i(round(u(1,$cv)))}
+    temp_2={i(round(u(1,$cv)))}
+    if $temp_1!=$temp_2 
+        f. i==$temp_1?$temp_2:(i==$temp_2?$temp_1:i)
+    fi
+done
+{w},1,1,3,[i0#-1%256,floor(i0#-1/256)%256,floor(i0#-1/(256^2))]
+map... . rm[-2,-1]
+if $3
+    +select_color 0,0,0
+    inpaint_pde [1],0,0,0
+    rm.
+    restore line
+    f.. i*i0#-1
+    rm.
+fi
 #@cli rep_regm: (eq. to rep_reverse_engineer_gradient_map)
 rep_regm: rep_reverse_engineer_gradient_map $*
 #@cli rep_reverse_engineer_gradient_map: _array_size>0
@@ -2767,6 +2830,19 @@ if $7
 else
     gui_rep_regm ${1--2}
 fi
+#@gui Autofill Coloring Book : gui_rep_acb,gui_rep_acb_preview(0)
+#@gui : note = note("This filter is specifically designed to autofill areas with random colors that only repeat once.\n\n<b>Don't trust the preview for colors, test the result first!</b>")
+#@gui : sep = separator()
+#@gui : Line Threshold = int(180,1,254)
+#@gui : Dilate/Erode = int(0,-3,3)
+#@gui : Line Mode = choice(1,"Hard","Soft")
+#@gui : Alpha Threshold = int(0,0,254)
+#@gui : Coloring Seed = int(250000,0,500000)
+#@gui :   sep   = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui :   sep   = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/6/4</i>.</small>")
+gui_rep_acb: rep_acb {$1/255},$2,$3,{$4/255},$5
+gui_rep_acb_preview:
+gui_split_preview "gui_rep_acb $*",${-3--1}
 ######################
 
 # Local Variables:
