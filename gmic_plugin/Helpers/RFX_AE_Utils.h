@@ -2,8 +2,8 @@
  #
  #  File        : RFX_AE_Utils.h
  #
- #  Description : A self-contained header file with helper functions to make    
- #                using the Adobe After Effects SDK a bit easier to use    
+ #  Description : A self-contained header file with helper functions to make
+ #                using the Adobe After Effects SDK a bit easier to use
  #
  #  Copyright   : Tobias Fleischer / reduxFX Productions (http://www.reduxfx.com)
  #
@@ -12,17 +12,17 @@
  #
  #                    CeCILL-C
  #                    The CeCILL-C license is close to the GNU LGPL.
- #                    ( http://www.cecill.info/licences/Licence_CeCILL-C_V1-en.html )
+ #                    ( http://cecill.info/licences/Licence_CeCILL-C_V1-en.html )
  #
  #                or  CeCILL v2.0
  #                    The CeCILL license is compatible with the GNU GPL.
- #                    ( http://www.cecill.info/licences/Licence_CeCILL_V2-en.html )
+ #                    ( http://cecill.info/licences/Licence_CeCILL_V2-en.html )
  #
  #  This software is governed either by the CeCILL or the CeCILL-C license
  #  under French law and abiding by the rules of distribution of free software.
  #  You can  use, modify and or redistribute the software under the terms of
  #  the CeCILL or CeCILL-C licenses as circulated by CEA, CNRS and INRIA
- #  at the following URL: "http://www.cecill.info".
+ #  at the following URL: "http://cecill.info".
  #
  #  As a counterpart to the access to the source code and  rights to copy,
  #  modify and redistribute granted by the license, users are provided only
@@ -110,7 +110,7 @@ struct ContextData
 
 struct WorldData
 {
-	PF_EffectWorld* srcWorld[MAX_NOF_LAYERS]; 
+	PF_EffectWorld* srcWorld[MAX_NOF_LAYERS];
 };
 
 struct PreRenderData
@@ -192,10 +192,10 @@ static void runScript(PF_InData *in_data, string script, string& result)
 {
 	if (in_data->appl_id == 'PrMr') return;
 	PF_Err err = PF_Err_NONE;
-	AEGP_SuiteHandler suites(in_data->pica_basicP);		
+	AEGP_SuiteHandler suites(in_data->pica_basicP);
 	AEGP_MemHandle resultMemH = NULL;
 	char* prompt = new char[16384];
-	memset(prompt, 0, 16384);	
+	memset(prompt, 0, 16384);
 	if (script.length() > 16380) script[16381] = '\0';
 	strcat(prompt, script.c_str());
 	A_char *resultAC = NULL;
@@ -222,7 +222,7 @@ static string cmd2str(int cmd)
 {
 	_cmd(PF_Cmd_ABOUT)
 	_cmd(PF_Cmd_GLOBAL_SETUP)
-	_cmd(PF_Cmd_UNUSED_0)			
+	_cmd(PF_Cmd_UNUSED_0)
 	_cmd(PF_Cmd_GLOBAL_SETDOWN)
 	_cmd(PF_Cmd_PARAMS_SETUP)
 	_cmd(PF_Cmd_SEQUENCE_SETUP)
@@ -251,24 +251,24 @@ static string cmd2str(int cmd)
 }
 
 inline PF_PixelFloat* getPixel(PF_EffectWorld* inputP, const A_long x, const A_long y)
-{ 
-	return (PF_PixelFloat*)((char*)inputP->data + (y * inputP->rowbytes) + x * sizeof(PF_PixelFloat)); 
+{
+	return (PF_PixelFloat*)((char*)inputP->data + (y * inputP->rowbytes) + x * sizeof(PF_PixelFloat));
 };
 
 inline void setPixel(PF_EffectWorld* inputP, const A_long x, const A_long y, const PF_PixelFloat* col)
-{ 
+{
 	*((PF_PixelFloat*)((char*)inputP->data + (y * inputP->rowbytes) + x * sizeof(PF_PixelFloat))) = *col;
 };
 
 inline PF_PixelFloat* getPixelSafe(PF_EffectWorld* inputP, A_long x, A_long y)
-{ 
+{
 	if (x < 0) x = 0; else if (x >= inputP->width) x = inputP->width;
 	if (y < 0) y = 0; else if (y >= inputP->height) y = inputP->height;
-	return (PF_PixelFloat*)((char*)inputP->data + (y * inputP->rowbytes) + x * sizeof(PF_PixelFloat)); 
+	return (PF_PixelFloat*)((char*)inputP->data + (y * inputP->rowbytes) + x * sizeof(PF_PixelFloat));
 };
 
 inline void setPixelSafe(PF_EffectWorld* inputP, A_long x, A_long y, const PF_PixelFloat* col)
-{ 
+{
 	if (x < 0) x = 0; else if (x >= inputP->width) x = inputP->width;
 	if (y < 0) y = 0; else if (y >= inputP->height) y = inputP->height;
 	*((PF_PixelFloat*)((char*)inputP->data + (y * inputP->rowbytes) + x * sizeof(PF_PixelFloat))) = *col;
@@ -322,7 +322,7 @@ static PF_Err it_Convert_ARGB16_to_RGBA8(void* refconPV, A_long thread_indexL, A
 	IterateData* i_data = (IterateData*)refconPV;
 	if (thread_indexL == 0) err = PF_ABORT(i_data->in_data);
 
-	A_u_short* in_pix = (A_u_short*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes)); 
+	A_u_short* in_pix = (A_u_short*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes));
 #ifdef PLANAR_BUFFER
 	A_u_char* out_pixR = (A_u_char*)((char*)i_data->outWorld->data + sizeof(A_u_char) * i_data->outWorld->width * (i + i_data->outWorld->height * 0));
 	A_u_char* out_pixG = (A_u_char*)((char*)i_data->outWorld->data + sizeof(A_u_char) * i_data->outWorld->width * (i + i_data->outWorld->height * 1));
@@ -350,7 +350,7 @@ static PF_Err it_Convert_ARGB32_to_RGBA8(void* refconPV, A_long thread_indexL, A
 	IterateData* i_data = (IterateData*)refconPV;
 	if (thread_indexL == 0) err = PF_ABORT(i_data->in_data);
 
-	float* in_pix = (float*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes)); 
+	float* in_pix = (float*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes));
 #ifdef PLANAR_BUFFER
 	A_u_char* out_pixR = (A_u_char*)((char*)i_data->outWorld->data + sizeof(A_u_char) * i_data->outWorld->width * (i + i_data->outWorld->height * 0));
 	A_u_char* out_pixG = (A_u_char*)((char*)i_data->outWorld->data + sizeof(A_u_char) * i_data->outWorld->width * (i + i_data->outWorld->height * 1));
@@ -406,7 +406,7 @@ static PF_Err it_Convert_BGRA32_to_RGBA8(void* refconPV, A_long thread_indexL, A
 	IterateData* i_data = (IterateData*)refconPV;
 	if (thread_indexL == 0) err = PF_ABORT(i_data->in_data);
 
-	float* in_pix = (float*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes)); 
+	float* in_pix = (float*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes));
 #ifdef PLANAR_BUFFER
 	A_u_char* out_pixR = (A_u_char*)((char*)i_data->outWorld->data + sizeof(A_u_char) * i_data->outWorld->width * (i + i_data->outWorld->height * 0));
 	A_u_char* out_pixG = (A_u_char*)((char*)i_data->outWorld->data + sizeof(A_u_char) * i_data->outWorld->width * (i + i_data->outWorld->height * 1));
@@ -434,7 +434,7 @@ static PF_Err it_Convert_ARGB8_to_RGBA32(void* refconPV, A_long thread_indexL, A
 	IterateData* i_data = (IterateData*)refconPV;
 	if (thread_indexL == 0) err = PF_ABORT(i_data->in_data);
 
-	A_u_char* in_pix = (A_u_char*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes)); 
+	A_u_char* in_pix = (A_u_char*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes));
 #ifdef PLANAR_BUFFER
 	float* out_pixR = (float*)((char*)i_data->outWorld->data + sizeof(float) * i_data->outWorld->width * (i + i_data->outWorld->height * 0));
 	float* out_pixG = (float*)((char*)i_data->outWorld->data + sizeof(float) * i_data->outWorld->width * (i + i_data->outWorld->height * 1));
@@ -462,7 +462,7 @@ static PF_Err it_Convert_ARGB16_to_RGBA32(void* refconPV, A_long thread_indexL, 
 	IterateData* i_data = (IterateData*)refconPV;
 	if (thread_indexL == 0) err = PF_ABORT(i_data->in_data);
 
-	A_u_short* in_pix = (A_u_short*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes)); 
+	A_u_short* in_pix = (A_u_short*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes));
 #ifdef PLANAR_BUFFER
 	float* out_pixR = (float*)((char*)i_data->outWorld->data + sizeof(float) * i_data->outWorld->width * (i + i_data->outWorld->height * 0));
 	float* out_pixG = (float*)((char*)i_data->outWorld->data + sizeof(float) * i_data->outWorld->width * (i + i_data->outWorld->height * 1));
@@ -490,7 +490,7 @@ static PF_Err it_Convert_ARGB32_to_RGBA32(void* refconPV, A_long thread_indexL, 
 	IterateData* i_data = (IterateData*)refconPV;
 	if (thread_indexL == 0) err = PF_ABORT(i_data->in_data);
 
-	float* in_pix = (float*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes)); 
+	float* in_pix = (float*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes));
 #ifdef PLANAR_BUFFER
 	float* out_pixR = (float*)((char*)i_data->outWorld->data + sizeof(float) * i_data->outWorld->width * (i + i_data->outWorld->height * 0));
 	float* out_pixG = (float*)((char*)i_data->outWorld->data + sizeof(float) * i_data->outWorld->width * (i + i_data->outWorld->height * 1));
@@ -518,7 +518,7 @@ static PF_Err it_Convert_BGRA8_to_RGBA32(void* refconPV, A_long thread_indexL, A
 	IterateData* i_data = (IterateData*)refconPV;
 	if (thread_indexL == 0) err = PF_ABORT(i_data->in_data);
 
-	A_u_char* in_pix = (A_u_char*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes)); 
+	A_u_char* in_pix = (A_u_char*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes));
 #ifdef PLANAR_BUFFER
 	float* out_pixR = (float*)((char*)i_data->outWorld->data + sizeof(float) * i_data->outWorld->width * (i + i_data->outWorld->height * 0));
 	float* out_pixG = (float*)((char*)i_data->outWorld->data + sizeof(float) * i_data->outWorld->width * (i + i_data->outWorld->height * 1));
@@ -546,7 +546,7 @@ static PF_Err it_Convert_BGRA32_to_RGBA32(void* refconPV, A_long thread_indexL, 
 	IterateData* i_data = (IterateData*)refconPV;
 	if (thread_indexL == 0) err = PF_ABORT(i_data->in_data);
 
-	float* in_pix = (float*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes)); 
+	float* in_pix = (float*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes));
 #ifdef PLANAR_BUFFER
 	float* out_pixR = (float*)((char*)i_data->outWorld->data + sizeof(float) * i_data->outWorld->width * (i + i_data->outWorld->height * 0));
 	float* out_pixG = (float*)((char*)i_data->outWorld->data + sizeof(float) * i_data->outWorld->width * (i + i_data->outWorld->height * 1));
@@ -602,7 +602,7 @@ static PF_Err it_Convert_RGBA8_to_ARGB16(void* refconPV, A_long thread_indexL, A
 	IterateData* i_data = (IterateData*)refconPV;
 	if (thread_indexL == 0) err = PF_ABORT(i_data->in_data);
 
-	A_u_char* in_pix = (A_u_char*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes)); 
+	A_u_char* in_pix = (A_u_char*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes));
 #ifdef PLANAR_BUFFER
 	A_u_short* out_pixR = (A_u_short*)((char*)i_data->outWorld->data + sizeof(A_u_short) * i_data->outWorld->width * (i + i_data->outWorld->height * 0));
 	A_u_short* out_pixG = (A_u_short*)((char*)i_data->outWorld->data + sizeof(A_u_short) * i_data->outWorld->width * (i + i_data->outWorld->height * 1));
@@ -630,7 +630,7 @@ static PF_Err it_Convert_RGBA8_to_ARGB32(void* refconPV, A_long thread_indexL, A
 	IterateData* i_data = (IterateData*)refconPV;
 	if (thread_indexL == 0) err = PF_ABORT(i_data->in_data);
 
-	A_u_char* in_pix = (A_u_char*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes)); 
+	A_u_char* in_pix = (A_u_char*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes));
 #ifdef PLANAR_BUFFER
 	float* out_pixR = (float*)((char*)i_data->outWorld->data + sizeof(float) * i_data->outWorld->width * (i + i_data->outWorld->height * 0));
 	float* out_pixG = (float*)((char*)i_data->outWorld->data + sizeof(float) * i_data->outWorld->width * (i + i_data->outWorld->height * 1));
@@ -686,7 +686,7 @@ static PF_Err it_Convert_RGBA8_to_BGRA32(void* refconPV, A_long thread_indexL, A
 	IterateData* i_data = (IterateData*)refconPV;
 	if (thread_indexL == 0) err = PF_ABORT(i_data->in_data);
 
-	A_u_char* in_pix = (A_u_char*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes)); 
+	A_u_char* in_pix = (A_u_char*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes));
 #ifdef PLANAR_BUFFER
 	float* out_pixR = (float*)((char*)i_data->outWorld->data + sizeof(float) * i_data->outWorld->width * (i + i_data->outWorld->height * 0));
 	float* out_pixG = (float*)((char*)i_data->outWorld->data + sizeof(float) * i_data->outWorld->width * (i + i_data->outWorld->height * 1));
@@ -721,7 +721,7 @@ static PF_Err it_Convert_RGBA32_to_ARGB8(void* refconPV, A_long thread_indexL, A
 	float* in_pixB = (float*)((char*)i_data->inWorld->data + sizeof(float) * i_data->inWorld->width * (i + i_data->inWorld->height * 2));
 	float* in_pixA = (float*)((char*)i_data->inWorld->data + sizeof(float) * i_data->inWorld->width * (i + i_data->inWorld->height * 3));
 #else
-	float* in_pixR = (float*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes)); 
+	float* in_pixR = (float*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes));
 	float* in_pixG = in_pixR + 1;
 	float* in_pixB = in_pixR + 2;
 	float* in_pixA = in_pixR + 3;
@@ -751,7 +751,7 @@ static PF_Err it_Convert_RGBA32_to_ARGB16(void* refconPV, A_long thread_indexL, 
 	float* in_pixB = (float*)((char*)i_data->inWorld->data + sizeof(float) * i_data->inWorld->width * (i + i_data->inWorld->height * 2));
 	float* in_pixA = (float*)((char*)i_data->inWorld->data + sizeof(float) * i_data->inWorld->width * (i + i_data->inWorld->height * 3));
 #else
-	float* in_pixR = (float*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes)); 
+	float* in_pixR = (float*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes));
 	float* in_pixG = in_pixR + 1;
 	float* in_pixB = in_pixR + 2;
 	float* in_pixA = in_pixR + 3;
@@ -781,7 +781,7 @@ static PF_Err it_Convert_RGBA32_to_ARGB32(void* refconPV, A_long thread_indexL, 
 	float* in_pixB = (float*)((char*)i_data->inWorld->data + sizeof(float) * i_data->inWorld->width * (i + i_data->inWorld->height * 2));
 	float* in_pixA = (float*)((char*)i_data->inWorld->data + sizeof(float) * i_data->inWorld->width * (i + i_data->inWorld->height * 3));
 #else
-	float* in_pixR = (float*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes)); 
+	float* in_pixR = (float*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes));
 	float* in_pixG = in_pixR + 1;
 	float* in_pixB = in_pixR + 2;
 	float* in_pixA = in_pixR + 3;
@@ -811,7 +811,7 @@ static PF_Err it_Convert_RGBA32_to_BGRA8(void* refconPV, A_long thread_indexL, A
 	float* in_pixB = (float*)((char*)i_data->inWorld->data + sizeof(float) * i_data->inWorld->width * (i + i_data->inWorld->height * 2));
 	float* in_pixA = (float*)((char*)i_data->inWorld->data + sizeof(float) * i_data->inWorld->width * (i + i_data->inWorld->height * 3));
 #else
-	float* in_pixR = (float*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes)); 
+	float* in_pixR = (float*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes));
 	float* in_pixG = in_pixR + 1;
 	float* in_pixB = in_pixR + 2;
 	float* in_pixA = in_pixR + 3;
@@ -841,7 +841,7 @@ static PF_Err it_Convert_RGBA32_to_BGRA32(void* refconPV, A_long thread_indexL, 
 	float* in_pixB = (float*)((char*)i_data->inWorld->data + sizeof(float) * i_data->inWorld->width * (i + i_data->inWorld->height * 2));
 	float* in_pixA = (float*)((char*)i_data->inWorld->data + sizeof(float) * i_data->inWorld->width * (i + i_data->inWorld->height * 3));
 #else
-	float* in_pixR = (float*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes)); 
+	float* in_pixR = (float*)((char*)i_data->inWorld->data + (i * i_data->inWorld->rowbytes));
 	float* in_pixG = in_pixR + 1;
 	float* in_pixB = in_pixR + 2;
 	float* in_pixA = in_pixR + 3;
@@ -861,7 +861,7 @@ static PF_Err it_Convert_RGBA32_to_BGRA32(void* refconPV, A_long thread_indexL, 
 // two functions to get Premiere to run functions multi-threaded, as it does NOT support PF_Iterate8Suite1->iterate_generic!
 typedef PF_Err (*GenericIterator)(void* refconPV, A_long thread_indexL, A_long i, A_long iterationsL);
 
-typedef struct { 
+typedef struct {
 	PF_InData* in_data;
 	GenericIterator fn_func;
 	AE_REFCON refconPV;
@@ -961,7 +961,7 @@ static PF_Err sequenceFlatten(PF_InData* in_data, PF_OutData* out_data, PF_Param
 	if (in_data->sequence_data) {
 		SequenceData* unflatSequenceDataP = reinterpret_cast<SequenceData*>(DH(in_data->sequence_data));
 		if (unflatSequenceDataP && !unflatSequenceDataP->isFlat) {
-			
+
 			SequenceData* flatSequenceDataP = NULL;
 			int flatSize = sizeof(SequenceData);
 
@@ -1027,9 +1027,9 @@ static PF_Err sequenceResetup(PF_InData* in_data, PF_OutData* out_data, PF_Param
 	PF_Err err = PF_Err_NONE;
 	AEGP_SuiteHandler suites(in_data->pica_basicP);
 	// We got here because we're either opening a project w/saved (flat) sequence data,
-	// or we've just been asked to flatten our sequence data (for a save) and now 
+	// or we've just been asked to flatten our sequence data (for a save) and now
 	// we're blowing it back up.
-	
+
 	if (in_data->sequence_data) {
 		SequenceData* flatSequenceDataP = reinterpret_cast<SequenceData*>(DH(in_data->sequence_data));
 		if (flatSequenceDataP && flatSequenceDataP->isFlat) {
@@ -1215,7 +1215,7 @@ static PF_Err showAboutDialog(PF_InData* in_data, PF_OutData* out_data, PF_Param
 	PF_Err err = PF_Err_NONE;
 	GlobalData* globalDataP = ((AE_GlobalData*)PF_LOCK_HANDLE(in_data->global_data))->globalDataP;
 	string txt = globalDataP->pluginInfo.description;
-	
+
 //	strToAscii(txt);
 	strReplace(txt, "  ", "\\r");
 	txt = strRemoveXmlTags(txt, true);
@@ -1246,7 +1246,7 @@ static PF_Err paramsSetup(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef*
 		} else if (globalDataP->param[i].displayStatus == DS_HIDDEN) {
 			def.ui_flags |= PF_PUI_INVISIBLE;
 		}
-		
+
 		if (PAR_TYPE(i) == PT_FLOAT) {
 			PF_ADD_FLOAT(
 				globalDataP->param[i].displayName.c_str(), // name
@@ -1260,15 +1260,15 @@ static PF_Err paramsSetup(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef*
 				0, //flags
 				i // id
 				);
-		} else if (PAR_TYPE(i) == PT_COLOR) {	
+		} else if (PAR_TYPE(i) == PT_COLOR) {
 			PF_ADD_COLOR(
-				globalDataP->param[i].displayName.c_str(), 
-				(A_u_char)(globalDataP->param[i].defaultValue[0] * 255), 
-				(A_u_char)(globalDataP->param[i].defaultValue[1] * 255), 
-				(A_u_char)(globalDataP->param[i].defaultValue[2] * 255), 
+				globalDataP->param[i].displayName.c_str(),
+				(A_u_char)(globalDataP->param[i].defaultValue[0] * 255),
+				(A_u_char)(globalDataP->param[i].defaultValue[1] * 255),
+				(A_u_char)(globalDataP->param[i].defaultValue[2] * 255),
 				i // id
-				); 
-		} else if (PAR_TYPE(i) == PT_INT) {	
+				);
+		} else if (PAR_TYPE(i) == PT_INT) {
 			PF_ADD_FLOAT(
 				globalDataP->param[i].displayName.c_str(), // name
 				dMin, //valid min
@@ -1281,7 +1281,7 @@ static PF_Err paramsSetup(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef*
 				0, //flags
 				i //id
 				);
-		} else if (PAR_TYPE(i) == PT_POINT || PAR_TYPE(i) == PT_VEC2) {	
+		} else if (PAR_TYPE(i) == PT_POINT || PAR_TYPE(i) == PT_VEC2) {
 			A_long a1 = (A_long)(globalDataP->param[i].defaultValue[0]*100);
 			A_long a2 = (A_long)(globalDataP->param[i].defaultValue[1]*100);
 			if (a1 > 10000) a1 = 10000;
@@ -1302,7 +1302,7 @@ static PF_Err paramsSetup(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef*
 				0,
 				i // id
 			);
-		} else if (PAR_TYPE(i) == PT_SELECT) {	
+		} else if (PAR_TYPE(i) == PT_SELECT) {
 			string t = globalDataP->param[i].text;
 			t = strReplace(t, "|-|", "|(-|");
 			def.flags = PF_ParamFlag_SUPERVISE | PF_ParamFlag_CANNOT_INTERP;
@@ -1313,7 +1313,7 @@ static PF_Err paramsSetup(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef*
 				t.c_str(), // text
 				i // id
 			);
-		} else if (PAR_TYPE(i) == PT_ANGLE) {	
+		} else if (PAR_TYPE(i) == PT_ANGLE) {
 			PF_ADD_ANGLE(
 				globalDataP->param[i].displayName.c_str(), // name
 				(A_long)(globalDataP->param[i].defaultValue[0]), //default
@@ -1329,22 +1329,22 @@ static PF_Err paramsSetup(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef*
 #ifdef AE_64
 				PF_ADD_BUTTON(
 					globalDataP->param[i].displayName.c_str(), //name
-					"Edit", // globalDataP->param[i].text.c_str(), // text, 
+					"Edit", // globalDataP->param[i].text.c_str(), // text,
 					def.ui_flags, // display flags
 					PF_ParamFlag_SUPERVISE | PF_ParamFlag_CANNOT_TIME_VARY | PF_ParamFlag_CANNOT_INTERP, // flags
 					i // id
-					); 
+					);
 #endif
 			} else {
 				def.ui_flags |= PF_PUI_INVISIBLE;
 				PF_ADD_COLOR(
-					globalDataP->param[i].displayName.c_str(), 
-					(A_u_char)(globalDataP->param[i].defaultValue[0] * 255), 
-					(A_u_char)(globalDataP->param[i].defaultValue[1] * 255), 
-					(A_u_char)(globalDataP->param[i].defaultValue[2] * 255), 
+					globalDataP->param[i].displayName.c_str(),
+					(A_u_char)(globalDataP->param[i].defaultValue[0] * 255),
+					(A_u_char)(globalDataP->param[i].defaultValue[1] * 255),
+					(A_u_char)(globalDataP->param[i].defaultValue[2] * 255),
 					i // id
-					); 
-			}	
+					);
+			}
 		} else if (PAR_TYPE(i) == PT_LAYER) {
 			def.flags = PF_ParamFlag_SUPERVISE | PF_ParamFlag_CANNOT_INTERP;
 			l++;
@@ -1353,13 +1353,13 @@ static PF_Err paramsSetup(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef*
 				PF_LayerDefault_MYSELF, //default
 				i // id
 			);
-		} else if (PAR_TYPE(i) == PT_TOPIC_START) {	
+		} else if (PAR_TYPE(i) == PT_TOPIC_START) {
 			def.flags |= PF_ParamFlag_CANNOT_TIME_VARY;
 			PF_ADD_TOPIC(
 				globalDataP->param[i].displayName.c_str(), // name
 				i // id
 			);
-		} else if (PAR_TYPE(i) == PT_TOPIC_END) {	
+		} else if (PAR_TYPE(i) == PT_TOPIC_END) {
 			def.flags |= PF_ParamFlag_CANNOT_TIME_VARY;
 			PF_END_TOPIC(
 				i // id
@@ -1392,7 +1392,7 @@ static PF_Err paramsSetup(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef*
 static PF_Err doRender(PF_InData* in_data, PF_OutData* out_data, SequenceData* sequenceDataP, GlobalData* globalDataP, WorldData* worldDataP, PF_LayerDef* outputP)
 {
 	PF_Err err = PF_Err_NONE;
-	
+
 	AEGP_SuiteHandler suites(in_data->pica_basicP);
 
 	PF_PixelFormatSuite1 *pfS = NULL;
@@ -1404,7 +1404,7 @@ static PF_Err doRender(PF_InData* in_data, PF_OutData* out_data, SequenceData* s
 	bool isPremiere = in_data->appl_id == 'PrMr';
 	if ((!pfS && isPremiere) || !wsP) {
 		return err;
-	} 
+	}
 
 	try {
 
@@ -1427,7 +1427,7 @@ static PF_Err doRender(PF_InData* in_data, PF_OutData* out_data, SequenceData* s
 	PF_Handle worldH[MAX_NOF_LAYERS] = { 0 };
 	PF_EffectWorld dstWorld[MAX_NOF_LAYERS] = { 0 };
 
-	// create input worlds	
+	// create input worlds
 	for (int i = 0; i < globalDataP->nofInputs; i++) {
 		dstWorld[i].width = worldDataP->srcWorld[i]->width;
 		dstWorld[i].height = worldDataP->srcWorld[i]->height;
@@ -1452,7 +1452,7 @@ static PF_Err doRender(PF_InData* in_data, PF_OutData* out_data, SequenceData* s
 #endif
 
 #ifdef CONVERT_FLOAT_TO_INT
-		if (worldFormat == PF_PixelFormat_ARGB64 || worldFormat == PF_PixelFormat_ARGB128 || 
+		if (worldFormat == PF_PixelFormat_ARGB64 || worldFormat == PF_PixelFormat_ARGB128 ||
 			worldFormat == PrPixelFormat_BGRA_4444_32f_Linear || worldFormat == PrPixelFormat_BGRA_4444_32f) {
 			sequenceDataP->inWorld[i].bitDepth = 8;
 		}
@@ -1469,13 +1469,13 @@ static PF_Err doRender(PF_InData* in_data, PF_OutData* out_data, SequenceData* s
 
 		i_data.inWorld = worldDataP->srcWorld[i];
 		i_data.outWorld = &(dstWorld[i]);
-		if (worldFormat == PF_PixelFormat_ARGB32) 
+		if (worldFormat == PF_PixelFormat_ARGB32)
 			err = iterate_generic(dstWorld[i].height, &i_data, sequenceDataP->inWorld[i].bitDepth==8?it_Convert_ARGB8_to_RGBA8:it_Convert_ARGB8_to_RGBA32);
 		else if (worldFormat == PF_PixelFormat_ARGB64)
 			err = iterate_generic(dstWorld[i].height, &i_data, sequenceDataP->inWorld[i].bitDepth==8?it_Convert_ARGB16_to_RGBA8:it_Convert_ARGB16_to_RGBA32);
 		else if (worldFormat == PF_PixelFormat_ARGB128)
 			err = iterate_generic(dstWorld[i].height, &i_data, sequenceDataP->inWorld[i].bitDepth==8?it_Convert_ARGB32_to_RGBA8:it_Convert_ARGB32_to_RGBA32);
-		else if (worldFormat == PrPixelFormat_BGRA_4444_8u) 
+		else if (worldFormat == PrPixelFormat_BGRA_4444_8u)
 			err = iterate_generic(dstWorld[i].height, &i_data, sequenceDataP->inWorld[i].bitDepth==8?it_Convert_BGRA8_to_RGBA8:it_Convert_BGRA8_to_RGBA32);
 		else if (worldFormat == PrPixelFormat_BGRA_4444_32f_Linear || worldFormat == PrPixelFormat_BGRA_4444_32f)
 			err = iterate_generic(dstWorld[i].height, &i_data, sequenceDataP->inWorld[i].bitDepth==8?it_Convert_BGRA32_to_RGBA8:it_Convert_BGRA32_to_RGBA32);
@@ -1503,7 +1503,7 @@ static PF_Err doRender(PF_InData* in_data, PF_OutData* out_data, SequenceData* s
 		setContextData(contextData, in_data, out_data, NULL, outputP, NULL);
 		err = pluginProcess(sequenceDataP, globalDataP, &contextData);
 	}
-	
+
 	ERR(PF_ABORT(in_data));
 	if (!err) {
 		if (!globalDataP->inplaceProcessing) {
@@ -1519,13 +1519,13 @@ static PF_Err doRender(PF_InData* in_data, PF_OutData* out_data, SequenceData* s
 		i_data.outWorld = outputP;
 		i_data.scale = 1.f / globalDataP->scale;
 
-		if (worldFormat == PF_PixelFormat_ARGB32) 
+		if (worldFormat == PF_PixelFormat_ARGB32)
 			err = iterate_generic(outputP->height, &i_data, it_Convert_RGBA32_to_ARGB8);
 		else if (worldFormat == PF_PixelFormat_ARGB64)
 			err = iterate_generic(outputP->height, &i_data, it_Convert_RGBA32_to_ARGB16);
 		else if (worldFormat == PF_PixelFormat_ARGB128)
 			err = iterate_generic(outputP->height, &i_data, it_Convert_RGBA32_to_ARGB32);
-		else if (worldFormat == PrPixelFormat_BGRA_4444_8u) 
+		else if (worldFormat == PrPixelFormat_BGRA_4444_8u)
 			err = iterate_generic(outputP->height, &i_data, it_Convert_RGBA32_to_BGRA8);
 		else if (worldFormat == PrPixelFormat_BGRA_4444_32f_Linear || worldFormat == PrPixelFormat_BGRA_4444_32f)
 			err = iterate_generic(outputP->height, &i_data, it_Convert_RGBA32_to_BGRA32);
@@ -1564,7 +1564,7 @@ static PF_Err getParamData(PF_InData* in_data, PF_ParamDef* param, SequenceData*
 		} else if (PAR_TYPE(i) == PT_INT) {
 			PAR_VAL(i) = floor((float)(param[i].u.fs_d.value));
 		} else if (PAR_TYPE(i) == PT_COLOR) {
-			PF_Pixel p = param[i].u.cd.value; 
+			PF_Pixel p = param[i].u.cd.value;
 			PAR_CH(i, 0) = p.red / 255.0f;
 			PAR_CH(i, 1) = p.green / 255.0f;
 			PAR_CH(i, 2) = p.blue / 255.0f;
@@ -1598,7 +1598,7 @@ static PF_Err render(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* para
 	vector<PF_ParamDef> vParams;
 	vParams.resize(globalDataP->nofParams);
 	vParams[0] = *(param[0]);
-	
+
 	WorldData worldData;
 	SequenceData* sequenceDataP = (SequenceData*)PF_LOCK_HANDLE(in_data->sequence_data);
 
@@ -1643,7 +1643,7 @@ static PF_Err render(PF_InData* in_data, PF_OutData* out_data, PF_ParamDef* para
 	// Always check in, no matter what the error condition!
 	for (int i = 1; i < globalDataP->nofParams; i++) {
 		PF_CHECKIN_PARAM(in_data, &(vParams[i]));
-	}	
+	}
 	PF_UNLOCK_HANDLE(in_data->sequence_data);
 	PF_UNLOCK_HANDLE(in_data->global_data);
 	return err;
@@ -1688,7 +1688,7 @@ static PF_Err paramsChanged(PF_InData* in_data, PF_OutData* out_data, PF_ParamDe
 
 		if (globalDataP->param[g].displayStatus == DS_DISABLED) {
 			AEGP_StreamRefH streamH = NULL;
-			AEGP_EffectRefH meH = NULL;	
+			AEGP_EffectRefH meH = NULL;
 			if (!isPremiere) {
 				ERR(suites.PFInterfaceSuite1()->AEGP_GetNewEffectForEffect(NULL, in_data->effect_ref, &meH));
 				ERR(suites.StreamSuite2()->AEGP_GetNewEffectStreamByIndex(NULL, meH, g, &streamH));
@@ -1699,7 +1699,7 @@ static PF_Err paramsChanged(PF_InData* in_data, PF_OutData* out_data, PF_ParamDe
 			p1.ui_flags |= PF_PUI_DISABLED;
 		} else if (globalDataP->param[g].displayStatus == DS_HIDDEN) {
 			AEGP_StreamRefH streamH = NULL;
-			AEGP_EffectRefH meH = NULL;	
+			AEGP_EffectRefH meH = NULL;
 			if (!isPremiere) {
 				ERR(suites.PFInterfaceSuite1()->AEGP_GetNewEffectForEffect(NULL, in_data->effect_ref, &meH));
 				ERR(suites.StreamSuite2()->AEGP_GetNewEffectStreamByIndex(NULL, meH, g, &streamH));
@@ -1723,7 +1723,7 @@ static PF_Err paramsChanged(PF_InData* in_data, PF_OutData* out_data, PF_ParamDe
 			PF_ParamDef p1 = *(param[g]);
 			if (globalDataP->param[g].displayStatus == DS_DISABLED) {
 				AEGP_StreamRefH streamH = NULL;
-				AEGP_EffectRefH meH = NULL;	
+				AEGP_EffectRefH meH = NULL;
 				if (!isPremiere) {
 					ERR(suites.PFInterfaceSuite1()->AEGP_GetNewEffectForEffect(NULL, in_data->effect_ref, &meH));
 					ERR(suites.StreamSuite2()->AEGP_GetNewEffectStreamByIndex(NULL, meH, g, &streamH));
@@ -1736,7 +1736,7 @@ static PF_Err paramsChanged(PF_InData* in_data, PF_OutData* out_data, PF_ParamDe
 				changed = true;
 			} else if (globalDataP->param[g].displayStatus == DS_HIDDEN) {
 				AEGP_StreamRefH streamH = NULL;
-				AEGP_EffectRefH meH = NULL;	
+				AEGP_EffectRefH meH = NULL;
 				if (!isPremiere) {
 					ERR(suites.PFInterfaceSuite1()->AEGP_GetNewEffectForEffect(NULL, in_data->effect_ref, &meH));
 					ERR(suites.StreamSuite2()->AEGP_GetNewEffectStreamByIndex(NULL, meH, g, &streamH));
@@ -1784,7 +1784,7 @@ static PF_Err preRender(PF_InData* in_data, PF_OutData* out_data, PF_PreRenderEx
 	if (preRenderDataH) {
 		extraP->output->pre_render_data = preRenderDataH;
 
-		PreRenderData* preRenderDataP = static_cast<PreRenderData*>(suites.HandleSuite1()->host_lock_handle(preRenderDataH));	
+		PreRenderData* preRenderDataP = static_cast<PreRenderData*>(suites.HandleSuite1()->host_lock_handle(preRenderDataH));
 		if (preRenderDataP) {
 			CLR_STRUCT(*preRenderDataP);
 			int l = 0;
@@ -1837,7 +1837,7 @@ static PF_Err smartRender(PF_InData* in_data, PF_OutData* out_data, PF_SmartRend
 	SequenceData* sequenceDataP = (SequenceData*)PF_LOCK_HANDLE(in_data->sequence_data);
 
 	AEGP_SuiteHandler suites(in_data->pica_basicP);
-	PreRenderData* preRenderDataP = static_cast<PreRenderData*>(suites.HandleSuite1()->host_lock_handle(static_cast<PF_Handle>(extraP->input->pre_render_data)));	
+	PreRenderData* preRenderDataP = static_cast<PreRenderData*>(suites.HandleSuite1()->host_lock_handle(static_cast<PF_Handle>(extraP->input->pre_render_data)));
 	int l = 0;
 	if (preRenderDataP) {
 		// checkout the required params
@@ -1845,7 +1845,7 @@ static PF_Err smartRender(PF_InData* in_data, PF_OutData* out_data, PF_SmartRend
 			if (PAR_TYPE(i) == PT_LAYER) {
 				CLR_STRUCT(preRenderDataP->param[i]);
 				PF_EffectWorld* layerP = NULL;
-				ERR(extraP->cb->checkout_layer_pixels(in_data->effect_ref, i, &layerP)); 
+				ERR(extraP->cb->checkout_layer_pixels(in_data->effect_ref, i, &layerP));
 				if (err) {
 					extraP->cb->checkout_output(in_data->effect_ref, &outputP);
 					suites.HandleSuite1()->host_unlock_handle(static_cast<PF_Handle>(extraP->input->pre_render_data));
@@ -1861,7 +1861,7 @@ static PF_Err smartRender(PF_InData* in_data, PF_OutData* out_data, PF_SmartRend
 			}
 		}
 
-		ERR(extraP->cb->checkout_output(in_data->effect_ref, &outputP)); 
+		ERR(extraP->cb->checkout_output(in_data->effect_ref, &outputP));
 		if (err) {
 			suites.HandleSuite1()->host_unlock_handle(static_cast<PF_Handle>(extraP->input->pre_render_data));
 			return err;
@@ -1872,7 +1872,7 @@ static PF_Err smartRender(PF_InData* in_data, PF_OutData* out_data, PF_SmartRend
 		WorldData worldData;
 		if (!err) getParamData(in_data, (PF_ParamDef*)&(preRenderDataP->param), sequenceDataP, globalDataP, &worldData);
 		suites.HandleSuite1()->host_unlock_handle(static_cast<PF_Handle>(extraP->input->pre_render_data));
-		
+
 		ERR(PF_ABORT(in_data));
 
 		ERR(doRender(in_data, out_data, sequenceDataP, globalDataP, &worldData, outputP));
@@ -1892,7 +1892,7 @@ inline PF_Err pluginMain(PF_Cmd cmd, PF_InData* in_data, PF_OutData* out_data, P
 	PF_Err err = PF_Err_NONE;
 	try
 	{
-	switch (cmd) 
+	switch (cmd)
 		{
 		case PF_Cmd_ABOUT:
 			{
@@ -1961,17 +1961,16 @@ inline PF_Err pluginMain(PF_Cmd cmd, PF_InData* in_data, PF_OutData* out_data, P
 			}
 		}
 	}
-	catch(PF_Err &thrown_err) 
-	{ 
+	catch(PF_Err &thrown_err)
+	{
 		err = thrown_err;
 	}
-	catch(...) 
-	{ 
-		err = PF_Err_INTERNAL_STRUCT_DAMAGED; 
+	catch(...)
+	{
+		err = PF_Err_INTERNAL_STRUCT_DAMAGED;
 	}
 
 	return err;
 }
 
 #endif
-

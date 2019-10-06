@@ -2,8 +2,8 @@
  #
  #  File        : RFX_Parameter.h
  #
- #  Description : A self-contained header file with helper functions and structures    
- #                for generic parameter handling in various plugin hosts    
+ #  Description : A self-contained header file with helper functions and structures
+ #                for generic parameter handling in various plugin hosts
  #
  #  Copyright   : Tobias Fleischer / reduxFX Productions (http://www.reduxfx.com)
  #
@@ -12,17 +12,17 @@
  #
  #                    CeCILL-C
  #                    The CeCILL-C license is close to the GNU LGPL.
- #                    ( http://www.cecill.info/licences/Licence_CeCILL-C_V1-en.html )
+ #                    ( http://cecill.info/licences/Licence_CeCILL-C_V1-en.html )
  #
  #                or  CeCILL v2.0
  #                    The CeCILL license is compatible with the GNU GPL.
- #                    ( http://www.cecill.info/licences/Licence_CeCILL_V2-en.html )
+ #                    ( http://cecill.info/licences/Licence_CeCILL_V2-en.html )
  #
  #  This software is governed either by the CeCILL or the CeCILL-C license
  #  under French law and abiding by the rules of distribution of free software.
  #  You can  use, modify and or redistribute the software under the terms of
  #  the CeCILL or CeCILL-C licenses as circulated by CEA, CNRS and INRIA
- #  at the following URL: "http://www.cecill.info".
+ #  at the following URL: "http://cecill.info".
  #
  #  As a counterpart to the access to the source code and  rights to copy,
  #  modify and redistribute granted by the license, users are provided only
@@ -119,7 +119,7 @@ public:
 	};
 };
 
-class PluginInfo 
+class PluginInfo
 {
 public:
 	string name;
@@ -183,7 +183,7 @@ public:
 	SequenceData() {
 		isFlat = false;
 		update = false;
-		for (int i = 0; i < MAX_NOF_PARAMS; i++) 
+		for (int i = 0; i < MAX_NOF_PARAMS; i++)
 			for (int j = 0; j < 4; j++) floatValue[i][j] = 0.f;
 		for (int i = 0; i < MAX_NOF_LAYERS; i++) inputConnected[i] = false;
 		time = 0;
