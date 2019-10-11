@@ -106,7 +106,7 @@ GMIC_DLLINTERFACE int GMIC_CALLCONV gmic_call(const char* _cmd, unsigned int* _n
     else
       gmic(_cmd, images, images_names);
 
-  } catch (gmic_exception &e) { // catch exception, if an error occured in the interpreter.
+  } catch (gmic_exception &e) { // catch exception, if an error occurred in the interpreter.
     std::string error_string = e.what();
     std::fprintf(stderr, "\n- Error encountered when calling G'MIC : '%s'\n", e.what());
     if (_options && _options->error_message_buffer) {
