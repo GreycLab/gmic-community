@@ -44,6 +44,96 @@
 #
 #-------------------------------
 
+#@cli rep_shape_brick: brick_width>0,brick_height>0,_mortar_width>0,_mortar_height>0,_bevel>=0,_outline>=0,_shift_direction= { 0=horizontal | 1=vertical },-1>=_shift_val>=1,_bevel_style= { 0=Round | 1=Inverse Round | 2=Diamond },_flip= { 0= Do Not Flip | 1= Flip },_sublevel>=0,_normal_01= { 0=Do Not Normalize | 1=Normalize to 0-1 Range }
+rep_shape_brick:
+skip ${3=10},${4=10},${5=0},${6=0},${7=0},${8=1},${9=0},${10=0},${11=0},${12=0}
+sublevel={abs($11)}
+sublevel+=1
+brick_width={abs($1)*$sublevel}
+brick_height={abs($2)*$sublevel}
+mortar_width={abs($3)*$sublevel}
+mortar_height={abs($4)*$sublevel}
+bevel={abs($5)*$sublevel}
+outline={abs($6)*$sublevel}
+shift_direction=$7
+shift_val=$8
+bevel_style=$9
+reverse_dir=$10
+normal_01=$12
+
+if !(($brick_width&&$brick_height)||$bevel) v + error "Brick Area must be greater than 0!" v - fi
+
+if $bevel
+    if $bevel_style==0||$bevel_style==1 shape_circle {$bevel*2} 
+    else shape_diamond {$bevel*2} fi
+    *. 2
+    if $outline
+        if $bevel_style==0 shape_circle {($bevel+$outline)*2}
+        elif $bevel_style==1 shape_circle {($bevel+$outline+1)*2} shrink_xy. 1
+        else shape_diamond {floor($bevel+($outline*(cos(45/180*pi)+sin(45/180*pi))))*2} r. {($bevel+$outline)*2},{($bevel+$outline)*2},100%,100%,0,0,.5,.5 fi 
+        j[-1] [-2],.5~,.5~,0,0,.5,[-2]
+        rm..
+    fi
+    s. x,2
+    s[-2,-1] y,2
+fi
+
+{$brick_width<$bevel*2?$bevel*2:$brick_width},{$brick_height<$bevel*2?$bevel*2:$brick_height},1,1,1
+
+if $outline
+    expand_xy. $outline,0
+    +. 1
+else
+    +. 1
+fi
+
+if $bevel if $bevel_style==1 negate[-5--2] fi fi
+
+if $bevel
+    j[-1] [-5],{$bevel_style!=1?0:1}~,{$bevel_style!=1?0:1}~
+    j[-1] [-4],{$bevel_style!=1?0:1}~,{$bevel_style!=1?1:0}~
+    j[-1] [-3],{$bevel_style!=1?1:0}~,{$bevel_style!=1?0:1}~ 
+    j[-1] [-2],{$bevel_style!=1?1:0}~,{$bevel_style!=1?1:0}~ 
+    rm[-5--2]
+fi
+
+mw={w}
+mh={h}
+mw/=2
+mh/=2
+
+r. {w+$mortar_width},{h+$mortar_height},100%,100%,0,0,1,1
+
+if $shift_val
+    if $shift_direction +shift. 0,{$shift_val*$mh+$mortar_height/2},0,0,2 a[-2,-1] x if $reverse_dir mirror. x fi
+    else +shift. {$shift_val*$mw+$mortar_width/2},0,0,0,2 a[-2,-1] y if $reverse_dir mirror. y fi
+    fi 
+fi
+
+if $sublevel-1 r2dx. {(1/$sublevel)*100}%,5 fi
+if $normal_01 n. 0,1 fi
+#@cli rep_z_render: _reverse_z_layer={ 0=first_layer | last_layer },_z_depth_value>0,_mirror_order={ 0=do_not_mirror | 1=mirror },_color_z_render={ 0=image_z_per_luminosity | 1=image_z_per_channel }
+#@cli : Generates the resulting image based on z-map layer.\n
+#@cli : '_reverse_z_layer' determines whether the first or last layer should be used to determine the "frame" to use.
+#@cli : '_z_depth_value' can be described as how smooth the transition between images should be
+#@cli : '_mirror_order' can be used to reorder the image transition
+#@cli : '_color_z_render' sets whether the transition are separated by channels or not.
+#@cli : Note: Try to use gradient as the z-layer.\n
+#@cli : Default values: '_reverse_layer=0','_z_depth_value=255','_mirror_order=0','_color_z_render=0'\n
+rep_z_render:
+skip ${1=0},${2=255},${3=0},${4=0}
+if $!<3 v + error "You need at least 3 images!" v - fi
+if $1 rv[0,-1] rv[0,-2] fi
+if !$4 to_gray[0] fi
+rep_aspect_crop_2d[^0] {w#0},{h#0}
+r[^0] {w#0},{h#0},100%,100%,3
+a[^0] z
+n[0] 0,$2
+r[^0] 100%,100%,$2,100%,3
+if $3 negate[0] fi
+r[0] 100%,100%,100%,{s#-1}
+f[0] i(#-1,x,y,i,c,3,1)
+k[0]
 #@cli rep_acb: (eq. to rep_autofill_coloring_book)
 rep_acb: rep_autofill_coloring_book $*
 #@cli rep_autofill_coloring_book: 0<threshold<1,_dilate_erode>=0,_color_mode={ 0=hard | 1= soft },0<=_alpha_threshold<1,_seed
@@ -3141,6 +3231,56 @@ u "{$1}_"{!$2?2:1}\
 "{$17}"\
 "{$18}_"{$17==2?2:0}\
 "{$19}_"{$17==2?2:0}
+#@gui Z-Time : rep_z_render
+#@gui : note = note("Z-Time Rendering is a filter that utilize the value of a layer to represent the frame where frames are interpolated and normalized to the value of that layer. In other word, the reference layer can be seen as a representative of time.<b>Note:</b>Try to use a gradient for top or bottom layer depending on option you use.\n\n<b>Z-Depth Values</b> is recommended to be altered when using float image as reference. Use values less than 255 in order to posterize.\n\n<b>This filter do not work with Paint.NET as you need 3 images!</b>"), sep = separator()
+#@gui : Layer to use as time reference? = choice(0,"Top Layer","Bottom Layer")
+#@gui : Z-Depth Values = int(255,3,1024)
+#@gui : Mirror Frame Ordering? = bool(0)
+#@gui : Separate time by channels? = bool(0)
+#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/10/13</i>.</small>")
+#@gui Bricks: gui_rep_shape_brick
+#@gui : note = note("This filter on the <a href="https://forums.getpaint.net/topic/8251-bricks-updated-with-examples/">Bricks plugin for Paint.NET</a> made by <a href="https://forums.getpaint.net/profile/49909-jchunn/">Jesse Chunn</a> as part of his <a href="https://forums.getpaint.net/index.php?/topic/8408-jesse-chunn-plugin-pack-march-8-2008/">plugin pack</a>.\n\n This is a extended version of the bricks filter with bevel options, and blending mode option.")
+#@gui : sep = separator(), note = note("<b>Brick Main Setting</b>")
+#@gui : 1. Brick Width (px) = int(150,4,2048)
+#@gui : 2. Brick Height (px) = int(150,4,2048)
+#@gui : 3. Mortar Width (px) = int(5,0,512)
+#@gui : 4. Mortar Height (px) = int(5,0,512)
+#@gui : 5. Outline (px) = int(0,0,50)
+#@gui : sep = separator(), note = note("<b>Offset Setting</b>)
+#@gui : 6. Brick Offset (%) = float(0,-100,100)
+#@gui : 7. Offset Direction = choice(0,"Horizontal","Vertical")
+#@gui : 8. Reverse Offset = bool(0)
+#@gui : sep = separator(), note = note("<b>Bevel Setting</b>)
+#@gui : 9. Bevel Radius (px) = int(0,0,50)
+#@gui : 10. Bevel Style = choice(0,"Round","Inverse Round","Chamfer")
+#@gui : sep = separator(), note = note("<b>Colouring and Blending Options</b>")
+#@gui : 11-12-13-14. Brick Colour = color(170,0,0,255)
+#@gui : 15-16-17-18. Brick Outline = color(85,0,0,255)
+#@gui : 19-20-21-22. Mortar Colour = color(121,77,2,255)
+#@gui : 23. Use Blending Mode? = bool(0)
+#@gui : 24. Blending Mode = choice(41,"add","alpha","and","average","blue","burn","darken",
+#@gui : "difference","divide","dodge","exclusion","freeze",
+#@gui : "grainextract","grainmerge","green","hardlight","hardmix",
+#@gui : "hue","interpolation","lighten","lightness","linearburn",
+#@gui : "linearlight","luminance","multiply","negation","or",
+#@gui : "overlay","pinlight","red","reflect","saturation","screen",
+#@gui : "shapeaverage","softburn","softdodge","softlight","stamp",
+#@gui : "subtract","value","vividlight","xor")
+#@gui : 25.Opacity (%) = float(100,0,100)
+#@gui : sep = separator(), note = note("<b>Antialias</b>)
+#@gui : 26. Antialias Level = float(0,0,3)
+#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/10/15</i>.</small>")
+gui_rep_shape_brick:
+-m "MergeChoice : $""=_mode" -MergeChoice "add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor","edges","error"
+repeat $! l[$>]
+to_a
+rep_shape_brick $1,$2,$3,$4,$9,$5,$7,$6%,$10,$8,$26,1
+r. {w#-2},{h#-2},100%,{s#-2},0,2,0,0
+($19,$15,$11^$20,$16,$12^$21,$17,$13^$22,$18,$14)
+f.. i(#-1,(w#-1-1)*i,0,z,c,3) rm.
+if $23 blend ${_mode{$24+1}},{$25%}
+else k. fi
+endl done
 ######################
 
 # Local Variables:
