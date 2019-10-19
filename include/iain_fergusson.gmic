@@ -2059,6 +2059,590 @@ nm name($nm)
 
 #@gui Iain Fergusson
 
+#@gui 2D_scopes: iain_2d_scopes,iain_2d_scopes(1)
+#@gui : Y axis = choice (1,"Yuv","yUv","yuV","Hsv","hSv","hsV","Lab","lAb","laB","lCh","lcH","Cmyk","cMyk","cmYk","cmyK","Rgb","rGb","rgB")
+#@gui : X axis = choice (2,"Yuv","yUv","yuV","Hsv","hSv","hsV","Lab","lAb","laB","lCh","lcH","Cmyk","cMyk","cmYk","cmyK","Rgb","rGb","rgB")
+#@gui : Type = Choice(2,"Dots","Circles","Circles scaled by Luma","Heat map")
+#@gui : Colour bits = int(6,1,8)
+#@gui : Plot size = int(512,64,1024)
+#@gui : Max samples = int(2048,16,4096)
+#@gui : Chart elements = choice(1,"no info","axes","underlay")
+#@gui : Generate test colours = bool (0)
+#@gui : Mirror Y axis = bool (0)
+#@gui : Mirror X axis = bool (0)
+#@gui : Rotate = choice (0,"0","90","180","270")
+iain_2d_scopes:
+-repeat $! -l[$>]
+-remove_opacity
+
+y_axis=$1
+x_axis=$2
+plot_type=$3
+resolution=$4
+plot_size=$5
+max_samples=$6
+
+chart_type=$7
+test_pattern=$8
+
+mirror_y=$9
+mirror_x=$10
+
+rotate_deg={$11*90}
+
+
+-if {$plot_type==3}
+remove_duplicates=0
+-else
+remove_duplicates=1
+-endif
+
+
+
+luma_sort=1
+
+
+
+# generate test pattern
+
+-if $test_pattern
+-rm
+cube_d={2^$resolution}
+$cube_d,$cube_d,$cube_d
+-to_rgb
+-split c
+-fill[0] x
+-fill[1] y
+-fill[2] z
+-n 0,255
+-append c
+-split z
+-append_tiles 0,0
+	-split y
+	-append x
+
+-endif
+
+
+-split y
+-append x
+
+-if {w>$max_samples}
+-resize $max_samples,1
+-endif
+# bit depth reducation, remove duplicates colours, sort by luma
+
+
+	-bsr[0] {8-$resolution}
+
+-if $remove_duplicates
+
+	--to_rgb[-1] 
+		-l[-1] #sort by colour numnber
+				-split c
+				-bsl[1] 8
+				-bsl[2] 16
+				-add
+		-endl
+
+	-reverse 
+	-append y 
+	-sort +,x 
+	-discard x 
+	-rows 1
+-endif
+	
+-if $luma_sort
+	--luminance[-1] 
+	## --norm[-1]
+	## --l[-1] -split c -max -endl
+	-reverse 
+	-append y 
+	-sort +,x 
+	-rows 1
+-endif	
+	
+	
+-bsl {8-$resolution} # scale back to better range
+
+
+
+# X-axis 
+
+--l[0]
+	-if {$x_axis==0}
+		-rgb2yuv8[0]
+		-channels[0] 0
+	-elif {$x_axis==1}
+		-rgb2yuv8[0]
+		-channels[0] 1
+	-elif {$x_axis==2}
+		-rgb2yuv8[0]
+		-channels[0] 2
+		
+		
+	-elif {$x_axis==3}
+		-rgb2hsv8[0]
+		-channels[0] 0
+	-elif {$x_axis==4}
+		-rgb2hsv8[0]
+		-channels[0] 1
+	-elif {$x_axis==5}
+		-rgb2hsv8[0]
+		-channels[0] 2
+	
+
+	-elif {$x_axis==6}
+		-rgb2lab8[0]
+		-channels[0] 0
+	-elif {$x_axis==7}
+		-rgb2lab8[0]
+		-channels[0] 1
+	-elif {$x_axis==8}
+		-rgb2lab8[0]
+		-channels[0] 2
+	
+	-elif {$x_axis==9}
+		-rgb2lch8[0]
+		-channels[0] 1
+	
+	-elif {$x_axis==10}
+		-rgb2lch8[0]
+		-channels[0] 2
+		
+		
+	-elif {$x_axis==11}
+		-rgb2cmyk[0]
+		-channels[0] 0
+	-elif {$x_axis==12}
+		-rgb2cmyk[0]
+		-channels[0] 1
+	-elif {$x_axis==13}
+		-rgb2cmyk[0]
+		-channels[0] 2
+	-elif {$x_axis==14}
+		-rgb2cmyk[0]
+		-channels[0] 3		
+		
+	-elif {$x_axis==15}
+		-channels[0] 0
+	-elif {$x_axis==16}
+		-channels[0] 1
+	-elif {$x_axis==17}
+		-channels[0] 2
+	-endif
+
+
+	
+-endl
+
+--l[0]
+	-if {$y_axis==0}
+		-rgb2yuv8[0]
+		-channels[0] 0
+	-elif {$y_axis==1}
+		-rgb2yuv8[0]
+		-channels[0] 1
+	-elif {$y_axis==2}
+		-rgb2yuv8[0]
+		-channels[0] 2
+		
+		
+	-elif {$y_axis==3}
+		-rgb2hsv8[0]
+		-channels[0] 0
+	-elif {$y_axis==4}
+		-rgb2hsv8[0]
+		-channels[0] 1
+	-elif {$y_axis==5}
+		-rgb2hsv8[0]
+		-channels[0] 2
+	
+
+	-elif {$y_axis==6}
+		-rgb2lab8[0]
+		-channels[0] 0
+	-elif {$y_axis==7}
+		-rgb2lab8[0]
+		-channels[0] 1
+	-elif {$y_axis==8}
+		-rgb2lab8[0]
+		-channels[0] 2
+	
+	-elif {$y_axis==9}
+		-rgb2lch8[0]
+		-channels[0] 1
+	
+	-elif {$y_axis==10}
+		-rgb2lch8[0]
+		-channels[0] 2
+
+	-elif {$y_axis==11}
+		-rgb2cmyk[0]
+		-channels[0] 0
+	-elif {$y_axis==12}
+		-rgb2cmyk[0]
+		-channels[0] 1
+	-elif {$y_axis==13}
+		-rgb2cmyk[0]
+		-channels[0] 2
+	-elif {$y_axis==14}
+		-rgb2cmyk[0]
+		-channels[0] 3	
+		
+	-elif {$y_axis==15}
+		-channels[0] 0
+	-elif {$y_axis==16}
+		-channels[0] 1
+	-elif {$y_axis==17}
+		-channels[0] 2
+	-endif
+	
+-endl
+
+
+
+
+
+	-mul[-1,-2] {$plot_size/256} # scale values to plot dimensions
+	
+
+				
+				$plot_size,$plot_size,1,1,0
+				-to_rgb[-1]
+				-fill[-1] -1
+				-repeat {0,w}
+				
+					# plot type 
+						-if {$plot_type==0}
+							-point[-1] {1,i($>)},{2,i($>)},0,1,{0,i($>,0,0,0)},{0,i($>,0,0,1)},{0,i($>,0,0,2)}
+						-elif {$plot_type==1}
+						
+							-circle[-1] {1,i($>)},{2,i($>)},0.3%,1,{0,i($>,0,0,0)},{0,i($>,0,0,1)},{0,i($>,0,0,2)}
+						
+						
+						-elif {$plot_type==2}
+							
+							circle_size={max({$<*(1/{0,w})},0.15)}
+							
+							-circle[-1] {1,i($>)},{2,i($>)},$circle_size%,1,{0,i($>,0,0,0)},{0,i($>,0,0,1)},{0,i($>,0,0,2)}
+					
+						-elif {$plot_type==3}
+									
+							-l[0]
+							-rgb2hsv -split c -fill[-1] 1 -append c -hsv2rgb
+							-endl
+			
+							circle_size={1}
+							
+							-circle[-1] {1,i($>)},{2,i($>)},$circle_size%,0.1,{0,i($>,0,0,0)},{0,i($>,0,0,1)},{0,i($>,0,0,2)}
+							
+							
+						-endif
+				-done
+			
+				
+-k[-1]
+			
+	
+			
+
+
+-if {$chart_type!=0}
+
+100%,100%,1,1
+-fill[-1] x
+			-n[-1] 0,255		
+	-l[-1]		
+		-if {$x_axis==0}
+		--fill[0] {255/2}
+		--fill[0] {255/2}
+		-append c
+		-yuv82rgb
+	-elif {$x_axis==1}
+		--fill[0] {255/2}
+		--fill[0] {255/2}
+		-move[0] 2
+		-append c
+		-yuv82rgb
+	-elif {$x_axis==2}
+		--fill[0] {255/2}
+		--fill[0] {255/2}
+		-move[0] 3
+		-append c
+		-yuv82rgb
+		
+	-elif {$x_axis==3}
+		--fill[0] {255}
+		--fill[0] {255}
+		-append c
+		-hsv82rgb
+	-elif {$x_axis==4}
+		--fill[0] {255}
+		--fill[0] {255}
+		-move[0] 2
+		-append c
+		-hsv82rgb
+	-elif {$x_axis==5}
+		--fill[0] {0}
+		--fill[0] {0}
+		-move[0] 3
+		-append c
+		-hsv82rgb
+		
+	-elif {$x_axis==6}
+		--fill[0] {255/2}
+		--fill[0] {255/2}
+		-move[0] 1
+		-append c
+		-lab82rgb
+	-elif {$x_axis==7}
+		--fill[0] {255/2}
+		--fill[0] {255/2}
+		-move[0] 2
+		-append c
+		-lab82rgb
+	-elif {$x_axis==8}
+		--fill[0] {255/2}
+		--fill[0] {255/2}
+		-move[0] 3
+		-append c
+		-lab82rgb
+	
+	-elif {$x_axis==9}
+		--fill[0] {255/2}
+		--fill[0] {255/2}
+		-move[0] 2
+		-append c
+		-lch82rgb
+	
+	-elif {$x_axis==10}
+		--fill[0] 180
+		--fill[0] 128
+		-move[0] 3
+		-append c
+		-lch82rgb
+		
+		
+	-elif {$x_axis==11}
+		--fill[0] {0}
+		--fill[0] {0}
+		--fill[0] {0}
+		-move[0] 1
+		-append c
+		-cmyk2rgb
+	-elif {$x_axis==12}
+		--fill[0] {0}
+		--fill[0] {0}
+		--fill[0] {0}
+		-move[0] 2
+		-append c
+		-cmyk2rgb
+	-elif {$x_axis==13}
+		--fill[0] {0}
+		--fill[0] {0}
+		--fill[0] {0}
+		-move[0] 3
+		-append c
+		-cmyk2rgb
+	-elif {$x_axis==14}
+		--fill[0] {0}
+		--fill[0] {0}
+		--fill[0] {0}
+		-move[0] 4
+		-append c
+		-cmyk2rgb	
+		
+	-elif {$x_axis==15}
+		--fill[0] {0}
+		--fill[0] {0}
+		-move[0] 1
+		-append c
+	-elif {$x_axis==16}
+		--fill[0] {0}
+		--fill[0] {0}
+		-move[0] 2
+		-append c
+	-elif {$x_axis==17}
+		--fill[0] {0}
+		--fill[0] {0}
+		-move[0] 3
+		-append c
+	-endif		
+	-endl	
+
+100%,100%,1,1
+-fill[-1] y
+			-n[-1] 0,255	
+	-l[-1]		
+		-if {$y_axis==0}
+		--fill[0] {255/2}
+		--fill[0] {255/2}
+		-append c
+		-yuv82rgb
+	-elif {$y_axis==1}
+		--fill[0] {255/2}
+		--fill[0] {255/2}
+		-move[0] 2
+		-append c
+		-yuv82rgb
+	-elif {$y_axis==2}
+		--fill[0] {255/2}
+		--fill[0] {255/2}
+		-move[0] 3
+		-append c
+		-yuv82rgb
+		
+	-elif {$y_axis==3}
+		--fill[0] {255}
+		--fill[0] {255}
+		-append c
+		-hsv82rgb
+	-elif {$y_axis==4}
+		--fill[0] {255}
+		--fill[0] {255}
+		-move[0] 2
+		-append c
+		-hsv82rgb
+	-elif {$y_axis==5}
+		--fill[0] {0}
+		--fill[0] {0}
+		-move[0] 3
+		-append c
+		-hsv82rgb
+		
+	-elif {$y_axis==6}
+		--fill[0] {255/2}
+		--fill[0] {255/2}
+		-move[0] 1
+		-append c
+		-lab82rgb
+	-elif {$y_axis==7}
+		--fill[0] {255/2}
+		--fill[0] {255/2}
+		-move[0] 2
+		-append c
+		-lab82rgb
+	-elif {$y_axis==8}
+		--fill[0] {255/2}
+		--fill[0] {255/2}
+		-move[0] 3
+		-append c
+		-lab82rgb
+	
+	-elif {$y_axis==9}
+		--fill[0] {255/2}
+		--fill[0] {255/2}
+		-move[0] 2
+		-append c
+		-lch82rgb
+	
+	-elif {$y_axis==10}
+		--fill[0] 180
+		--fill[0] 128
+		-move[0] 3
+		-append c
+		-lch82rgb
+		
+		
+	-elif {$y_axis==11}
+		--fill[0] {0}
+		--fill[0] {0}
+		--fill[0] {0}
+		-move[0] 1
+		-append c
+		-cmyk2rgb
+	-elif {$y_axis==12}
+		--fill[0] {0}
+		--fill[0] {0}
+		--fill[0] {0}
+		-move[0] 2
+		-append c
+		-cmyk2rgb
+	-elif {$y_axis==13}
+		--fill[0] {0}
+		--fill[0] {0}
+		--fill[0] {0}
+		-move[0] 3
+		-append c
+		-cmyk2rgb
+	-elif {$y_axis==14}
+		--fill[0] {0}
+		--fill[0] {0}
+		--fill[0] {0}
+		-move[0] 4
+		-append c
+		-cmyk2rgb	
+		
+	-elif {$y_axis==15}
+		--fill[0] {0}
+		--fill[0] {0}
+		-move[0] 1
+		-append c
+	-elif {$y_axis==16}
+		--fill[0] {0}
+		--fill[0] {0}
+		-move[0] 2
+		-append c
+	-elif {$y_axis==17}
+		--fill[0] {0}
+		--fill[0] {0}
+		-move[0] 3
+		-append c
+	-endif		
+	-endl	
+
+
+-if {$chart_type==1}
+
+100%,100%
+100%,100%
+-linethick[-1] 50%,0,50%,100%,{$plot_size*.01},1,1
+-linethick[-2] 0%,50%,100%,50%,{$plot_size*.01},1,1
+-mul[1,3]
+-mul[2,3]
+
+	-endif
+-blend[-1,-2] average
+		
+-if {$chart_type==1}
+-l[-1]
+--l[0] split c -max -endl
+-gt[-1] 0
+-replace[-1] 1,128
+-laplacian[-1]
+-abs
+-max
+-endl
+
+-endif
+		
+		
+--eq[0] -1
+-l[-1] -split c -min  -erode_circ {round($plot_size*.1)} -blur {$plot_size*.025} -endl
+
+-mul[-1,-2]
+
+
+
+
+-endif
+
+-max
+
+-if $mirror_y
+-mirror y
+-endif
+-if $mirror_x
+-mirror x
+-endif
+
+-rotate $rotate_deg
+
+		-endl -done
+
+
+
 #@gui Split Detials [Orientation] : iain_split_orientation,iain_split_orientation_preview(0)
 #@gui : Center (%) = point(75,50,0,1)
 #@gui : Angle range = int (45,1,90)
