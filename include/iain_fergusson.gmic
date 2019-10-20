@@ -2059,6 +2059,201 @@ nm name($nm)
 
 #@gui Iain Fergusson
 
+#@gui Auto WB by hue variance: iain_auto_wb,iain_auto_wb_preview(1)
+#@gui : note = note{"Restrict analysis to this box"}
+#@gui : Corner 1 = point(5,5,0,1,255,255,255,128,10)
+#@gui : Corner 2 = point(95,95,0,1,255,255,255,128,10)
+#@gui : sep = separator()
+#@gui : Normalise = bool(1)
+#@gui : Negative = bool(0)
+#@gui : sep = separator()
+#@gui : note = note{"This filter finds the white balance of the image by maxiumising the variation of hues. The area for analysis should contain a range of hues. Do not try to select a neutral grey area."}
+iain_auto_wb_preview:
+-iain_auto_wb[0] $1,$2,$3,$4,$5,$6
+-rectangle[0] $1%,$2%,$3%,$4%,1,0xffff,255
+
+iain_auto_wb:
+-repeat $! -l[$>]
+-remove_opacity
+norm_out=$5
+repeats=15
+display_text=0
+rm_outliers=1
+max_pixels={2^16}
+
+lower_limit=5
+upper_limit=200
+
+
+--l[0] #reduce number of pixels to analyse
+
+	target_pixel_number={2^16}
+	-crop $1%,$2%,$3%,$4%
+	--l[0] -split c -max -endl
+
+	-fill[-1] if(i<$lower_limit||i>$upper_limit,0,1)
+	good_pixels={-1,is}
+	pixel_retention_ratio={$good_pixels/{wh}}
+	scale_factor={sqrt((($target_pixel_number/$pixel_retention_ratio)/{wh}))}
+
+	-if {$scale_factor<1}
+	-resize {w*$scale_factor},{h*$scale_factor},100%,100%,2
+	-endif
+
+	-gt[-1] 0
+	-add[0] 1
+	-mul[0] [-1]
+	-sub[0] 1
+	-rm[-1]
+	-split c
+	-unroll[0] x
+	-unroll[1] x
+	-unroll[2] x
+	-discard[0,1,2] x,-1
+	-append[0,1,2] c
+
+		--to_rgb[-1] 
+			-l[-1] #sort by colour numnber
+					-split c
+					-bsl[1] 8
+					-bsl[2] 16
+					-add
+			-endl
+
+		-reverse 
+		-append y 
+		-sort +,x 
+		-discard x 
+		-rows 1
+	-append c
+
+-endl
+
+#find base hue variation
+	--l[1]
+			-rgb2hsv -channels 0 --add[-1] 180 -mod[-1] 360
+			hv_old={min({0,iv},{1,iv})}
+		-rm
+	-endl
+
+
+hv_old_b=$hv_old
+hv_new_A_plus_B_plus=0
+hv_new_A_plus_B_minus=0
+hv_new_A_minus_B_plus=0
+hv_new_A_minus_B_minus=0
+shift_a=0
+shift_b=0
+step_size=3
+
+-repeat $repeats 
+shift_a_top=$shift_a
+
+# test A+step and B+step
+
+	--l[1]
+
+	 -iain_rgb_mix_wb[0] {$shift_a+$step_size},{$shift_b+$step_size}
+			-rgb2hsv -channels 0 	--add[-1] 180 -mod[-1] 360
+			hv_new_A_plus_B_plus={min({0,iv},{1,iv})}
+		-rm
+	-endl
+
+# test A+step and B-step
+
+	--l[1]
+	 -iain_rgb_mix_wb[0] {$shift_a+$step_size},{$shift_b-$step_size}
+			-rgb2hsv -channels 0 	--add[-1] 180 -mod[-1] 360
+			hv_new_A_plus_B_minus={min({0,iv},{1,iv})}
+		-rm
+	-endl
+
+# test A-step and B+step
+
+	--l[1]
+	 -iain_rgb_mix_wb[0] {$shift_a-$step_size},{$shift_b+$step_size}
+			-rgb2hsv -channels 0 	--add[-1] 180 -mod[-1] 360
+			hv_new_A_minus_B_plus={min({0,iv},{1,iv})}
+		-rm
+	-endl
+
+# test A-step and B-step
+
+	--l[1]
+	 -iain_rgb_mix_wb[0] {$shift_a-$step_size},{$shift_b-$step_size}
+			-rgb2hsv -channels 0 	--add[-1] 180 -mod[-1] 360
+			hv_new_A_minus_B_minus={min({0,iv},{1,iv})}
+		-rm
+	-endl
+
+
+hv_max={max($hv_old,$hv_new_A_plus_B_plus,$hv_new_A_plus_B_minus,$hv_new_A_minus_B_plus,$hv_new_A_minus_B_minus)}
+
+
+
+-if {$hv_old==$hv_max}
+
+# keep old
+
+-elif {$hv_new_A_plus_B_plus==$hv_max}
+ 
+shift_a={$shift_a+$step_size}
+shift_b={$shift_b+$step_size}
+hv_old=$hv_new_A_plus_B_plus
+
+-elif {$hv_new_A_plus_B_minus==$hv_max}
+ 
+shift_a={$shift_a+$step_size}
+shift_b={$shift_b-$step_size}
+hv_old=$hv_new_A_plus_B_minus
+
+-elif {$hv_new_A_minus_B_plus==$hv_max}
+ 
+shift_a={$shift_a-$step_size}
+shift_b={$shift_b+$step_size}
+hv_old=$hv_new_A_minus_B_plus
+
+-elif {$hv_new_A_minus_B_minus==$hv_max}
+ 
+shift_a={$shift_a-$step_size}
+shift_b={$shift_b-$step_size}
+hv_old=$hv_new_A_minus_B_minus
+
+-endif
+
+		step_size={$step_size/2}	
+
+		red_mul={round((2^$shift_a),0.1,0)}
+		blue_mul={round((2^$shift_b),0.1,0)}
+
+-done
+
+-iain_rgb_mix_wb[0] $shift_a,$shift_b
+-k[0]
+
+-if $norm_out
+-n 0,255
+-endif
+-c 0,255
+-if $6
+-negate
+-endif
+
+-endl
+-done
+
+
+iain_rgb_mix_wb:
+-remove_opacity
+-split c
+-mul[0] {2^$1}
+-mul[2] {2^$2}
+-append c
+
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+
+
 #@gui 2D_scopes: iain_2d_scopes,iain_2d_scopes(1)
 #@gui : Y axis = choice (1,"Yuv","yUv","yuV","Hsv","hSv","hsV","Lab","lAb","laB","lCh","lcH","Cmyk","cMyk","cmYk","cmyK","Rgb","rGb","rgB")
 #@gui : X axis = choice (2,"Yuv","yUv","yuV","Hsv","hSv","hsV","Lab","lAb","laB","lCh","lcH","Cmyk","cMyk","cmYk","cmyK","Rgb","rGb","rgB")
