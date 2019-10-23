@@ -72,18 +72,49 @@ fx_darken_sky_preview :
 #---------------------
 #@gui afre
 
-#@gui Vigrect : fx_vigrect, fx_vigrect_preview(1)
-#@gui : Size(%) = int(10,1,25)
-#@gui : Blur(%) = int(10,5,20)
-#@gui : Opacity = float(.75,.5,1)
-#@gui : sep = separator(), note = note("Filter by <i>afre</i>. Latest update: <i>2017-01-05</i>.")
-fx_vigrect :
-  p={min(w,h)*$1/100}
-  +to_gray rectangle. {[$p,$p,w-$p,h-$p]}
-  f. i==0?0:ia#0 b. {min(w,h)*$2/100} *. $3 - c 0,255
+#@gui Vigrect : afre_vigrect, afre_vigrect_preview(0)
+#@gui : note = note("<strong>Add rectangular vignette.\n</strong>* Negative strength will brighten periphery.\n\n<strong>Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2017-2019.</strong>\n\n")
+#@gui : Size = int(50,1,100)
+#@gui : Strength = int(75,-500,500)
+#@gui : Blur = int(10,1,50)
+#@gui : Left-Right = int(50,0,100)
+#@gui : Up-Down = int(50,0,100)
+#@cli afre_vigrect : 1<=size<=100, -500<=_strength<=500, 1<=_blur<=50, 0<=_position_x<=100, 0<=_position_y<=100
+#@cli : Add rectangular vignette. Negative strength will brighten periphery.
+#@cli : Default values: 'size=50', 'strength=75', 'blur=10', 'position_x=50' and 'position_y=50'.
+afre_vigrect:
+  check "${1=50}>=1 && ${2=75}>=-500 && ${3=10}>=1 && ${4=50}>=0 && ${5=50}>=0"
+  check "$1<=100 && $2<=500 && $3<=50 && $4<=100 && $5<=100"
+  e[^-1] " Add circular vignette using size=$1, strength=$2, position_x=$3, position_y=$4."
+  v - repeat $! l[$>] iM={iM} min={min(w,h)}
+    s={$min/100*(50.5-$1/2)} tx={$min/100*($4-50)} ty={$min/100*($5-50)}
+    +f x<$s+$tx||x>w-$s+$tx||y<$s+$ty||y>h-$s+$ty
+    distance. 0 b. {$min/100*$3} -. {im} *. {$2/100} -
+  c 0,$iM endl done v +
 
-fx_vigrect_preview :
-  fx_vigrect $*
+afre_vigrect_preview :
+  afre_vigrect $*
+
+#@gui Vigcirc : afre_vigcirc, afre_vigcirc_preview(0)
+#@gui : note = note("<strong>Add circular vignette.\n</strong>* Negative strength will brighten periphery.\n\n<strong>Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019.</strong>\n\n")
+#@gui : Size = int(90,50,150)
+#@gui : Strength = int(75,-500,500)
+#@gui : Left-Right = int(50,0,100)
+#@gui : Up-Down = int(50,0,100)
+#@cli afre_vigcirc : 50<=size<=150, -500<=_strength<=500, 0<=_position_x<=100, 0<=_position_y<=100
+#@cli : Add circular vignette. Negative strength will brighten periphery.
+#@cli : Default values: 'size=90', 'strength=75', 'position_x=50' and 'position_y=50'.
+afre_vigcirc :
+  check "${1=90}>=50 && ${2=75}>=-500 && ${3=50}>=0 && ${4=50}>=0"
+  check "$1<=150 && $2<=500 && $3<=100 && $4<=100"
+  e[^-1] " Add circular vignette using size=$1, strength=$2, position_x=$3, position_y=$4."
+  v - repeat $! l[$>] iM={iM} min={min(w,h)}
+    +f 1 circle. $3%,$4%,{($min/2-2)/100*$1}
+    distance. 0 b. 1 -. {im} *. {$2/100} -
+  c 0,$iM endl done v +
+
+afre_vigcirc_preview :
+  afre_vigcirc $*
 
 #@gui Gamify : fx_gamify, fx_gamify_preview(1)
 #@gui : Lightness = int(50,50,60)
@@ -120,13 +151,13 @@ fx_hnorm_preview :
   fx_hnorm $*
 
 #@gui Clean Text : afre_cleantext, afre_cleantext_preview(0)
-#@gui : note = note("<strong>Cleans scanned text. &nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019.</strong>\n\n")
+#@gui : note = note("<strong>Clean scanned text. &nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019.</strong>\n\n")
 #@gui : Clean = int(8,0,10)
 #@gui : Range = float(1,0.2,1)
 #@gui : Black = int(80,0,100)
 #@gui : White = int(95,0,100)
 #@cli afre_cleantext : 0<=clean<=10, 0.2<=_range<=1, 0<=_black<=100, 0<=_white<=100
-#@cli : Cleans scanned text.
+#@cli : Clean scanned text.
 #@cli : Default values: 'clean=8', 'range=1', 'black=80' and 'white=95'.
 afre_cleantext :
   check "${1=8}>=0 && ${2=1}>=0.2 && ${3=80}>=0 && ${4=95}>=0"
@@ -156,7 +187,7 @@ afre_hnorm :
   v - repeat $! l[$>] hessian sqr s c + sqrt endl done v +
 
 #@cli afre_y50 : colour_space={ 0=Rec.709 | 1=Rec.2020 }
-#@cli : Computes D50 luminance.
+#@cli : Compute D50 luminance.
 #@cli : Default value: 'colour_space=1'.
 afre_y50 : skip ${1=1}
   v - if !isbool($1) v + error[] " * (>_<) * $0: Parameter must be '0' (Rec.709) or '1' (Rec.2020)." fi
