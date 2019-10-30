@@ -9,13 +9,13 @@
 #                ( https://discuss.pixls.us/u/reptorian/summary )
 #
 #  License     : CeCILL v2.0
-#                ( http://www.cecill.info/licences/Licence_CeCILL_V2-en.html )
+#                ( http://cecill.info/licences/Licence_CeCILL_V2-en.html )
 #
 #  This software is governed by the CeCILL  license under French law and
 #  abiding by the rules of distribution of free software.  You can  use,
 #  modify and/ or redistribute the software under the terms of the CeCILL
 #  license as circulated by CEA, CNRS and INRIA at the following URL
-#  "http://www.cecill.info".
+#  "http://cecill.info".
 #
 #  As a counterpart to the access to the source code and  rights to copy,
 #  modify and redistribute granted by the license, users are provided only
@@ -44,6 +44,245 @@
 #
 #-------------------------------
 
+#@cli rep_colmt: (eq. to rep_color_modulo_texture)
+rep_colmt: rep_color_modulo_texture $*
+#@cli rep_color_modulo_texture: _modulo_method_1= { 0=Mod | 1=Reflected Mod | 2=Divmod | 3=Reflected Divmod },_modulo_value_a_1>0,_modulo_value_b_1>0,_angle_1<=360,_value_shift_1>0,_centered_1= { 0=Not centered | 1=Centered },_negate_mod_1= { 0=Not Negated | 1=Negated },_normalize_bool_1= { 0=Do not Normalize | 1=Normalize },_modulo_method_2= { 0=Mod | 1=Reflected Mod | 2=Divmod | 3=Reflected Divmod },_modulo_value_a_2>0,_modulo_value_b_2>0,_angle_2<=360,_value_shift_2>0,_centered_2= { 0=Not centered | 1=Centered },_negate_mod_2= { 0=Not Negated | 1=Negated },_normalize_bool_2= { 0=Do not Normalize | 1=Normalize },_modulo_method_3= { 0=Mod | 1=Reflected Mod | 2=Divmod | 3=Reflected Divmod },_modulo_value_a_3>0,_modulo_value_b_3>0,_angle_3<=360,_value_shift_3>0,_centered_3= { 0=Not centered | 1=Centered },_negate_mod_3= { 0=Not Negated | 1=Negated },_normalize_bool_3= { 0=Do not Normalize | 1=Normalize },_modulo_method_4= { 0=Mod | 1=Reflected Mod | 2=Divmod | 3=Reflected Divmod },_modulo_value_a_4>0,_modulo_value_b_4>0,_angle_4<=360,_value_shift_4>0,_centered_4= { 0=Not centered | 1=Centered },_negate_mod_4= { 0=Not Negated | 1=Negated },_normalize_bool_4= { 0=Do not Normalize | 1=Normalize },_diagonal_flip= { 0=not flipped | 1 = flipped },0<=_colorspacemode<=11,_contain_alpha= { 0=no_alpha | 1=alpha },_subpixel_processing_level>0,_interpolation= { 0=Nearest | 1=Average | 2=Linear | 3=Grid | 4=Bicubic | 5=Lanczos },0<=_channel_num_1<=4,0<=_channel_num_2<=4,0<=_channel_num_3<=4,0<=_channel_num_4<=4
+#@cli : Inspired by MadJik's Color Modulo Texture for Paint.NET, this is a extension of that filter converted into G'MIC form. New features is being able to change color space, allow alpha, and anti-aliasing.\n
+#@cli : '_modulo_method' defines what method of modulo operation would be applied to each channel.
+#@cli : '_modulo_value_a' and 'modulo_value_b' is value used for calculation of modulo of function per channel.
+#@cli : '_angle' defines the function angle.
+#@cli : '_centered' defines if the function are centered.
+#@cli : '_value_shift' adds value to function before modulo calculation.
+#@cli : '_centered' is used to place function within -.5,.5 range instead of 0,1 range.
+#@cli : '_negate_mod' negates the end modulo value.
+#@cli : '_normalize_bool' is used to normalize values. Note - This can be used to make the filter behave similar to Madjik's Color Modulo Texture filter.
+#@cli : '_diagonal_flip' is used to flip diagonal function.
+#@cli : '_colorspacemode' defines the color space of modulo.
+#@cli : '_contain_alpha' adds alpha value to modulo. In the case of CMYK, this option is nullified, and K is used to replace alpha instead.
+#@cli : '_subpixel_processing_level' defines the subpixel processing level.
+#@cli : '_interpolation' defines the method of interpolation.
+#@cli : '_channel_num' defines the order of channel.\n
+#@cli : Default values: '_modulo_method=3','_modulo_value_a=64','_modulo_value_b=255','_angle=0','_value_shift=0','_centered=1','_negate_mod=0','_normalize_bool=0','_diagonal_flip=0','_colorspacemode=3','_contain_alpha=0','_subpixel_processing_level=1','_interpolation=3','_channel_num_1=0','_channel_num_2=1','_channel_num_3=2','_channel_num_4=3'
+#@cli : $ rep_color_modulo_texture 2,150,32,30,50,1,0,1,,,,,,,,,,,,,,,,,,,,,,,,,0,0,1,1.5,4,0,1,2,3
+rep_color_modulo_texture:
+skip ${1=},${2=},${3=},${4=},${5=},${6=},${7=},${8=},${9=},${10=},${11=},${12=},${13=},${14=},${15=},${16=},${17=},${18=},${19=},${20=},${21=},${22=},${23=},${24=},${25=},${26=},${27=},${28=},${29=},${30=},${31=},${32=},${33=1},${34=3},${35=0},${36=1},${37=3},${38=0},${39=1},${40=2},${41=3}
+if narg($1)  modulo_method_1={$1%4}  else modulo_method_1=3 fi
+if narg($2)  modvalue_a_1={abs($2)}  else modvalue_a_1=196 fi
+if narg($3)  modvalue_b_1={abs($3)}  else modvalue_b_1=255 fi
+if narg($4)  angle_1=$4              else angle_1=0 fi
+if narg($5)  value_shift_1=$5        else value_shift_1=0 fi
+if narg($6)  center_1=$6             else center_1=1 fi
+if narg($7)  negate_1=$7             else negate_1=0 fi
+if narg($8)  normalize_1=$8          else normalize_1=0 fi
+if narg($9)  modulo_method_2={$9%4}  else modulo_method_2=$modulo_method_1 fi
+if narg($10) modvalue_a_2={abs($10)} else modvalue_a_2=$modvalue_a_1 fi
+if narg($11) modvalue_b_2={abs($11)} else modvalue_b_2=$modvalue_b_1 fi
+if narg($12) angle_2=$12             else angle_2=$angle_1 fi
+if narg($13) value_shift_2=$13       else value_shift_2=$value_shift_1 fi
+if narg($14) center_2=$14            else center_2=$center_1 fi
+if narg($15) negate_2=$15            else negate_2=$negate_1 fi
+if narg($16) normalize_2=$16         else normalize_2=$normalize_1 fi
+if narg($17) modulo_method_3={$17%4} else modulo_method_3=$modulo_method_2 fi
+if narg($18) modvalue_a_3={abs($18)} else modvalue_a_3=$modvalue_a_2 fi
+if narg($19) modvalue_b_3={abs($19)} else modvalue_b_3=$modvalue_b_2 fi
+if narg($20) angle_3=$20             else angle_3=$angle_2 fi
+if narg($21) value_shift_3=$21       else value_shift_3=$value_shift_2 fi
+if narg($22) center_3=$22            else center_3=$center_2 fi
+if narg($23) negate_3=$23            else negate_3=$negate_2 fi
+if narg($24) normalize_3=$24         else normalize_3=$normalize_2 fi
+if narg($25) modulo_method_4={$25%4} else modulo_method_4=$modulo_method_3 fi
+if narg($26) modvalue_a_4={abs($26)} else modvalue_a_4=$modvalue_a_3 fi
+if narg($27) modvalue_b_4={abs($27)} else modvalue_b_4=$modvalue_b_3 fi
+if narg($28) angle_4=$28             else angle_4=$angle_3 fi
+if narg($29) value_shift_4=$29       else value_shift_4=$value_shift_3 fi
+if narg($30) center_4=$30            else center_4=$center_3 fi
+if narg($31) negate_4=$31            else negate_4=$negate_3 fi
+if narg($32) normalize_4=$32         else normalize_4=$normalize_3 fi
+modnum_1={min($modvalue_a_1,$modvalue_b_1)}
+modnum_2={min($modvalue_a_2,$modvalue_b_2)}
+modnum_3={min($modvalue_a_3,$modvalue_b_3)}
+modnum_4={min($modvalue_a_4,$modvalue_b_4)}
+maxmodnum_1={max($modvalue_a_1,$modvalue_b_1)}
+maxmodnum_2={max($modvalue_a_2,$modvalue_b_2)}
+maxmodnum_3={max($modvalue_a_3,$modvalue_b_3)}
+maxmodnum_4={max($modvalue_a_4,$modvalue_b_4)}
+lcmod_1=$38
+lcmod_2=$39
+lcmod_3=$40
+lcmod_4=$41
+cs=$34
+alp={$35?1}
+diag=$33
+interpolation={abs($37)+1}
+subpixel={abs($36)+1}
+tc={$cs!=3?3+$alp:4}
+if $modvalue_a_1==$modvalue_b_1 v + error "Mod Value A for first channel and Mod Value B for first channel cannot be the same value!" v - fi
+if $modvalue_a_2==$modvalue_b_2 v + error "Mod Value A for second channel and Mod Value B for second channel cannot be the same value!" v - fi
+if $modvalue_a_3==$modvalue_b_3 v + error "Mod Value A for third channel and Mod Value B for third channel cannot be the same value!" v - fi
+if $tc==4 if $modvalue_a_4==$modvalue_b_4 v + error "Mod Value A for fourth channel and Mod Value B for fourth channel cannot be the same value!" v - fi fi
+repeat $! l[$>]
+    iw={w}
+    ih={h}
+    maxv={max($iw,$ih)}
+    sd={min($iw,$ih)/max($iw,$ih)}
+    sx={w<h?$sd:1}
+    sy={h<w?$sd:1}
+    msx={.5*1*$sx}
+    msy={.5*1/$sy}
+    center=1
+    f 0 r {$interpolation?$subpixel*100:100}%,{$interpolation?$subpixel*100:100}%,100%,$tc
+    ($lcmod_1,$lcmod_2,$lcmod_3,$lcmod_4)
+    l.
+        s x ti=$! remove_duplicates
+        if $!!=$ti v + error "Invalid channel inputs!" v - fi a x
+    endl
+    repeat $tc sh[0] {i(#1,$>,0)} done rm[1]
+    f[1] begin(ang=pi*($angle_1/180));ix=(x/w)-.5;iy=(y/h)-.5;ix*=$sx;iy*=$sy;IX=ix*cos(ang)-iy*sin(ang);IX+=!$center_1?$msx;IX*=$maxv;ix=IX;ix if $center_1||$modulo_method_1==3 abs[1] fi
+        if $negate_1 negate[1] fi
+        +[1] $value_shift_1
+        modf[1] $modulo_method_1,$maxmodnum_1,{($maxmodnum_1-$modnum_1)/$maxmodnum_1}
+        if $normalize_1 n[1] $modnum_1,$maxmodnum_1 fi
+    f[2] begin(ang=pi*($angle_2/180));ix=(x/w)-.5;iy=(y/h)-.5;ix*=$sx;iy*=$sy;IY=ix*sin(ang)+iy*cos(ang);IY+=!$center_2?$msy;IY*=$maxv;iy=IY;iy if $center_2||$modulo_method_2==3 abs[2] fi
+        if $negate_2 negate[2] fi
+        +[2] $value_shift_2
+        modf[2] $modulo_method_2,$maxmodnum_2,{($maxmodnum_2-$modnum_2)/$maxmodnum_2}
+        if $normalize_2 n[2] $modnum_2,$maxmodnum_2 fi
+    f[3] begin(ang=pi*($angle_3/180));ix=(x/w)-.5;iy=(y/h)-.5;ix*=$sx;iy*=$sy;IX=ix*cos(ang)-iy*sin(ang);IY=ix*sin(ang)+iy*cos(ang);IX+=!$center_3?$msx;IX*=$maxv;IY+=!$center_3?$msy;IY*=$maxv;ix=IX;iy=IY;if($center_3||$modulo_method_3==3,($diag?(abs(ix)+abs(iy)):abs(abs(ix)-abs(iy))),($diag?ix+iy:-ix+iy))
+        if $negate_3 negate[3] fi
+        +[3] $value_shift_3
+        modf[3] $modulo_method_3,$maxmodnum_3,{($maxmodnum_3-$modnum_3)/$maxmodnum_3}
+        if $normalize_3 n[3] $modnum_3,$maxmodnum_3 fi
+    if $tc==4
+        f[4] begin(ang=pi*($angle_4/180));ix=(x/w)-.5;iy=(y/h)-.5;ix*=$sx;iy*=$sy;IX=ix*cos(ang)-iy*sin(ang);IY=ix*sin(ang)+iy*cos(ang);IX+=!$center_4?$msx;IX*=$maxv;IY+=!$center_4?$msy;IY*=$maxv;ix=IX;iy=IY;if($center_4||$modulo_method_4==3,(!$diag?(abs(ix)+abs(iy)):abs(abs(ix)-abs(iy))),(!$diag?ix+iy:-ix+iy))
+        if $negate_4 negate[4] fi
+        +[4] $value_shift_4
+        modf[4] $modulo_method_4,$maxmodnum_4,{($maxmodnum_4-$modnum_4)/$maxmodnum_4}
+        if $normalize_4 n[4] $modnum_4,$maxmodnum_4 fi
+    fi
+    k[0]
+    if $interpolation&&$subpixel>1 r $iw,$ih,100%,100%,$interpolation fi
+    if $cs!=3
+        if $cs!=0 sh 0,2 fi
+        if $cs==1 ryb2rgb.
+        elif $cs==2 cmy2rgb.
+        elif $cs==4 hsi82rgb.
+        elif $cs==5 hsl82rgb.
+        elif $cs==6 hsv82rgb.
+        elif $cs==7 lab82rgb.
+        elif $cs==8 lch82rgb.
+        elif $cs==9 yiq82rgb.
+        elif $cs==10 yuv82rgb.
+        elif $cs==11 ycbcr2rgb.
+        elif $cs==12 ycbcrglic2rgb.
+        elif $cs==13 xyz82rgb.
+        fi
+        if $cs!=0 rm. fi
+    else
+        cmyk2rgb
+    fi
+endl done
+#@cli rep_shape_brick: brick_width>0,brick_height>0,_mortar_width>0,_mortar_height>0,_outline>=0,_bevel>=0,_bevel_style= { 0=Round | 1=Inverse Round | 2=Diamond },-1>=_shift_val>=1,_shift_direction= { 0=horizontal | 1=vertical },_flip_offset= { 0= Do Not Flip | 1= Flip },_subpixel_processing_level>=0
+#@cli : 'brick_width' - Width of brick(s)
+#@cli : 'brick_height' - Height of brick(s)
+#@cli : '_mortar_width' - Filling width between brick(s)
+#@cli : '_mortar_height' - Filling height between brick(s)
+#@cli : '_outline' - Thickness of outline of brick(s)
+#@cli : '_bevel' - Beveling of corners of brick(s)
+#@cli : '_bevel_style' - Form of beveling of brick(s)
+#@cli : '_shift_val' - Shift of bricks
+#@cli : '_shift_direction' - Direction of shift
+#@cli : '_flip_offset' - Determines which order the offset from original, to original.
+#@cli : '_subpixel_level' - Degree of antialiasing of brick(s)\n
+#@cli : Default values: '_mortar_width','_mortar_height','_outline',
+rep_shape_brick:
+skip ${3=10},${4=10},${5=0},${6=0},${7=0},${8=1},${9=0},${10=0},${11=0}
+sublevel={abs($11)}
+sublevel+=1
+brick_width={abs($1)*$sublevel}
+brick_height={abs($2)*$sublevel}
+mortar_width={abs($3)*$sublevel}
+mortar_height={abs($4)*$sublevel}
+outline={abs($5)*$sublevel}
+bevel={abs($6)*$sublevel}
+bevel_style=$7
+shift_val=$8
+shift_direction=$9
+flip_offset=$10
+
+if !(($brick_width&&$brick_height)||$bevel) v + error "Brick Area must be greater than 0!" v - fi
+
+if $bevel
+    if $bevel_style==0||$bevel_style==1 shape_circle {$bevel*2}
+    else shape_diamond {$bevel*2} fi
+    *. 2
+    if $outline
+        if $bevel_style==0||$bevel_style==1 shape_circle {($bevel+$outline)*2}
+        else shape_diamond {floor($bevel+($outline*(cos(45/180*pi)+sin(45/180*pi))))*2} r. {($bevel+$outline)*2},{($bevel+$outline)*2},100%,100%,0,0,.5,.5 fi
+        j[-1] [-2],.5~,.5~,0,0,.5,[-2]
+        rm..
+    fi
+    s. x,2
+    s[-2,-1] y,2
+fi
+
+{$brick_width<$bevel*2?$bevel*2:$brick_width},{$brick_height<$bevel*2?$bevel*2:$brick_height},1,1,1
+
+if $outline expand_xy. $outline,0 fi +. 1
+
+if $bevel if $bevel_style==1 negate[-5--2] +f[-5--2] i==2?0:1 fi fi
+
+if $bevel
+    if $bevel_style==1
+    j[-5] [-9],1~,1~,0,0,1,[-4]
+    j[-5] [-8],1~,0~,0,0,1,[-3]
+    j[-5] [-7],0~,1~,0,0,1,[-2]
+    j[-5] [-6],0~,0~,0,0,1,[-1]
+    rm[-4--1]
+    else
+    j[-1] [-5],0~,0~
+    j[-1] [-4],0~,1~
+    j[-1] [-3],1~,0~
+    j[-1] [-2],1~,1~
+    fi
+    rm[-5--2]
+fi
+
+mw={w}
+mh={h}
+mw/=2
+mh/=2
+
+r. {w+$mortar_width},{h+$mortar_height},100%,100%,0,0,{!$flip_offset},{!$flip_offset}
+
+if $shift_val
+    if $shift_direction +shift. 0,{$shift_val*$mh+($mortar_height/2*($shift_val?1:-1))},0,0,2 a[-2,-1] x if $flip_offset mirror. x fi
+    else +shift. {$shift_val*$mw+($mortar_height/2*($shift_val?1:-1))},0,0,0,2 a[-2,-1] y if $flip_offset mirror. y fi
+    fi
+fi
+
+if $sublevel-1 r2dx. {(1/$sublevel)*100}%,5 fi
+#@cli rep_z_render: _reverse_z_layer={ 0=first_layer | last_layer },_z_depth_value>0,_mirror_order={ 0=do_not_mirror | 1=mirror },_color_z_render={ 0=image_z_per_luminosity | 1=image_z_per_channel }
+#@cli : Generates the resulting image based on z-map layer.\n
+#@cli : '_reverse_z_layer' determines whether the first or last layer should be used to determine the "frame" to use.
+#@cli : '_z_depth_value' can be described as how smooth the transition between images should be
+#@cli : '_mirror_order' can be used to reorder the image transition
+#@cli : '_color_z_render' sets whether the transition are separated by channels or not.
+#@cli : Note: Try to use gradient as the z-layer.\n
+#@cli : Default values: '_reverse_layer=0','_z_depth_value=255','_mirror_order=0','_color_z_render=0'\n
+rep_z_render:
+skip ${1=0},${2=255},${3=0},${4=0}
+if $!<3 v + error "You need at least 3 images!" v - fi
+if $1 rv[0,-1] rv[0,-2] fi
+if !$4 to_gray[0] fi
+rep_aspect_crop_2d[^0] {w#0},{h#0}
+r[^0] {w#0},{h#0},100%,100%,3
+a[^0] z
+n[0] 0,$2
+r[^0] 100%,100%,$2,100%,3
+if $3 negate[0] fi
+r[0] 100%,100%,100%,{s#-1}
+f[0] i(#-1,x,y,i,c,3,1)
+k[0]
 #@cli rep_acb: (eq. to rep_autofill_coloring_book)
 rep_acb: rep_autofill_coloring_book $*
 #@cli rep_autofill_coloring_book: 0<threshold<1,_dilate_erode>=0,_color_mode={ 0=hard | 1= soft },0<=_alpha_threshold<1,_seed
@@ -61,8 +300,8 @@ repeat $! l[$>]
     sh 0,2
     if s#0==4 sh.. {s} vv={iv#-1} fi
     rep_acb_color[1] ${1-3}
-    if s#0==4 
-        if ($4>0&&$4<1)&&$vv f. i>(iM*$4)?255:0 fi 
+    if s#0==4
+        if ($4>0&&$4<1)&&$vv f. i>(iM*$4)?255:0 fi
     fi
     k[0]
 endl done
@@ -73,7 +312,7 @@ to_gray n 0,1
 if !iv#-1 v + error "Invalid Image!" v - fi
 if $3 +store line fi
 f i>=$1?1:0
-if abs($2) 
+if abs($2)
     if $2<0 dilate {abs($2)}
     else erode {abs($2)}
 fi fi
@@ -93,7 +332,7 @@ done
 repeat $cv
     temp_1={i(round(u(1,$cv)))}
     temp_2={i(round(u(1,$cv)))}
-    if $temp_1!=$temp_2 
+    if $temp_1!=$temp_2
         f. i==$temp_1?$temp_2:(i==$temp_2?$temp_1:i)
     fi
 done
@@ -103,7 +342,7 @@ if $3
     +select_color 0,0,0
     inpaint_pde [1],0,0,0
     rm.
-    restore line
+    $line
     f.. i*i0#-1
     rm.
 fi
@@ -146,7 +385,7 @@ for(in=2,in<=int(round(abs(i)))/2,++in,isP=round(abs(i))%in==0?0:1;if(isP==0,bre
 isP=round(abs(i))>1?isP:0;
 "
 #@cli rep_prime_surface: _width,_height,_negate= { 0=do_not_negate | 1=negate },_mirror
-#@cli: Creates a simple prime surface by combining rep_isprime and spiralbw. Due to the time-consuming nature, this command will only create a new prime surface once. 
+#@cli: Creates a simple prime surface by combining rep_isprime and spiralbw. Due to the time-consuming nature, this command will only create a new prime surface once.
 #@cli: Default values: '_width=last_image_width','_height=last_image_height'
 rep_prime_surface:
 skip ${1=w},${2=h},${3=1},${4=0}
@@ -195,7 +434,7 @@ aang={360/$1}
 repeat $1 +rep_sdaxy[0] $2,{$>*$aang+$3},$5,$6 done if {$4==0} rm[0] fi
 #@cli rep_frblur: (eq. to rep_fragment_blur)
 rep_frblur: rep_fragment_blur $*
-#@cli rep_fragment_blur: duplicates_count>=2,_radius_offset>0,_offset_angle,_keep_original = { 0=remove_original | 1=keep_original },_boundary_condition = { 0=None | 1=Neumann | 2=Periodic | 3=Mirror },_interpolation={ 0=nearest_neighbor | 1=linear },_color_space = { 0=RGB | 1=SRGB | 2=RYB | 3=CMYK | 4=HCY | 5=HSI | 6=HSL | 7=HSV | 8=LAB | 9=LCH } 
+#@cli rep_fragment_blur: duplicates_count>=2,_radius_offset>0,_offset_angle,_keep_original = { 0=remove_original | 1=keep_original },_boundary_condition = { 0=None | 1=Neumann | 2=Periodic | 3=Mirror },_interpolation={ 0=nearest_neighbor | 1=linear },_color_space = { 0=RGB | 1=SRGB | 2=RYB | 3=CMYK | 4=HCY | 5=HSI | 6=HSL | 7=HSV | 8=LAB | 9=LCH }
 #@cli : Fragment Blur is a effect that originated from the Windows software named Paint.NET. Copies or "fragments" of images are superimposed over their respective images. Copies are redrawn at a distance, and starting copy starts from the right at 0. \n
 #@cli : _radius_offset refers to the distance the duplicates are from the original image. Each circular duplicates are of the same distance. radius_offset can be in percentage form, or in integer form. When it is in percentage form, the length of each duplicates offset is equal to the percentage of hypotenuse of image.
 #@cli : _offset_angle refers to the starting angle the original duplicate is at. The primary duplicate starts from the right.
@@ -204,13 +443,13 @@ rep_frblur: rep_fragment_blur $*
 rep_fragment_blur:
 skip ${2=5%},${3=0},${4=0},${5=1},${6=1},${7=0}
 repeat $! l[$>]
-    if ${is_percent\ $2} dist={abs($2)*(sqrt(w^2+h^2))} 
+    if ${is_percent\ $2} dist={abs($2)*(sqrt(w^2+h^2))}
     else dist=abs($2) fi
     tcr=3
     convert_back=0
     if (s==3||s==4)&&$7
         convert_back=1
-        if $7!=3 
+        if $7!=3
             sh 0,2
             if $7==1 rgb2srgb.
             elif $7==2 rgb2ryb.
@@ -240,7 +479,7 @@ repeat $! l[$>]
             rep_frblur_2. $1,$dist,${3-6}
             rm.
         fi
-    else 
+    else
         rep_frblur_2 $1,$dist,${3-6}
     fi
     if $convert_back
@@ -271,11 +510,11 @@ mina={im#-1}
 vr={iv#-1}
 maxa={iM#-1}
 rm.
-if $mina<=0 
+if $mina<=0
     if ($vr==0)&&($mina==0)
         v + error "Cannot be used on empty alpha!" v -
     elif $mina<0
-        v + error "Last channel is cannot contain values less than zero!" v - 
+        v + error "Last channel is cannot contain values less than zero!" v -
     fi
 fi
 f i{s-1}?i:0
@@ -776,7 +1015,7 @@ if {$A==$B} if {w>h} r {h},100%,1,100%,0,0,{.5+$shift_factor/2},.5 else r 100%,{
 if {($A/$B)>(w/h)} r 100%,{$B/$A*(w/h)*100}%,1,100%,0,0,0.5,{.5+$shift_factor/2} else r {$A/$B/(w/h)*100}%,100%,1,100%,0,0,{.5+$shift_factor/2},0.5 fi fi
 endl done
 #@cli rep_nebulous: _main_surf_xy_factor>0,_main_surf_x_factor>0,_main_surf_y_fact>0,-100<=_x_center[%]<=100,-100<=_y_center[%]<=100,0<=_fxyangle<=360,_wave,0<=_lighting_angle<=360,_disturbance>=0,_distx,_disty,0<=_distangle<=360,_disturbance_mode={ 0= do_not_scale | 1=scale_by_axisfact },_color={ 0=gray | 1=color },0<=_alpha_base<=2,_subpixelevel,0<=_subpixelprocessingmethod<=4
-#@cli : Creates a nebulous texture inspired by its PDN equivalent. 
+#@cli : Creates a nebulous texture inspired by its PDN equivalent.
 #@cli : Default value: '_main_surf_x_factor=10','_main_surf_y_factor=10','_x_center[%]=0','_y_center[%]=0','_fxangle=0','_wave=1','_lighting_angle=0','_disturbance=0','_distx=100','_disty=100','_distangle=0','_disturbance_mode=0','_color=1','_alpha_base=0','_subpixellevel=1','_subpixelprocessingmethod=1'
 #@cli : $ rep_nebulous 10,,,,,45,,,2000,100,100,45,,0,1 n 0,255
 rep_nebulous:
@@ -790,21 +1029,25 @@ else to_rgb fi
 if $15 r $iw,$ih,1,{s+1} fi
 if $16>1 r {$iw*($16+1)},{$ih*($16+1)},1,{s} fi
 f "
+begin(
 sd=w/h;
 shx=($4*w)/2;
 shy=($5*h)/2;
 ang=pi*$6/180;
+distlvl=$9*$1;
+dist=pi/(distlvl/100);
+disth=$10;
+distv=$11;
+dang=pi*$12/180;
+k=pi+((-pi+(pi*$7))*10)/10;
+ld=($8-$6)*pi/180;
+);
 ix=(((x+shx)/w-.5)*1.5*($1*10))/(h>w?1/sd:1);
 iy=(((y+shy)/h-.5)*1.5*($1*10))/(w>h?sd:1);
 IX=ix*cos(ang)-iy*sin(ang);
 IY=ix*sin(ang)+iy*cos(ang);
 IX*=$2*4;
 IY*=$3*4;
-distlvl=$9*$1;
-dist=pi/(distlvl/100);
-disth=$10;
-distv=$11;
-dang=pi*$12/180;
 dix=(x/w-.5)*2/(h>w?1/sd:1);
 diy=(y/h-.5)*2/(w>h?sd:1);
 DIX=dix*cos(dang)-diy*sin(dang);
@@ -813,8 +1056,6 @@ cx=DIX*($13?$2:1);
 cy=DIY*($13?$3:1);
 IX+=distlvl>0?(disth*(sin(((cx+cy)/2)/dist)-cos(((cy-cx)/2)/dist)));
 IY+=distlvl>0?(-distv*(sin(((cx+cy)/2)/dist)+cos(((cy-cx)/2)/dist)));
-k=pi+((-pi+(pi*$7))*10)/10;
-ld=($8-$6)*pi/180;
 t=atan2(IY,IX);
 r=sqrt(IX*IX+IY*IY);
 r/=100;
@@ -842,11 +1083,11 @@ influence_var=$3
 shift_var={($ws+1)/2}
 dir={$axis?($ws>=0?1:-1):($ws<0?1:-1)}
 s c
-l. alpha_max={iM} 
-alpha_middle={iM/2} 
+l. alpha_max={iM}
+alpha_middle={iM/2}
 endl
 f. $threshold_var>0?($threshold_var==1?(i<(1-10^-8)*$alpha_max?0:i):(i<$threshold_var*$alpha_max?0:i)):i
-a c 
+a c
 +channels {$is-1}
 f. i==0?0:$alpha_max
 if $axis
@@ -932,7 +1173,7 @@ rep_binaltquad: rep_binary_alterating_quad_texture $*
 #@cli : Generates a texture full of alternating quadrilateral shapes using binary logic. Converted, and extended from Asmageddon Quaddro Bumperoo/Inverto Paint.NET source code.
 rep_binary_alterating_quad_texture:
 skip ${4=128},${5=2},${6=0},${7=0},${8=0},${9=256},${10=255},${11=1}
-channels 0 
+channels 0
 style=$1
 var_1=$2
 var_2=$3
@@ -944,7 +1185,7 @@ y_dir=$8
 modnum=$9
 normalize=$10
 allow_normal=$11
-f ang=pi*($angle/180);sd=w/h;ix=((x/w)-.5)/(h>w?1/sd:1);iy=((y/h)-.5)/(w>h?sd:1);IX=ix*cos(ang)-iy*sin(ang);IY=ix*sin(ang)+iy*cos(ang);ix=IX;iy=IY;ix+=.5/(h>w?1/sd:1);iy+=.5/(w>h?sd:1);ix=(w>h?ix*w:ix*h);iy=(w>h?iy*w:iy*h);ix=round(ix)+1;iy=round(iy)+1;$style==2?((!$x_dir?xor(ix,$var_1):xor(w-ix,$var_1))+(!$y_dir?xor(iy,$var_2):xor(h-iy,$var_2)))%$modnum:(int(((($style==1?($operand?($operand==1?(((($x_dir?w-ix:ix)|int($var_1))+(($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(($x_dir?w-ix:ix),int($var_1))+xor(($y_dir?h-iy:iy),int($var_2)))%$modnum):((($x_dir?w-ix:ix)&int($var_1))+(($y_dir?h-iy:iy)&int($var_2)))):($operand?($operand==1?(((-($x_dir?w-ix:ix)|int($var_1))+(-($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(-($x_dir?w-ix:ix),int($var_1))+xor(-($y_dir?h-iy:iy),int($var_2)))%$modnum):((-($x_dir?w-ix:ix)&int($var_1))+(-($y_dir?h-iy:iy)&int($var_2)))))/(int($operand!=2?$var_3:-$var_3)*2))-int(($style==1?($operand?($operand==1?(((($x_dir?w-ix:ix)|int($var_1))+(($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(($x_dir?w-ix:ix),int($var_1))+xor(($y_dir?h-iy:iy),int($var_2)))%$modnum):((($x_dir?w-ix:ix)&int($var_1))+(($y_dir?h-iy:iy)&int($var_2)))):($operand?($operand==1?(((-($x_dir?w-ix:ix)|int($var_1))+(-($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(-($x_dir?w-ix:ix),int($var_1))+xor(-($y_dir?h-iy:iy),int($var_2)))%$modnum):((-($x_dir?w-ix:ix)&int($var_1))+(-($y_dir?h-iy:iy)&int($var_2)))))/(int($operand!=2?$var_3:-$var_3)*2)))*($style==1?($operand?($operand==1?(((($x_dir?w-ix:ix)|int($var_1))+(($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(($x_dir?w-ix:ix),int($var_1))+xor(($y_dir?h-iy:iy),int($var_2)))%$modnum):((($x_dir?w-ix:ix)&int($var_1))+(($y_dir?h-iy:iy)&int($var_2)))):($operand?($operand==1?(((-($x_dir?w-ix:ix)|int($var_1))+(-($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(-($x_dir?w-ix:ix),int($var_1))+xor(-($y_dir?h-iy:iy),int($var_2)))%$modnum):((-($x_dir?w-ix:ix)&int($var_1))+(-($y_dir?h-iy:iy)&int($var_2))))))<int($operand!=2?$var_3:-$var_3)?($style==1?($operand?($operand==1?(abs($modnum)-1)-(((($x_dir?w-ix:ix)|int($var_1))+(-($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(($x_dir?w-ix:ix),int($var_1))+xor(-($y_dir?h-iy:iy),int($var_2)))%$modnum):((($x_dir?w-ix:ix)&int($var_1))+(-($y_dir?h-iy:iy)&int($var_2)))%$modnum):($operand?($operand==1?(abs($modnum)-1)-(((($x_dir?w-ix:ix)|int($var_1))+(($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(($x_dir?w-ix:ix),int($var_1))+xor(($y_dir?h-iy:iy),int($var_2)))%$modnum):((($x_dir?w-ix:ix)&int($var_1))+(($y_dir?h-iy:iy)&int($var_2)))%$modnum)):($style==1?($operand?($operand==1?(abs($modnum)-1)-(((-($x_dir?w-ix:ix)|int($var_1))+(($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(-($x_dir?w-ix:ix),int($var_1))+xor(($y_dir?h-iy:iy),int($var_2)))%$modnum):((-($x_dir?w-ix:ix)&int($var_1))+(($y_dir?h-iy:iy)&int($var_2)))%$modnum):($operand?($operand==1?(abs($modnum)-1)-(((-($x_dir?w-ix:ix)|int($var_1))+(-($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(-($x_dir?w-ix:ix),int($var_1))+xor(-($y_dir?h-iy:iy),int($var_2)))%$modnum):((-($x_dir?w-ix:ix)&int($var_1))+(-($y_dir?h-iy:iy)&int($var_2)))%$modnum)))
+f begin(ang=pi*($angle/180);sd=w/h;);ix=((x/w)-.5)/(h>w?1/sd:1);iy=((y/h)-.5)/(w>h?sd:1);IX=ix*cos(ang)-iy*sin(ang);IY=ix*sin(ang)+iy*cos(ang);ix=IX;iy=IY;ix+=.5/(h>w?1/sd:1);iy+=.5/(w>h?sd:1);ix=(w>h?ix*w:ix*h);iy=(w>h?iy*w:iy*h);ix=round(ix)+1;iy=round(iy)+1;$style==2?((!$x_dir?xor(ix,$var_1):xor(w-ix,$var_1))+(!$y_dir?xor(iy,$var_2):xor(h-iy,$var_2)))%$modnum:(int(((($style==1?($operand?($operand==1?(((($x_dir?w-ix:ix)|int($var_1))+(($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(($x_dir?w-ix:ix),int($var_1))+xor(($y_dir?h-iy:iy),int($var_2)))%$modnum):((($x_dir?w-ix:ix)&int($var_1))+(($y_dir?h-iy:iy)&int($var_2)))):($operand?($operand==1?(((-($x_dir?w-ix:ix)|int($var_1))+(-($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(-($x_dir?w-ix:ix),int($var_1))+xor(-($y_dir?h-iy:iy),int($var_2)))%$modnum):((-($x_dir?w-ix:ix)&int($var_1))+(-($y_dir?h-iy:iy)&int($var_2)))))/(int($operand!=2?$var_3:-$var_3)*2))-int(($style==1?($operand?($operand==1?(((($x_dir?w-ix:ix)|int($var_1))+(($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(($x_dir?w-ix:ix),int($var_1))+xor(($y_dir?h-iy:iy),int($var_2)))%$modnum):((($x_dir?w-ix:ix)&int($var_1))+(($y_dir?h-iy:iy)&int($var_2)))):($operand?($operand==1?(((-($x_dir?w-ix:ix)|int($var_1))+(-($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(-($x_dir?w-ix:ix),int($var_1))+xor(-($y_dir?h-iy:iy),int($var_2)))%$modnum):((-($x_dir?w-ix:ix)&int($var_1))+(-($y_dir?h-iy:iy)&int($var_2)))))/(int($operand!=2?$var_3:-$var_3)*2)))*($style==1?($operand?($operand==1?(((($x_dir?w-ix:ix)|int($var_1))+(($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(($x_dir?w-ix:ix),int($var_1))+xor(($y_dir?h-iy:iy),int($var_2)))%$modnum):((($x_dir?w-ix:ix)&int($var_1))+(($y_dir?h-iy:iy)&int($var_2)))):($operand?($operand==1?(((-($x_dir?w-ix:ix)|int($var_1))+(-($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(-($x_dir?w-ix:ix),int($var_1))+xor(-($y_dir?h-iy:iy),int($var_2)))%$modnum):((-($x_dir?w-ix:ix)&int($var_1))+(-($y_dir?h-iy:iy)&int($var_2))))))<int($operand!=2?$var_3:-$var_3)?($style==1?($operand?($operand==1?(abs($modnum)-1)-(((($x_dir?w-ix:ix)|int($var_1))+(-($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(($x_dir?w-ix:ix),int($var_1))+xor(-($y_dir?h-iy:iy),int($var_2)))%$modnum):((($x_dir?w-ix:ix)&int($var_1))+(-($y_dir?h-iy:iy)&int($var_2)))%$modnum):($operand?($operand==1?(abs($modnum)-1)-(((($x_dir?w-ix:ix)|int($var_1))+(($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(($x_dir?w-ix:ix),int($var_1))+xor(($y_dir?h-iy:iy),int($var_2)))%$modnum):((($x_dir?w-ix:ix)&int($var_1))+(($y_dir?h-iy:iy)&int($var_2)))%$modnum)):($style==1?($operand?($operand==1?(abs($modnum)-1)-(((-($x_dir?w-ix:ix)|int($var_1))+(($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(-($x_dir?w-ix:ix),int($var_1))+xor(($y_dir?h-iy:iy),int($var_2)))%$modnum):((-($x_dir?w-ix:ix)&int($var_1))+(($y_dir?h-iy:iy)&int($var_2)))%$modnum):($operand?($operand==1?(abs($modnum)-1)-(((-($x_dir?w-ix:ix)|int($var_1))+(-($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(-($x_dir?w-ix:ix),int($var_1))+xor(-($y_dir?h-iy:iy),int($var_2)))%$modnum):((-($x_dir?w-ix:ix)&int($var_1))+(-($y_dir?h-iy:iy)&int($var_2)))%$modnum)))
 if $allow_normal n 0,$normalize fi
 #@cli rep_binaltquadc: (eq. to rep_binary_alterating_quad_c)
 rep_binaltquadc: rep_binary_alterating_quad_c $*
@@ -971,9 +1212,9 @@ r 100%,100%,100%,$tch
 if {$tch==3} ($4,$5,$6)
 elif {$tch==4} ($4,$5,$6,$7)
 elif {$tch==5} ($4,$5,$6,$7,$8)
-fi 
+fi
 
-tc={w#1} s. x remove_duplicates tw={$!-1} if $tw<$tc v + error "Invalid Channel Order!" v - fi 
+tc={w#1} s. x remove_duplicates tw={$!-1} if $tw<$tc v + error "Invalid Channel Order!" v - fi
 a[^0] x rv
 ($*)
 if ($cs_mode==3||(($cs_mode>8&&$cs_mode<11)||$cs_mode<3))||$bitmode (256,256,256,256,255)
@@ -1026,7 +1267,7 @@ else
             fi
             cut 0,255
         else
-            if $cs_mode>3&&$cs_mode<7 
+            if $cs_mode>3&&$cs_mode<7
                 f s<4?[i0,i1/100,i2/100,i3]:[i0,i1/100,i2/100]
                 if $cs_mode==4 hsi2rgb
                 elif $cs_mode==5 hsv2rgb
@@ -1060,11 +1301,11 @@ rep_strbul: rep_strange_bulger $*
 #@cli rep_strange_bulger : 0<=_angle<=360,_axis={ 0 = X-Axis | 1 = Y-Axis },_interpolation,_boundary_condition
 #@cli : Performs a bulge effect found in Strange Bulger Series made by Asmageddon for Paint.NET.
 rep_strange_bulger:
-f "
-Ang=$1;
-BulgeAng=Ang*(pi/180);
+f "begin(
+BulgeAng=$1*(pi/180);
 cX=w/2;
 cY=h/2;
+);
 vx=$2?x:cX-x;
 vy=$2?cY-y:y;
 vx=(vx^2)/cX;
@@ -1093,7 +1334,7 @@ if $12==0 v + error "dimension_reference cannot be 0!" v - fi
 
 shift {50*$4}%,{50*$5}%,0,0,3,1
 
-f "
+f "begin(
 BulgeAng=pi*((h>w?360-$1:$1)/180);
 ang=pi*($8/180);
 sd=w/h;
@@ -1106,6 +1347,12 @@ OY=ox*sin(ang)+oy*cos(ang);
 ox=OX;
 oy=OY;
 ed=abs(int($12));
+id=w>h?ed/w:ed/h;
+iw=w*id;
+ih=h*id;
+cx=iw/2;
+cy=ih/2;
+);
 ix=((x/w)-.5)/(h>w?1/sd:1);
 iy=((y/h)-.5)/(w>h?sd:1);
 IX=ix*cos(ang)-iy*sin(ang);
@@ -1114,13 +1361,8 @@ ix=IX;
 iy=IY;
 ix+=.5/(h>w?1/sd:1);
 iy+=.5/(w>h?sd:1);
-id=w>h?ed/w:ed/h;
-iw=w*id;
-ih=h*id;
 ix*=ed;
 iy*=ed;
-cx=iw/2;
-cy=ih/2;
 xx=sqrt(abs(ix-cx-ox*(cx>cy?cx:cy)));
 yy=sqrt(abs(iy-cy-oy*(cx>cy?cx:cy)));
 xx*=$3*ed;
@@ -1148,7 +1390,7 @@ if $17<1 v + error "interpolation cannot be less than 1" v - fi
 
 shift {50*$2}%,{50*$3}%,0,0,3,1
 f "
-sd=w/h;
+begin(sd=w/h;
 ang=pi*($10/180);
 ox=$4*-1;
 oy=$5;
@@ -1158,6 +1400,11 @@ OX=ox*cos(ang)-oy*sin(ang);
 OY=ox*sin(ang)+oy*cos(ang);
 ox=OX;
 oy=OY;
+ed=int(abs($18));
+ed/=2;
+dx=($14?1:-1);
+dy=($15?1:-1);
+);
 ix=((x/w)-.5)/(h>w?1/sd:1);
 iy=((y/h)-.5)/(w>h?sd:1);
 IX=ix*cos(ang)-iy*sin(ang);
@@ -1166,14 +1413,10 @@ ix=IX;
 iy=IY;
 ix=abs(ix+ox/2)*$6;
 iy=abs(iy+oy/2)*$7;
-ed=int(abs($18));
-ed/=2;
 ix*=ed;
 iy*=ed;
 lx=ix==0||iy==0?log(1^-8)*$1:log($12?iy^2:ix*iy)*$1;
 ly=ix==0||iy==0?log(1^-8)*$1:log($13?ix^2:ix*iy)*$1;
-dx=($14?1:-1);
-dy=($15?1:-1);
 ix-=lx*dx;
 iy-=ly*dy;
 ix*=w/ed;
@@ -1193,7 +1436,7 @@ if $17<1 v + error "interpolation cannot be less than 1" v - fi
 
 shift {50*$2}%,{50*$3}%,0,0,3,1
 
-f "ed=int(abs($18));
+f "begin(ed=int(abs($18));
 sd=w/h;
 ang=pi*($10/180);
 ox=$4;
@@ -1204,6 +1447,7 @@ OX=ox*cos(ang)-oy*sin(ang);
 OY=ox*sin(ang)+oy*cos(ang);
 ox=OX;
 oy=OY;
+);
 ix=((x/w)-.5)/(h>w?1/sd:1);
 iy=((y/h)-.5)/(w>h?sd:1);
 IX=ix*cos(ang)-iy*sin(ang);
@@ -1239,16 +1483,16 @@ i(vx,vy,z,c,$17,($16?3:2));
 if $11 shift 50%,50%,0,0,3,1 fi
 #@cli rep_stitch: _intensity,_thickness,_modulo,_interpolation,_boundary,0<_sublevel,randomize_stitching,0<=_angle<=360..._angle
 #@cli: Multiple angles are permitted.
-rep_stitch: 
+rep_stitch:
 repeat $! l[$>]
 is={s}
 iw={w}
 ih={h}
 l[0] ($*) rv endl
-if i(#0,3,0)<0 v + error "Interpolation cannot be less than zero!" v - fi 
+if i(#0,3,0)<0 v + error "Interpolation cannot be less than zero!" v - fi
 f[0] "x==3?i+1:i"
 if w#0<8 v + error "There must be angle input!" v - fi
-if w#0==8 _rep_stitch. {i(#0,0,0)},{i(#0,7,0)},{crop(#0,1,0,6,1)} rm[0] 
+if w#0==8 _rep_stitch. {i(#0,0,0)},{i(#0,7,0)},{crop(#0,1,0,6,1)} rm[0]
 else
 interpolation={i(#0,3,0)}
 repeat {w#0-8} . done
@@ -1269,7 +1513,7 @@ ih={h}
 if $5>0 r {($7+1)*100}%,{($7+1)*100}%,100%,100%,1 fi
 {w},{h},1,1,sur=x*cos($ang)+y*sin($ang);res=floor(sur/($3*($7+1)));$4?abs(res)%$4:abs(res)
 {max(1,round(iM,1,1))},1,1,1,u(-1,1) n. -1,1 map.. . rm.
-repeat s#0 
+repeat s#0
     sh[0] $>
     f. "sx=($7+1)*$1*cos("$ang2")*i#1;sy=($7+1)*$1*sin("$ang2")*i#1;sx+=x;sy+=y;i(sx,sy,z,c,$5,$6)" rm.
 done
@@ -1298,9 +1542,7 @@ if $5<-1||$5>1 v + error "Invalid Number - Variable 4" v - fi
 if $12<0 v + error "Invalid Number - Variable" 12 v - fi
 if $13<=0 v + error "Invalid Number - Variable" 13 v - fi
 r2dx {($12+1)*100}%,$13
-f "
-dr=max(w,h)/min(w,h);
-ang=pi*(($3*-1)/180);
+f "begin(dr=max(w,h)/min(w,h);ang=pi*(($3*-1)/180););
 xx=((x-$4*w/2)/w-.5)*2;
 yy=((y+$5*h/2)/h-.5)*2;
 xx*=w>h?dr:1;
@@ -1355,7 +1597,7 @@ if $vv!=0
 +channels {s-1}
 f. i==0?0:1 .
 f[2] "begin(A = resize([ 0,(s#0-1)],s,s#0-1));I+A" norm[2] round[2] 0.01 label[2] 0 {iM+1},1,1,{0,1}
-f[1] ">i(#3,i(#2,x,y,z,0),0,0,c)+=i;i" n. 0,1 map[2] . 
+f[1] ">i(#3,i(#2,x,y,z,0),0,0,c)+=i;i" n. 0,1 map[2] .
 f. i==im#-1?1:i
 min_pas_zero={im#-1}
 tmm={1-$min_pas_zero}
@@ -1402,12 +1644,12 @@ if $isnis
 else
     r {ceil(w/abs($2))*abs($2)},{ceil(h/abs($3))*abs($3)},100%,100%,0,1,.5,.5
 fi
-if $isnis 
-    if $!>1 apply_parallel[^0] "restore shape_reference rv _rep_form_pixel $*"
-    else apply_parallel "restore shape_reference rv _rep_form_pixel $*"
+if $isnis
+    if $!>1 apply_parallel[^0] "$shape_reference rv _rep_form_pixel $*"
+    else apply_parallel "$shape_reference rv _rep_form_pixel $*"
     fi
-else 
-    apply_parallel "_rep_form_pixel $*" 
+else
+    apply_parallel "_rep_form_pixel $*"
 fi
 _rep_form_pixel:
 skip ${4=},${5=},${6=},${7=},${8=}
@@ -1438,19 +1680,19 @@ isnum_sid={isnum($sid)}
 isint_sid={isint($sid)}
 isnis={$isnum_sid&&$isint_sid}
 
-l[0] 
+l[0]
     if !$isnis
-        if $#>8 shape_$sid {max($tw,$th)*$sub},${9--1} 
-        else shape_$sid {max($tw,$th)*$sub} 
-        fi 
-        rv 
-    fi 
+        if $#>8 shape_$sid {max($tw,$th)*$sub},${9--1}
+        else shape_$sid {max($tw,$th)*$sub}
+        fi
+        rv
+    fi
 endl
 if abs($ang)%360!=0 rotate[0] $ang,1 fi
 if $mi==1 mirror[0] x elif $mi==2 mirror[0] y fi
 n[0] 0,1
 if $isnis
-    if s#0<=4&&s#0>1 l[0] s c,{if(s==4,-3,if(s==2,-1,-s))} if $!==2 to_gray.. *[-2,-1] else to_gray fi endl 
+    if s#0<=4&&s#0>1 l[0] s c,{if(s==4,-3,if(s==2,-1,-s))} if $!==2 to_gray.. *[-2,-1] else to_gray fi endl
     elif s#0==5 l[0] s c,-4 cmyk2rgb.. to_gray.. *[-2,-1] endl fi
 fi
 autocrop[0] 0
@@ -1467,7 +1709,7 @@ repeat $!-1 l[0,{$>+1}]
     ti_w={$!-1}
     s[^0] y,{h#1/h#0}
     ti_h={($!-1)/$ti_w}
-    repeat $!-1 l[0,{$>+1}] 
+    repeat $!-1 l[0,{$>+1}]
         .
         repeat s#-1
             sh. $>
@@ -1493,6 +1735,263 @@ repeat $!-1 l[0,{$>+1}]
     endl
 endl done
 rm[0]
+#@cli rep_tfrac: (eq. to rep_thorn_fractal)
+rep_tfrac: rep_thorn_fractal $*
+#@cli rep_thorn_fractal: style= { -1= Custom Formula | 0= Normal | 1= Normal Inverted | 2= Tanh Stroke 1 | 3= Tanh Stroke 2 | 4= Asymphological Vibrato | 5= Asymphological Basic | 6= Asymphological Basic 2 | 7= Asymphochaos | 8= Petallian | 9= Semi-Thorny Petallian | 10= Thorny Petal 1| 11= Thorny Petal 2 | 12= Inflation | 13= Inflation 2 | 14= Earthing | 15= Acrylic Earthing | 16= Unearthing Origami | 17= Cubic Unearthing | 18= Webbing Cubic Unearthing | 19= Chaotic Hooks | 20= Echo Wide | 21= Echo Squircle | 22= Echo Hall | 23= Echo Hall 2 | 24= Liquid Parabolic | 25= Chaos-Vibrato | 26= Chaos Deep-Vibrato | 27= Chaos Spacetime | 28= Parabolic | 29= Parabolic Chaos | 30= Cubic-Diamond Chaos | 31= C-Line | 32= Contour Chaos | 33= Spiderweb-Diamond | 34= Acrylica | 35= Refractive Space | 36= Smooth-Artistry | 37= Ferrofluid | 38= Triangular Interweaving | 39= Fabric Chaos | 40= Reverse Tangent Division | 41= Chaotic Tangent | 42= Alternating Chaos 1 | 43= Alternating Chaos 2 | 44= Alternating Chaos 3 | 45= Alternating Chaos 4 },_escape>0,_iteration>0,_subsampling_level>=1,_cx,_cy,_r_xy>0,_r_x>0,_r_y>0,_r_pi= { 0=r_xy multiplied by 1 | 1=r_xy multiplied by pi },_o_x,_o_y,_function_angle,_norm_01,_custom_x,_custom_y
+#@cli : Thorn Fractal is the fractal attributed to Andrew Wayne Graff, alternatively named the "Secant Sea". The code was adapted from Sample C source code provided by Adam Majewski.\n
+#@cli : Source - http://paulbourke.net/fractals/thorn/#dane\n
+#@cli : Alternating Chaos Formula are alternating formula founded by MadJik and are originally implemented in Fractal Attractor Plugin for Paint.NET.
+#@cli : \n
+#@cli : 'style' variable is used to define how the thorn fractal will look like with predefined formula. Use a value less than 0 to use custom formula.
+#@cli : 'escape' variable is used to define the minimum value to escape from the iterative loop.
+#@cli : 'iteration' variable defines how much repetition of loop used to find the end value.
+#@cli : 'subsampling_level' defines the subsampling level of image.
+#@cli : 'cx' is a number used to add to a variable involving distortion within the x-axis during the loop used for fractal generation.
+#@cli : 'cy' is a number used to add to a variable involving distortion within the y-axis during the loop used for fractal generation.
+#@cli : 'r_xy' defines how much the general infinite line boundary will repeat within the xy axis.
+#@cli : 'r_x' defines how much the general infinite line boundary will repeat within the x axis.
+#@cli : 'r_y' defines how much the general infinite line boundary will repeat within the y axis.
+#@cli : 'r_pi' is used as a multiple to r_xy or to normalize the xmin and xmax to pi ranges.
+#@cli : 'o_x' offset the resulting image within the x-direction.
+#@cli : 'o_y' offset the resulting image within the y-direction.
+#@cli : 'ang' defines the function angle of the thorn fractal.
+#@cli : 'norm_01' is boolean option that defines whether the function will be normalized to 0-1 range.
+#@cli : 'custom_x' variable is used to define custom formula for vx variable for the thorn fractal formula by default.
+#@cli : 'custom_y' variable is used to define custom formula for vy variable for the thorn fractal formula by default.\n
+#@cli : - Note on custom formula usage -\n
+#@cli : Available adjustible variable: vx,vy,a,b\n
+#@cli : 'a' defines result of number defined by vx equation based on the number of repeats needed to escape from the iterative loop to check when resulting value is greater than escape number.
+#@cli : 'b' defines result of number defined by vy equation based on the number of repeats needed to escape from the iterative loop to check when resulting value is greater than escape number.
+#@cli : 'vx' defines the formula used to distort by the x-axis.
+#@cli : 'vy' defines the formula used to distort by the y-axis.\n
+#@cli : Multiple expressions are supported, and they are separated by the character semicolon-[;]. Furthermore, the usage of commas-[,] requires you to wrap them around with quotation marks-["]. See example of usage with commas. If it the only expression, then it would be used for calculation of vx or vy. Otherwise, the first expression may be the only one used for calculation of vx or vy.\n
+#@cli : - End of Note on custom formula usage -\n
+#@cli : Default values: '_escape=50000','_iteration=255','_subsampling_level=4','_cx=0','_cy=0','_r_xy=1','_r_x=1','_r_y=1','_r_pi=1','_o_x=0','_o_y=0','_function_angle=0','_norm_01=1','_custom_x=','_custom_y='
+#@cli : $ 1024,1024,1,1 rep_thorn_fractal -1,10000,255,4,2.544,-5.2424,1,1,1/2,1,0,0,30,1,atan2(a^2\,b^2)/cos(b),b/sin(a)
+rep_thorn_fractal:
+skip ${2=50000},${3=255},${4=4},${5=0},${6=0},${7=1},${8=1},${9=1},${10=1},${11=0},${12=0},${13=0},${14=1},${15=},${16=}
+if $1<0 if !(narg($15)&&narg($16)) v + error "When using custom formula, there must be an arguments into custom_x and custom_y variables" fi fi
+if $2<=0 v + error "Escape Variable cannot be zero or less than zero!" v - fi
+if $3<1 v + error "Iteration Variable must be at least 1!" v - fi
+if $4<1 v + error "Subsampling level must be at least 1!" v - fi
+if !(($7>0&&$8>0)&&$9>0) v + error "Repeat variables cannot be 0!" v - fi
+repeat $! l[$>]
+ww={w}
+hh={h}
+r {$4*100}%,{$4*100}%,1,1,0
+r {w%2==0?w+1:w},{h%2==0?h+1:h},1,1,0
+f "begin(altern=0;ang=pi*($13/180);sd=max(w,h)/min(w,h););
+xx=2*((x/w)-.5);
+yy=2*((y/h)-.5);
+if(w>h,xx*=sd,yy*=sd);
+zx=$8*($10?pi:1)*$7*((xx*cos(ang)-yy*sin(ang))+($11*cos(ang)-$12*sin(ang)));
+zy=$9*($10?pi:1)*$7*((xx*sin(ang)+yy*cos(ang))+($11*sin(ang)+$12*cos(ang)));
+vx=zx;
+vy=zy;
+for(v=0,v<$3,v++,
+    a=vx;
+    b=vy;
+    if($1<0,
+        vx=$15;
+        vy=$16;
+        );
+    if($1==0,
+        vx=a/cos(b);
+        vy=b/sin(a);
+        );
+    if($1==1,
+        vx=a/sin(b);
+        vy=b/cos(a);
+        );
+    if($1==2,
+        vx=a/tan(b);
+        vy=b/tan(a);
+        );
+    if($1==3,
+        vx=(a/cos(b))*sin(b);
+        vy=(b/sin(a))*cos(a);
+        );
+    if($1==4,
+        vx=(a*tan(a*b))/sin(b);
+        vy=(b*tan(a*b))/cos(a);
+        );
+    if($1==5,
+        vx=(a+tan(a*b))/sin(b);
+        vy=(b+tan(a*b))/cos(a);
+        );
+    if($1==6,
+        vx=(a-tan(a*b))/sin(b);
+        vy=(b-tan(a*b))/cos(a);
+        );
+    if($1==7,
+        vx=(a/(cos(b)))+(a/(sin(b)));
+        vy=(b/(cos(a)))+(b/(sin(a)));
+        );
+    if($1==8,
+        vx=a/(cos(b)*sin(b));
+        vy=b/(sin(a)*cos(a));
+        );
+    if($1==9,
+        vx=a/(cos(tan(b))*sin(tan(b)));
+        vy=b/(sin(tan(a))*cos(tan(a)));
+        );
+    if($1==10,
+        vx=(tan(a)+b)/(cos(tan(b))*sin(tan(b)));
+        vy=(tan(b)+a)/(sin(tan(a))*cos(tan(a)));
+        );
+    if($1==11,
+        vx=(a+tan(a)+tan(b))/(cos(tan(b))*sin(tan(b)));
+        vy=(b+tan(a)+tan(b))/(sin(tan(a))*cos(tan(a)));
+        );
+    if($1==12,
+        vx=(a+tan(a)+tan(b))/cos(a);
+        vy=(b+tan(a)+tan(b))/sin(a);
+        );
+    if($1==13,
+        vx=(a+tan(a)+tan(b))/sin(b);
+        vy=(b+tan(a)+tan(b))/cos(a);
+        );
+    if($1==14,
+        vx=(a+tan(a)/tan(b))/cos(a);
+        vy=(b+tan(a)/tan(b))/sin(b);
+        );
+    if($1==15,
+        vx=(b+tan(a)/tan(b))/cos(a);
+        vy=(a+tan(a)/tan(b))/sin(b);
+        );
+    if($1==16,
+        vx=(b+tan(b)/tan(a))/cos(a);
+        vy=(a+tan(a)/tan(b))/sin(b);
+        );
+    if($1==17,
+        vx=(b+tan(b)/tan(a))/cos(a);
+        vy=(a+tan(b)/tan(a))/sin(b);
+        );
+    if($1==18,
+        vx=(b+tan(a)/tan(a))/cos(a);
+        vy=(a+tan(b)/tan(a))/sin(b);
+        );
+    if($1==19,
+        vx=b+tan(a)/(a/(cos(b)))+(a/(sin(b)));
+        vy=a+tan(b)/(b/(cos(a)))+(b/(sin(a)));
+        );
+    if($1==20,
+        vx=a/sin(a/sin(b));
+        vy=b/cos(b/cos(a));
+        );
+    if($1==21,
+        vx=a/cos(a/sin(b));
+        vy=b/sin(b/cos(a));
+        );
+    if($1==22,
+        vx=a/cos(a/atan(sin(b)));
+        vy=b/sin(b/atan(cos(a)));
+        );
+    if($1==23,
+        vx=a/sin(a/atan(cos(b)));
+        vy=b/cos(b/atan(sin(a)));
+        );
+    if($1==24,
+        vx=a/atan(cos(b));
+        vy=b/atan(sin(a));
+        );
+    if($1==25,
+        vx=(a+tanh(a*b))/cos(b);
+        vy=(b+tanh(a*b))/sin(a);
+        );
+    if($1==26,
+        vx=b+tan(b)/(a/(cos(b)))+(a/(sin(a)));
+        vy=a+tan(a)/(b/(cos(a)))+(b/(sin(b)));
+        );
+    if($1==27,
+        vx=(a+tanh(a+b))/cos(b);
+        vy=(b+tanh(a+b))/sin(a);
+        );
+    if($1==28,
+        vx=(a/sin(b))/tan(b);
+        vy=(b/cos(a))/tan(a);
+        );
+    if($1==29,
+        vx=a/(tan(b)*cos(b)*sin(b));
+        vy=b/(tan(a)*cos(a)*sin(a));
+        );
+    if($1==30,
+        vx=a/tan(cos(b));
+        vy=b/tan(sin(a));
+        );
+    if($1==31,
+        vx=(a+tanh(a*b))/(cos(b)*sin(a));
+        vy=(b+tanh(a*b))/(sin(b)*cos(a));
+        );
+    if($1==32,
+        vx=(a+tan(cos(a)*sin(b)))/cos(a);
+        vy=(b+tan(sin(a)*cos(b)))/sin(b);
+        );
+    if($1==33,
+        vx=(tan(a+b)*b)/cos(b);
+        vy=(tan(a-b)*a)/sin(a);
+        );
+    if($1==34,
+        vx=(a/cos(b))*sin(a);
+        vy=(b/sin(a))*cos(b);
+        );
+    if($1==35,
+        vx=a/tan(cos(b)+sin(b));
+        vy=b/tan(cos(a)+sin(a));
+        );
+    if($1==36,
+        vx=a+(tanh(a+b)/cos(b));
+        vy=b+(tanh(a+b)/sin(a));
+        );
+    if($1==37,
+        vx=(a/(cos(b)))/(b/(sin(a)));
+        vy=(b/(cos(a)))/(a/(sin(b)));
+        );
+    if($1==38,
+        vx=(a*tan(a+b))/sin(b);
+        vy=(b*tan(a+b))/cos(a);
+        );
+    if($1==39,
+        vx=a/(atan2(b^2,a^2)*tan(b));
+        vy=b/(atan2(b^2,a^2)*tan(a));
+        );
+    if($1==40,
+        vx=tan(a)/b;
+        vy=tan(b)/a;
+        );
+    if($1>=41,
+        vx=a/atan(b/cos(a/sin(a)));
+        vy=b/atan(a/sin(b/cos(b)));
+        );
+    if($1>41,
+        if(altern==0,
+            vx=a/cos(b);
+            vy=b/sin(a);
+        );
+        if(altern==1,
+            vx=a/sin(b);
+            vy=b/cos(a);
+        );
+        if(altern==2,
+            vx=a/tan(b);
+            vy=b/tan(a);
+        );
+        if(altern==3,
+            vx=a/atan(b);
+            vy=b/atan(a);
+        );
+        altern+=1;
+        if(altern>($1-38),altern=0);
+    );
+    vx+=$5;
+    vy+=$6;
+    if((vx^2+vy^2)>$2,break())
+);
+abs(zx)!=0&&abs(zy)!=0?v;
+"
+r {$ww},{$hh},1,1,5
+if $14 n 0,1 fi
+endl done
 #@gui _<b>Testing</b>
 #@gui <i>Reptorian</i>
 
@@ -2045,71 +2544,174 @@ u "{$1}"\
 goof_res: repeat $! l[$>] if $2 s x,$1 repeat {$1/2-1} a[0,{$>+2}] x done a[^0] x if $4 rv fi if $3 a y else a x fi else  $2 s y,$1 repeat {$1/2-1} a[0,{$>+2}] y done a[^0] y if $4 rv fi if $3 a y else a x fi fi endl done
 goof_res_preview: goof_res $*
 
-#@gui Color Modulo Texture : colmt,colmt_preview(0)
-#@gui : note = note("This filter is inspired by <i><a href="https://forums.getpaint.net/topic/7186-madjik-all-plugins-last-updated-2018-04-07/">MadJik's<small><small>.</small></small></a></i> PDN plugin named <i>Color Modulo</i>. This version offers more features than the original plugin for Paint.NET such as channel swapping, color space, and finally, modulo forms."), sep = separator()
-#@gui : Color Space = choice(0,"RGB8","CMY8","CMYK8","HSI8","HSL8","HSV8","LAB8","LCH8","YIQ8","YUV8","XYZ8")
-#@gui : sep = separator(), note = note("<b>Main Section</b>")
-#@gui : Interpolation = choice(2,"None","Nearest","Average","Linear","Grid","Bicubic","Lanczos")
-#@gui : Interpolation Factor = int(5,1,5)
-#@gui : Reverse Diagonal = bool(0)
-#@gui : Maximum Channel Value = float(255,2,255)
-#@gui : Channel #1 Modulo Method = choice(0,"Modulo","Modulo - Continuous","Divisive Modulo","Divisive Modulo - Continuous")
-#@gui : End Value = float(255,2,512)
-#@gui : Negate Channel = bool(0)
-#@gui : Channel #2 Modulo Method = choice(0,"Modulo","Modulo - Continuous","Divisive Modulo","Divisive Modulo - Continuous")
-#@gui : End Value = float(255,2,512)
-#@gui : Negate Channel = bool(0)
-#@gui : Channel #3 Modulo Method = choice(0,"Modulo","Modulo - Continuous","Divisive Modulo","Divisive Modulo - Continuous")
-#@gui : End Value = float(255,2,512)
-#@gui : Negate Channel = bool(0)
-#@gui : Channel #4 Modulo Method = choice(0,"Modulo","Modulo - Continuous","Divisive Modulo","Divisive Modulo - Continuous")
-#@gui : End Value = float(255,2,512)
-#@gui : Negate Channel = bool(0)
-#@gui : sep = separator(), note = note("<i>Channel Order</i>\n\nPick numbers to order the channels")
-#@gui : First Channel = choice(0,"Channel 1","Channel 2","Channel 3","Channel 4")
-#@gui : Second Channel = choice(1,"Channel 1","Channel 2","Channel 3","Channel 4")
-#@gui : Third Channel = choice(2,"Channel 1","Channel 2","Channel 3","Channel 4")
-#@gui : Fourth Channel = choice(3,"Channel 1","Channel 2","Channel 3","Channel 4")
-#@gui : Alpha Channel = bool(1)
-#@gui : note = note("<small>If CMYK is chosen as color space, then there is no alpha channel.</small>")
-colmt: repeat $! l[$>]
-modulo_texture_pre ${2-21}
-if {$1==0} a[0-2] c
-elif {$1==1} a[0-2] c cmy2rgb..
-elif {$1==2} a c cmyk2rgb
-elif {$1==3} a[0-2] c hsi82rgb..
-elif {$1==4} a[0-2] c hsl82rgb..
-elif {$1==5} a[0-2] c hsv82rgb..
-elif {$1==6} a[0-2] c lab82rgb..
-elif {$1==7} a[0-2] c lch82rgb..
-elif {$1==8} a[0-2] c yiq82rgb..
-elif {$1==9} a[0-2] c yuv82rgb..
-elif {$1==10} a[0-2] c xyz82rgb..
+#@gui Color Modulo Texture: gui_rep_colmt,gui_rep_colmt_preview
+#@gui : note = note("This filter is inspired by <a href="https://forums.getpaint.net/topic/111782-color-modulo-texture-tool-ymd20170922/">Color Modulo</a> plugin made by <b>MadJik</b> for <a href="https://www.getpaint.net/">Paint.NET</a> software.\n\nPreview is inaccurate! Use 100% Zoom Preview for most accuracy!"), sep = separator()
+#@gui : note = note("<b>Colour and Channel Setting</b>"), sep = separator()
+#@gui : note = note("- Colour Space and Alpha Setting -")
+#@gui : Colour Space = choice(0,"RGB-8","RYB-8","CMY-8","CMYK-8","HSI-8","HSL-8","HSV-8","LAB-8","LCH-8","YIQ-8","YUV-8","YCbCr-8","YCbCrGLIC-8","XYZ-8")
+#@gui : Contain Alpha? = bool(0)
+#@gui : sep = separator(), note = note("- Channel Setting -")
+#@gui : Channel Order = choice(0,"1-2-3-4","1-2-4-3","1-3-2-4","1-3-4-2","1-4-2-3","1-4-3-2","2-1-3-4","2-1-4-3","2-3-1-4","2-3-4-1","2-4-1-3","2-4-3-1","3-1-2-4","3-1-4-2","3-2-1-4","3-2-4-1","3-4-1-2","3-4-2-1","4-1-2-3","4-1-3-2","4-2-1-3","4-2-3-1","4-3-1-2","4-3-2-1")
+#@gui : Channel Order = choice(0,"1-2-3","1-3-2","2-1-3","2-3-1","3-1-2","3-2-1")
+#@gui : Edit Multiple Channel Separately? = bool(1)
+#@gui : sep = separator(), note = note("<b>Diagonal Setting</b>"), sep = separator()
+#@gui : Flip Diagonal? = bool(0)
+#@gui : sep = separator(), note = note("<b>Modulo Texture Setting</b>")
+#@gui : sep = separator(), note = note("- Multichannel Editing-")
+#@gui : Modulo Mode = choice(3,"Regular Modulo","Continuous Regular Modulo","Divisive Modulo","Continuous Divisive Modulo")
+#@gui : Modulo Variable #1 = int(0,0,255)
+#@gui : Modulo Variable #2 = int(255,0,255)
+#@gui : Function Angle = float(0,-180,180)
+#@gui : Value Shift = int(0,0,255)
+#@gui : Centered = bool(0)
+#@gui : Negate = bool(0)
+#@gui : Normalize = bool(0)
+#@gui : note = note("<small>Option available when <u>Edit Multiple Channel Separately</u> is turned off</small>")
+#@gui : sep = separator(), note = note("- Separate Channel Editing -")
+#@gui : Channel Section = choice(0,"Channel #1","Channel #2","Channel #3","Channel #4")
+#@gui : Channel Section = choice(0,"Channel #1","Channel #2","Channel #3")
+#@gui : note = note("<small>Option available when <u>Edit Multiple Channel Separately</u> is turned on</small>"), sep = separator()
+#@gui : Modulo Mode = choice(3,"Regular Modulo","Continuous Regular Modulo","Divisive Modulo","Continuous Divisive Modulo")
+#@gui : Modulo Variable #1 = int(0,0,255)
+#@gui : Modulo Variable #2 = int(255,0,255)
+#@gui : Function Angle = float(0,-180,180)
+#@gui : Value Shift = int(0,0,255)
+#@gui : Centered = bool(0)
+#@gui : Negate = bool(0)
+#@gui : Normalize = bool(0)
+#@gui : Modulo Mode = choice(3,"Regular Modulo","Continuous Regular Modulo","Divisive Modulo","Continuous Divisive Modulo")
+#@gui : Modulo Variable #1 = int(0,0,255)
+#@gui : Modulo Variable #2 = int(255,0,255)
+#@gui : Function Angle = float(0,-180,180)
+#@gui : Value Shift = int(0,0,255)
+#@gui : Centered = bool(0)
+#@gui : Negate = bool(0)
+#@gui : Normalize = bool(0)
+#@gui : Modulo Mode = choice(3,"Regular Modulo","Continuous Regular Modulo","Divisive Modulo","Continuous Divisive Modulo")
+#@gui : Modulo Variable #1 = int(0,0,255)
+#@gui : Modulo Variable #2 = int(255,0,255)
+#@gui : Function Angle = float(0,-180,180)
+#@gui : Value Shift = int(0,0,255)
+#@gui : Centered = bool(0)
+#@gui : Negate = bool(0)
+#@gui : Normalize = bool(0)
+#@gui : Modulo Mode = choice(3,"Regular Modulo","Continuous Regular Modulo","Divisive Modulo","Continuous Divisive Modulo")
+#@gui : Modulo Variable #1 = int(0,0,255)
+#@gui : Modulo Variable #2 = int(255,0,255)
+#@gui : Function Angle = float(0,-180,180)
+#@gui : Value Shift = int(0,0,255)
+#@gui : Centered = bool(0)
+#@gui : Negate = bool(0)
+#@gui : Normalize = bool(0)
+#@gui : note = note("<small>Option available when <u>Edit Multiple Channel Separately</u> is turned on</small>")
+#@gui : sep = separator(), note = note("<b>Subpixel Processing Setting</b>"), sep = separator()
+#@gui : Subpixel Rendering Level = float(1,0,1)
+#@gui : Subpixel Interpolation = choice(5,"Nearest","Average","Grid","Linear","Bicubic","Lanczos")
+#@gui : sep = separator(), note = note("<b>Preview Setting</b>"), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/10/22</i>.</small>")
+gui_rep_colmt:
+cs=$1
+alp=$2
+tc={$cs!=3?3+$alp:4}
+if $tc==4
+    if $3==0    (0,1,2,3)
+    elif $3==1  (0,1,3,2)
+    elif $3==2  (0,2,1,3)
+    elif $3==3  (0,2,3,1)
+    elif $3==4  (0,3,1,2)
+    elif $3==5  (0,3,2,1)
+    elif $3==6  (1,0,2,3)
+    elif $3==7  (1,0,3,2)
+    elif $3==8  (1,2,0,3)
+    elif $3==9  (1,2,3,0)
+    elif $3==10 (1,3,0,2)
+    elif $3==11 (1,3,2,0)
+    elif $3==12 (2,0,1,3)
+    elif $3==13 (2,0,3,1)
+    elif $3==14 (2,1,0,3)
+    elif $3==15 (2,1,3,0)
+    elif $3==16 (2,3,0,1)
+    elif $3==17 (2,3,1,0)
+    elif $3==18 (3,0,1,2)
+    elif $3==19 (3,0,2,1)
+    elif $3==20 (3,1,0,2)
+    elif $3==21 (3,1,2,0)
+    elif $3==22 (3,2,0,1)
+    elif $3==23 (3,2,1,0)
+    fi
+else
+    if $4==0 (0,1,2)
+    elif $4==1 (0,2,1)
+    elif $4==2 (1,0,2)
+    elif $4==3 (1,2,0)
+    elif $4==4 (2,0,1)
+    elif $4==5 (2,1,0)
+    fi
 fi
-if {$1!=2} if $22 a c else k.. fi fi
-endl done
-colmt_preview:
-colmt $*
-modulo_texture_pre:
-to_gray repeat 3 [0] done
-lcmod_a=$17
-lcmod_b=$18
-lcmod_c=$19
-lcmod_d=$20
-mul 0 +[0] $lcmod_a +[1] $lcmod_b +[2] $lcmod_c +[3] $lcmod_d
-remove_duplicates
-if {$!<4} v + error "Invalid numbers!" fi
-if {$2<1} v + error "Input 2 cannot be less than 1!" fi
-if {$2!={floor($2)}} v + error "Input 2 must be a integer!" fi
-f "0"
-if $1 r2dx {$2*100}%,1,1 fi
-f[0] "x/$2" modf[0] $5,$4,{$6/$4} if $7 negate[0] fi
-f[1] "y/$2"  modf[1] $8,$4,{$9/$4} if $10 negate[1] fi
-f[2] "(!$3?x+y:abs(x-y))/$2"  modf[2] $11,$4,{$12/$4} if $13 negate[2] fi
-f[3] "(!$3?abs(x-y):x+y)/$2"  modf[3] $14,$4,{$15/$4} if $16 negate[3] fi
-r2dx[0,1] {(1/$2)*100}%,4,1
-if $1 r2dx[2,3] {(1/$2)*100}%,$1,1 fi
-[$lcmod_a] [$lcmod_b] [$lcmod_c] [$lcmod_d] rm[0-3]
+channels={crop(#-1)}
+if $5
+    rep_colmt[^-1] ${17-48},$6,$1,$2,$49,$50,$channels
+else
+    rep_colmt[^-1] ${7-14},,,,,,,,,,,,,,,,,,,,,,,,,$6,$1,$2,$49,$50,$channels
+fi
+rm.
+gui_rep_colmt_preview:
+cs=$1
+alp={$2?1}
+tc={$cs!=3?3+$alp:4}
+gui_split_preview "gui_rep_colmt ${1-50}",${-3--1}
+u "{$1}"\
+"{$2}_"{$1==3?0:2}\
+"{$3}_"{$tc==4?2:0}\
+"{$4}_"{$tc==3?2:0}\
+"{$5}"\
+"{$6}"\
+"{$7}_"{!$5?2:0}\
+"{$8}_"{!$5?2:0}\
+"{$9}_"{!$5?2:0}\
+"{$10}_"{!$5?2:0}\
+"{$11}_"{!$5?2:0}\
+"{$12}_"{!$5?2:0}\
+"{$13}_"{!$5?2:0}\
+"{$14}_"{!$5?2:0}\
+"{$15}_"{$5&&$tc==4?2:0}\
+"{$16}_"{$5&&$tc==3?2:0}\
+"{$17}_"{$5?($tc==4?($15==0?2:0):($16==0?2:0)):0}\
+"{$18}_"{$5?($tc==4?($15==0?2:0):($16==0?2:0)):0}\
+"{$19}_"{$5?($tc==4?($15==0?2:0):($16==0?2:0)):0}\
+"{$20}_"{$5?($tc==4?($15==0?2:0):($16==0?2:0)):0}\
+"{$21}_"{$5?($tc==4?($15==0?2:0):($16==0?2:0)):0}\
+"{$22}_"{$5?($tc==4?($15==0?2:0):($16==0?2:0)):0}\
+"{$23}_"{$5?($tc==4?($15==0?2:0):($16==0?2:0)):0}\
+"{$24}_"{$5?($tc==4?($15==0?2:0):($16==0?2:0)):0}\
+"{$25}_"{$5?($tc==4?($15==1?2:0):($16==1?2:0)):0}\
+"{$26}_"{$5?($tc==4?($15==1?2:0):($16==1?2:0)):0}\
+"{$27}_"{$5?($tc==4?($15==1?2:0):($16==1?2:0)):0}\
+"{$28}_"{$5?($tc==4?($15==1?2:0):($16==1?2:0)):0}\
+"{$29}_"{$5?($tc==4?($15==1?2:0):($16==1?2:0)):0}\
+"{$30}_"{$5?($tc==4?($15==1?2:0):($16==1?2:0)):0}\
+"{$31}_"{$5?($tc==4?($15==1?2:0):($16==1?2:0)):0}\
+"{$32}_"{$5?($tc==4?($15==1?2:0):($16==1?2:0)):0}\
+"{$33}_"{$5?($tc==4?($15==2?2:0):($16==2?2:0)):0}\
+"{$34}_"{$5?($tc==4?($15==2?2:0):($16==2?2:0)):0}\
+"{$35}_"{$5?($tc==4?($15==2?2:0):($16==2?2:0)):0}\
+"{$36}_"{$5?($tc==4?($15==2?2:0):($16==2?2:0)):0}\
+"{$37}_"{$5?($tc==4?($15==2?2:0):($16==2?2:0)):0}\
+"{$38}_"{$5?($tc==4?($15==2?2:0):($16==2?2:0)):0}\
+"{$39}_"{$5?($tc==4?($15==2?2:0):($16==2?2:0)):0}\
+"{$40}_"{$5?($tc==4?($15==2?2:0):($16==2?2:0)):0}\
+"{$41}_"{$5?($tc==4?($15==3?2:0):0):0}\
+"{$42}_"{$5?($tc==4?($15==3?2:0):0):0}\
+"{$43}_"{$5?($tc==4?($15==3?2:0):0):0}\
+"{$44}_"{$5?($tc==4?($15==3?2:0):0):0}\
+"{$45}_"{$5?($tc==4?($15==3?2:0):0):0}\
+"{$46}_"{$5?($tc==4?($15==3?2:0):0):0}\
+"{$47}_"{$5?($tc==4?($15==3?2:0):0):0}\
+"{$48}_"{$5?($tc==4?($15==3?2:0):0):0}\
+"{$49}"\
+"{$50}"\
+"{$51}"\
+"{$52,53}"
 #@gui Picture Mosaic : fx_rep_pmos,_fx_rep_pmos_preview(0)
 #@gui : note = note("<b>- Information -</b>\n\n<b>Do not be alarmed when multiple command prompt shows up when using folder input as it is a normal process!</b>\n\nThis filter is used for generation of mosaic pictures. Also, the mosaic cli command cannot support a number of images that is less than 3, so this gui filter will automatically use folder input option instead. So, you need at least 2 images inside a folder for the mosaic filter to work when using folder input. For more information, see below.\n\n<b>-Software Usage -</b>\n\n<b>For Krita, and GIMP: </b> Set to input layers to <b>All</b> assuming 3 or more layers are in your file to create mosaic using the top image as a mosaic target.If you are using folder input instead, it is recommended to set layer input to <b>Active</b>.\n\n<b>For Paint.NET: </b> Using 3 or more layer is unsupported due to the Paint.NET plugin restriction, so you can only use folder input. This is a workaround as G'MIC itself supports more than 2 layers.\n\nRight now because of certain issues, split_preview is not functional as of now."), sep = separator()
 #@gui : note = note("<b>- Folder Input -<b>")
@@ -2204,7 +2806,7 @@ fx_rep_nebulous:
 repeat $! l[$>]
 rep_nebulous ${2-8},{$1>4&&$1<9?$9+180:$9},{$10*$11},${12-16},{$1>4&&$1<9?$17!=0?($17>=3?3+(4-$17):1+(2-$17)):$17},{$18+1},$19 + 1 * 127.5
 if $1&&$16
-sh 0,2 
+sh 0,2
 if {$1==1} ryb2rgb.
 elif {$1==2} hsi82rgb.
 elif {$1==3} hsl82rgb.
@@ -2809,7 +3411,7 @@ if $7
             r. 256,$5,100%,100%,1
             rm..
         endl done
-        repeat $!/2 rm[$>] done a y       
+        repeat $!/2 rm[$>] done a y
     else
         repeat $! l[$>]
             if $4==1
@@ -2843,6 +3445,120 @@ fi
 gui_rep_acb: rep_acb {$1/255},$2,$3,{$4/255},$5
 gui_rep_acb_preview:
 gui_split_preview "gui_rep_acb $*",${-3--1}
+#@gui Thorn Fractal - Secant Sea: gui_rep_tfrac,gui_rep_tfrac_preview
+#@gui : note = note("Thorn Fractal is the fractal attributed to Andrew Wayne Graff, alternatively named the "Secant Sea".\nThe code was adapted from <a href="http://paulbourke.net/fractals/thorn/thorn_code.c">Sample C source code</a> provided by Adam Majewski.\n\nDocumentation - <a href="http://paulbourke.net/fractals/thorn/#dane">Thorn Fractal</a> by <a href="http://paulbourke.net/fractals/">Paul Bourke</a>\n\nAlternating Chaos formula are made by <a href="https://forums.getpaint.net/profile/45895-madjik/">MadJik</a>, and they are originally used in <a href="https://forums.getpaint.net/topic/111491-fractal-attractor-ymd170628/">Fractal Attractor</a> plugin for Paint.NET software."), sep=separator()
+#@gui : note = note("<b>Style Setting</b>")
+#@gui : Predefined Formula = choice(0,"Normal","Normal Inverted","Tanh Stroke 1","Tanh Stroke 2","Asymphological Vibrato","Asymphological Basic","Asymphological Basic 2","Asymphochaos","Petallian","Semi-Thorny Petallian","Thorny Petal 1,"Thorny Petal 2","Inflation","Inflation 2","Earthing","Acrylic Earthing","Unearthing Origami","Cubic Unearthing","Webbing Cubic Unearthing","Chaotic Hooks","Echo Wide","Echo Squircle","Echo Hall","Echo Hall 2","Liquid Parabolic","Chaos-Vibrato","Chaos Deep-Vibrato","Chaos Spacetime","Parabolic","Parabolic Chaos","Cubic-Diamond Chaos","C-Line","Contour Chaos","Spiderweb-Diamond","Acrylica","Refractive Space","Smooth-Artistry","Ferrofluid","Triangular Interweaving","Fabric Chaos","Reverse Tangent Division","Chaotic Tangent","Alternating Chaos 1","Alternating Chaos 2","Alternating Chaos 3","Alternating Chaos 4")
+#@gui : Utilize Custom Formula Instead? = bool(0),sep = separator()
+#@gui : note = note("<b>Fractal Calculation Constraints</b>")
+#@gui : note = note("<small>Information at bottom of filter. Some predefined formulas requires you to use low values. You may need to type in values from 5-1024 manually.</small>")
+#@gui : Escape Value = int(10000,5,1000000)
+#@gui : Loop Limitation = int(255,1,1024)
+#@gui : Subsampling Level = float(3,1,10)
+#@gui : sep = separator(), note = note("<b>Distortion Factors</b>")
+#@gui : Distortion X = float(0,-50,50)
+#@gui : Distortion Y = float(0,-50,50)
+#@gui : sep = separator(), note = note("<b>Transformations</b>"), note = note("- Scaling -")
+#@gui : Scaling XY-Axis = float(1,.1,15)
+#@gui : Scaling X-Axis = float(1,.1,15)
+#@gui : Scaling Y-Axis = float(1,.1,15)
+#@gui : PI-Based Scaling = bool(1), sep = separator(), note = note("- Displacement -")
+#@gui : Offset X-Transformation = float(0,-5,5)
+#@gui : Offset Y-Transformation = float(0,-5,5)
+#@gui : sep = separator(), note = note("- Rotation -")
+#@gui : Function Angle = float(0,-180,180)
+#@gui : sep = separator(), note = note("<b>Custom Formula</b>)
+#@gui : note = note("<small>See bottom of this filter to see instruction of usage</small>")
+#@gui : Distortion X Formula-[VX] = text{atan2(a^2,b^2)/cos(b)}
+#@gui : Distortion Y Formula-[VY] = text{b/sin(a)}
+#@gui : sep = separator(), note = note("<b>Colour Setting</b>)
+#@gui : Fractal Mapping = choice(0,"Grayscale","Hue","Random Color Map")
+#@gui : Colours = int(3,3,8)
+#@gui : Colour Generation Seed = int(0,0,5000)
+#@gui : sep = separator(), note = note("<b>Information of Thorn Fractal - Secant Sea filter</b>"), sep = separator(), note = note("<i>Fractal Calculation Constraints</i>\n\n<b>Escape Value</b> defines the minimum value to escape from the loop used to determine the amount of iteration needed to be bigger than the specified value per pixels. The lower the value, the more contrast at a sacrifise of details.\n\n<b>Iterations</b> defines the maximum possible amount of loop per pixels when escape value is not reached. The lower the value, the more contrast and the more posterization of values.\n\n<b>Subsampling Level</b> is used to alter the dimensions before calculation of fractal, and it is resized to the original dimension after the fractal has been generated. The bigger the value, the more computationally intensive it is. In fact, this has the most consistent impact on performance."), sep = separator(),note = note("<i>Custom Formula</i>\n\nTo use this, type in a formula utilizing the syntax given by the G'MIC reference manual. Use notes given the information provided below.\n\nMultiple expressions are supported, and they are separated by \";\" character. If it the only expression, then it would be used for calculation of vx or vy. Otherwise, the first expression may be the only one used for calculation of vx or vy.\n\n<i>Available adjustible variable - </i> vx,vy,a,b\n\n<b>vx</b> - Distortion formula for x-axis.\n\n<b>vy</b> - Distortion formula for y-axis.\n\n<b>a</b> - Value of <b>a</b> is given by vx equation based on the number of repeats needed to escape from the iterative loop to check when resulting value is greater than escape number.\n\n<b>b</b> - Value of <b>b</b> is given by vx equation based on the number of repeats needed to escape from the iterative loop to check when resulting value is greater than escape number.")
+#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/10/6</i>.</small>")
+gui_rep_tfrac:
+srand $19
+if !$2 rep_thorn_fractal $1,${3-14} else rep_thorn_fractal -1,${3-14},1,"$15","$16" fi
+if $17==0 n 0,255
+elif $17==1 n 0,360 r 100%,100%,100%,3 f [i0,1,1] hsv2rgb
+else $18,1,1,1 f. u(x/w#-1,(x+1)/w#-1) n. 0,16777215 r. 100%,100%,1,3 f. [i0-256*floor(i0/256),floor(i0/256)-256*floor(floor(i0/256)/256),i0/(256^2)] r. 4096,1,100%,100%,5 r[^-1] 100%,100%,100%,3 f[^-1] i(#-1,i0*w#-1,0,z,c,2) rm.
+fi
+gui_rep_tfrac_preview:
+gui_rep_tfrac ${1-14},"$15","$16",${17-19}
+u "{$1}_"{!$2?2:1}\
+"{$2}"\
+"{$3}"\
+"{$4}"\
+"{$5}"\
+"{$6}"\
+"{$7}"\
+"{$8}"\
+"{$9}"\
+"{$10}"\
+"{$11}"\
+"{$12}"\
+"{$13}"\
+"{$14}"\
+"{$15}_"{$2==1?2:1}\
+"{$16}_"{$2==1?2:1}\
+"{$17}"\
+"{$18}_"{$17==2?2:0}\
+"{$19}_"{$17==2?2:0}
+#@gui Z-Time : rep_z_render
+#@gui : note = note("Z-Time Rendering is a filter that utilize the value of a layer to represent the frame where frames are interpolated and normalized to the value of that layer. In other word, the reference layer can be seen as a representative of time.<b>Note:</b>Try to use a gradient for top or bottom layer depending on option you use.\n\n<b>Z-Depth Values</b> is recommended to be altered when using float image as reference. Use values less than 255 in order to posterize.\n\n<b>This filter do not work with Paint.NET as you need 3 images!</b>"), sep = separator()
+#@gui : Layer to use as time reference? = choice(0,"Top Layer","Bottom Layer")
+#@gui : Z-Depth Values = int(255,3,1024)
+#@gui : Mirror Frame Ordering? = bool(0)
+#@gui : Separate time by channels? = bool(0)
+#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/10/13</i>.</small>")
+#@gui Bricks: gui_rep_shape_brick
+#@gui : note = note("This filter on the <a href="https://forums.getpaint.net/topic/8251-bricks-updated-with-examples/">Bricks plugin for Paint.NET</a> made by <a href="https://forums.getpaint.net/profile/49909-jchunn/">Jesse Chunn</a> as part of his <a href="https://forums.getpaint.net/index.php?/topic/8408-jesse-chunn-plugin-pack-march-8-2008/">plugin pack</a>.\n\n This is a extended version of the bricks filter with bevel options, and blending mode option.")
+#@gui : sep = separator(), note = note("<b>Brick Main Setting</b>")
+#@gui : Brick Width (px) = int(150,4,2048)
+#@gui : Brick Height (px) = int(150,4,2048)
+#@gui : Mortar Width (px) = int(5,0,512)
+#@gui : Mortar Height (px) = int(5,0,512)
+#@gui : Outline (px) = int(0,0,50)
+#@gui : sep = separator(), note = note("<b>Offset Setting</b>)
+#@gui : Brick Offset (%) = float(0,-100,100)
+#@gui : Offset Direction = choice(0,"Horizontal","Vertical")
+#@gui : Reverse Offset = bool(0)
+#@gui : sep = separator(), note = note("<b>Bevel Setting</b>)
+#@gui : Bevel Radius (px) = int(0,0,50)
+#@gui : Bevel Style = choice(0,"Round","Inverse Round","Chamfer")
+#@gui : sep = separator(), note = note("<b>Colouring and Blending Options</b>")
+#@gui : Brick Colour = color(170,0,0,255)
+#@gui : Brick Outline = color(85,0,0,255)
+#@gui : Mortar Colour = color(121,77,2,255)
+#@gui : Use Blending Mode? = bool(0)
+#@gui : Blending Mode = choice(41,"add","alpha","and","average","blue","burn","darken",
+#@gui : "difference","divide","dodge","exclusion","freeze",
+#@gui : "grainextract","grainmerge","green","hardlight","hardmix",
+#@gui : "hue","interpolation","lighten","lightness","linearburn",
+#@gui : "linearlight","luminance","multiply","negation","or",
+#@gui : "overlay","pinlight","red","reflect","saturation","screen",
+#@gui : "shapeaverage","softburn","softdodge","softlight","stamp",
+#@gui : "subtract","value","vividlight","xor")
+#@gui : Opacity (%) = float(100,0,100)
+#@gui : sep = separator(), note = note("<b>Antialias</b>)
+#@gui : Antialias Level = float(0,0,3)
+#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/10/15</i>.</small>")
+gui_rep_shape_brick:
+-m "MergeChoice : $""=_mode" -MergeChoice "add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor","edges","error"
+repeat $! l[$>]
+to_a
+rep_shape_brick $1,$2,$3,$4,$5,$9,$10,$6%,$7,$8,$26
+n. 0,1
+r. {w#-2},{h#-2},100%,{s#-2},0,2,0,0
+if $5 ($19,$15,$11^$20,$16,$12^$21,$17,$13^$22,$18,$14)
+else ($19,$11^$20,$12^$21,$13^$22,$14)
+fi
+r. {($26+1)*100}%,100%,100%,100%,3
+f.. i(#-1,(w#-1-1)*i,0,z,c,3) rm.
+if $23 blend ${_mode{$24+1}},{$25%}
+else k. fi
+endl done
 ######################
 
 # Local Variables:

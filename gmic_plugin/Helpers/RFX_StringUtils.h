@@ -2,8 +2,8 @@
  #
  #  File        : RFX_String_Utils.h
  #
- #  Description : A self-contained header file with helper functions for    
- #                string operations on std::string    
+ #  Description : A self-contained header file with helper functions for
+ #                string operations on std::string
  #
  #  Copyright   : Tobias Fleischer / reduxFX Productions (http://www.reduxfx.com)
  #
@@ -12,17 +12,17 @@
  #
  #                    CeCILL-C
  #                    The CeCILL-C license is close to the GNU LGPL.
- #                    ( http://www.cecill.info/licences/Licence_CeCILL-C_V1-en.html )
+ #                    ( http://cecill.info/licences/Licence_CeCILL-C_V1-en.html )
  #
  #                or  CeCILL v2.0
  #                    The CeCILL license is compatible with the GNU GPL.
- #                    ( http://www.cecill.info/licences/Licence_CeCILL_V2-en.html )
+ #                    ( http://cecill.info/licences/Licence_CeCILL_V2-en.html )
  #
  #  This software is governed either by the CeCILL or the CeCILL-C license
  #  under French law and abiding by the rules of distribution of free software.
  #  You can  use, modify and or redistribute the software under the terms of
  #  the CeCILL or CeCILL-C licenses as circulated by CEA, CNRS and INRIA
- #  at the following URL: "http://www.cecill.info".
+ #  at the following URL: "http://cecill.info".
  #
  #  As a counterpart to the access to the source code and  rights to copy,
  #  modify and redistribute granted by the license, users are provided only
@@ -127,18 +127,18 @@ static void strSplit(const string& s, const char seperator, vector<string>& resu
 }
 
 static string strAfterFirst(const string s, const string ss, const int ofs = 0)
-{ 
-	int ii = (int)s.find(ss); 
-	if (ii >= 0) 
+{
+	int ii = (int)s.find(ss);
+	if (ii >= 0)
 		return s.substr(ii + ofs);
 	else
 		return "";
 }
 
 static string strAfterLast(const string s, const string ss, const int ofs = 0)
-{ 
-	int ii = (int)s.rfind(ss); 
-	if (ii >= 0) 
+{
+	int ii = (int)s.rfind(ss);
+	if (ii >= 0)
 		return s.substr(ii + ofs);
 	else
 		return "";
@@ -400,7 +400,7 @@ static string strRemoveXmlTags(const string s, bool replaceEntities = false)
 			unsigned char c = (unsigned char)i;
 			string ss; ss += c;
 			strReplace(r, "&#" + intToString(i) + ";", ss);
-		
+
 		}
 	}
 	return r;
@@ -417,4 +417,3 @@ static void strToChar(string src, char** dst)
 }
 
 #endif
-

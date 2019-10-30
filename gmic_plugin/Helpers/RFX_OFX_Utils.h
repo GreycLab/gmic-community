@@ -2,8 +2,8 @@
  #
  #  File        : RFX_OFX_Utils.h
  #
- #  Description : A self-contained header file with helper functions to make    
- #                using the OpenFX SDK/API a bit easier to use    
+ #  Description : A self-contained header file with helper functions to make
+ #                using the OpenFX SDK/API a bit easier to use
  #
  #  Copyright   : Tobias Fleischer / reduxFX Productions (http://www.reduxfx.com)
  #
@@ -12,17 +12,17 @@
  #
  #                    CeCILL-C
  #                    The CeCILL-C license is close to the GNU LGPL.
- #                    ( http://www.cecill.info/licences/Licence_CeCILL-C_V1-en.html )
+ #                    ( http://cecill.info/licences/Licence_CeCILL-C_V1-en.html )
  #
  #                or  CeCILL v2.0
  #                    The CeCILL license is compatible with the GNU GPL.
- #                    ( http://www.cecill.info/licences/Licence_CeCILL_V2-en.html )
+ #                    ( http://cecill.info/licences/Licence_CeCILL_V2-en.html )
  #
  #  This software is governed either by the CeCILL or the CeCILL-C license
  #  under French law and abiding by the rules of distribution of free software.
  #  You can  use, modify and or redistribute the software under the terms of
  #  the CeCILL or CeCILL-C licenses as circulated by CEA, CNRS and INRIA
- #  at the following URL: "http://www.cecill.info".
+ #  at the following URL: "http://cecill.info".
  #
  #  As a counterpart to the access to the source code and  rights to copy,
  #  modify and redistribute granted by the license, users are provided only
@@ -172,7 +172,7 @@ struct MyInstanceData {
 	OfxParamHandle seqDataH;
 };
 
-// Convenience wrapper to get private data 
+// Convenience wrapper to get private data
 static MyInstanceData* getMyInstanceData(OfxImageEffectHandle effect)
 {
 	// get the property handle for the plugin
@@ -258,7 +258,7 @@ static OfxStatus createInstance(int pluginIndex, OfxImageEffectHandle effect)
 	} else {
 		myData->sequenceDataP->customSequenceDataP = createCustomSequenceData();
 	}
-		
+
 	char *context = 0;
 
 	// is this instance a general effect ?
@@ -275,7 +275,7 @@ static OfxStatus createInstance(int pluginIndex, OfxImageEffectHandle effect)
 		gParamHost->paramGetHandle(paramSet, globalData[pluginIndex].param[i].paramName.c_str(), &(myData->param[i]), 0);
 	}
 	gEffectHost->clipGetHandle(effect, "Output", &myData->output, 0);
-	
+
 	// set my private instance data
 	gPropHost->propSetPointer(effectProps, kOfxPropInstanceData, 0, (void*)myData);
 
@@ -462,23 +462,23 @@ OfxStatus getTemporalDomain(int pluginIndex, OfxImageEffectHandle effect, OfxPro
 {
 	MyInstanceData *myData = getMyInstanceData(effect);
 	double sourceRange[2];
-	
+
 	// get the frame range of the source clip
 	OfxPropertySetHandle props; gEffectHost->clipGetPropertySet(myData->input[0], &props);
 	gPropHost->propGetDoubleN(props, kOfxImageEffectPropFrameRange, 2, sourceRange);
 
 	// set it on the out args
 	gPropHost->propSetDoubleN(outArgs, kOfxImageEffectPropFrameRange, 2, sourceRange);
-	
+
 	return kOfxStatOK;
 }
 
-// Set our clip preferences 
+// Set our clip preferences
 static OfxStatus getClipPreferences(int pluginIndex, OfxImageEffectHandle effect, OfxPropertySetHandle /*inArgs*/, OfxPropertySetHandle outArgs)
 {
 	// retrieve any instance data associated with this effect
 	MyInstanceData *myData = getMyInstanceData(effect);
-	
+
 	// get the component type and bit depth of our main input
 	int	bitDepth;
 	bool isRGBA;
@@ -552,7 +552,7 @@ static OfxStatus instanceChanged(int pluginIndex, OfxImageEffectHandle instance,
 
 	// retrieve any instance data associated with this effect
 	MyInstanceData* myData = getMyInstanceData(instance);
-	
+
 	if (isParam) {
 		if (strcmp(objChanged, "SequenceData") == 0) {
 			char* flatCustomSequenceDataP = NULL;
@@ -577,7 +577,7 @@ static OfxStatus instanceChanged(int pluginIndex, OfxImageEffectHandle instance,
 		}
 		OfxParamSetHandle paramSet;
 		gEffectHost->getParamSet(instance, &paramSet);
-		OfxParamHandle param; 
+		OfxParamHandle param;
 		OfxPropertySetHandle props;
 		gParamHost->paramGetHandle(paramSet, objChanged, &param, &props);
 		char* paramType;
@@ -600,8 +600,8 @@ static OfxStatus instanceChanged(int pluginIndex, OfxImageEffectHandle instance,
 
 
 	}
-	
-	// don't trap any 
+
+	// don't trap any
 	return kOfxStatReplyDefault;
 }
 
@@ -617,7 +617,7 @@ public:
 	int width;
 	int height;
 	float scale;
-	
+
 	ConvertData(void* _srcData = NULL, int _srcRowBytes = 0, void* _dstData = NULL, int _dstRowBytes = 0, int _width = 0, int _height = 0, float _scale = 1.f)
 	{
 		srcData = _srcData;
@@ -890,7 +890,7 @@ static OfxStatus render(int pluginIndex, OfxImageEffectHandle instance, OfxPrope
 		myData->sequenceDataP->time = time;
 		myData->sequenceDataP->downsample_x = (float)renderScale.x;
 		myData->sequenceDataP->downsample_y = (float)renderScale.y;
-		
+
 		getAllParamData(pluginIndex, myData, time);
 
 		// get the input image(s)
@@ -946,7 +946,7 @@ static OfxStatus render(int pluginIndex, OfxImageEffectHandle instance, OfxPrope
 				myData->sequenceDataP->inWorld[i].data = new unsigned char[myData->sequenceDataP->inWorld[i].height * myData->sequenceDataP->inWorld[i].rowBytes];
 				myData->sequenceDataP->inWorld[i].bitDepth = 32;
 				ConvertData data(srcData, srcRowBytes, myData->sequenceDataP->inWorld[i].data, myData->sequenceDataP->inWorld[i].rowBytes, myData->sequenceDataP->inWorld[i].width, myData->sequenceDataP->inWorld[i].height, scale);
-	
+
 #ifndef NO_MULTITHREADED_CONVERSION
 				int nofLines = (int)(floor((float)myData->sequenceDataP->inWorld[i].height / (float)NOF_CONVERT_THREADS) + 1.f);
 				for (int j = 0; j < NOF_CONVERT_THREADS; ++j) {
@@ -983,11 +983,11 @@ static OfxStatus render(int pluginIndex, OfxImageEffectHandle instance, OfxPrope
 					t[j] = thread(convert_RGBA32_to_RGBA32P, data, startLine, endLine);
 				}
 				for (int j = 0; j < NOF_CONVERT_THREADS; ++j) t[j].join();
-#else				
+#else
 				convert_RGBA32_to_RGBA32P(data, 0, myData->sequenceDataP->inWorld[i].height);
 #endif
 				customInputData[i] = true;
-#endif			
+#endif
 			}
 
 
@@ -1034,7 +1034,7 @@ static OfxStatus render(int pluginIndex, OfxImageEffectHandle instance, OfxPrope
 					t[j] = thread(convert_RGBA8_to_RGBA8P, data, startLine, endLine);
 				}
 				for (int j = 0; j < NOF_CONVERT_THREADS; ++j) t[j].join();
-#else				
+#else
 				convert_RGBA8_to_RGBA8P(data, 0, myData->sequenceDataP->inWorld[i].height);
 #endif
 				customInputData[i] = true;
@@ -1054,7 +1054,7 @@ static OfxStatus render(int pluginIndex, OfxImageEffectHandle instance, OfxPrope
 					t[j] = thread(convert_RGBA8_to_RGBA8P, data, startLine, endLine);
 				}
 				for (int j = 0; j < NOF_CONVERT_THREADS; ++j) t[j].join();
-#else				
+#else
 				convert_RGBA8_to_RGBA8P(data, 0, myData->sequenceDataP->inWorld[i].height);
 #endif
 			} else if (srcBitDepth == 32) {
@@ -1070,7 +1070,7 @@ static OfxStatus render(int pluginIndex, OfxImageEffectHandle instance, OfxPrope
 					t[j] = thread(convert_RGBA32_to_RGBA32P, data, startLine, endLine);
 				}
 				for (int j = 0; j < NOF_CONVERT_THREADS; ++j) t[j].join();
-#else				
+#else
 				convert_RGBA32_to_RGBA32P(data, 0, myData->sequenceDataP->inWorld[i].height);
 #endif
 			}
@@ -1263,7 +1263,7 @@ static OfxStatus render(int pluginIndex, OfxImageEffectHandle instance, OfxPrope
 	}
 	if (customOutputData) delete (unsigned char*)myData->sequenceDataP->outWorld.data;
 	if (outputImg) gEffectHost->clipReleaseImage(outputImg);
-	
+
 	return status;
 }
 
@@ -1280,7 +1280,7 @@ static void paramAddFloat(OfxParamSetHandle effectParams, OfxPropertySetHandle& 
 	gPropHost->propSetDouble(props, kOfxParamPropDisplayMin, 0, minValue);
 	gPropHost->propSetDouble(props, kOfxParamPropDisplayMax, 0, maxValue);
 	gPropHost->propSetDouble(props, kOfxParamPropIncrement, 0, 0.01);
-	gPropHost->propSetDouble(props, kOfxParamPropDigits, 0, precision);	
+	gPropHost->propSetDouble(props, kOfxParamPropDigits, 0, precision);
 }
 
 static void paramAddColor(OfxParamSetHandle effectParams, OfxPropertySetHandle& props, const char* paramName, double red, double green, double blue)
@@ -1399,7 +1399,7 @@ static OfxStatus describeInContext(int pluginIndex, OfxImageEffectHandle effect,
 	gParamHost->paramDefine(paramSet, kOfxParamTypeCustom, "SequenceData", &props);
 	gPropHost->propSetInt(props, kOfxParamPropSecret, 0, 1);
 	}
-	
+
 #ifdef ABOUT_DIALOG
 	{
 	OfxPropertySetHandle props;
@@ -1417,7 +1417,7 @@ static OfxStatus describeInContext(int pluginIndex, OfxImageEffectHandle effect,
 
 		float mmin = globalData[pluginIndex].param[i].minValue;
 		float mmax = globalData[pluginIndex].param[i].maxValue;
-		
+
 		if (globalData[pluginIndex].param[i].paramType == PT_FLOAT) {
 			paramAddFloat(paramSet, props,
 				globalData[pluginIndex].param[i].paramName.c_str(), // param
@@ -1431,15 +1431,15 @@ static OfxStatus describeInContext(int pluginIndex, OfxImageEffectHandle effect,
 			paramAddColor(
 				paramSet, props,
 				globalData[pluginIndex].param[i].paramName.c_str(), // param
-				globalData[pluginIndex].param[i].defaultValue[0], 
-				globalData[pluginIndex].param[i].defaultValue[1], 
+				globalData[pluginIndex].param[i].defaultValue[0],
+				globalData[pluginIndex].param[i].defaultValue[1],
 				globalData[pluginIndex].param[i].defaultValue[2]
-				); 
+				);
 		} else if (globalData[pluginIndex].param[i].paramType == PT_TEXT) {
 			paramAddText(
 				paramSet, props,
 				globalData[pluginIndex].param[i].paramName.c_str(), // param
-				globalData[pluginIndex].param[i].text.c_str(), globalData[pluginIndex].param[i].flags); 
+				globalData[pluginIndex].param[i].text.c_str(), globalData[pluginIndex].param[i].flags);
 		} else if (globalData[pluginIndex].param[i].paramType == PT_INT) {
 			paramAddInt(
 				paramSet, props,
@@ -1461,7 +1461,7 @@ static OfxStatus describeInContext(int pluginIndex, OfxImageEffectHandle effect,
 				globalData[pluginIndex].param[i].paramName.c_str(), // param
 				(int)globalData[pluginIndex].param[i].defaultValue[0] //default
 			);
-		} else if (globalData[pluginIndex].param[i].paramType == PT_SELECT) {	
+		} else if (globalData[pluginIndex].param[i].paramType == PT_SELECT) {
 			string t = globalData[pluginIndex].param[i].text;
 			// t = strReplace(t, "|-|", "|(-|");
 			vector<string> choices;
@@ -1473,7 +1473,7 @@ static OfxStatus describeInContext(int pluginIndex, OfxImageEffectHandle effect,
 				(int)(min(globalData[pluginIndex].param[i].maxValue,globalData[pluginIndex].param[i].defaultValue[0])), //default
 				choices // choices
 			);
-		} else if (globalData[pluginIndex].param[i].paramType == PT_ANGLE) {	
+		} else if (globalData[pluginIndex].param[i].paramType == PT_ANGLE) {
 			paramAddAngle(
 				paramSet, props,
 				globalData[pluginIndex].param[i].paramName.c_str(), // param
@@ -1487,13 +1487,13 @@ static OfxStatus describeInContext(int pluginIndex, OfxImageEffectHandle effect,
 			gPropHost->propSetString(props, kOfxImageEffectPropSupportedComponents, 0, kOfxImageComponentRGBA);
 			l++;
 			continue;
-		} else if (globalData[pluginIndex].param[i].paramType == PT_TOPIC_START) {	
+		} else if (globalData[pluginIndex].param[i].paramType == PT_TOPIC_START) {
 			gParamHost->paramDefine(paramSet, kOfxParamTypeGroup, globalData[pluginIndex].param[i].paramName.c_str(), &props);
 			if (globalData[pluginIndex].param[i].flags>0) gPropHost->propSetInt(props, kOfxParamPropGroupOpen, 0, 0);
 			gPropHost->propSetInt(props, kOfxParamPropAnimates, 0, 0);
 			gPropHost->propSetInt(props, kOfxParamPropGroupOpen, 0, globalData[pluginIndex].param[i].flags>0?0:1);
 			group = globalData[pluginIndex].param[i].paramName;
-		} else if (globalData[pluginIndex].param[i].paramType == PT_TOPIC_END) {	
+		} else if (globalData[pluginIndex].param[i].paramType == PT_TOPIC_END) {
 			group = "";
 			continue;
 		} else {
@@ -1508,7 +1508,7 @@ static OfxStatus describeInContext(int pluginIndex, OfxImageEffectHandle effect,
 		gPropHost->propSetString(props, kOfxParamPropScriptName, 0, globalData[pluginIndex].param[i].paramName.c_str());
 		gPropHost->propSetString(props, kOfxPropLabel, 0, globalData[pluginIndex].param[i].displayName.c_str());
 
-		if (group != "" && globalData[pluginIndex].param[i].paramType != PT_TOPIC_START) 
+		if (group != "" && globalData[pluginIndex].param[i].paramType != PT_TOPIC_START)
 			gPropHost->propSetString(props, kOfxParamPropParent, 0, group.c_str());
 	}
 	if (globalData[pluginIndex].nofInputs == 0) {
@@ -1535,7 +1535,7 @@ static OfxStatus describe(int pluginIndex, OfxImageEffectHandle effect)
 
 	// say we cannot support multiple pixel depths
 	gPropHost->propSetInt(effectProps, kOfxImageEffectPropSupportsMultipleClipDepths, 0, 0);
-	
+
 	// set the bit depths the plugin can handle
 	gPropHost->propSetString(effectProps, kOfxImageEffectPropSupportedPixelDepths, 0, kOfxBitDepthFloat);
 	gPropHost->propSetString(effectProps, kOfxImageEffectPropSupportedPixelDepths, 1, kOfxBitDepthByte);
@@ -1601,34 +1601,34 @@ static OfxStatus pluginMain(int pluginIndex, const char *action, const void *han
 	}
 	else if (strcmp(action, kOfxActionCreateInstance) == 0) {
 		return createInstance(pluginIndex, effect);
-	} 
+	}
 	else if (strcmp(action, kOfxActionDestroyInstance) == 0) {
 		return destroyInstance(pluginIndex, effect);
-	} 
+	}
 	else if (strcmp(action, kOfxImageEffectActionIsIdentity) == 0) {
 		return isIdentity(pluginIndex, effect, inArgs, outArgs);
-	}		
+	}
 	else if (strcmp(action, kOfxImageEffectActionRender) == 0) {
 		return render(pluginIndex, effect, inArgs, outArgs);
-	}		
+	}
 	else if (strcmp(action, kOfxImageEffectActionGetRegionOfDefinition) == 0) {
 		return getSpatialRoD(pluginIndex, effect, inArgs, outArgs);
 	}
 	else if (strcmp(action, kOfxActionSyncPrivateData) == 0) {
 		return syncPrivateData(pluginIndex, effect);
-	}	
+	}
 	else if (strcmp(action, kOfxImageEffectActionGetRegionsOfInterest) == 0) {
 		return getSpatialRoI(pluginIndex, effect, inArgs, outArgs);
-	}	
+	}
 	else if (strcmp(action, kOfxImageEffectActionGetClipPreferences) == 0) {
 		return getClipPreferences(pluginIndex, effect, inArgs, outArgs);
-	}	
+	}
 	else if (strcmp(action, kOfxActionInstanceChanged) == 0) {
 		return instanceChanged(pluginIndex, effect, inArgs, outArgs);
-	}	
+	}
 	else if (strcmp(action, kOfxImageEffectActionGetTimeDomain) == 0) {
 		return getTemporalDomain(pluginIndex, effect, inArgs, outArgs);
-	}	
+	}
 	} catch (std::bad_alloc) {
 		// catch memory
 		//std::cout << "OFX Plugin Memory error." << std::endl;
@@ -1660,7 +1660,7 @@ static void setHostFunc(OfxHost *hostStruct)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// the plugin struct 
+// the plugin struct
 
 // this little macro/template trickery was originally found in Alexandre Gauthier-Foichat's OFX G'MIC plugin
 template<int nth>
@@ -1708,13 +1708,12 @@ EXPORT OfxPlugin* OfxGetPlugin(int nth)
 	if (nth < (int)gPlugins.size()) return &gPlugins[nth];
 	return NULL;
 }
- 
+
 EXPORT int OfxGetNumberOfPlugins(void)
 {
 	initPlugins();
 	int n = (int)gPlugins.size();
 	return n;
-} 
+}
 
 #endif
-
