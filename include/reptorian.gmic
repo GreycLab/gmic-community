@@ -929,25 +929,25 @@ if {isnum("$1")} if {isint("$1")} mvcma=${arg\ 1+$1,min,max,avg,var,sum,pro,med}
 repeat $! l[$>] v - _rep_bchstatfunc_$mvcma $2 endl done
 _rep_bchstatfunc_im : _rep_bchstatfunc_min $1
 _rep_bchstatfunc_minimum : _rep_bchstatfunc_min $1
-_rep_bchstatfunc_min : s c f "im" a c if $1 r 1,1,1,{s},0 fi
+_rep_bchstatfunc_min : repeat s sh $> f. im#-1 rm. done if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_iM : _rep_bchstatfunc_max $1
 _rep_bchstatfunc_maximum : _rep_bchstatfunc_max $1
-_rep_bchstatfunc_max : s c f "iM" a c if $1 r 1,1,1,{s},0 fi
+_rep_bchstatfunc_max : repeat s sh $> f. iM#-1 rm. done if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_ia : _rep_bchstatfunc_avg $1
 _rep_bchstatfunc_average : _rep_bchstatfunc_avg $1
-_rep_bchstatfunc_avg : s c f "ia" a c if $1 r 1,1,1,{s},0 fi
+_rep_bchstatfunc_avg : repeat s sh $> f. ia#-1 rm. done if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_iv : _rep_bchstatfunc_var $1
 _rep_bchstatfunc_variance : _rep_bchstatfunc_var $1
-_rep_bchstatfunc_var : s c f "iv" a c if $1 r 1,1,1,{s},0 fi
+_rep_bchstatfunc_var : repeat s sh $> f. iv#-1 rm. done if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_is : _rep_bchstatfunc_sum $1
 _rep_bchstatfunc_total : _rep_bchstatfunc_sum $1
-_rep_bchstatfunc_sum : s c f "is" a c if $1 r 1,1,1,{s},0 fi
+_rep_bchstatfunc_sum : repeat s sh $> f. is#-1 rm. done if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_ip : _rep_bchstatfunc_pro $1
 _rep_bchstatfunc_product : _rep_bchstatfunc_pro $1
-_rep_bchstatfunc_pro : s c f "ip" a c if $1 r 1,1,1,{s},0 fi
+_rep_bchstatfunc_pro : repeat s sh $> f. ip#-1 rm. done if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_ic : _rep_bchstatfunc_med $1
 _rep_bchstatfunc_median : _rep_bchstatfunc_med $1
-_rep_bchstatfunc_med : s c f "ic" a c if $1 r 1,1,1,{s},0 fi
+_rep_bchstatfunc_med : repeat s sh $> f. ic#-1 rm. done if $1 r 1,1,1,{s},0 fi
 #@cli rep_lbchstatfunc_to_pal: (eq. to rep_layers_by_channel_statistical_function_to_palette)
 rep_lbchstatfunc_to_pal: rep_layers_by_channel_statistical_function_to_palette $*
 #@cli rep_layers_by_channel_statistical_function_to_palette: _variable
@@ -1614,7 +1614,7 @@ f... i0#-2?i#-1:i
 rm[1,2]
 fi
 endl done
-#@cli rep_form_pixel: _form_id<24,_form_quad_lx!=0,_form_quad_ly!=0,_form_ratio[%]!=0,_angle,0<=_reflect_dir<=2,_sublevel,_interpolation<6,_shape_option_1..._shape_option_n
+#@cli rep_form_pixel: _form_id<24,_form_quad_lx!=0,_form_quad_ly!=0,_form_ratio[%]!=0,_angle,0<=_reflect_dir<=2,_sublevel,_interpolation<6,_keep_original_size={ 0=resized_result | 1=preserve_original_size },_shape_option_1..._shape_option_n
 #@cli : _form_id refers to the id or name of shape. circle is a valid form id, and any integer number that is 0-24 inclusive is a form id.
 #@cli : _form_quad_lx refers to the size of the tile in pixel form. It cannot be 0 unless you want to use _form_quad_ly variable to define the tile width.
 #@cli : _form_quad_ly refers to the size of the tile in pixel form. It cannot be 0 unless you want to use _form_quad_lx variable to define it tile height.
@@ -1623,12 +1623,14 @@ endl done
 #@cli : _reflect_dir refers to the mirroring of each shape. 1,2 means the mirroring is applied.
 #@cli : _sublevel refers to the initial size of the shape to be scaled down to fit tiles.
 #@cli : _interpolation refers to the interpolation of the scaling of shapes to fit each tile.
+#@cli : _keep_original_size places the image at center if it a value greater than 0. Otherwise, the filter will proceed keeping all the tiles at the same size.
 #@cli : If _form_id is a negative number, then it will use the layer number 0 as form reference. Forms that supports dynamic options are fern,gear,polygon,snowflake,star. Dynamic options corresponds to _shape_option_n.\n
 #@cli : Note: _shape_option_1 can be empty. n refers to corresponding shape option.\n
 #@cli : Default value: '_form_ratio=1','_ang=0','_reflect_dir=0','_sublevel=.5','_interpolation=2'
 #@cli : $ sp tiger rep_form_pixel star,35,35,,,,,,8
 #@cli : $ sp lena rep_form_pixel cupid,35,35,,24,1
 rep_form_pixel:
+skip ${9=0}
 sid="$1"
 isnum_sid={isnum($sid)}
 isint_sid={isint($sid)}
@@ -1637,7 +1639,13 @@ if $isnis if $sid>=0 sid=${"-arg "1+$sid"","australia,barbedwire,circle,crosshai
 isnum_sid={isnum($sid)}
 isint_sid={isint($sid)}
 isnis={$isnum_sid&&$isint_sid}
-+store[0] shape_reference
+if $#>=9
+    if $9
+    {$!},1,1,2,[w#x,h#x]
+    store. original_dimension
+    fi
+fi
++store[0] __shape_reference
 if $isnis
     r[0] {ceil(w/abs($2))*abs($2)},{ceil(h/abs($3))*abs($3)},100%,100%,0,0,.5,.5
     r[^0] {ceil(w/abs($2))*abs($2)},{ceil(h/abs($3))*abs($3)},100%,100%,0,1,.5,.5
@@ -1645,26 +1653,32 @@ else
     r {ceil(w/abs($2))*abs($2)},{ceil(h/abs($3))*abs($3)},100%,100%,0,1,.5,.5
 fi
 if $isnis
-    if $!>1 apply_parallel[^0] "$shape_reference rv _rep_form_pixel $*"
-    else apply_parallel "$shape_reference rv _rep_form_pixel $*"
+    if $!>1 apply_parallel[^0] "$__shape_reference rv _rep_form_pixel $*"
+    else apply_parallel "$__shape_reference rv _rep_form_pixel $*"
     fi
 else
     apply_parallel "_rep_form_pixel $*"
 fi
+if $#>=9
+    if $9
+    $original_dimension
+    repeat $!-1
+    r[$>] {i(#-1,$>,0,0,0)},{i(#-1,$>,0,0,1)},100%,100%,0,0,.5,.5
+    done
+    rm.
+    fi
+fi
 _rep_form_pixel:
-skip ${4=},${5=},${6=},${7=},${8=}
+skip ${4=},${5=},${6=},${7=},${8=},${9=}
 if narg($4) form_ratio={abs($4)} else form_ratio=1 fi
 if narg($5) ang=$5 else ang=0 fi
 if narg($6) mi={abs($6)} else mi=0 fi
 if narg($7) sub={abs($7)} else sub=.5 fi
 if narg($8) interpolation={abs($8)} else interpolation=5 fi
-
-
 sid="$1"
 isnum_sid={isnum($sid)}
 isint_sid={isint($sid)}
 isnis={$isnum_sid&&$isint_sid}
-
 tw=abs($2)
 th=abs($3)
 if !{$tw||$th} v + error "Invalid Dimension!" v - fi
@@ -1673,27 +1687,24 @@ th={!$th?$tw:$th}
 sub+=1
 interpolation+=1
 if $form_ratio==0||$form_ratio>1 v + error "Invalid Form Ratio Number!" v - fi
-
 if $isnis if $sid>=0 sid=${"-arg "1+$sid"","australia,barbedwire,circle,crosshair,cupid,diamond,dragonfly,fern,flip,gear,gumleaf,heart,information,kookaburra,mail,mapleleaf,paint_splat,paw,phone,polygon,rooster,shopping_cart,snowflake,star"} fi fi
-
 isnum_sid={isnum($sid)}
 isint_sid={isint($sid)}
 isnis={$isnum_sid&&$isint_sid}
-
 l[0]
-    if !$isnis
-        if $#>8 shape_$sid {max($tw,$th)*$sub},${9--1}
-        else shape_$sid {max($tw,$th)*$sub}
-        fi
-        rv
-    fi
+if !$isnis
+if $#>9 shape_$sid {max($tw,$th)*$sub},${10--1}
+else shape_$sid {max($tw,$th)*$sub}
+fi
+rv
+fi
 endl
 if abs($ang)%360!=0 rotate[0] $ang,1 fi
 if $mi==1 mirror[0] x elif $mi==2 mirror[0] y fi
 n[0] 0,1
 if $isnis
-    if s#0<=4&&s#0>1 l[0] s c,{if(s==4,-3,if(s==2,-1,-s))} if $!==2 to_gray.. *[-2,-1] else to_gray fi endl
-    elif s#0==5 l[0] s c,-4 cmyk2rgb.. to_gray.. *[-2,-1] endl fi
+if s#0<=4&&s#0>1 l[0] s c,{if(s==4,-3,if(s==2,-1,-s))} if $!==2 to_gray.. *[-2,-1] else to_gray fi endl
+elif s#0==5 l[0] s c,-4 cmyk2rgb.. to_gray.. *[-2,-1] endl fi
 fi
 autocrop[0] 0
 shape_image_ratio={w#0/h#0}
@@ -1705,34 +1716,34 @@ r[0] {$tw},{$th},1,1,0,0,.5,.5
 cut[0] 0,1 n[0] 0,1
 ti_l={$!-1}
 repeat $!-1 l[0,{$>+1}]
-    s. x,{w#1/w#0}
-    ti_w={$!-1}
-    s[^0] y,{h#1/h#0}
-    ti_h={($!-1)/$ti_w}
-    repeat $!-1 l[0,{$>+1}]
-        .
-        repeat s#-1
-            sh. $>
-            if iv#-1!=0
-                sh... $>
-                f. i*i0#0
-                f.. i*(1-i0#0)
-                f.. is/((1-ia#0)*w*h)
-                f. is/(ia#0*w*h)
-                f.. i#-1*i0#0+i*(1-i0#0)
-                rm[^0-2]
-            else
-                rm.
-            fi
-        done
-        rm..
-    endl done
-    l[^0]
-        repeat $ti_w
-            a[{$<*$ti_h}-{($<+1)*$ti_h-1}] y
-        done
-        a x
-    endl
+s. x,{w#1/w#0}
+ti_w={$!-1}
+s[^0] y,{h#1/h#0}
+ti_h={($!-1)/$ti_w}
+repeat $!-1 l[0,{$>+1}]
+.
+repeat s#-1
+sh. $>
+if iv#-1!=0
+sh... $>
+f. i*i0#0
+f.. i*(1-i0#0)
+f.. is/((1-ia#0)*w*h)
+f. is/(ia#0*w*h)
+f.. i#-1*i0#0+i*(1-i0#0)
+rm[^0-2]
+else
+rm.
+fi
+done
+rm..
+endl done
+l[^0]
+repeat $ti_w
+a[{$<*$ti_h}-{($<+1)*$ti_h-1}] y
+done
+a x
+endl
 endl done
 rm[0]
 #@cli rep_tfrac: (eq. to rep_thorn_fractal)
@@ -1771,6 +1782,7 @@ rep_tfrac: rep_thorn_fractal $*
 rep_thorn_fractal:
 skip ${2=50000},${3=255},${4=4},${5=0},${6=0},${7=1},${8=1},${9=1},${10=1},${11=0},${12=0},${13=0},${14=1},${15=},${16=}
 if $1<0 if !(narg($15)&&narg($16)) v + error "When using custom formula, there must be an arguments into custom_x and custom_y variables" fi fi
+if $1>45 v + error "Formula variable cannot be greater than 45" v - fi
 if $2<=0 v + error "Escape Variable cannot be zero or less than zero!" v - fi
 if $3<1 v + error "Iteration Variable must be at least 1!" v - fi
 if $4<1 v + error "Subsampling level must be at least 1!" v - fi
@@ -1780,7 +1792,7 @@ ww={w}
 hh={h}
 r {$4*100}%,{$4*100}%,1,1,0
 r {w%2==0?w+1:w},{h%2==0?h+1:h},1,1,0
-f "begin(altern=0;ang=pi*($13/180);sd=max(w,h)/min(w,h););
+f "begin(altern=0;ang=pi*($13/180);sd=max(w,h)/min(w,h);ff=$1-38);
 xx=2*((x/w)-.5);
 yy=2*((y/h)-.5);
 if(w>h,xx*=sd,yy*=sd);
@@ -1959,7 +1971,7 @@ for(v=0,v<$3,v++,
         vx=tan(a)/b;
         vy=tan(b)/a;
         );
-    if($1>=41,
+    if($1==41,
         vx=a/atan(b/cos(a/sin(a)));
         vy=b/atan(a/sin(b/cos(b)));
         );
@@ -1980,8 +1992,8 @@ for(v=0,v<$3,v++,
             vx=a/atan(b);
             vy=b/atan(a);
         );
-        altern+=1;
-        if(altern>($1-38),altern=0);
+        altern++;
+        if(altern>ff,altern=0);
     );
     vx+=$5;
     vy+=$6;
@@ -3242,83 +3254,86 @@ u "{$1}"\
 "{$12}"\
 "{$13}{$14,$15}"
 #@gui Tiled Form : gui_rep_form_pixel, gui_rep_form_pixel_preview(0)
-#@gui : note = note("Original idea comes from <a href="https://forums.getpaint.net/topic/26758-trs-tiled-pixels-v12/">TR's Tiled Pixels V1.2</a> plugin by <b>TechnoRobbo</b> for Paint.NET. This version is a extended version utilizing average sampling per area per tile. Dynamic shapes are also supported by this filter.\n\nDynamic Shapes - Fern, Gear, Polygon, Snowflake, Star\n\nShape that are dynamic are labeled with -[D] next to their name.\n\n<small>Note - You may want to sharp your picture due to the average sampling per area per tile algorithm applied by this filter. The reason being is that the contour of the shape would be more discernible after filter is processed.</small>"), sep = separator()
-#@gui : note = note("<b>Color Space Processing</b>")
-#@gui : Colour Space  = choice(0,"RGB","RYB","CMYK","HCY","HSI","HSL","HSV","LAB","LCH")
-#@gui : sep = separator(), note = note("<b>Shape Option</b>")
-#@gui : Tiled Shape = choice(1,"By Layer","Australia","Barbedwire","Circle","Crosshair","Cupid","Diamond","Dragonfly","Fern-[D]","Flip","Gear-[D]","Gumleaf","Heart","Information","Kookaburra","Mail","Mapleleaf","Paint Splat","Paw","Phone","Polygon-[D]","Rooster","Shopping Cart","Snowflake-[D]","Star-[D]")
-#@gui : Reverse Layer = bool(0)
-#@gui : note = note("<small>For the first option, you must use at least 2 layer to use layer as shape reference, else it'll use the only image itself as shape reference. Reverse Layer option might have to be used to generate the proper result when using first option.</small>")
-#@gui : sep = separator(), note = note("<b>Tile Options</b>")
-#@gui : Shape Width (px) = int(30,4,100)
-#@gui : Shape Height (px) = int(30,4,100)
-#@gui : Shape Ratio (%) = float(100,5,100)
-#@gui : Shape Rotation = float(0,-180,180)
-#@gui : Shape Mirror Axis = choice(0,"None","X","Y")
-#@gui : Subpixel Level = float(.5,0,2)
-#@gui : Interpolation = choice(5,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
-#@gui : sep = separator(), note = note("<b>Dynamic Options</b>")
-#@gui : Fern Type = choice("Asplenium Adiantum-Nigrum","Thelypteridaceae")
-#@gui : Fern Density (%) = float(100,0,300)
-#@gui : Gear Teeth Count = int(8,3,32)
-#@gui : Gear Height (%) = float(25,0.1,100)
-#@gui : Gear Offset Teeth (%) = float(0,0,100)
-#@gui : Gear Inner Ratio (%) = float(50,0.1,100)
-#@gui : Polygon Vertices = int(5,3,100)
-#@gui : Snowflake Recursion = int(5,1,6)
-#@gui : Star Branches = int(3,5,100)
-#@gui : Star Thickness (%) = float(38,.1,100)
-#@gui : note = note("<small>Options are only visible for dynamic shapes!</small>")
-#@gui :  sep  = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui :  sep  = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/5/18</i>.</small>")
+#@gui : note  = note("Original idea comes from <a href="https://forums.getpaint.net/topic/26758-trs-tiled-pixels-v12/">TR's Tiled Pixels V1.2</a> plugin by <b>TechnoRobbo</b> for Paint.NET. This version is a extended version utilizing average sampling per area per tile. Dynamic shapes are also supported by this filter.\n\nDynamic Shapes - Fern, Gear, Polygon, Snowflake, Star\n\nShape that are dynamic are labeled with -[D] next to their name.\n\n<small>Note - You may want to sharp your picture due to the average sampling per area per tile algorithm applied by this filter. The reason being is that the contour of the shape would be more discernible after filter is processed.</small>"), sep = separator()
+#@gui : note  = note("<b>Color Space Processing</b>")
+#@gui : Colour Space   = choice(0,"RGB","RYB","CMYK","HCY","HSI","HSL","HSV","LAB","LCH")
+#@gui : sep  = separator(), note = note("<b>Shape Option</b>")
+#@gui : Tiled Shape  = choice(1,"By Layer","Australia","Barbedwire","Circle","Crosshair","Cupid","Diamond","Dragonfly","Fern-[D]","Flip","Gear-[D]","Gumleaf","Heart","Information","Kookaburra","Mail","Mapleleaf","Paint Splat","Paw","Phone","Polygon-[D]","Rooster","Shopping Cart","Snowflake-[D]","Star-[D]")
+#@gui : Reverse Layer  = bool(0)
+#@gui : note  = note("<small>For the first option, you must use at least 2 layer to use layer as shape reference, else it'll use the only image itself as shape reference. Reverse Layer option might have to be used to generate the proper result when using first option.</small>")
+#@gui : sep  = separator(), note = note("<b>Tile Options</b>")
+#@gui : Shape Width (px)  = int(30,4,100)
+#@gui : Shape Height (px)  = int(30,4,100)
+#@gui : Shape Ratio (%)  = float(100,5,100)
+#@gui : Shape Rotation  = float(0,-180,180)
+#@gui : Shape Mirror Axis  = choice(0,"None","X","Y")
+#@gui : Subpixel Level  = float(.5,0,2)
+#@gui : Interpolation  = choice(5,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
+#@gui : sep  = separator(), note = note("<b>Dynamic Options</b>")
+#@gui : Fern Type  = choice("Asplenium Adiantum-Nigrum","Thelypteridaceae")
+#@gui : Fern Density (%)  = float(100,0,300)
+#@gui : Gear Teeth Count  = int(8,3,32)
+#@gui : Gear Height (%)  = float(25,0.1,100)
+#@gui : Gear Offset Teeth (%)  = float(0,0,100)
+#@gui : Gear Inner Ratio (%)  = float(50,0.1,100)
+#@gui : Polygon Vertices  = int(5,3,100)
+#@gui : Snowflake Recursion  = int(5,1,6)
+#@gui : Star Branches  = int(3,5,100)
+#@gui : Star Thickness (%)  = float(38,.1,100)
+#@gui : note  = note("<small>Options are only visible for dynamic shapes!</small>")
+#@gui : sep = separator() note = note("<b>Preservation of Image Size</b>")
+#@gui : Preserve Image Size = bool(0)
+#@gui : note = note("<small>It is recommended to use this for blending mode and/or if you're using Paint.NET")
+#@gui :  sep   = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui :  sep   = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/5/18</i>.</small>")
 gui_rep_form_pixel:
 if $3&&!$2 rv fi
 if $1!=2&&$1!=0
-    repeat {!$2&&$!>1?$!-1:$!} l[{!$2&&$!>1?$>+1:$>}]
-        sh 0,2
-        if $1==1 rgb2ryb.
-        elif $1==3 rgb2hcy.
-        elif $1==4 rgb2hsi.
-        elif $1==5 rgb2hsl.
-        elif $1==6 rgb2hsv.
-        elif $1==7 rgb2lab.
-        elif $1==8 rgb2lch.
-        fi
-        rm.
-    endl done
-elif $1==2
-    repeat {!$2&&$!>1?$!-1:$!} l[{!$2&&$!>1?$>+1:$>}]
-        if s==3 rgb2cmyk
-        elif s==4 s c,-3 rgb2cmyk.. a c
-        fi
-    endl done
+repeat {!$2&&$!>1?$!-1:$!} l[{!$2&&$!>1?$>+1:$>}]
+sh 0,2
+if $1==1 rgb2ryb.
+elif $1==3 rgb2hcy.
+elif $1==4 rgb2hsi.
+elif $1==5 rgb2hsl.
+elif $1==6 rgb2hsv.
+elif $1==7 rgb2lab.
+elif $1==8 rgb2lch.
 fi
-if $2==8 rep_form_pixel {$2-1},${4-5},{$6%},${7-10},$12%,0,{100%},$11
-elif $2==10 rep_form_pixel {$2-1},${4-5},{$6%},${7-10},${13-16}
-elif $2==20 rep_form_pixel {$2-1},${4-5},{$6%},${7-10},{$17}
-elif $2==23 rep_form_pixel {$2-1},${4-5},{$6%},${7-10},{$18}
-elif $2==24 rep_form_pixel {$2-1},${4-5},{$6%},${7-10},{$19},{$20%}
-else rep_form_pixel {$2-1},${4-5},{$6%},${7-10}
+rm.
+endl done
+elif $1==2
+repeat {!$2&&$!>1?$!-1:$!} l[{!$2&&$!>1?$>+1:$>}]
+if s==3 rgb2cmyk
+elif s==4 s c,-3 rgb2cmyk.. a c
+fi
+endl done
+fi
+if $2==8 rep_form_pixel {$2-1},${4-5},{$6%},${7-10},$21,$12%,0,{100%},$11
+elif $2==10 rep_form_pixel {$2-1},${4-5},{$6%},$21,${7-10},${13-16}
+elif $2==20 rep_form_pixel {$2-1},${4-5},{$6%},$21,${7-10},{$17}
+elif $2==23 rep_form_pixel {$2-1},${4-5},{$6%},$21,${7-10},{$18}
+elif $2==24 rep_form_pixel {$2-1},${4-5},{$6%},$21,${7-10},{$19},{$20%}
+else rep_form_pixel {$2-1},${4-5},{$6%},${7-10},$21
 fi
 if $1!=2&&$1!=0
-    repeat {!$2&&$!>1?$!-1:$!} l[{!$2&&$!>1?$>+1:$>}]
-        sh 0,2
-        if $1==1 ryb2rgb.
-        elif $1==3 hcy2rgb.
-        elif $1==4 hsi2rgb.
-        elif $1==5 hsl2rgb.
-        elif $1==6 hsv2rgb.
-        elif $1==7 lab2rgb.
-        elif $1==8 lch2rgb.
-        fi
-        rm.
-    endl done
+repeat {!$2&&$!>1?$!-1:$!} l[{!$2&&$!>1?$>+1:$>}]
+sh 0,2
+if $1==1 ryb2rgb.
+elif $1==3 hcy2rgb.
+elif $1==4 hsi2rgb.
+elif $1==5 hsl2rgb.
+elif $1==6 hsv2rgb.
+elif $1==7 lab2rgb.
+elif $1==8 lch2rgb.
+fi
+rm.
+endl done
 elif $1==2
-    repeat {!$2&&$!>1?$!-1:$!} l[{!$2&&$!>1?$>+1:$>}]
-        if s==4 cmyk2rgb
-        elif s==5 s c,-4 cmyk2rgb.. a c
-        fi
-    endl done
+repeat {!$2&&$!>1?$!-1:$!} l[{!$2&&$!>1?$>+1:$>}]
+if s==4 cmyk2rgb
+elif s==5 s c,-4 cmyk2rgb.. a c
+fi
+endl done
 fi
 if $3 rv fi
 gui_rep_form_pixel_preview:
@@ -3345,7 +3360,8 @@ u "{$1}"\
 "{$19}_"{$2==24?2:0}\
 "{$20}_"{$2==24?2:0}\
 "{$21}"\
-"{$22}"
+"{$22}"\
+"{$23}"
 #@gui Color Existence Distribution [RGB-8]: rep_color_existence_distribution_rgb8,rep_color_existence_distribution_rgb8
 #@gui : note = note("This filter is used to find colors that does or does not exist within a image.\n\n For <b>Paint.NET users</b>, please refer to this tutorial named <a href="https://forums.getpaint.net/topic/115124-finding-millions-of-colors-that-does-or-does-not-exist-gmic-qt-tutorial/?tab=comments#comment-562927">Finding millions of colors that does or does not exist - G'MIC QT Tutorial</a>")
 #@gui : sep = separator()
