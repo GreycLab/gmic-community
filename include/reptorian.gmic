@@ -44,15 +44,75 @@
 #
 #-------------------------------
 
+#@cli rep_equi2cube: (eq. to rep_equirectangular_panorama_to_cube_map)
+rep_equi2cube: rep_equirectangular_panorama_to_cube_map $*
+#@cli rep_equirectangular_panorama_to_cube_map: 0<=_top_face_placement<=3,_bottom_face_placement
+#@cli : An extension of a code provided by 'Salix alba' at stackoverflow to solve conversion from eqirectangular panorama to cube map. Source: https://stackoverflow.com/questions/29678510/convert-21-equirectangular-panorama-to-cube-map
+#@cli : Note: _bottom_face_placement will use placement of _top_face_placement when not specified.
+#@cli : Default values: '_top_face_placement=1'
+rep_equirectangular_panorama_to_cube_map:
+skip ${1=1}
+if $#>2 v + error "Only 1 or 2 variables are accepted!" v - fi
+if $1<0||$-1<0||$1>3||$-1>3||!isint($1)||!isint($-1) v + error "All variables should be integer number\(s\) in the range of \[0,3\]!" v - fi
+repeat $! l[$>]
+v + e[^-1] "Convert equirectangular panorama to cube map using face $1 for top placement and face $-1 for bottom placement!" v -
+ratio={w/h}
+if $ratio<2 r {w},{.5*w},100%,100%,5
+else r {2*h},{h},100%,100%,5
+fi
+{w},{3/4*w},100%,100%,"
+begin(edge=w/4;
+    outImgToXYZ(xc,yc,face,edge)=(
+        a=2*xc/edge;b=2*yc/edge;
+        if(face==0,ret=[-1,1-a,3-b];); #Left Face#
+        if(face==1,ret=[a-3,-1,3-b];); #Front Face#
+        if(face==2,ret=[1,a-5,3-b];); #Right Face#
+        if(face==3,ret=[7-a,1,3-b];); #Back Face#
+        if($1==0,if(face==4,ret=[1-b,1-a,1];); #Top Face#
+        ,if($1==1,if(face==4,ret=[a-3,1-b,1];);
+        ,if($1==2,if(face==4,ret=[b-1,a-5,1];);
+        ,if($1==3,if(face==4,ret=[7-a,b-1,1];);
+        );
+        );
+        );
+        );
+        if($-1==0,if(face==5,ret=[b-5,1-a,-1;]); #Bottom Face#
+        ,if($-1==1,if(face==5,ret=[a-3,b-5,-1;]);
+        ,if($-1==2,if(face==5,ret=[5-b,a-5,-1;]);
+        ,if($-1==3,if(face==5,ret=[7-a,5-b,-1;]);
+        );
+        );
+        );
+        );
+        ret;
+    );
+);
+face2=int(x/edge);
+if(y<edge,face2=4;);
+if(y>edge*2,face2=5;);
+coord3=outImgToXYZ(x,y,face2,edge);
+theta=atan2(coord3[1],coord3[0]);
+r=sqrt(sqr(coord3[0])+sqr(coord3[1]));
+phi=atan2(coord3[2],r);
+uf=((theta+pi)/pi)*edge*2;
+vf=((pi/2-phi)/pi)*edge*2;
+if($1==$-1,if((x>=edge*$1&&x<edge*($1+1))||(y>edge&&y<edge*2),i(#0,uf,vf,z,c,2,2););, #If first and last variable are the same, then visible output will show top and bottom faces along the same face#
+if(y<edge*2,if((x>=edge*$1&&x<edge*($1+1))||(y>edge&&y<edge*2),i(#0,uf,vf,z,c,2,2););,if((x>=edge*$-1&&x<edge*($-1+1))||(y>edge&&y<edge*2),i(#0,uf,vf,z,c,2,2);););); #If first and last variable are not the same, then visible output will show top and bottom faces along the same face#
+"
+rm..
+endl done
 #@cli rep_trps: (eq. to rep_tr_pixel_sharpener)
 rep_trps: rep_tr_pixel_sharpener $*
-#@cli rep_tr_pixel_sharpener: sharpen,_internal_blur>=0,_blur_type= { 0=Photo | 1= Horizontal | 2= Vertical }
-#@cli : Nearly direct conversion of TR's Pixel Sharpener plugin for Paint.NET into G'MIC code. Some code were changed to make more sense or is more practical. Negative values are enabled for first variable in the G'MIC version. The original code this was based on was created by TechnoRobbo. Source code - https://forums.getpaint.net/topic/26783-trs-pixel-sharpener-plugin-v20-dec-21-2014/\n
-#@cli : Default values: '_internal_blur=0','_blur_type=0'
+#@cli rep_tr_pixel_sharpener: sharpen,_internal_blur>=0,_type= { 0=Photo | 1= Horizontal | 2= Vertical | 3= One-Axis Angle | 4= Two-Axis Angle },-360<=_sharpening_angle<=360
+#@cli : Extended version of the original TR's Pixel Sharpener for Paint.NET. Some code were changed to make more sense or is more practical. Negative values are enabled for first variable in the G'MIC version. The original code this was based on was created by TechnoRobbo. Source code - https://forums.getpaint.net/topic/26783-trs-pixel-sharpener-plugin-v20-dec-21-2014/\n
+#@cli : Default values: '_internal_blur=0','_blur_type=0','_sharpening_angle=0'
 rep_tr_pixel_sharpener:
-skip ${2=0},${3=0}
+skip ${2=0},${3=0},${4=0}
 f "
 begin(
+ang=pi*($4/180);
+rot_x(a,b)=a*cos(ang)-b*sin(ang);
+rot_y(a,b)=a*sin(ang)+b*cos(ang);
 blur=(round(abs($2)+1)-1)*2+3;
 qblur=sqr(blur);
 eblur=floor(blur/2);
@@ -65,10 +125,11 @@ sum=i*mult;
 for(k=int(sblur),k<=eblur,k++,
 for(j=int(sblur),j<=eblur,j++,
 if(k!=0&j!=0,
-nx=x+j;
-ny=y+k;
-if($3==2,nx=x);
-if($3==1,ny=y);
+if($3==4,nx=x+rot_x(j,k);ny=y+rot_y(j,k););
+if($3==3,nx=x+rot_x(j,0);ny=y+rot_y(j,0););
+if($3==2,nx=x;ny=y+k;);
+if($3==1,nx=x+j;ny=y;);
+if($3==0,nx=x+j;ny=y+k;);
 nfcalc=i(nx,ny,z,c,0,1);
 sum-=nfcalc*coeff;
 );
@@ -3659,14 +3720,30 @@ endl done
 #@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/11/1</i>.</small>")
 gui_rep_trif: rep_trif $1,$2%,$3%,$4
 gui_rep_trif_preview: gui_split_preview "gui_rep_trif ${1-4}",${-3--1}
-#@gui TR's Pixel Sharpener: rep_trps,rep_trps_preview(0)
+#@gui TR's Pixel Sharpener: gui_rep_trps,gui_rep_trps_preview(0)
 #@gui : Sharpening = float(0,0,50)
 #@gui : Internal Blurring = int(0,0,4)
-#@gui : Blur Type = choice(0,"Photo","Horizontal","Vertical")
-#@gui : sep = separator(), note = note("This filter was based on Paint.NET plugin created by TechnoRobbo - \n<a href="https://forums.getpaint.net/topic/26783-trs-pixel-sharpener-plugin-v20-dec-21-2014/">Source code of TR's Pixel Sharpener</a>")
+#@gui : Blur Type = choice(0,"Photo","Horizontal","Vertical","Angle - One Axis","Angle - Two Axis")
+#@gui : Angle = float(0,-180,180)
+#@gui : Channel(s) = choice(11,"All","RGBA [All]","RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","RGBA [Alpha]",
+#@gui : "Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]",
+#@gui : "YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]",
+#@gui : "YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]",
+#@gui : "Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]",
+#@gui : "HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]",
+#@gui : "CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]","RYB [All]","RYB [Red]","RYB [Yellow]","RYB [Blue]")
+#@gui : sep = separator(), note = note("This is a extended filter which was based on a Paint.NET plugin that was created by <b>TechnoRobbo</b> - <a href="https://forums.getpaint.net/topic/26783-trs-pixel-sharpener-plugin-v20-dec-21-2014/">TR's Pixel Sharpener</a>")
 #@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/11/2</i>.</small>")
-rep_trps_preview: gui_split_preview "rep_trps ${1-4}",${-3--1}
+gui_rep_trps: ac "rep_tr_pixel_sharpener ${1-4}",$5
+gui_rep_trps_preview: gui_split_preview "gui_rep_trps ${1-5}",${-3--1}
+u "{$1}"\
+"{$2}"\
+"{$3}"\
+"{$4}_"{$3>2?2:0}\
+"{$5}"\
+"{$6}"\
+"{$7}"
 ######################
 
 # Local Variables:
