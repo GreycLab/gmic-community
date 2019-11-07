@@ -44,6 +44,160 @@
 #
 #-------------------------------
 
+#@cli rep_gv: (eq. to rep_glass_vignette)
+rep_gv: rep_glass_vignette $*
+#@cli rep_glass_vignette: refraction,_refraction_power,_chromatic_aberration,-100%<=_preliminary_shift_x<=100%,-100%<=_preliminary_shift_y<=100%,_image_additional_zoom>0,-360<=_image_angle<=360,_distortion_scale_x,_distortion_scale_y,_distortion_scale_xy>0,-360<=_distortion_angle<=360,_distortion_offset_x,_distortion_offset_y,0<=_colorspace<=1,_boundary={ 0=none | 1=neumann | 2=periodic | 3=mirror },_interpolation={ 0=nearest | 1=average | 2=linear | 3=grid | 4=bicubic | 5=lanczos },_subpixel>0
+#@cli : Distorts images as if it is based from the view of a bulged car mirror or camera len. This G'MIC filter is a heavily extended version of TR's Glass Vignette plugin made for Paint.NET by TechnoRobbo. It can also be used for generating abstract art as well.\n
+#@cli : 'refraction' defines the strength of distortion. The farther the values from 0, the greater the distortion is. It is recommended to use percentage alongside a number.
+#@cli : '_refraction_power' defines the distortion factor within the refraction. The farther the values from 0, the greater the distortion is. It is recommended to use percentage alongside a number.
+#@cli : '_chromatic_aberration' is the degree of aberration within channels. The farther the values from 0, the greater the distortion per channels would be. It is recommended to use percentage alongside a number.
+#@cli : '_preliminary_shift_x' is the preshift of images before the distortion effect. This is used in the original plugin. It is recommended to use percentage alongside a number.
+#@cli : '_preliminary_shift_y' is the preshift of images before the distortion effect. This is used in the original plugin. It is recommended to use percentage alongside a number.
+#@cli : '_image_additional_zoom' defines the scaling based on scaling of coordinates of image within the distortion effect. 0 starts with scaling of 1x, and 1 means scaling of 2x.
+#@cli : '_image_angle' defines the angle of image within the distortion.
+#@cli : '_distortion_scale_x' is the scaling of distortion within the x-axis. When this is set to 0, the ratio of image is used instead. 0 starts with scaling of 1x, and 1 means scaling of 2x.
+#@cli : '_distortion_scale_y' is the scaling of distortion within the y-axis. When this is set to 0, the ratio of image is used instead. 0 starts with scaling of 1x, and 1 means scaling of 2x.
+#@cli : '_distortion_scale_xy' is the scaling of distortion within the x and y axis at the same time.
+#@cli : '_distortion_angle' is the angle of distortion effect. 0 starts with scaling of 1x, and 1 means scaling of 2x.
+#@cli : '_distortion_offset_x' is the displacement of distortion within the x-axis. It is recommended to use percentage alongside a number.
+#@cli : '_distortion_offset_y' is the displacement of distortion within the y-axis. It is recommended to use percentage alongside a number.
+#@cli : '_colorspace' defines the color space of the image to process distortion on.
+#@cli : '_boundary' defines how the out-of-bound areas is to be behave. 
+#@cli : '_interpolation' defines the interpolation within distortion.
+#@cli : '_subpixel' is the level of subpixel sampling to be used.
+#@cli : Default values: '_refraction_power=0','_chromatic_aberration=0','_preliminary_shift_x=0','_preliminary_shift_y=0','_image_zoom=0','_image_angle=0','_distortion_scale_x=1','_distortion_scale_y=1','_distortion_scale_xy=1','_distortion_angle=0','_distortion_offset_x=0','_distortion_offset_y=0','_colorspace=0','_boundary=3','_interpolation=5','_subpixel=1'
+rep_glass_vignette:
+skip ${2=0},${3=0},${4=0},${5=0},${6=0},${7=0},${8=1},${9=1},${10=1},${11=0},${12=0},${13=0},${14=0},${15=3},${16=5},${17=1}
+convert_back=0
+sub={1+abs($17)}
+repeat $! l[$>]
+v + e[^-1] "Distorts image at angle of $11 with refraction factor of $1, chromatic aberration of $3, zoom factor of $6, preliminary shift of $4, preliminary shift of $5, scale x-axis distortion by $8 multiplied by $10, scale y-axis distortion by $9 multiplied by $10, refraction index by power of $2 placed at $12,$13 at angle of $7." v -
+if (s==3||s==4)&&$14
+convert_back=1
+if $14!=4
+sh 0,2
+if $14==1 rgb2srgb.
+elif $14==2 rgb2ryb.
+elif $14==3 rgb2cmy.
+elif $14==5 rgb2hcy.
+elif $14==6 rgb2hsi.
+elif $14==7 rgb2hsl.
+elif $14==8 rgb2hsv.
+elif $14==9 rgb2lab.
+elif $14==10 rgb2lch.
+elif $14==11 rgb2yiq.
+elif $14==12 rgb2yuv.
+elif $14==13 rgb2ycbcr.
+elif $14==14 rgb2ycbcrglic.
+elif $14==15 rgb2xyz.
+fi
+rm.
+else
+if s==3 rgb2cmyk
+elif s==4 s c,-3 rgb2cmyk.. a c
+fi
+fi
+fi
+shift $4,$5,0,0,$15,{(abs($16)-1)?1}
+r2dx {$sub*100}%,{abs($16)+1}
+f "begin(
+aberate=((1-$1)-.001)/.999;
+aberate=sqr(1*aberate+(1-$3)*(1-aberate));
+offset_x=w/2*(1-$12);
+offset_y=h/2*(1-$13);
+if($8&&$9,
+mx=1/($8*(1/$10));
+my=1/($9*(1/$10));
+,
+if(w>h,
+mx=1/(1*(1/$10));
+my=1/((h/w)*(1/$10));
+,
+mx=1/((w/h)*(1/$10));
+my=1/(1*(1/$10));
+);
+);
+ang=pi*($7/180);
+dang=pi*($11/180);
+distrad=1*10^($2/10);
+rot_x(a,b)=a*cos(ang)-b*sin(ang);
+rot_y(a,b)=a*sin(ang)+b*cos(ang);
+dist_rot_x(a,b)=a*cos(dang)-b*sin(dang);
+dist_rot_y(a,b)=a*sin(dang)+b*cos(dang);
+sq2(a,b)=sqrt(a^2+b^2);
+sd=max(w,h)/min(w,h);
+sx=w>h?sd:1;
+sy=w>h?1:sd;
+rx(a)=((a/2+.5*sx)/sx)*w;
+ry(a)=((a/2+.5*sy)/sy)*h;        
+cv=sq2(rot_x(sx,sy)/2,rot_y(sx,sy)/2);
+off_x_primary(a,b)=cos(a)*b*(abs($6)+1);
+off_y_primary(a,b)=sin(a)*b*(abs($6)+1);
+off_secondary(a,b,c)=a*(1-c)+b*c;
+);
+XX=((x+offset_x)/w-.5)*2;
+YY=((y+offset_y)/h-.5)*2;
+xx=dist_rot_x(XX,YY);
+yy=dist_rot_y(XX,YY);
+xx*=mx;
+yy*=my;
+xx*=sx;
+yy*=sy;
+XX=rot_x(xx,yy);
+YY=rot_y(xx,yy);
+far=sq2(XX,YY);
+rad=atan2(YY*distrad,XX+.0001);
+eff=far/cv;
+RB=far^(1-$1);
+RA=RB*aberate;
+off_xS=off_x_primary(rad,far);
+off_xA=off_x_primary(rad,RA);
+off_xB=off_x_primary(rad,RB);
+off_yS=off_y_primary(rad,far);
+off_yA=off_y_primary(rad,RA);
+off_yB=off_y_primary(rad,RB);
+offxA=off_secondary(off_xS,off_xA,eff);
+offyA=off_secondary(off_yS,off_yA,eff);
+offxB=off_secondary(off_xS,off_xB,eff);
+offyB=off_secondary(off_yS,off_yB,eff);
+fax=rx(offxA);
+fay=ry(offyA);
+fbx=rx(offxB);
+fby=ry(offyB);
+if(s==1,result=[i((fax+fbx)/2,(fay+fby)/2,z,1,(abs($16)-1)?1,$15)]);
+if(s==2,result=[i(fbx,fby,z,0,(abs($16)-1)?1,$15),i((fax+fbx)/2,(fay+fby)/2,z,1,(abs($16)-1)?1,$15)]);
+if(s==3,result=[i(fbx,fby,z,0,(abs($16)-1)?1,$15),i((fax+fbx)/2,(fay+fby)/2,z,1,(abs($16)-1)?1,$15),i(fax,fay,0,2,(abs($16)-1)?1,$15)]);
+if(s==4,result=[i(fbx,fby,z,0,(abs($16)-1)?1,$15),i((fax+fbx)/2,(fay+fby)/2,z,1,(abs($16)-1)?1,$15),i(fax,fay,0,2,(abs($16)-1)?1,$15),i((fax+fbx)/2,(fay+fby)/2,z,3,(abs($16)-1)?1,$15)]);
+if(s==5,result=[i(fbx,fby,z,0,(abs($16)-1)?1,$15),i((fax+fbx)/2,(fay+fby)/2,z,1,(abs($16)-1)?1,$15),i(fax,fay,0,2,(abs($16)-1)?1,$15),i((fax+fbx)/2,(fay+fby)/2,z,3,(abs($16)-1)?1,$15),i((fax+fbx)/2,(fay+fby)/2,z,4,(abs($16)-1)?1,$15)]);
+result;
+"
+r2dx {(1/$sub)*100}%,{abs($16)+1}
+if $convert_back
+if $14!=4
+sh 0,2
+if $14==1 srgb2rgb.
+elif $14==2 ryb2rgb.
+elif $14==3 cmy2rgb.
+elif $14==5 hcy2rgb.
+elif $14==6 hsi2rgb.
+elif $14==7 hsl2rgb.
+elif $14==8 hsv2rgb.
+elif $14==9 lab2rgb.
+elif $14==10 lch2rgb.
+elif $14==11 yiq2rgb.
+elif $14==12 yuv2rgb.
+elif $14==13 ycbcr2rgb.
+elif $14==14 ycbcrglic2rgb.
+elif $14==15 xyz2rgb.
+fi
+rm.
+else
+if s==4 cmyk2rgb
+elif s==5 s c,-4 cmyk2rgb.. a c
+fi
+fi
+fi
+endl done
 #@cli rep_equi2cube: (eq. to rep_equirectangular_panorama_to_cube_map)
 rep_equi2cube: rep_equirectangular_panorama_to_cube_map $*
 #@cli rep_equirectangular_panorama_to_cube_map: 0<=_top_face_placement<=3,_bottom_face_placement
@@ -96,8 +250,8 @@ r=sqrt(sqr(coord3[0])+sqr(coord3[1]));
 phi=atan2(coord3[2],r);
 uf=((theta+pi)/pi)*edge*2;
 vf=((pi/2-phi)/pi)*edge*2;
-if($1==$-1,if((x>=edge*$1&&x<edge*($1+1))||(y>edge&&y<edge*2),i(#0,uf,vf,z,c,2,2););, #If first and last variable are the same, then visible output will show top and bottom faces along the same face#
-if(y<edge*2,if((x>=edge*$1&&x<edge*($1+1))||(y>edge&&y<edge*2),i(#0,uf,vf,z,c,2,2););,if((x>=edge*$-1&&x<edge*($-1+1))||(y>edge&&y<edge*2),i(#0,uf,vf,z,c,2,2);););); #If first and last variable are not the same, then visible output will show top and bottom faces along the same face#
+if($1==$-1,if((x>=edge*$1&&x<edge*($1+1))||(y>=edge&&y<edge*2),i(#0,uf,vf,z,c,2,2););, #If first and last variable are the same, then visible output will show top and bottom faces along the same face#
+if(y<edge*2,if((x>=edge*$1&&x<edge*($1+1))||(y>=edge&&y<edge*2),i(#0,uf,vf,z,c,2,2););,if((x>=edge*$-1&&x<edge*($-1+1))||(y>=edge&&y<edge*2),i(#0,uf,vf,z,c,2,2);););); #If first and last variable are not the same, then visible output will show top and bottom faces along the same face#
 "
 rm..
 endl done
@@ -3744,6 +3898,33 @@ u "{$1}"\
 "{$5}"\
 "{$6}"\
 "{$7}"
+#@gui Glass Vignette: gui_rep_gv, gui_rep_gv_preview(0)
+#@gui : note=note("<small>Distorts images as if it is based from the view of a bulged car mirror or camera len. This G'MIC filter is a heavily extended version of <a href="https://forums.getpaint.net/topic/28355-trs-glass-vignette/">TR's Glass Vignette</a> plugin made by TechnoRobbo for Paint.NET. It can also be used for generating abstract art as well.</small>"), sep=separator()
+#@gui : note=note("<b>Refraction Settings</b>")
+#@gui : Refraction (%)=float(0,-200,200)
+#@gui : Refraction Power (%)=float(0,-200,200)
+#@gui : Chromatic Aberration (%)=float(0,-100,100)
+#@gui : sep=separator(),note=note("<b>Transformations Settings</b>")
+#@gui : note=note("<small><i>Preliminary Image Transformations</i></small>")
+#@gui : Preliminary Image Shift=point(50,50,0,1,128,128,128,255)
+#@gui : Image Additional Zoom (%)=float(0,0,500)
+#@gui : Image Angle = float(0,-180,180)
+#@gui : sep=separator(),note=note("<small><i>Distortion Transformations</i></small>")
+#@gui : Distortion Scale by X-Axis (%)=float(100,0,1000)
+#@gui : Distortion Scale by Y-Axis (%)=float(100,0,1000)
+#@gui : Distortion Scale by XY-Axis (%)=float(100,0.01,500)
+#@gui : Distortion Angle = float(0,-180,180)
+#@gui : Distortion Offset=point(50,50,0,1,255,255,255,255)
+#@gui : note=note("<small><i>When Distortion Scale by X-Axis and/or Y-Axis is 0, then distortion will be based on image ratio.</i></small>")
+#@gui : sep=separator(),note=note("<b>Processing Settings</b>")
+#@gui : Colour Space=choice(0,"RGB","sRGB","RYB","CMY","CMYK",HCY",HSI","HSL","HSV","LAB","LCH","YIQ","YUV","YCbCr","YCbCrGLIC","XYZ")
+#@gui : Boundary=choice(3,"None","Neumann","Periodic","Mirror")
+#@gui : Interpolation=choice(5,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
+#@gui : Subpixel=float(1,1,2)
+#@gui : sep=separator(),note=note("<b>Preview Settings</b>"), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(), note=note("<small>Author: Reptorian.      Latest Update: <i>2019/11/2</i>.</small>")
+gui_rep_gv: rep_gv $1%,$2%,$3%,{$4-50}%,{$5-50}%,$6%,$7,$8%,$9%,$10%,$11,{$12+50}%,{$13+50}%,${14-17}
+gui_rep_gv_preview: gui_split_preview "gui_rep_gv ${1-17}",${-3--1}
 ######################
 
 # Local Variables:
