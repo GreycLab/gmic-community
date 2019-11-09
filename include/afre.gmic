@@ -73,7 +73,9 @@ fx_darken_sky_preview :
 #@gui afre
 
 #@gui Vigrect : afre_vigrect, afre_vigrect_preview(0)
-#@gui : note = note("<strong>Add rectangular vignette.\n</strong>* Negative strength will brighten periphery.\n\n<strong>Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2017-2019.</strong>\n\n")
+#@gui : note = note("<strong>Add rectangular vignette. &nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2017-2019.</strong>\n<hr />
+#@gui : <strong>Instructions:</strong>\n\n
+#@gui : * Negative strength brightens the periphery.\n\n")
 #@gui : Size = int(50,1,100)
 #@gui : Strength = int(75,-500,500)
 #@gui : Blur = int(10,1,50)
@@ -95,7 +97,9 @@ afre_vigrect_preview :
   afre_vigrect $*
 
 #@gui Vigcirc : afre_vigcirc, afre_vigcirc_preview(0)
-#@gui : note = note("<strong>Add circular vignette.\n</strong>* Negative strength will brighten periphery.\n\n<strong>Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019.</strong>\n\n")
+#@gui : note = note("<strong>Add circular vignette. &nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019.</strong>\n<hr />
+#@gui : <strong>Instructions:</strong>\n\n
+#@gui : * Negative strength brightens the periphery.\n\n")
 #@gui : Size = int(90,50,150)
 #@gui : Strength = int(75,-500,500)
 #@gui : Left-Right = int(50,0,100)
@@ -113,6 +117,23 @@ afre_vigcirc : check "${1=90}>=50 && ${2=75}>=-500 && ${3=50}>=0 && ${4=50}>=0 &
 
 afre_vigcirc_preview :
   afre_vigcirc $*
+
+#@gui Softlight : afrx_softlight, afrx_softlight_preview(0)
+#@gui : note = note("<strong>Blend 1-2 images using softlight. &nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019.</strong>\n<hr />
+#@gui : <strong>Instructions:</strong>\n\n
+#@gui : Set the <strong>Input layers</strong> option below to handle multiple layers:\n\n
+#@gui : * <strong>Active</strong> blends the active layer with itself.\n\n
+#@gui : * <strong>Active and below</strong>, or <strong>Active and above</strong>, blends layers together. <strong>Reverse Order</strong> determines the blending order.\n\n
+#@gui : * <strong>Bug alert</strong> * &nbsp; To fix preview alignment or crop issues, press the <strong>Reset zoom</strong> button.\n\n")
+#@gui : Inverse = bool(0)
+#@gui : Reverse Order = bool(0)
+#@gui : Amount = int(100,0,150)
+afrx_softlight :
+  if $!==2 l=0,1 elif $!==1 l=0 fi
+  afre_softlight[$l] $1,$2,$3
+
+afrx_softlight_preview :
+  afrx_softlight $*
 
 #@gui Gamify : fx_gamify, fx_gamify_preview(1)
 #@gui : Lightness = int(50,50,60)
@@ -140,12 +161,12 @@ fx_gamify_preview :
 #@gui : Recovery = float(1,.5,4)
 #@gui : Brightness = float(1,.5,4)
 #@gui : Details = float(1,.5,4)
-#@cli afre_edge : 10>=thinning>=1, 4>=_recovery>=.5, 4>=_brightness>=.5, 4>=_details>=.5
+#@cli afre_edge : 1<=thinning<=10, 0.5<=_recovery<=4, 0.5<=_brightness<=4, 0.5<=_details<=4
 #@cli : Compute edge of selected images.
 #@cli : Default values: 'thinning=1', 'recovery=1', 'brightness=1' and 'details=1'.
-afre_edge : check "${1=1}>=1 && ${2=1}>=.5 && ${3=1}>=.5 && ${4=1}>=.5 &&
+afre_edge : check "${1=1}>=1 && ${2=1}>=0.5 && ${3=1}>=0.5 && ${4=1}>=0.5 &&
     $1<=10 && $2<=4 && $3<=4 && $4<=4"
-  e[] "[afre]^_^) edge: Compute edge of image$?."
+  e[] "[afre]^_^) edge: Compute edge of image$? using thinning=$1, recovery=$2, brightness=$3, details=$4."
   v - repeat $! l[$>]
     afre_gnorm im,ic,iM={[im,ic,iM]} ^ {1/$4} n $im,$iM
     repeat $1 +afre_box 1 afre_gnorm. r={[im,iM]} ^. $2 n. $r - done
@@ -172,7 +193,7 @@ fx_hnorm_preview :
 #@gui Clean Text : afre_cleantext, afre_cleantext_preview(0)
 #@gui : note = note("<strong>Clean scanned text. &nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019.</strong>\n\n")
 #@gui : Clean = int(8,0,10)
-#@gui : Range = float(1,0.2,1)
+#@gui : Range = float(1,.2,1)
 #@gui : Black = int(80,0,100)
 #@gui : White = int(95,0,100)
 #@cli afre_cleantext : 0<=clean<=10, 0.2<=_range<=1, 0<=_black<=100, 0<=_white<=100
@@ -238,18 +259,28 @@ afre_box : check "${1=1}>=1 && isbool(${2=1}) && isbool(${3=1})"
     +convolve[1] [2],$3 convolve[0] [2],$3 k[0,3] /
   endl done v +
 
-#@cli afre_softlight : inverse={ 0 | 1 }, _reverse_order={ 0 | 1 }
+#@cli afre_sharpenfft : 0<=strength<=10, 0<=_size<=5
+#@cli : Sharpen selected images with fourier transform.
+#@cli : Default values: 'strength=1' and 'size=1'.
+afre_sharpenfft: check "${1=1}>=0 && ${2=1}>=0 && $1<=10 && $2<=5"
+  e[] "[afre]^_^) sharpenfft: Sharpen image$? with fourier transform using strength=$1, size=$2."
+  v - repeat $! l[$>] iM={iM} +l
+    fftpolar +gaussian.. {100/$2}% negate. *[^1] ifftpolar * $1
+  endl + c 0,$iM endl done v +
+
+#@cli afre_softlight : inverse={ 0 | 1 }, _reverse_order={ 0 | 1 }, 0<=_amount<=150
 #@cli : Blend last 1-2 images of selection using softlight.
-#@cli : Default values: 'inverse=0' and 'reverse_order=0'.
-afre_softlight : check "isbool(${1=0}) && isbool(${2=0})"
+#@cli : Default values: 'inverse=0', 'reverse_order=0' and 'amount=100'.
+afre_softlight : check "isbool(${1=0}) && isbool(${2=0}) && ${3=100}>=0 &&
+    $3<=150"
   v - if $1 i="inverse softlight" else i="softlight" fi
-  if $!==1 v + e[] "[afre]^_^) softlight: Blend image$? with itself using "$i"." v - .
+  if $!==1 . v + e[] "[afre]^_^) softlight: Blend image$? with itself using "$i"." v -
   else v + e[] "[afre]^_^) softlight: Blend last 2 images of image$? using "$i"." v - fi
-  l[-2,-1] if $2 rv fi r={0,[im,iM]} to_colormode 0
+  l[-2,-1] if $2 rv fi r={0,[im,iM]} a={.5*$3/100+.5} to_colormode 0
     if w#0!=w#1||h#0!=h#1 if w#0>w#1||h#0>h#1 rr2d[1] {0,[w,h]},1,2 fi
-      r[1] [0],[0],[0],100%,0,0,0.5,0.5
-    fi n 0,1 if $1 negate. fi *. -2 +. 1 f. i#0^(2^(i#1))
-   n $r nm {0,b} k. endl v +
+      r[1] [0],[0],[0],100%,0,0,.5,.5
+    fi n 0,1 if $1 negate. fi *. -2 +. 1 f. i#0^(($a*2)^($a*i#1))
+  n $r nm {0,b} k. endl v +
 
 
 # Local Variables:
