@@ -44,6 +44,134 @@
 #
 #-------------------------------
 
+#@cli rep_fibosq: (eq. to rep_fibonacci_squares)
+rep_fibosq: rep_fibonacci_squares $*
+#@cli rep_fibonacci_squares: iterations,_corner_location>=0, _spiral_mode={ 0= non-spiral | 1= spiral_fill }
+#@cli : Generate a new fibonacci image(s). The value of each squares are increased by 1 starting from 0 while the size of the squares are increased by Fibonacci iterations starting from 1.\n
+#@cli : Default values: '_corner_location=0','_spiral_mode=1'
+rep_fibonacci_squares:
+size1=0 size2=1 nextterm=0 wi=0
+ti={$!}
+size1={$size2}
+size2={$nextterm}
+nextterm={$size1+$size2}
+
+switch=$2
+ci=0
+
+
+do
+    $nextterm,$nextterm,1,1,$wi #Size of each squares are determined by nextterm while the value of each squares are determined by number of iteration within loop#
+    size1={$size2}
+    size2={$nextterm}
+    nextterm={$size1+$size2}
+    if ($!-$ti)==2
+        if $ci%2
+            if $3 if floor($switch/2)%2 rv[-2,-1] fi fi #Switches order of squares before appending to generate fibonacci square spirals#
+            if $switch%2&&!$3 rv[-2,-1] fi #Enables non-spiral connection of fibonacci Squares to have different corner locations#
+            a[-2,-1] x
+        else
+            if $3 if floor($switch/2)%2  rv[-2,-1] fi fi #Switches order of squares before appending to generate fibonacci spirals#
+            if $switch>=2&&!$3 rv[-2,-1] fi #Enables non-spiral connection of fibonacci Squares to have different corner locations#
+            a[-2,-1] y
+        fi
+    fi
+    ci+=1
+    wi+=1
+    if $3 switch+=1 fi
+while $wi<$1
+#@cli rep_fibofill: (eq. to rep_fibonacci_fill)
+rep_fibofill: rep_fibonacci_fill $*
+#@cli rep_fibonacci_fill: _corner_location={ 0= top left | 1= top right | 2= bottom left | 3= bottom right }, _spiral_mode={ 0= non-spiral | 1= spiral_fill },_fill_images_with_fibonacci_fill= { 0= Adds fibonacci fill image | 1= Replaces all current images with fibonacci fill }, -1<=_spiral_place_center_x<=1,-1<=_spiral_place_center_y<=1
+#@cli : Generates fibonacci filled image(s) based on dimensions of existing image(s). The value of each squares are increased by 1 starting from 0 while the size of the squares are increased by Fibonacci iterations starting from 1.\n
+#@cli : Note: Last two variables or _spiral_place_center variables series only works for spiral cases.\n
+#@cli : Default values: '_corner_location=0','_spiral_mode=1','_fill_images_with_fibonacci_fill=0','_spiral_place_center_x=0','_spiral_place_center_y=0'
+rep_fibonacci_fill:
+skip ${1=0},${2=1},${3=1},${4=0},${5=0}
+mw=0 mh=0 size1=0 size2=1 nextterm=0 #Starting variables#
+ti={$!}
+
+repeat $!
+    if w#$>>$mw mw={w#$>} fi
+    if h#$>>$mh mh={h#$>} fi
+done
+
+size1={$size2}
+size2={$nextterm}
+nextterm={$size1+$size2}
+
+if $2
+    if $mw==$mh||$mw>$mh
+        switch={$1<=1?1-$1:$1}
+        ci=0
+    else
+        switch={$1%2?3-$1:$1}
+        ci=1
+    fi
+else
+    switch=$1
+    ci=0
+fi
+
+wi=0 #While Iteration#
+wic=0 #While Iteration after length of value from the minimum to one of the size requirement has been met#
+
+if !$2 mlb={sqrt(max($mh,$mw)^2+max($mh,$mw)^2)}
+else mlb={max($mh,$mw)} fi
+
+do
+    $nextterm,$nextterm,1,1,$wi #Size of each squares are determined by nextterm while the value of each squares are determined by number of iteration within loop#
+    size1={$size2}
+    size2={$nextterm}
+    nextterm={$size1+$size2}
+    
+    if $wi
+        if $ci%2
+            if $2 if floor($switch/2)%2 rv[$ti,{$ti+1}] fi fi #Switches order of squares before appending to generate fibonacci square spirals#
+            if $switch%2&&!$2 rv[$ti,{$ti+1}] fi #Enables non-spiral connection of fibonacci Squares to have different corner locations#
+            a[$ti,{$ti+1}] x
+        else
+            if $2 if floor($switch/2)%2  rv[$ti,{$ti+1}] fi fi #Switches order of squares before appending to generate fibonacci spirals#
+            if $switch>=2&&!$2 rv[$ti,{$ti+1}] fi #Enables non-spiral connection of fibonacci Squares to have different corner locations#
+            a[$ti,{$ti+1}] y
+        fi
+    fi
+    ci+=1
+    wi+=1
+    if $2 switch+=1 fi
+    cw={$2?min(xm#-1,w#-1-xm#-1):max(xm#-1,w#-1-xm#-1)}
+    ch={$2?min(ym#-1,h#-1-xm#-1):max(ym#-1,h#-1-xm#-1)}
+    if $2 cl={max($cw,$ch)} #Max Length of minimum value of spiral to one of the sides based on x or y axis#
+    else cl={sqrt($cw^2+$ch^2)} fi #Hypotenuse of Fibonacci non-spiral form#
+    if $cl>$mlb wic+=1 if !$2 wic+=1 fi fi #Iteration after size requirement has been met #
+while $wic!=2
+
+place_x={xm#-1}
+place_y={ym#-1}
+cex={(w#-1)/2}
+cey={(h#-1)/2}
+cex={$place_x>$cex?1:0}
+cey={$place_y>$cey?1:0}
+
+if $3
+channels 0
+    if $2
+        repeat $ti
+            sx={ceil(w#$>/2)}
+            sy={ceil(h#$>/2)}
+            sx+={$4*$sx}
+            sy+={$5*$sy}
+            f[$>] i(#-1,$place_x-$sx+x,$place_y-$sy+y)
+        done
+    else
+        repeat $ti
+            +r. {w#$>},{h#$>},100%,100%,0,0,$cex,$cey
+            rv[$>,-1]
+            rm.
+        done
+    fi
+    rm.
+fi
 #@cli rep_gv: (eq. to rep_glass_vignette)
 rep_gv: rep_glass_vignette $*
 #@cli rep_glass_vignette: refraction,_refraction_power,_chromatic_aberration,-100%<=_preliminary_shift_x<=100%,-100%<=_preliminary_shift_y<=100%,_image_additional_zoom>0,-360<=_image_angle<=360,_distortion_scale_x,_distortion_scale_y,_distortion_scale_xy>0,-360<=_distortion_angle<=360,_distortion_offset_x,_distortion_offset_y,0<=_colorspace<=1,_boundary={ 0=none | 1=neumann | 2=periodic | 3=mirror },_interpolation={ 0=nearest | 1=average | 2=linear | 3=grid | 4=bicubic | 5=lanczos },_subpixel>0
@@ -866,8 +994,233 @@ endl
 l[1]
 if $6 rep_dupsdaxy 0,2,$1,$2,$3,$4 tai={$!} add / $tai fi
 endl a c
-#@cli pal :
-#@cli : Creates pre-made user-made palette or palette that are based off older system.
+#@cli pal: 0<="palette_id"<=223
+#@cli : Inserts pre-made user-made palette or palette that are based off older system.\n
+#@cli : - The following list contains valid inputs directly next to their name, but anything after dashes is only for information purpose. Equal sign means that the commands are identical.-\n
+#@cli : pal 0 = pal bw -- Black & White
+#@cli : pal 1 = pal rgb -- Red-Green-Blue
+#@cli : pal 2 = pal b_rgb -- Black w/ Red-Green-Blue
+#@cli : pal 3 = pal bw_rgb -- Black & White w/ Red-Green-Blue
+#@cli : pal 4 = pal cmy -- Cyan-Magenta-Yellow
+#@cli : pal 5 = pal cmyk -- Cyan-Magenta-Yellow-Black
+#@cli : pal 6 = pal wcmyk -- White-Cyan-Magenta-Yellow-Black
+#@cli : pal 7 = pal rgbcmy -- Red-Green-Blue w/ Cyan-Magenta-Yellow
+#@cli : pal 8 = pal 1bitrgb -- 1 BPC RGB
+#@cli : pal 9 = pal aurora -- Aurora by GrafxKid
+#@cli : pal 10 = pal playpal -- PLAYPAL by id Tech 1/DOOM Engine
+#@cli : pal 11 = pal srb2 -- Sonic Robo Blast 2
+#@cli : pal 12 = pal famicube -- Famicube by Arne
+#@cli : pal 13 = pal kens16 -- Andrew Kensler - 16 by Andrew Kensler
+#@cli : pal 14 = pal kens32 -- Andrew Kensler - 32 by Andrew Kensler
+#@cli : pal 15 = pal kens54 -- Andrew Kensler - 54 by Andrew Kensler
+#@cli : pal 16 = pal aap12 -- AAP-Micro 12 by Adigun A. Polack
+#@cli : pal 17 = pal aap16 -- AAP-16 by Adigun A. Polack
+#@cli : pal 18 = pal aap64 -- AAP-64 by Adigun A. Polack
+#@cli : pal 19 = pal aap128 -- AAP-SPLENDOR128 by Adigun A. Polack
+#@cli : pal 20 = pal db8 -- DB8 by DawnBringer
+#@cli : pal 21 = pal db16 -- DB16 by DawnBringer
+#@cli : pal 22 = pal db32 -- DB32 by DawnBringer
+#@cli : pal 23 = pal db_iso22 -- DB-ISO22 by DawnBringer
+#@cli : pal 24 = pal dimwid17 -- DimWiddy 17 by DimWiddy
+#@cli : pal 25 = pal dimwid23 -- DimWiddy 23 by DimWiddy
+#@cli : pal 26 = pal edg4 -- Endesga-4 by Endesga
+#@cli : pal 27 = pal edg8 -- Endesga-8 by Endesga
+#@cli : pal 28 = pal edg16 -- Endesga-16 by Endesga
+#@cli : pal 29 = pal edg32 -- Endesga-32 by Endesga
+#@cli : pal 30 = pal edg36 -- Endesga-36 by Endesga
+#@cli : pal 31 = pal edg64 -- Endesga-64 by Endesga
+#@cli : pal 32 = pal juicy32 -- Juicy-32 by Real Juice
+#@cli : pal 33 = pal juicy56 -- Juicy-56 by Real Juice
+#@cli : pal 34 = pal xaiue -- XAIUE-22 by xaiue
+#@cli : pal 35 = pal 15pdx -- 15P-DX by GrafxKid
+#@cli : pal 36 = pal 20pdx -- 20P-DX by GrafxKid
+#@cli : pal 37 = pal 24pdx -- 24P-DX by GrafxKid
+#@cli : pal 38 = pal cabana64 -- Cabana-64 by Crabby
+#@cli : pal 39 = pal fant16 -- Fantasy 16 by Brettybooop
+#@cli : pal 40 = pal fant24 -- Fantasy 24 by Gabriel C.
+#@cli : pal 41 = pal tf23 -- Tranquil Fantasy 23 by windfall.apples
+#@cli : pal 42 = pal tfp39 -- Tranquility Plus 39 by windfall.apples
+#@cli : pal 43 = pal faraway48 -- Faraway 48 by Igor Ferreira.
+#@cli : pal 44 = pal fleja_m -- Fleja Master Palette by Fleja
+#@cli : pal 45 = pal koni 32 -- Koni32 by Konic
+#@cli : pal 46 = pal linearbasic -- Linear Color Palette Basic by GrafxKid
+#@cli : pal 47 = pal vinelinear -- Vines Flexible Linear Ramps by Vine 2D
+#@cli : pal 48 = pal arcade29 -- Arcade Standard 29 by GrafxKid
+#@cli : pal 49 = pal arq16 -- ARQ16 by Endesga
+#@cli : pal 50 = pal blk36 -- BLK 36 by BlackedIRL.
+#@cli : pal 51 = pal blkneo -- BLK-NEO by BlackedIRL.
+#@cli : pal 52 = pal brokefac -- Broken Facility by u/telepathic-melon
+#@cli : pal 53 = pal bubblegum -- Bubblegum-16 by PineTreePizza
+#@cli : pal 54 = pal cade15 -- Cade 15 by MonstersGoBoom
+#@cli : pal 55 = pal calder8 -- Calder 8 by Philip Dodderige
+#@cli : pal 56 = pal chrom16 -- Chromatic16 by DragonDePlatino
+#@cli : pal 57 = pal cdbac -- CD-BAC by DimWiddy
+#@cli : pal 58 = pal cgarne -- CG Arne by Arne Niklas Jansson
+#@cli : pal 59 = pal cpcboy -- CPC BOY by Arne Niklas Jansson
+#@cli : pal 60 = pal dino -- Dinoknight 16 by Retrospec
+#@cli : pal 61 = pal 4l -- ||||-22 by ||||
+#@cli : pal 62 = pal ftzeth16 -- FZT Ethereal 16 by Fusionnist
+#@cli : pal 63 = pal gzxp -- GZXP by GrafxKid
+#@cli : pal 64 = pal indc -- Indecision by Nelson SMG
+#@cli : pal 65 = pal island16 -- Island Joy 16 by Kerrie Lake
+#@cli : pal 66 = pal journey -- Journey by PineTreePizza
+#@cli : pal 67 = pal juicy -- Juicy 17 by JerryPie
+#@cli : pal 68 = pal oak -- Oak21 by Dan Oak
+#@cli : pal 69 = pal nature55 -- Nature's Embrace 55 by GrafxKid
+#@cli : pal 70 = pal nauris16 -- Nauris-16 by Nauris
+#@cli : pal 71 = pal pear36 -- Pear 36 by PineTreePizza
+#@cli : pal 72 = pal peach -- Peachy Pop 16 by Kerrie Lake
+#@cli : pal 73 = pal pineapple32 -- Pineapple 32 by PineTreePizza
+#@cli : pal 74 = pal resurrect -- Resurrect 32 by Kerrie Lake
+#@cli : pal 75 = pal rosy42 -- Rosy 42 by PineTreePizza
+#@cli : pal 76 = pal slso -- SLSO-CLR17 by Luis Miguel Maldonado
+#@cli : pal 77 = pal softy15 -- Softy 15 by Eggy
+#@cli : pal 78 = pal spec12 -- SPEC12 by Smalls
+#@cli : pal 79 = pal starmancer -- Starmancer by Ominux Games
+#@cli : pal 80 = pal sup8 -- Superb 8 by BigPotato
+#@cli : pal 81 = pal superfuture -- SuperFuture25 by Endesga
+#@cli : pal 82 = pal sweetie16 -- Sweetie 16 by GrafxKid
+#@cli : pal 83 = pal taffy16 -- Taffy 16 by PineTreePizza
+#@cli : pal 84 = pal todayland -- Todayland Palette V2 by GrafxKid
+#@cli : pal 85 = pal vivid17 -- Vivid-17 by Irenaart
+#@cli : pal 86 = pal voodo -- Voodo34 by Shamaboy
+#@cli : pal 87 = pal zu32 -- Zughy 32 by Zughy
+#@cli : pal 88 = pal enos16 -- ENOS16 by Endesga
+#@cli : pal 89 = pal undertones -- Undertones-17 by Irenaart
+#@cli : pal 90 = pal equpix15 -- Equpix 15 by Night
+#@cli : pal 91 = pal night16 -- Night 16 by Night
+#@cli : pal 92 = pal star29 -- Star 29 by Starlane
+#@cli : pal 93 = pal star34 -- Star 34 by Starlane
+#@cli : pal 94 = pal stilllife -- Still-Life by cure
+#@cli : pal 95 = pal simjpc16 -- SimpleJPC-16 by Adigun A. Polack
+#@cli : pal 96 = pal acid15 -- Acid 15 by pyrometal
+#@cli : pal 97 = pal battery24 -- Battery 24 by Battery Jellyfish
+#@cli : pal 98 = pal clump18 -- Clumpy 18 by windfall.apples
+#@cli : pal 99 = pal cthul -- Cthulhu by Starlane
+#@cli : pal 100 = pal crimso11 -- Crimso 11 by Crimso
+#@cli : pal 101 = pal coptec -- Copper-Tech by Arne Niklas Jansson
+#@cli : pal 102 = pal drz15 -- DRZ15A by Drazille
+#@cli : pal 103 = pal eggy15 -- Eggy 15 by Eggy
+#@cli : pal 104 = pal eroge -- Eroge-Copper by Arne Niklas Jansson
+#@cli : pal 105 = pal europa -- Europa 16 by Starlane
+#@cli : pal 106 = pal greyt -- GreyT-bit by Sam Keddy
+#@cli : pal 107 = pal jewel -- Jewel by AprilSundae
+#@cli : pal 108 = pal polar11 -- Polar 11 by Smalls
+#@cli : pal 109 = pal sheltzy -- Sheltzy 32 by Please Check - NatTorpedia
+#@cli : pal 110 = pal rube-goldberg -- Rube-Goldberg
+#@cli : pal 111 = pal boomboom -- BoomBoom by Salman_Shh
+#@cli : pal 112 = pal g8 -- Generic-8 by GrafxKid
+#@cli : pal 113 = pal matriax8c -- Matriax8c by Davit Masia
+#@cli : pal 114 = pal nt1h -- NT1H by NatTorpedia
+#@cli : pal 115 = pal au15 -- Autum 15 by jok
+#@cli : pal 116 = pal au15y -- Autum 15 [Yellow] by jok
+#@cli : pal 117 = pal jerrypie22 -- JerryPie 22 by JerryPie
+#@cli : pal 118 = pal naji16 -- Naji 16 by Naji
+#@cli : pal 119 = pal blessing -- Blessing by Maruki
+#@cli : pal 120 = pal crayola -- Crayola Blind
+#@cli : pal 121 = pal easter -- Easter Island by skamocore
+#@cli : pal 122 = pal fairy -- Fairy Tales by lollige
+#@cli : pal 123 = pal fuzz4 -- Fuzzy Four by P-Tux7
+#@cli : pal 124 = pal xdb_01 -- 0xdb-01 by 0xDB
+#@cli : pal 125 = pal ocaso -- Ocaso by Minord
+#@cli : pal 126 = pal pastel -- Oh Hell, Pastel by StarlitSunset
+#@cli : pal 127 = pal pastel17 -- 17 Pastels by Irenaart
+#@cli : pal 128 = pal pollen8 -- Pollen-8 by Conker
+#@cli : pal 129 = pal nopal -- Nopal-12 by BlackedIRL.
+#@cli : pal 130 = pal sy17 -- Sy17 by xaiue
+#@cli : pal 131 = pal syz15 -- Syz15 by Fusionnist
+#@cli : pal 132 = pal tui15 -- TUI-15 by Jeremy
+#@cli : pal 133 = pal cave -- Cave by PineTreePizza
+#@cli : pal 134 = pal psygnosia -- Psygnosia by Arne Niklas Jansson
+#@cli : pal 135 = pal marshmellow32 -- MarshMellow32 by FormalPrejudice
+#@cli : pal 136 = pal rabbit7 -- Rabbit 7 by GrafxKid
+#@cli : pal 137 = pal finlal11 -- Finlal 11 by Finlal
+#@cli : pal 138 = pal vinik24 -- Vinik 24 by Vinik
+#@cli : pal 139 = pal ykb22 -- YKB-22 by yahkehbu
+#@cli : pal 140 = pal graveyard -- Graveyard-21 by AprilSundae
+#@cli : pal 141 = pal steamlords -- Steam Lords by Slynyrd
+#@cli : pal 142 = pal aaprad -- AAP-RadiantXV by Adigun A. Polack
+#@cli : pal 143 = pal aapmaj -- AAP-Majesty XVII by Adigun A. Polack
+#@cli : pal 144 = pal daruda -- Daruda 22 by daruda
+#@cli : pal 145 = pal rust6 -- Rust-6 by Blue Phoenix
+#@cli : pal 146 = pal xaiue_rad -- XAIUE-Radiant by xaiue
+#@cli : pal 147 = pal firestorm -- Firestorm by theartistjulian
+#@cli : pal 148 = pal supernova7 -- SuperNova 7 by Blue Phoenix
+#@cli : pal 149 = pal nyx8 -- NYX8 by Javier Guerrero
+#@cli : pal 150 = pal oil6 -- OIL6 by GrafxKid
+#@cli : pal 151 = pal sgm -- SGM-Palette 2 by s.g.m
+#@cli : pal 152 = pal fornaxvoid1 -- Fornax Void I by Fornax Void
+#@cli : pal 153 = pal fornaxvoid2 -- Fornax Void II by Fornax Void
+#@cli : pal 154 = pal pixelwave -- Pixelwave by Reptorian
+#@cli : pal 155 = pal spaceyeaster -- Spacey Easter by Spark Norris
+#@cli : pal 156 = pal moon39 -- Moonlit-39 by theartistjulian
+#@cli : pal 157 = pal pet8 -- Petite-8 by Adigun A. Polack
+#@cli : pal 158 = pal pet8d -- Petite-8 Afterdark by Adigun A. Polack
+#@cli : pal 159 = pal autochrome -- Autochrome 3 by Reptorian
+#@cli : pal 160 = pal autochrome5 -- Autochrome 5 by Reptorian
+#@cli : pal 161 = pal gb_d_1 -- GB Default #1
+#@cli : pal 162 = pal gb_d_2 -- GB Default #2
+#@cli : pal 163 = pal gb_andrade -- GB Andrade by Andrade
+#@cli : pal 164 = pal gb_blue -- GB Blue Seni by WildLeoKnight
+#@cli : pal 165 = pal gb_bz -- GB Blackzone
+#@cli : pal 166 = pal gb_crimson -- GB Crimson by WildLeoKnight
+#@cli : pal 167 = pal gb_didi -- GB Didi by DidiGameboy
+#@cli : pal 168 = pal gb_dirty -- GB Dirty by WildLeoKnight
+#@cli : pal 169 = pal gb_arne -- GB Arne by Arne
+#@cli : pal 170 = pal gb_easy -- GB Easy by GrafxKid
+#@cli : pal 171 = pal gb_forest -- GB Forest
+#@cli : pal 172 = pal gb_hg -- GB Harsh Green by WildLeoKnight
+#@cli : pal 173 = pal gb_lg -- GB Light Green by WildLeoKnight
+#@cli : pal 174 = pal gb_nostalgia -- GB Nostalgia by WildLeoKnight
+#@cli : pal 175 = pal gb_platinum -- GB Platinum by WildLeoKnight
+#@cli : pal 176 = pal gb_kirokaze -- GB Kirokaze by Kirokaze
+#@cli : pal 177 = pal gb_pj -- GB PJ
+#@cli : pal 178 = pal gb_cyber -- GB Cyber
+#@cli : pal 179 = pal gb_wish -- GB Wish by Kerrie Lake
+#@cli : pal 180 = pal gb_grapefruit -- GB Grapefruit by GrafxKid
+#@cli : pal 181 = pal gb_ice_cream -- GB Ice Cream by Kerrie Lake
+#@cli : pal 182 = pal gb_rb -- GB Red_Blue
+#@cli : pal 183 = pal gb_space -- GB Spacehaze by WildLeoKnight
+#@cli : pal 184 = pal gb_choco -- GB Chocolate by GrafxKid
+#@cli : pal 185 = pal gb_purpdawn -- GB Purple Dawn by WildLeoKnight
+#@cli : pal 186 = pal gb_gray -- GB Gray by GrafxKid
+#@cli : pal 187 = pal arne4 -- ARNE4 by Arne
+#@cli : pal 188 = pal hal4 -- HallowPumpkin by WildLeoKnight
+#@cli : pal 189 = pal amiga2600ntsc -- Amiga 2600 NTSC
+#@cli : pal 190 = pal amiga2600pal -- Amiga 2600 PAL
+#@cli : pal 191 = pal amiga2600secam -- Amiga 2600 SECAM
+#@cli : pal 192 = pal amiga7800mess -- Amiga 7800 M.E.S.S by Nabuko78
+#@cli : pal 193 = pal amiga7800 -- Amiga 7800
+#@cli : pal 194 = pal amstrad_cpc -- Amstrad CPC
+#@cli : pal 195 = pal apple2 -- Apple II
+#@cli : pal 196 = pal cga -- CGA
+#@cli : pal 197 = pal cga00 -- CGA Mode 0 [Low]
+#@cli : pal 198 = pal cga01 -- CGA Mode 0 [High]
+#@cli : pal 199 = pal cga10 -- CGA Mode 1 [Low]
+#@cli : pal 200 = pal cga11 -- CGA Mode 1 [High]
+#@cli : pal 201 = pal cga20 -- CGA Mode 2 [Low]
+#@cli : pal 202 = pal cga21 -- CGA Mode 2 [High]
+#@cli : pal 203 = pal c64_pepto -- Commodore 64 - https://www.pepto.de/projects/colorvic/2001/
+#@cli : pal 204 = pal c64_colodore -- Commodore 64 - https://www.pepto.de/projects/colorvic/
+#@cli : pal 205 = pal com_vic_20 -- Commodore VIC-20
+#@cli : pal 206 = pal colecovision -- Colecovision
+#@cli : pal 207 = pal jmp -- Japanese Machine Palette by Arne Niklas Jansson
+#@cli : pal 208 = pal mac2 -- Macintosh II
+#@cli : pal 209 = pal nes -- NES
+#@cli : pal 210 = pal pico_8 -- PICO-8 by Lexaloffle Games
+#@cli : pal 211 = pal risc -- RISC OS
+#@cli : pal 212 = pal samcoupe -- SAM Coupe
+#@cli : pal 213 = pal mo5 -- Thomson MO5
+#@cli : pal 214 = pal vga -- VGA
+#@cli : pal 215 = pal zx -- ZX Spectrum
+#@cli : pal 216 = pal gnome32 -- GNOME 32
+#@cli : pal 217 = pal elc22 -- Electronic Crayon 22
+#@cli : pal 218 = pal chip16 -- Chip16
+#@cli : pal 219 = pal msx -- MSX
+#@cli : pal 220 = pal deluxepaint -- Deluxe Paint
+#@cli : pal 221 = pal lms -- Legacy Paint
+#@cli : pal 222 = pal msxp -- XP Paint
+#@cli : pal 223 = pal vis -- Vista Paint
 pal:
 v - _gmic_s="$?" v +
 _$0 $"*"
@@ -875,7 +1228,7 @@ _pal:
 v - mode="$1"
 if {isnum("$1")} if {isint("$1")}
 if {$1!=abs($1)} mode="i" else
-mode=${arg\ 1+$1,bw,rgb,b_rgb,bw_rgb,cmy,cmyk,wcmyk,rgbcmy,1bitrgb,aurora,playpal,srb2,famicube,kens16,kens32,kens54,aap12,aap16,aap64,aap128,db8,db16,db32,db_iso22,dimwid17,dimwid23,edg4,edg8,edg16,edg32,edg36,edg64,juicy32,juicy56,xaiue,15pdx,20pdx,24pdx,cabana64,fant16,fant24,tf23,tfp39,faraway48,fleja_m,koni32,linearbasic,vinelinear,arcade29,arq16,blk36,blkneo,brokefac,bubblegum,cade15,calder8,chrom16,cdbac,cgarne,cpcboy,dino,4l,ftzeth16,gzxp,indc,island16,journey,juice,oak,nature55,nauris16,pear36,peach,pineapple32,resurrect,rosy42,slso,softy15,spec12,starmancer,sup8,superfuture,sweetie16,taffy16,todayland,vivid17,voodo,zu32,enos16,undertones,equpix15,night16,star29,star34,stilllife,simjpc16,acid15,battery24,clump18,cthul,crimso11,coptec,drz15,eggy15,eroge,europa,greyt,jewel,polar11,sheltzy,rube_goldberg,boomboom,g8,matriax8c,nt1h,au15,au15y,jerrypie22,naji16,blessing,crayola,easter,fairy,fuzz4,xdb_01,ocaso,pastel,pastel17,pollen8,nopal,sy17,syz15,tui15,cave,psygnosia,marshmellow32,rabbit7,finlal11,vinik24,ykb22,graveyard,steamlords,aaprad,aapmaj,daruda,rust6,xaiue_rad,firestorm,supernova7,nyx8,oil6,sgm,fornaxvoid1,fornaxvoid2,pixelwave,spaceyeaster,moon39,pet8,pet8d,autochrome3,autochrome5,gb_d_1,gb_d_2,gb_andrade,gb_blue,gb_bz,gb_crimson,gb_didi,gb_dirty,gb_arne,gb_easy,gb_forest,gb_hg,gb_lg,gb_nostalgia,gb_platinum,gb_kirokaze,gb_pj,gb_cyber,gb_wish,gb_grapefruit,gb_ice_cream,gb_rb,gb_space,gb_choco,gb_purpdawn,gb_gray,arne4,hal4,amiga2600ntsc,amiga2600pal,amiga2600secam,amiga7800mess,amiga7800,amstrad_cpc,apple2,cga,cga00,cga01,cga10,cga11,cga20,cga21,c64_pepto,c64_colodore,com_vic_20,colecovision,jmp,mac2,nes,pico_8,risc,samcoupe,mo5,vga,zx,gnome32,elc22,chip16,msx,deluxepaint,lms,msxp,vis}
+mode=${arg\ 1+$1,bw,rgb,b_rgb,bw_rgb,cmy,cmyk,wcmyk,rgbcmy,1bitrgb,aurora,playpal,srb2,famicube,kens16,kens32,kens54,aap12,aap16,aap64,aap128,db8,db16,db32,db_iso22,dimwid17,dimwid23,edg4,edg8,edg16,edg32,edg36,edg64,juicy32,juicy56,xaiue,15pdx,20pdx,24pdx,cabana64,fant16,fant24,tf23,tfp39,faraway48,fleja_m,koni32,linearbasic,vinelinear,arcade29,arq16,blk36,blkneo,brokefac,bubblegum,cade15,calder8,chrom16,cdbac,cgarne,cpcboy,dino,4l,fzteth16,gzxp,indc,island16,journey,juice,oak,nature55,nauris16,pear36,peach,pineapple32,resurrect,rosy42,slso,softy15,spec12,starmancer,sup8,superfuture,sweetie16,taffy16,todayland,vivid17,voodo,zu32,enos16,undertones,equpix15,night16,star29,star34,stilllife,simjpc16,acid15,battery24,clump18,cthul,crimso11,coptec,drz15,eggy15,eroge,europa,greyt,jewel,polar11,sheltzy,rube_goldberg,boomboom,g8,matriax8c,nt1h,au15,au15y,jerrypie22,naji16,blessing,crayola,easter,fairy,fuzz4,xdb_01,ocaso,pastel,pastel17,pollen8,nopal,sy17,syz15,tui15,cave,psygnosia,marshmellow32,rabbit7,finlal11,vinik24,ykb22,graveyard,steamlords,aaprad,aapmaj,daruda,rust6,xaiue_rad,firestorm,supernova7,nyx8,oil6,sgm,fornaxvoid1,fornaxvoid2,pixelwave,spaceyeaster,moon39,pet8,pet8d,autochrome3,autochrome5,gb_d_1,gb_d_2,gb_andrade,gb_blue,gb_bz,gb_crimson,gb_didi,gb_dirty,gb_arne,gb_easy,gb_forest,gb_hg,gb_lg,gb_nostalgia,gb_platinum,gb_kirokaze,gb_pj,gb_cyber,gb_wish,gb_grapefruit,gb_ice_cream,gb_rb,gb_space,gb_choco,gb_purpdawn,gb_gray,arne4,hal4,amiga2600ntsc,amiga2600pal,amiga2600secam,amiga7800mess,amiga7800,amstrad_cpc,apple2,cga,cga00,cga01,cga10,cga11,cga20,cga21,c64_pepto,c64_colodore,com_vic_20,colecovision,jmp,mac2,nes,pico_8,risc,samcoupe,mo5,vga,zx,gnome32,elc22,chip16,msx,deluxepaint,lms,msxp,vis}
 fi fi fi
 v + e[^-1] "Create palette '"$mode"' for pixel art or effect."$_gmic_s"." v -
 _pal_$mode
@@ -1105,7 +1458,7 @@ _pal_pico_8:(0,95,194,255,255,255,255,171,255,255,131,126,41,29,0,0^0,87,195,241
 _pal_msxp:(0,128,192,255,128,255,128,255,0,0,0,0,0,0,128,255,128,255,0,0,0,128,0,128,128,255,128,255^0,128,192,255,0,0,128,255,128,255,128,255,0,0,0,0,128,255,64,255,128,255,64,128,0,0,64,128^0,128,192,255,0,0,0,0,0,0,128,255,128,255,128,255,64,128,64,128,255,255,128,255,255,128,0,64)
 _pal_jmp:(0,25,70,161,69,118,131,158,220,225,214,233,33,211,175,245^0,16,175,214,62,100,49,194,83,141,185,216,108,101,170,244^0,40,69,133,120,254,41,232,75,121,123,161,75,200,185,235)
 _pal_mac2:(255,255,255,220,255,54,0,0,0,0,101,151,185,134,69,0^255,255,101,0,0,0,0,151,168,101,54,101,185,134,69,0^255,0,0,0,151,151,202,255,0,0,0,54,185,134,69,0)
-_pal_jewel (50,102,184,210,242,240,223,188,121,86,74,77,115,116,156^30,36,40,106,197,232,183,123,65,96,143,193,227,130,172^45,49,28,18,60,156,127,98,107,148,169,179,123,161,186)
+_pal_jewel: (50,102,184,210,242,240,223,188,121,86,74,77,115,116,156^30,36,40,106,197,232,183,123,65,96,143,193,227,130,172^45,49,28,18,60,156,127,98,107,148,169,179,123,161,186)
 #@cli pal_t : eq. to 'palette_transfer'
 pal_t: palette_transfer $*
 #@cli palette_transfer : 0<=_palette_id<=142,0<=_indexing_style<=4,0<=_color_dithering[%]<=1,_transfer_rgb={0=No | 1=Yes },0<=_alpha_count,0<=_alpha_dithering<=1,_special_effect_factor>=0,0<=_initial_resize_method<=5,_activate_upscaling_stimulation={ 0=Does not activate | 1=Activate Upscale},_pixel_width>=1,_pixel_height>=1,_activate_hardware_stimulation={ 0=Does not activate | 1= Stimulate hardware restriction },1<=_color_section_of_hardware_restriction_precision_factor,_hardware_restriction_by_tile_width>0,_hardware_restriction_by_tile_height>0,_hardware_color_precision>2,_hardware_color_mapping_method={0=Median Cut | Median Cut and K-Means},alpha_precion_factor>2,alpha_mapping_method_for_hardware_stimulation={0=Median Cut | Median Cut and K-Means}
@@ -3925,6 +4278,76 @@ u "{$1}"\
 #@gui : sep=separator(), note=note("<small>Author: Reptorian.      Latest Update: <i>2019/11/7</i>.</small>")
 gui_rep_gv: rep_gv $1%,$2%,$3%,{$4-50}%,{$5-50}%,$6%,$7,$8%,$9%,$10%,$11,{$12+50}%,{$13+50}%,${14-17}
 gui_rep_gv_preview: gui_split_preview "gui_rep_gv ${1-17}",${-3--1}
+#@gui Fibonacci Texture:gui_rep_fibo,gui_rep_fibo_preview
+#@gui : note=note("Generates texture based on the <b>Fibonacci Sequence</b>\n\nFor <b>GIMP</b> or <b>Krita</b> users - The first option for <b>Output Mode</b> will generate a new layer that can exceed boundary of current canvas.")
+#@gui : sep=separator(),note=note("<b>Main</b>")
+#@gui : Fill Mode=choice(1,"Textile","Fill")
+#@gui : Iterations=int(10,3,16)
+#@gui : Output Mode=choice(1,"Create New Layer","Fill Images")
+#@gui : Corner Location=choice(0,"0","1","2","3")
+#@gui : Corner Location=choice(0,"Top Left","Top Right","Bottom Left","Bottom Right")
+#@gui : Square Spiral Mode=bool(1)
+#@gui : Centerpoint (%)=point(50,50)
+#@gui : Exponential Scaling=int(1,1,20)
+#@gui : Boundary=choice(1,"None","Periodic","Mirror")
+#@gui : Attachment Mode=choice(0,"A","B")
+#@gui : sep=separator(),note=note("<b>Coloring/Shading</b>")
+#@gui : Palette=choice(0,"Normalized Grayscale","BW-{2}","RGB-{3}","B-RGB-{4}","BW-RGB-{5}","CMY-{3}","CMYK-{4}","W-CMYK-{5}","RGBCMY-{6}","1-Bit-RGB-{8}","Aurora-{256}","PLAYPAL-{249}","Sonic Robo Blast 2-{256}","Famicube-{64}","Andrew Kensler - 16","Andrew Kensler - 32","Andrew Kensler - 54","AAP-Micro 12","AAP-16","AAP-64","AAP-SPLENDOR128","DB8","DB16","DB32","DB-ISO22","DimWiddy 17","DimWiddy 23","Endesga-4","Endesga-8","Endesga-16","Endesga-32","Endesga-36","Endesga-64","Juicy-32","Juicy-56","XAIUE-22","15P-DX","20P-DX","24P-DX","Cabana-64","Fantasy 16","Fantasy 24","Tranquil Fantasy 23","Tranquility Plus 39","Faraway 48","Fleja Master Palette-{33}","Koni32","Linear Color Palette Basic-{31}","Vines Flexible Linear Ramps-{38}","Arcade Standard 29","ARQ16","BLK 36","BLK-NEO-{46}","Broken Facility","Bubblegum-16","Cade 15","Calder 8-{11}","Chromatic16","CD-BAC-{16}","CG Arne-{16}","CPC BOY-{32}","Dinoknight 16","||||-22","FZT Ethereal 16","GZXP-{11}","Indecision-{17}","Island Joy 16","Journey-{64}","Juicy 17","Oak21","Nature's Embrace 55","Nauris-16","Pear 36","Peachy Pop 16-{16}","Pineapple 32","Resurrect 32-{32}","Rosy 42","SLSO-CLR17","Softy 15","SPEC12","Starmancer-{52}","Superb 8","SuperFuture25","Sweetie 16","Taffy 16","Todayland Palette V2-{25}","Vivid-17","Voodo34","Zughy 32","ENOS16","Undertones-17","Equpix 15","Night 16","Star 29","Star 34","Still-Life-{14}","SimpleJPC-16","Acid 15","Battery 24","Clumpy 18","Cthulhu-{16}","Crimso 11","Copper-Tech-{16}","DRZ15A","Eggy 15","Eroge-Copper","Europa 16-{16}","GreyT-bit-{8}","Jewel-{15}","Polar 11","Sheltzy 32","Rube-Goldberg-{9}","BoomBoom-{7}","Generic-8","Matriax8c","NT1H-{26}","Autum 15","Autum 15 [Yellow]","JerryPie 22","Naji 16","Blessing-{5}","Crayola Blind-{9}","Easter Island-{16}","Fairy Tales-{8}","Fuzzy Four-{4}","0xdb-01-{17}","Ocaso-{17}","Pastel-{15}","17 Pastels","Pollen-8","Nopal-12","Sy17","Syz15","TUI-15","Cave-{8}","Psygnosia-{16}","MarshMellow32","Rabbit 7","Finlal 11","Vinik 24","YKB-22","Graveyard-21","Steam Lords-{16}","AAP-RadiantXV-{15}","AAP-Majesty XVII-{17}","Daruda 22","Rust-6","XAIUE-Radiant-{22}","Firestorm-{9}","SuperNova 7","NYX8","OIL6","SGM-Palette 2-{17}","Fornax Void I-{256}","Fornax Void II-{128}","Pixelwave-{12}","Spacey Easter-{17}","Moonlit-39","Petite-8","Petite-8 Afterdark","Autochrome 3","Autochrome 5","GB Default #1-{4}","GB Default #2-{4}","GB Andrade-{4}","GB Blue Seni-{4}","GB Blackzone-{4}","GB Crimson-{4}","GB Didi-{4}","GB Dirty-{4}","GB Arne-{4}","GB Easy-{4}","GB Forest-{4}","GB Harsh Green-{4}","GB Light Green-{4}","GB Nostalgia-{4}","GB Platinum-{4}","GB Kirokaze-{4}","GB PJ-{4}","GB Cyber-{4}","GB Wish-{4}","GB Grapefruit-{4}","GB Ice Cream-{4}","GB Red_Blue-{4}","GB Spacehaze-{4}","GB Chocolate-{4}","GB Purple Dawn-{4}","GB Gray-{4}","ARNE4","HallowPumpkin-{4}","Amiga 2600 NTSC-{128}","Amiga 2600 PAL-{104}","Amiga 2600 SECAM-{8}","Amiga 7800 M.E.S.S-{256}","Amiga 7800-{256}","Amstrad CPC-{27}","Apple II-{15}","CGA-{16}","CGA Mode 0 [Low]-{4}","CGA Mode 0 [High]-{4}","CGA Mode 1 [Low]-{4}","CGA Mode 1 [High]-{4}","CGA Mode 2 [Low]-{4}","CGA Mode 2 [High]-{4}","Commodore 64 [Pepto Interpretation]-{16}","Commodore 64 [Colodore Interpretation]-{16}","Commodore VIC-20-{16}","Colecovision-{15}","Japanese Machine Palette-{16}","Macintosh II-{16}","NES-{52}","PICO-8-{16}","RISC OS-{16}","SAM Coupe-{128}","Thomson MO5-{16}","VGA-{244}","ZX Spectrum-{15}","GNOME 32-{32}","Electronic Crayon 22","Chip16","MSX-{15}","Deluxe Paint-{222}","Legacy Paint-{16}","XP Paint-{28}","Vista Paint-{28}")
+#@gui : Color Random Ordering Seed=int(2500,0,5000)
+#@gui : Negate?=bool(0)
+#@gui : sep = separator(), note = note("<small>Author: Reptorian. Latest Update: <i>2019/11/11</i>.</small>")
+#@gui : sep=separator(),note=note("<u>- Guide for Paint.NET Users -</u>\n\nDue to the <i>Paint.NET</i> API, option for creating new layer using plugins is not supported!\n\nIf you prefer a filter based on <i>Fibonacci Sequence</i> as a individual plugin rather than a G'MIC filter, you can download <a href="https://forums.getpaint.net/topic/28522-fibonacci-fill/">Fibonacci Fill plugin</a> for <i>Paint.NET</i>.")
+gui_rep_fibo:
+srand $13
+if $12 pal {$12-1} {w#-1},1,1,1,u(0,1) pixelsort.. +,x,[-1] rm. store. palmap fi
+ww={w}
+hh={h}
+if $12&&$3 to_rgb elif !$12&&$3 channels 0 fi
+if $1
+    rep_fibonacci_fill $5,$6,$3,{($7-50)*2}%,{($8-50)*2}%
+    if $14 if $3 negate else negate. fi fi
+    if $12
+        $palmap
+        if $3 map[^-1] [-1],2 else map.. .,2 fi
+        rm.
+    else
+        if $3 n 0,255 else n. 0,255 fi
+    fi
+else
+    rep_fibonacci_squares $2,$4,$6 r2dx. {$9*100}%,1
+    if !$14 negate. fi 
+    if $10 
+        . negate.
+        if $2%2 if $11 a[-2,-1] y else a[-2,-1] x fi
+        else if $11 a[-2,-1] x else a[-2,-1] y fi
+        fi
+    fi
+    if $12
+        $palmap map.. .,2 rm.
+    else
+        n. 0,255
+    fi
+    to_a
+    if $3
+        r. $ww,$hh,100%,100%,0,{$10?$10+1:$10},.5,.5
+        f[^-1] i(#-1)
+        rm.
+    fi
+fi
+gui_rep_fibo_preview: gui_rep_fibo $* if !$3 k. fi
+u "{$1}"\
+"{$2}_"{$1?0:2}\
+"{$3}"\
+"{$4}_"{$1?0:2}\
+"{$5}_"{$1?2:0}\
+"{$6}"\
+"{$7,$8}_"{$1?($6?2:1):0}\
+"{$9}_"{$1?0:2}\
+"{$10}_"{$1?0:2}\
+"{$11}_"{$1?0:($10?2:1)}\
+"{$12}"\
+"{$13}_"{$12?2:1}\
+"{$14}"
 ######################
 
 # Local Variables:
