@@ -44,6 +44,104 @@
 #
 #-------------------------------
 
+#@cli rep_sd: (eq. to rep_spiral_distort)
+rep_sd: rep_spiral_distort $*
+#@cli rep_spiral_distort: _revolution!=0,_height!=0,_refraction>0,_direction={ 0=clockwise | 1=counterclockwise },_angle,_continuous_spiral={ 0=periodic | 1=continuous },-1<=_preshift_x<=1,-1<=_preshift_y<=1,_preshift_boundary={ 0=periodic | 1=mirror },_skew_x,_skew_y,_skew_m,_scale_coord_x,_scale_coord_y,_offx,_offy,_spiral_boundary={ 0=none | 1=neumann | 2=periodic | 3=mirror },_interpolation={ 0=nearest | 1=average | 2=linear | 3=bicubic | 4=lanczos }
+#@cli : Transform images into spiral by using spiral gradient for x coordinate, and radial gradient for y coordinate.\n
+#@cli : '_revolution' defines the number of revolution within the spiral assuming coordinates range of [-1,1].
+#@cli : '_height' is the height of spiral. The higher the height of the spiral, the more duplicates will repeat within one revolution.
+#@cli : '_refraction' refers to the logarithmic distortion within spiral.
+#@cli : '_direction' determines if it clockwise or counter-clockwise.
+#@cli : '_angle' determines the function angle.
+#@cli : '_continuous_spiral' determines whether the spiral distortion is continuous or not.
+#@cli : '_preshift_x' shifts the images before the spiral distortion along the x-axis.
+#@cli : '_preshift_y' shifts the image before the spiral distortion along the y-axis.
+#@cli : '_preshift_boundary' determines the boundary within the preliminary shift.
+#@cli : '_skew_x' skews the distortion alongside the x-axis. It is recommended to keep ranges to -100% to 100%.
+#@cli : '_skew_y' skews the distortion alongside the y-axis. It is recommended to keep ranges to -100% to 100%.
+#@cli : '_skew_m' is the multiplier for skewing.
+#@cli : '_scale_x' scales the coordinates alongside the x-axis.
+#@cli : '_scale_y' scales the coordinates alongside the y-axis.
+#@cli : '_offx' determines the offset-placement of the distortion alongside the x-axis. It is recommended to keep ranges to -100% to 100%.
+#@cli : '_offy' determines the offset-placement of the distortion alongside the y-axis. It is recommended to keep ranges to -100% to 100%.
+#@cli : '_spiral_boundary' determines how the out-of-bound values is to be evaluated.
+#@cli : '_interpolation' determines the interpolation of the spiral distortion.\n
+#@cli : Default values: '_frequency=1','_height=1','_refraction=0','_direction=0','_angle=0','_continuous_spiral=0','_preshift_x=0','_preshift_y=0','_preshift_boundary=0','_skew_x=0','_skew_y=0','_skew_m=1','_scale_x=1','_scale_y=1','_offx=0','_offy=0','_spiral_boundary=3','_interpolation=4'\n
+#@cli : Author: Reptorian.
+#@cli : $ rep_spiral_distort .5,4,-.5,1,40,1,.5,.5,0,50%,-25%,2,2,.5,-.5,2,4
+rep_spiral_distort:
+skip ${1=1},${2=1},${3=0},${4=0},${5=0},${6=0},${7=0},${8=0},${9=0},${10=0},${11=0},${12=1},${13=1},${14=1},${15=0},${16=0},${17=3},${18=4}
+if !$! v + error "No images to perform spiral distortion on" v - fi
+if $1==0 v + error ""$"1/_revolution cannot be 0!" v - fi
+if $2==0 v + error ""$"2/_height cannot be 0!" v - fi
+if $3==-1 v + error ""$"3/_refraction cannot be -1!" v - fi
+if !$13||!$14 v + error ""$"13/_scale_x and "$"14/_scale_y cannot be 0!" v - fi
+v -
+skew_m={abs(2*$12)}
+if $4 direction=counterclockwise
+else direction=clockwise
+fi
+if $6 spiral_mode=continuous
+else spiral_mode=periodic
+fi
+if abs($9) preshift_boundary=mirror
+else preshift_boundary=periodic
+fi
+if abs($17)==0 spiral_boundary=none
+elif abs($17)==1 spiral_boundary=neumann
+elif abs($17)==2 spiral_boundary=periodic
+elif abs($17)==3 spiral_boundary=mirror
+fi
+if abs($18)==0 interpolation=nearest
+elif abs($18)==1 interpolation=average
+elif abs($18)==2 interpolation=linear
+elif abs($18)==3 interpolation=bicubic
+elif abs($18)==4 interpolation=lanczos
+fi
+if abs($7)||abs($8) preshift="Preshift of {$7*100}% alongside the x-axis, and {$8*100}% alongside the y-axis has been applied before the distortion using "$preshift_boundary" boundary condition."
+else preshift=""
+fi
+v +
+e[] "Apply spiral distortion at coordinates $15,$16 with scale factor of $13 within x-axis and $14 within y-axis and skew-"$skew_m" distortion utilizing factor of $10 within x-axis and factor of $11 within y-axis to images using "$direction" "$spiral_mode" spiral with revolution of $1, height of $2, refraction factor of $3 using "$spiral_boundary" boundary condition and "$interpolation" interpolation. "$preshift""
+v +
+if abs($18)>1 r2dx 200%,{abs($18)>2?abs($18)+2:abs($18)+1} fi
+if abs($7)||abs($8)
+e[] "Apply of {$7*100}% alongside the x-axis, and {$8*100}% alongside the y-axis" 
+f "begin(offx=(w/2)*$7*-1;offy=(h/2)*$8;interpolation=abs($18)>2?2:abs($18);boundary=(abs($9)+2););
+i(x+offx,y+offy,z,c,interpolation,boundary);
+"
+fi
+if $4 mirror x fi
+f "begin(
+    sd=max(w,h)/min(w,h);
+    sx=w>h?sd:1;
+    sy=w>h?1:sd;
+    ang=pi*($5*-1/180);
+    skew_x=($10*-1)/abs($13);
+    skew_y=$11/abs($14);
+    skew_m=abs(2*$12);
+    offx=-.5+($15*-1/2);
+    offy=-.5+($16*-1/2);
+    nw=abs(w*sin(ang))+abs(h*cos(ang));
+    nh=abs(w*cos(ang))+abs(h*sin(ang));
+    rot_x(a,b)=a*cos(ang)-b*sin(ang);
+    rot_y(a,b)=a*sin(ang)+b*cos(ang);
+    interpolation=abs($18)>2?2:abs($18);
+    boundary=abs($17);
+);
+XX=(x/w+offx)*sx*$13;
+YY=(y/h+offy)*sy*$14;
+xx=(rot_x(XX,YY)*(skew_m^(rot_x(XX,YY)*skew_x)))*2;
+yy=(rot_y(XX,YY)*(skew_m^(rot_y(XX,YY)*skew_y)))*2;
+radial=sqrt(xx^2+yy^2);
+if($4,sur_atan=1-(atan2(xx,yy)+pi)/(2*pi);,sur_atan=(atan2(xx,yy)+pi)/(2*pi););
+es=(sur_atan+radial*$1);
+es=es-floor(es);
+if($6,es=(es>.5?1-es:es)*2;);
+i((es^(1+$3))*w*$2,radial*h,z,c,interpolation,boundary);
+"
+if abs($18)>1 r2dx 50%,{abs($18)>2?abs($18)+2:abs($18)+1} fi
+v -
 #@cli rep_fibosq: (eq. to rep_fibonacci_squares)
 rep_fibosq: rep_fibonacci_squares $*
 #@cli rep_fibonacci_squares: iterations,_corner_location>=0, _spiral_mode={ 0= non-spiral | 1= spiral_fill }
@@ -196,10 +294,13 @@ rep_gv: rep_glass_vignette $*
 #@cli : Default values: '_refraction_power=0','_chromatic_aberration=0','_preliminary_shift_x=0','_preliminary_shift_y=0','_image_zoom=0','_image_angle=0','_distortion_scale_x=1','_distortion_scale_y=1','_distortion_scale_xy=1','_distortion_angle=0','_distortion_offset_x=0','_distortion_offset_y=0','_colorspace=0','_boundary=3','_interpolation=5','_subpixel=1'
 rep_glass_vignette:
 skip ${2=0},${3=0},${4=0},${5=0},${6=0},${7=0},${8=1},${9=1},${10=1},${11=0},${12=0},${13=0},${14=0},${15=3},${16=5},${17=1}
+v -
 convert_back=0
 sub={1+abs($17)}
+v +
+v +
 repeat $! l[$>]
-v + e[^-1] "Distorts image at angle of $11 with refraction factor of $1, chromatic aberration of $3, zoom factor of $6, preliminary shift of $4, preliminary shift of $5, scale x-axis distortion by $8 multiplied by $10, scale y-axis distortion by $9 multiplied by $10, refraction index by power of $2 placed at $12,$13 at angle of $7." v -
+e[^-1] "Distorts image at angle of $11 with refraction factor of $1, chromatic aberration of $3, zoom factor of $6, preliminary shift of $4, preliminary shift of $5, scale x-axis distortion by $8 multiplied by $10, scale y-axis distortion by $9 multiplied by $10, refraction index by power of $2 placed at $12,$13 at angle of $7."
 if (s==3||s==4)&&$14
 convert_back=1
 if $14!=4
@@ -326,6 +427,7 @@ fi
 fi
 fi
 endl done
+v -
 #@cli rep_equi2cube: (eq. to rep_equirectangular_panorama_to_cube_map)
 rep_equi2cube: rep_equirectangular_panorama_to_cube_map $*
 #@cli rep_equirectangular_panorama_to_cube_map: 0<=_top_face_placement<=3,_bottom_face_placement
@@ -766,8 +868,8 @@ fi
 #@cli rep_regm: (eq. to rep_reverse_engineer_gradient_map)
 rep_regm: rep_reverse_engineer_gradient_map $*
 #@cli rep_reverse_engineer_gradient_map: _array_size>0
-#@cli: The array size is used to define the depth of gradient map, if you're using float, then you need to scale image to something higher than 256. The only instruction is to have two images of same width and height dimension with the first one being a grayscale image.
-#@cli: Default values: '_array_size=256'
+#@cli : The array size is used to define the depth of gradient map, if you're using float, then you need to scale image to something higher than 256. The only instruction is to have two images of same width and height dimension with the first one being a grayscale image.
+#@cli : Default values: '_array_size=256'
 rep_reverse_engineer_gradient_map:
 skip ${1=256}
 if $!!=2 v + e "Only 2 images are acceptable!" v - fi
@@ -795,15 +897,15 @@ eval ${-math_lib}"
         );
 "
 #@cli rep_isprime:
-#@cli: Checks if all values are prime number. The fill function rounds float number to nearest value.
+#@cli : Checks if all values are prime number. The fill function rounds float number to nearest value.
 rep_isprime:
 f "isP=1;
 for(in=2,in<=int(round(abs(i)))/2,++in,isP=round(abs(i))%in==0?0:1;if(isP==0,break()));
 isP=round(abs(i))>1?isP:0;
 "
 #@cli rep_prime_surface: _width,_height,_negate= { 0=do_not_negate | 1=negate },_mirror
-#@cli: Creates a simple prime surface by combining rep_isprime and spiralbw. Due to the time-consuming nature, this command will only create a new prime surface once.
-#@cli: Default values: '_width=last_image_width','_height=last_image_height'
+#@cli : Creates a simple prime surface by combining rep_isprime and spiralbw. Due to the time-consuming nature, this command will only create a new prime surface once.
+#@cli : Default values: '_width=last_image_width','_height=last_image_height'
 rep_prime_surface:
 skip ${1=w},${2=h},${3=1},${4=0}
 spiralbw {abs($1)},{abs($2)}
@@ -815,7 +917,7 @@ rep_isprime.
 #@cli rep_ced8: (eq. to rep_color_existence_distribution_rgb8)
 rep_ced8: rep_color_existence_distribution_rgb8 $*
 #@cli rep_color_existence_distribution_rgb8: _bool_found= { 0=colour_nonexistence | colour_existence }
-#@cli: This cli command is used to find which colors exist within the color lookup table generated from 8-bit positive-only colors that ranges from 0-255. Millions of colors that does not exist within a image can be picked from a image generated with this command.
+#@cli : This cli command is used to find which colors exist within the color lookup table generated from 8-bit positive-only colors that ranges from 0-255. Millions of colors that does not exist within a image can be picked from a image generated with this command.
 rep_color_existence_distribution_rgb8:
 nk=$1
 nk_1={$nk?255:0}
@@ -1593,7 +1695,7 @@ _rep_bchstatfunc_med : repeat s sh $> f. ic#-1 rm. done if $1 r 1,1,1,{s},0 fi
 #@cli rep_lbchstatfunc_to_pal: (eq. to rep_layers_by_channel_statistical_function_to_palette)
 rep_lbchstatfunc_to_pal: rep_layers_by_channel_statistical_function_to_palette $*
 #@cli rep_layers_by_channel_statistical_function_to_palette: _variable
-#@cli: Converts layers to palette using statistical function by channels per layers into 1x1 tile, then append them.
+#@cli : Converts layers to palette using statistical function by channels per layers into 1x1 tile, then append them.
 rep_layers_by_channel_statistical_function_to_palette: rep_bchstatfunc $1 a x to_rgb
 #@cli rep_mosaic_gen : _tile_width>=0,_tile_height>=0,_dithering<=1,1<=_interpolation<=6,_autocrop-by-median_bool={ 0=Do not autocrop by median | 1=Autocrop by median },_out_original_dimension={ 0=Do not output original dimension | 1= Output Original Dimension },use_folder={ 0=Do not use folder | 1=Use folder },folder_location="location_in_computer"
 #@cli : Generates mosaic using multiple pictures using indexing methodology, and uses average to determine the mapping based on colors. Tile_Width and Tile_Height cannot be both zero!
@@ -2124,7 +2226,7 @@ i(vx,vy,z,c,$17,($16?3:2));
 
 if $11 shift 50%,50%,0,0,3,1 fi
 #@cli rep_stitch: _intensity,_thickness,_modulo,_interpolation,_boundary,0<_sublevel,randomize_stitching,0<=_angle<=360..._angle
-#@cli: Multiple angles are permitted.
+#@cli : Multiple angles are permitted.
 rep_stitch:
 repeat $! l[$>]
 is={s}
@@ -2209,8 +2311,8 @@ r2dx {(1/($12+1))*100}%,$13
 #@cli rep_objvf: (eq. to rep_objvolumefilt)
 rep_objvf: rep_objvolumefilt $*
 #@cli rep_objvolumefilt: 0<=_v1<=1,0<=_v2<=1,_mode= { 0=eliminate_interior || 1=eliminate_exterior },_colour1...
-#@cli:_v1 and _v2 refers to boundary in percent. By default, this command use alpha as reference unless all channel values are specified next to mode.
-#@cli: Default value: '_mode=1'
+#@cli : _v1 and _v2 refers to boundary in percent. By default, this command use alpha as reference unless all channel values are specified next to mode.
+#@cli : Default value: '_mode=1'
 rep_objvolumefilt:
 skip ${3=1}
 repeat $! l[$>]
@@ -2648,68 +2750,66 @@ if $14 n 0,1 fi
 endl done
 #@gui _<b>Testing</b>
 #@gui <i>Reptorian</i>
-
-#@gui Modulos Operations : fx_modulo, fx_modulo_preview(0)
-#@gui : note = note("This filters applies modulo operation after arithmetic operation. Future version of this filter might be able to be used on different color space and channels.")
-#@gui : sep = separator()
-#@gui : Multiply = float(1,0,32)
-#@gui : Addition = int(0,0,255)
-#@gui : sep = separator(), note = note("<small>Author : <i>Reptorian</i>.      Latest update : <i>2018/08/18</i>.</small>")
+#@gui Modulos Operations: fx_modulo, fx_modulo_preview(0)
+#@gui : note=note("This filters applies modulo operation after arithmetic operation. Future version of this filter might be able to be used on different color space and channels.")
+#@gui : sep=separator()
+#@gui : Multiply=float(1,0,32)
+#@gui : Addition=int(0,0,255)
+#@gui : sep=separator(), note=note("<small>Author : <i>Reptorian</i>.      Latest update : <i>2018/08/18</i>.</small>")
 fx_modulo:
 repeat $! l[$>] split_opacity l[0]
 mul $1 add $2 mod 256
 endl a c endl done
 fx_modulo_preview :
 gui_split_preview "fx_modulo $*"
-
 #@gui Channel Overblur-Overline-Blur-Sharpen : fx_OOBS, _fx_OOBS_preview(0)
-#@gui : sep = separator()
-#@gui : 1. Color Space = choice("RGB&#47;sRGB","HSV&#47;HSV8","HSL&#47;HSL8","HSI&#47;HSI8","LCH&#47;LCH8","Lab&#47;Lab8","YCbCr&#47;YCbCrGLIC","YIQ&#47;YIQ8","YUV&#47;YUV8","XYZ&#47;XYZ8")
-#@gui : 2. Alt Choice = bool(0)
-#@gui : sep = separator()
-#@gui : note = note("Configuration for OOBS filter")
-#@gui : 3. Use Master Editor(Manipulate Multiple Channels at Once?) = bool(1)
-#@gui : 4. Edit Channel #1? = bool(1)
-#@gui : 5. Edit Channel #2? = bool(1)
-#@gui : 6. Edit Channel #3? = bool(1)
-#@gui : 7. Edit Alpha Channel? = bool(0)
-#@gui : sep = separator()
-#@gui : note = note("<b>Master Editor</b>")
-#@gui : 8. Overblur/Overline/Sharpen/Blur = choice ("Overblur","Overline","Blur","Sharpen")
-#@gui : 9. Effect Factor = float (1,.1,100)
-#@gui : 10. Multiplication Factor = float (1,.1,10)
-#@gui : 11. Blend Operation = choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
-#@gui : 12. Blending Opacity = float (100,.01,100)
-#@gui : sep = separator(), note = note("<u>Individual Channels</u>"), sep = separator()
-#@gui : note = note("<b>Channel #1</b>")
-#@gui : 13. Overblur/Overline/Sharpen/Blur = choice ("Overblur","Overline","Blur","Sharpen")
-#@gui : 14. Effect Factor = float (1,.1,10)
-#@gui : 15. Multiplication Factor = float (1,.1,10)
-#@gui : 16. Blend Operation = choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
-#@gui : 17. Blending Opacity = float (100,.01,100)
-#@gui : sep = separator()
-#@gui : note = note("<b>Channel #2</b>")
-#@gui : 18. Overblur/Overline/Sharpen/Blur = choice ("Overblur","Overline","Blur","Sharpen")
-#@gui : 19. Effect Factor = float (1,.1,10)
-#@gui : 20. Multiplication Factor = float (1,.1,10)
-#@gui : 21. Blend Operation = choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
-#@gui : 22. Blending Opacity = float (100,.01,100)
-#@gui : sep = separator()
-#@gui : note = note("<b>Channel #3</b>")
-#@gui : 23. Overblur/Overline/Sharpen/Blur = choice ("Overblur","Overline","Blur","Sharpen")
-#@gui : 24. Effect Factor = float (1,.1,10)
-#@gui : 25. Multiplication Factor = float (1,.1,10)
-#@gui : 26. Blend Operation = choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
-#@gui : 27. Blending Opacity = float (100,.01,100)
-#@gui : sep = separator()
-#@gui : note = note("<b>Alpha Channel</b>")
-#@gui : 28. Overblur/Overline/Sharpen/Blur = choice ("Overblur","Overline","Blur","Sharpen")
-#@gui : 29. Effect Factor = float (1,.1,10)
-#@gui : 30. Multiplication Factor = float (1,.1,10)
-#@gui : 31. Blend Operation = choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
-#@gui : 32. Blending Opacity = float (100,.01,100)
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse")
-#@gui : sep = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2019/01/7</i>.</small>")
+#@gui : sep=separator()
+#@gui : Color Space=choice("RGB&#47;sRGB","HSV&#47;HSV8","HSL&#47;HSL8","HSI&#47;HSI8","LCH&#47;LCH8","Lab&#47;Lab8","YCbCr&#47;YCbCrGLIC","YIQ&#47;YIQ8","YUV&#47;YUV8","XYZ&#47;XYZ8")
+#@gui : Alt Choice=bool(0)
+#@gui : sep=separator()
+#@gui : note=note("Configuration for OOBS filter")
+#@gui : Use Master Editor(Manipulate Multiple Channels at Once?)=bool(1)
+#@gui : Edit Channel #1?=bool(1)
+#@gui : Edit Channel #2?=bool(1)
+#@gui : Edit Channel #3?=bool(1)
+#@gui : Edit Alpha Channel?=bool(0)
+#@gui : sep=separator()
+#@gui : note=note("<b>Master Editor</b>")
+#@gui : Overblur/Overline/Sharpen/Blur=choice ("Overblur","Overline","Blur","Sharpen")
+#@gui : Effect Factor=float (1,.1,100)
+#@gui : Multiplication Factor=float (1,.1,10)
+#@gui : Blend Operation=choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
+#@gui : Blending Opacity=float (100,.01,100)
+#@gui : sep=separator(), note=note("<u>Individual Channels</u>"), sep=separator()
+#@gui : note=note("<b>Channel #1</b>")
+#@gui : Overblur/Overline/Sharpen/Blur=choice ("Overblur","Overline","Blur","Sharpen")
+#@gui : Effect Factor=float (1,.1,10)
+#@gui : Multiplication Factor=float (1,.1,10)
+#@gui : Blend Operation=choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
+#@gui : Blending Opacity=float (100,.01,100)
+#@gui : sep=separator()
+#@gui : note=note("<b>Channel #2</b>")
+#@gui : Overblur/Overline/Sharpen/Blur=choice ("Overblur","Overline","Blur","Sharpen")
+#@gui : Effect Factor=float (1,.1,10)
+#@gui : Multiplication Factor=float (1,.1,10)
+#@gui : Blend Operation=choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
+#@gui : Blending Opacity=float (100,.01,100)
+#@gui : sep=separator()
+#@gui : note=note("<b>Channel #3</b>")
+#@gui : Overblur/Overline/Sharpen/Blur=choice ("Overblur","Overline","Blur","Sharpen")
+#@gui : Effect Factor=float (1,.1,10)
+#@gui : Multiplication Factor=float (1,.1,10)
+#@gui : Blend Operation=choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
+#@gui : Blending Opacity=float (100,.01,100)
+#@gui : sep=separator()
+#@gui : note=note("<b>Alpha Channel</b>")
+#@gui : Overblur/Overline/Sharpen/Blur=choice ("Overblur","Overline","Blur","Sharpen")
+#@gui : Effect Factor=float (1,.1,10)
+#@gui : Multiplication Factor=float (1,.1,10)
+#@gui : Blend Operation=choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
+#@gui : Blending Opacity=float (100,.01,100)
+#@gui : sep=separator(),Preview type=choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse")
+#@gui : sep=separator(),note=note("<small>Author: <i>Reptorian</i> Latest update: <i>2019/01/7</i>.</small>")
 fx_OOBS:
 -m "MergeChoice : $""=_mode" -MergeChoice "add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor","edges","error"
 split_opacity
@@ -2794,106 +2894,106 @@ remove[1]
 _fx_OOBS_preview :
 gui_split_preview "fx_OOBS ${1--2}",$-1
 #@gui Vibrato: fx_vibrato, _fx_vibrato_preview(0)
-#@gui : note = note("This is the advanced version of the Vibrato filter. If you do want to manipulate multiple channels at once, use <u>Vibrato - Basic</u> filter. <i>Note: Disable channel mulplication for non-transparent images.</i> \n\n")
-#@gui : note = note("This filter is the one of the G'MIC version of <b>MadJik's</b> <i>Paint.NET plugin</i>")
-#@gui : sep = separator()
-#@gui : Colour Space = choice("RGB", "CMY", "HSI", "HSL", "HSV", "LAB", "LCH", "YCbCr", "YCbCr-Glic", "YUV", "YIQ", "XYZ", "Bayer")
-#@gui : sep = separator()
-#@gui : Manipulate Multiple Channels at Once? = bool(1)
-#@gui : Process Channel 1? = bool(1)
-#@gui : Process Channel 2? = bool(1)
-#@gui : Process Channel 3? = bool(1)
-#@gui : Process Alpha Channel? = bool(1)
-#@gui : Inherit Alpha? = bool(1)
-#@gui : X-Orientation = bool(1)
-#@gui : Y-Orientation = bool(1)
-#@gui : U- Factor = float(.85,.1,15)
-#@gui : V- Factor = float(.85,.1,15)
-#@gui : X-Scale Factor = float(1,.1,15)
-#@gui : Y-Scale Factor = float(1,.1,15)
-#@gui : XY-Scale Factor = float(1,.1,3)
-#@gui : Percentage-Based X Pixel Shift = float(0,-200,200)
-#@gui : Percentage-Based Y Pixel Shift = float(0,-200,200)
-#@gui : Elevation = float(.7,-100,100)
-#@gui : Multiply Blending = bool(0)
-#@gui : Invert Vibrato = bool(0)
-#@gui : Vibrato Blending Factor = float (100,0,100)
-#@gui : Channel Influence Factor = float(1,-8,8)
-#@gui : Final Channel Modulos Multiplication Factor = float(1,1,32)
-#@gui : sep = separator()
-#@gui : note = note("- <b>Channel #1</b> - ")
-#@gui : Process Channel? = bool(1)
-#@gui : X-Orientation = bool(1)
-#@gui : Y-Orientation = bool(1)
-#@gui : U-Factor = float(.85,.1,15)
-#@gui : V-Factor = float(.85,.1,15)
-#@gui : X-Scale Factor = float(1,.1,15)
-#@gui : Y-Scale Factor = float(1,.1,15)
-#@gui : XY-Scale Factor = float(1,.1,3)
-#@gui : Percentage-Based X Pixel Shift = float(0,-200,200)
-#@gui : Percentage-Based Y Pixel Shift = float(0,-200,200)
-#@gui : Elevation = float(.7,-100,100)
-#@gui : Multiply Blending = bool(0)
-#@gui : Invert Vibrato = bool(0)
-#@gui : Vibrato Blending Factor = float (100,0,100)
-#@gui : Channel Influence Factor = float(1,-8,8)
-#@gui : Final Channel Modulos Multiplication Factor = float(1,1,32)
-#@gui : sep = separator()
-#@gui : note = note("- <b>Channel #2</b> - ")
-#@gui : Process Channel? = bool(1)
-#@gui : X-Orientation = bool(1)
-#@gui : Y-Orientation = bool(1)
-#@gui : U-Factor = float(.85,.1,15)
-#@gui : V-Factor = float(.85,.1,15)
-#@gui : X-Scale Factor = float(1,.1,15)
-#@gui : Y-Scale Factor = float(1,.1,15)
-#@gui : XY-Scale Factor = float(1,.1,3)
-#@gui : Percentage-Based X Pixel Shift = float(0,-200,200)
-#@gui : Percentage-Based Y Pixel Shift = float(0,-200,200)
-#@gui : Elevation = float(.7,-100,100)
-#@gui : Multiply Blending = bool(0)
-#@gui : Invert Vibrato = bool(0)
-#@gui : Vibrato Blending Factor = float (100,0,100)
-#@gui : Channel Influence Factor = float(1,-8,8)
-#@gui : Final Channel Modulos Multiplication Factor = float(1,1,32)
-#@gui : sep = separator()
-#@gui : note = note("- <b>Channel #3</b> - ")
-#@gui : Process Channel? = bool(1)
-#@gui : X-Orientation = bool(1)
-#@gui : Y-Orientation = bool(1)
-#@gui : U-Factor = float(.85,.1,15)
-#@gui : V-Factor = float(.85,.1,15)
-#@gui : X-Scale Factor = float(1,.1,15)
-#@gui : Y-Scale Factor = float(1,.1,15)
-#@gui : XY-Scale Factor = float(1,.1,3)
-#@gui : Percentage-Based X Pixel Shift = float(0,-200,200)
-#@gui : Percentage-Based Y Pixel Shift = float(0,-200,200)
-#@gui : Elevation = float(.7,-100,100)
-#@gui : Multiply Blending = bool(0)
-#@gui : Invert Vibrato = bool(0)
-#@gui : Vibrato Blending Factor = float (100,0,100)
-#@gui : Channel Influence Factor = float(1,-8,8)
-#@gui : Final Channel Modulos Multiplication Factor = float(1,1,32)
-#@gui : sep = separator()
-#@gui : note = note("- <b>Alpha Channel #1</b> - ")
-#@gui : Process Channel? = bool(0)
-#@gui : X-Orientation = bool(1)
-#@gui : Y-Orientation = bool(1)
-#@gui : U-Factor = float(.85,.1,15)
-#@gui : V-Factor = float(.85,.1,15)
-#@gui : X-Scale Factor = float(1,.1,15)
-#@gui : Y-Scale Factor = float(1,.1,15)
-#@gui : XY-Scale Factor = float(1,.1,3)
-#@gui : Percentage-Based X Pixel Shift = float(0,-200,200)
-#@gui : Percentage-Based Y Pixel Shift = float(0,-200,200)
-#@gui : Elevation = float(.7,-100,100)
-#@gui : Multiply Blending = bool(1)
-#@gui : Invert Vibrato = bool(0)
-#@gui : Vibrato Blending Factor = float (100,0,100)
-#@gui : Channel Influence Factor = float(1,-8,8)
-#@gui : Final Channel Modulos Multiplication Factor = float(1,1,32)
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse")
-#@gui : sep = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2018/12/19</i>.</small>")
+#@gui : note=note("This is the advanced version of the Vibrato filter. If you do want to manipulate multiple channels at once, use <u>Vibrato - Basic</u> filter. <i>Note: Disable channel mulplication for non-transparent images.</i> \n\n")
+#@gui : note=note("This filter is the one of the G'MIC version of <b>MadJik's</b> <i>Paint.NET plugin</i>")
+#@gui : sep=separator()
+#@gui : Colour Space=choice("RGB", "CMY", "HSI", "HSL", "HSV", "LAB", "LCH", "YCbCr", "YCbCr-Glic", "YUV", "YIQ", "XYZ", "Bayer")
+#@gui : sep=separator()
+#@gui : Manipulate Multiple Channels at Once?=bool(1)
+#@gui : Process Channel 1?=bool(1)
+#@gui : Process Channel 2?=bool(1)
+#@gui : Process Channel 3?=bool(1)
+#@gui : Process Alpha Channel?=bool(1)
+#@gui : Inherit Alpha?=bool(1)
+#@gui : X-Orientation=bool(1)
+#@gui : Y-Orientation=bool(1)
+#@gui : U- Factor=float(.85,.1,15)
+#@gui : V- Factor=float(.85,.1,15)
+#@gui : X-Scale Factor=float(1,.1,15)
+#@gui : Y-Scale Factor=float(1,.1,15)
+#@gui : XY-Scale Factor=float(1,.1,3)
+#@gui : Percentage-Based X Pixel Shift=float(0,-200,200)
+#@gui : Percentage-Based Y Pixel Shift=float(0,-200,200)
+#@gui : Elevation=float(.7,-100,100)
+#@gui : Multiply Blending=bool(0)
+#@gui : Invert Vibrato=bool(0)
+#@gui : Vibrato Blending Factor=float (100,0,100)
+#@gui : Channel Influence Factor=float(1,-8,8)
+#@gui : Final Channel Modulos Multiplication Factor=float(1,1,32)
+#@gui : sep=separator()
+#@gui : note=note("- <b>Channel #1</b> - ")
+#@gui : Process Channel?=bool(1)
+#@gui : X-Orientation=bool(1)
+#@gui : Y-Orientation=bool(1)
+#@gui : U-Factor=float(.85,.1,15)
+#@gui : V-Factor=float(.85,.1,15)
+#@gui : X-Scale Factor=float(1,.1,15)
+#@gui : Y-Scale Factor=float(1,.1,15)
+#@gui : XY-Scale Factor=float(1,.1,3)
+#@gui : Percentage-Based X Pixel Shift=float(0,-200,200)
+#@gui : Percentage-Based Y Pixel Shift=float(0,-200,200)
+#@gui : Elevation=float(.7,-100,100)
+#@gui : Multiply Blending=bool(0)
+#@gui : Invert Vibrato=bool(0)
+#@gui : Vibrato Blending Factor=float (100,0,100)
+#@gui : Channel Influence Factor=float(1,-8,8)
+#@gui : Final Channel Modulos Multiplication Factor=float(1,1,32)
+#@gui : sep=separator()
+#@gui : note=note("- <b>Channel #2</b> - ")
+#@gui : Process Channel?=bool(1)
+#@gui : X-Orientation=bool(1)
+#@gui : Y-Orientation=bool(1)
+#@gui : U-Factor=float(.85,.1,15)
+#@gui : V-Factor=float(.85,.1,15)
+#@gui : X-Scale Factor=float(1,.1,15)
+#@gui : Y-Scale Factor=float(1,.1,15)
+#@gui : XY-Scale Factor=float(1,.1,3)
+#@gui : Percentage-Based X Pixel Shift=float(0,-200,200)
+#@gui : Percentage-Based Y Pixel Shift=float(0,-200,200)
+#@gui : Elevation=float(.7,-100,100)
+#@gui : Multiply Blending=bool(0)
+#@gui : Invert Vibrato=bool(0)
+#@gui : Vibrato Blending Factor=float (100,0,100)
+#@gui : Channel Influence Factor=float(1,-8,8)
+#@gui : Final Channel Modulos Multiplication Factor=float(1,1,32)
+#@gui : sep=separator()
+#@gui : note=note("- <b>Channel #3</b> - ")
+#@gui : Process Channel?=bool(1)
+#@gui : X-Orientation=bool(1)
+#@gui : Y-Orientation=bool(1)
+#@gui : U-Factor=float(.85,.1,15)
+#@gui : V-Factor=float(.85,.1,15)
+#@gui : X-Scale Factor=float(1,.1,15)
+#@gui : Y-Scale Factor=float(1,.1,15)
+#@gui : XY-Scale Factor=float(1,.1,3)
+#@gui : Percentage-Based X Pixel Shift=float(0,-200,200)
+#@gui : Percentage-Based Y Pixel Shift=float(0,-200,200)
+#@gui : Elevation=float(.7,-100,100)
+#@gui : Multiply Blending=bool(0)
+#@gui : Invert Vibrato=bool(0)
+#@gui : Vibrato Blending Factor=float (100,0,100)
+#@gui : Channel Influence Factor=float(1,-8,8)
+#@gui : Final Channel Modulos Multiplication Factor=float(1,1,32)
+#@gui : sep=separator()
+#@gui : note=note("- <b>Alpha Channel #1</b> - ")
+#@gui : Process Channel?=bool(0)
+#@gui : X-Orientation=bool(1)
+#@gui : Y-Orientation=bool(1)
+#@gui : U-Factor=float(.85,.1,15)
+#@gui : V-Factor=float(.85,.1,15)
+#@gui : X-Scale Factor=float(1,.1,15)
+#@gui : Y-Scale Factor=float(1,.1,15)
+#@gui : XY-Scale Factor=float(1,.1,3)
+#@gui : Percentage-Based X Pixel Shift=float(0,-200,200)
+#@gui : Percentage-Based Y Pixel Shift=float(0,-200,200)
+#@gui : Elevation=float(.7,-100,100)
+#@gui : Multiply Blending=bool(1)
+#@gui : Invert Vibrato=bool(0)
+#@gui : Vibrato Blending Factor=float (100,0,100)
+#@gui : Channel Influence Factor=float(1,-8,8)
+#@gui : Final Channel Modulos Multiplication Factor=float(1,1,32)
+#@gui : sep=separator(),Preview type=choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse")
+#@gui : sep=separator(),note=note("<small>Author: <i>Reptorian</i> Latest update: <i>2018/12/19</i>.</small>")
 
 fx_vibrato:
 split_opacity
@@ -2969,69 +3069,69 @@ _fx_vibrato_preview :
 gui_split_preview "fx_vibrato ${1--2}",$-1
 
 #@gui Construction Material Texture : _cons_turb, _cons_turb_preview(0)
-#@gui : note = note("Construction Material Texture filter is based off the following tutorial by <b>theonlychad</b> for Paint.NET software: <a href="https://forums.getpaint.net/topic/16075-concrete-texture-tutorial/">Concrete Texture Tutorial</a>.\n")
-#@gui : sep = separator(), note = note("<b>Turbulance Texture</b>")
+#@gui : note=note("Construction Material Texture filter is based off the following tutorial by <b>theonlychad</b> for Paint.NET software: <a href="https://forums.getpaint.net/topic/16075-concrete-texture-tutorial/">Concrete Texture Tutorial</a>.\n")
+#@gui : sep=separator(), note=note("<b>Turbulance Texture</b>")
 #@gui : 1-3. Background Color = color(0,0,0)
-#@gui : 4. Radius = float(88,1,1024)
-#@gui : 5. Octaves = int(8,1,12)
-#@gui : 6. Damping per Octave = float(2.5,1,10)
-#@gui : 7. Mode = choice(2,"Turbulence","Turbulence 2","Fractal Noise","Fractured Clouds","Stardust","Pea Soup")
+#@gui : 4. Radius=float(88,1,1024)
+#@gui : 5. Octaves=int(8,1,12)
+#@gui : 6. Damping per Octave=float(2.5,1,10)
+#@gui : 7. Mode=choice(2,"Turbulence","Turbulence 2","Fractal Noise","Fractured Clouds","Stardust","Pea Soup")
 #@gui : 8-10. Color Balance = color(128,128,128)
-#@gui : sep = separator(), note = note("<b>Noise Processing</b>")
-#@gui : 11. Amplitude = float(20,0,200)
-#@gui : 12. Noise Type = choice(3,"Gaussian","Uniform","Salt and Pepper","Poisson")
-#@gui : sep = separator(), 13. Channel(s) = choice(0,"RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]","YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]","YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]","Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]","HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]","CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]")
-#@gui : 14. Value Action = choice(1,"None","Cut","Normalize")
-#@gui : sep = separator(), note = note("<b>Grayscale Processing</b>")
-#@gui : 15. Colour Space = choice("RGB","sRGB")
-#@gui : 15. Channel 1 = float(1,0,3)
-#@gui : 16. Channel 2 = float(1,0,3)
-#@gui : 17. Channel 3 = float(1,0,3)
-#@gui : 18. Normalise = bool(1)
-#@gui : 19. Desaturation (%) = float (100,0,100)
-#@gui : sep = separator(), note = note("<b>Self-Image Processing</b>")
-#@gui : 21. Self-Blending = choice(20,"add","burn","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","linearburn","linearlight","luminance","multiply","negation","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","vividlight")
-#@gui : 22. Self-Blending Opacity (%) = float (100,0,100)
-#@gui : 23. Self-Blending V. Original Blending = choice(15,"add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor")
-#@gui : 24. Self-Blend V. Original Opacity (%) = float (100,0,100)
-#@gui : sep = separator(), note = note("<b>Value Processing</b>")
-#@gui : 25. Value Action = choice(2,"None","Cut","Normalize")
-#@gui : 26. Number #1 = float(0,0,255)
-#@gui : 27. Number #2 = float(188,0,255)
-#@gui : 28. Equalize? = bool(0)
-#@gui : 29. Negate? = bool(0)
-#@gui : sep = separator(), note = note("<b>Warp by Intensity</b>")
-#@gui : 30. X-Factor = float(0.19,-6,6)
-#@gui : 31. Y-Factor = float(0.52,-6,6)
-#@gui : sep = separator()
-#@gui : 32. X-Offset = float(128,0,255)
-#@gui : 34. Y-Offset = float(128,0,255)
-#@gui : sep = separator()
-#@gui : 34. Correlated Channels = bool(0)
-#@gui : 35. Interpolation = choice(1,"Nearest Neighbor","Linear")
-#@gui : 36. Boundary = choice(2,"Transparent","Nearest","Periodic","Mirror")
-#@gui : sep = separator(), 37. Channel(s) = choice("All","RGBA [All]","RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","RGBA [Alpha]","Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]","YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]","YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]","Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]","HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]","CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]")
-#@gui : sep = separator(), note = note("<b>Style Processing</b>")
-#@gui : 38. Blur Original = float(0,0,16)
-#@gui : sep = separator(), note = note("<b>Butterworth Bandpass Processing</b>")
-#@gui : 39. Activate Butterworth Bandpass Processing = bool(0)
-#@gui : 40. Create Copy? = bool(0)
-#@gui : 41. LP Frequency Power = float(3,0,16)
-#@gui : 42. LP Order Cube Root = float(2,0,4)
-#@gui : 43. HP Frequency Power = float(4,0,16)
-#@gui : 44. HP Order Cube Root = float(2,0,4)
-#@gui : 45. Colour Space = choice("RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","CMY","CMYK","Bayer")
-#@gui : 46. Absolute = bool(1)
-#@gui : 47. Makeup Gain = bool(1)
-#@gui : sep = separator(), note = note("<b>Relief Processing</b>")
-#@gui : 48. Activate Relief Processing = bool(1)
-#@gui : 49. Angle = float(0,0,360)
-#@gui : 50. Depth (%) = float(100,0,200)
-#@gui : 51. Smoothness = float(0,0,10)
-#@gui : 52. Blending Mode = choice(0,"Grain Extract","Grain Merge")
-#@gui : 53. Blending Opacity (%) = float(100,0,100)
-#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/1/27</i>.</small>")
+#@gui : sep=separator(), note=note("<b>Noise Processing</b>")
+#@gui : 11. Amplitude=float(20,0,200)
+#@gui : 12. Noise Type=choice(3,"Gaussian","Uniform","Salt and Pepper","Poisson")
+#@gui : sep=separator(), 13. Channel(s)=choice(0,"RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]","YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]","YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]","Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]","HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]","CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]")
+#@gui : 14. Value Action=choice(1,"None","Cut","Normalize")
+#@gui : sep=separator(), note=note("<b>Grayscale Processing</b>")
+#@gui : 15. Colour Space=choice("RGB","sRGB")
+#@gui : 15. Channel 1=float(1,0,3)
+#@gui : 16. Channel 2=float(1,0,3)
+#@gui : 17. Channel 3=float(1,0,3)
+#@gui : 18. Normalise=bool(1)
+#@gui : 19. Desaturation (%)=float (100,0,100)
+#@gui : sep=separator(), note=note("<b>Self-Image Processing</b>")
+#@gui : 21. Self-Blending=choice(20,"add","burn","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","linearburn","linearlight","luminance","multiply","negation","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","vividlight")
+#@gui : 22. Self-Blending Opacity (%)=float (100,0,100)
+#@gui : 23. Self-Blending V. Original Blending=choice(15,"add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor")
+#@gui : 24. Self-Blend V. Original Opacity (%)=float (100,0,100)
+#@gui : sep=separator(), note=note("<b>Value Processing</b>")
+#@gui : 25. Value Action=choice(2,"None","Cut","Normalize")
+#@gui : 26. Number #1=float(0,0,255)
+#@gui : 27. Number #2=float(188,0,255)
+#@gui : 28. Equalize?=bool(0)
+#@gui : 29. Negate?=bool(0)
+#@gui : sep=separator(), note=note("<b>Warp by Intensity</b>")
+#@gui : 30. X-Factor=float(0.19,-6,6)
+#@gui : 31. Y-Factor=float(0.52,-6,6)
+#@gui : sep=separator()
+#@gui : 32. X-Offset=float(128,0,255)
+#@gui : 34. Y-Offset=float(128,0,255)
+#@gui : sep=separator()
+#@gui : 34. Correlated Channels=bool(0)
+#@gui : 35. Interpolation=choice(1,"Nearest Neighbor","Linear")
+#@gui : 36. Boundary=choice(2,"Transparent","Nearest","Periodic","Mirror")
+#@gui : sep=separator(), 37. Channel(s)=choice("All","RGBA [All]","RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","RGBA [Alpha]","Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]","YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]","YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]","Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]","HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]","CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]")
+#@gui : sep=separator(), note=note("<b>Style Processing</b>")
+#@gui : 38. Blur Original=float(0,0,16)
+#@gui : sep=separator(), note=note("<b>Butterworth Bandpass Processing</b>")
+#@gui : 39. Activate Butterworth Bandpass Processing=bool(0)
+#@gui : 40. Create Copy?=bool(0)
+#@gui : 41. LP Frequency Power=float(3,0,16)
+#@gui : 42. LP Order Cube Root=float(2,0,4)
+#@gui : 43. HP Frequency Power=float(4,0,16)
+#@gui : 44. HP Order Cube Root=float(2,0,4)
+#@gui : 45. Colour Space=choice("RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","CMY","CMYK","Bayer")
+#@gui : 46. Absolute=bool(1)
+#@gui : 47. Makeup Gain=bool(1)
+#@gui : sep=separator(), note=note("<b>Relief Processing</b>")
+#@gui : 48. Activate Relief Processing=bool(1)
+#@gui : 49. Angle=float(0,0,360)
+#@gui : 50. Depth (%)=float(100,0,200)
+#@gui : 51. Smoothness=float(0,0,10)
+#@gui : 52. Blending Mode=choice(0,"Grain Extract","Grain Merge")
+#@gui : 53. Blending Opacity (%)=float(100,0,100)
+#@gui : sep=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(),note=note("<small>Author: Reptorian. Latest Update: <i>2019/1/27</i>.</small>")
 _cons_turb :
 repeat $! l[$>] cons_turb $* endl done
 cons_turb :
@@ -3064,18 +3164,18 @@ blend ${_mode{$1+1}},$2/100
 _cons_turb_preview :
 gui_split_preview "_cons_turb $*",${-3--1}
 #@gui Emboss-Relief : fx_emboss_relief, fx_emboss_relief_preview(0)
-#@gui : sep = separator(), Enable Extreme Emboss or Relief? = bool(0), sep = separator()
-#@gui : Angle = float(0,0,360)
-#@gui : Depth (%) = float(100,0,500)
-#@gui : Depth (%) = float(500,500,5000)
-#@gui : Smoothness = float(0,0,10)
-#@gui : Invert Embossing? = bool(0)
-#@gui : Preserve Alpha? = bool(1)
-#@gui : sep = separator(), note = note("Relief Section")
-#@gui : Apply Relief? = bool(1)
-#@gui : Blending Opacity (%) = float(100,0,100)
-#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui : sep = separator(), note = note("<small>Author: Reptorian, Samj.      Latest Update: <i>2019/3/24</i>.</small>")
+#@gui : sep=separator(), Enable Extreme Emboss or Relief?=bool(0), sep=separator()
+#@gui : Angle=float(0,0,360)
+#@gui : Depth (%)=float(100,0,500)
+#@gui : Depth (%)=float(500,500,5000)
+#@gui : Smoothness=float(0,0,10)
+#@gui : Invert Embossing?=bool(0)
+#@gui : Preserve Alpha?=bool(1)
+#@gui : sep=separator(), note=note("Relief Section")
+#@gui : Apply Relief?=bool(1)
+#@gui : Blending Opacity (%)=float(100,0,100)
+#@gui : sep=separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(), note=note("<small>Author: Reptorian, Samj.      Latest Update: <i>2019/3/24</i>.</small>")
 fx_emboss_relief : to_a repeat $! l[$>] split_opacity if $8 +em[0] {$6?$2+180:$2},{$1?$4/100:$3/100},$5 blend[^1] grainmerge,{$9/100} else em[0] {$6?$2+180:$2},{$1?$4/100:$3/100},$5 fi if $7 a c else k[0] fi endl done
 fx_emboss_relief_preview :
 gui_split_preview "fx_emboss_relief $*",${-3--1}
@@ -3090,20 +3190,20 @@ u "{$1}"\
 "{$9}_"{$8==1?2:1}\
 "{$10}{$11,$12}"
 #@gui Premade Palette : _palgen, _palgen_preview(0)
-#@gui : note = note("This filter creates palettes. Credits are given below. "), sep = separator()
-#@gui : Palette = choice(10,"BW-{2}","RGB-{3}","B-RGB-{4}","BW-RGB-{5}","CMY-{3}","CMYK-{4}","W-CMYK-{5}","RGBCMY-{6}","1-Bit-RGB-{8}","Aurora-{256}","PLAYPAL-{249}","Sonic Robo Blast 2-{256}","Famicube-{64}","Andrew Kensler - 16","Andrew Kensler - 32","Andrew Kensler - 54","AAP-Micro 12","AAP-16","AAP-64","AAP-SPLENDOR128","DB8","DB16","DB32","DB-ISO22","DimWiddy 17","DimWiddy 23","Endesga-4","Endesga-8","Endesga-16","Endesga-32","Endesga-36","Endesga-64","Juicy-32","Juicy-56","XAIUE-22","15P-DX","20P-DX","24P-DX","Cabana-64","Fantasy 16","Fantasy 24","Tranquil Fantasy 23","Tranquility Plus 39","Faraway 48","Fleja Master Palette-{33}","Koni32","Linear Color Palette Basic-{31}","Vines Flexible Linear Ramps-{38}","Arcade Standard 29","ARQ16","BLK 36","BLK-NEO-{46}","Broken Facility","Bubblegum-16","Cade 15","Calder 8-{11}","Chromatic16","CD-BAC-{16}","CG Arne-{16}","CPC BOY-{32}","Dinoknight 16","||||-22","FZT Ethereal 16","GZXP-{11}","Indecision-{17}","Island Joy 16","Journey-{64}","Juicy 17","Oak21","Nature's Embrace 55","Nauris-16","Pear 36","Peachy Pop 16-{16}","Pineapple 32","Resurrect 32-{32}","Rosy 42","SLSO-CLR17","Softy 15","SPEC12","Starmancer-{52}","Superb 8","SuperFuture25","Sweetie 16","Taffy 16","Todayland Palette V2-{25}","Vivid-17","Voodo34","Zughy 32","ENOS16","Undertones-17","Equpix 15","Night 16","Star 29","Star 34","Still-Life-{14}","SimpleJPC-16","Acid 15","Battery 24","Clumpy 18","Cthulhu-{16}","Crimso 11","Copper-Tech-{16}","DRZ15A","Eggy 15","Eroge-Copper","Europa 16-{16}","GreyT-bit-{8}","Jewel-{15}","Polar 11","Sheltzy 32","Rube-Goldberg-{9}","BoomBoom-{7}","Generic-8","Matriax8c","NT1H-{26}","Autum 15","Autum 15 [Yellow]","JerryPie 22","Naji 16","Blessing-{5}","Crayola Blind-{9}","Easter Island-{16}","Fairy Tales-{8}","Fuzzy Four-{4}","0xdb-01-{17}","Ocaso-{17}","Pastel-{15}","17 Pastels","Pollen-8","Nopal-12","Sy17","Syz15","TUI-15","Cave-{8}","Psygnosia-{16}","MarshMellow32","Rabbit 7","Finlal 11","Vinik 24","YKB-22","Graveyard-21","Steam Lords-{16}","AAP-RadiantXV-{15}","AAP-Majesty XVII-{17}","Daruda 22","Rust-6","XAIUE-Radiant-{22}","Firestorm-{9}","SuperNova 7","NYX8","OIL6","SGM-Palette 2-{17}","Fornax Void I-{256}","Fornax Void II-{128}","Pixelwave-{12}","Spacey Easter-{17}","Moonlit-39","Petite-8","Petite-8 Afterdark","Autochrome 3","Autochrome 5","GB Default #1-{4}","GB Default #2-{4}","GB Andrade-{4}","GB Blue Seni-{4}","GB Blackzone-{4}","GB Crimson-{4}","GB Didi-{4}","GB Dirty-{4}","GB Arne-{4}","GB Easy-{4}","GB Forest-{4}","GB Harsh Green-{4}","GB Light Green-{4}","GB Nostalgia-{4}","GB Platinum-{4}","GB Kirokaze-{4}","GB PJ-{4}","GB Cyber-{4}","GB Wish-{4}","GB Grapefruit-{4}","GB Ice Cream-{4}","GB Red_Blue-{4}","GB Spacehaze-{4}","GB Chocolate-{4}","GB Purple Dawn-{4}","GB Gray-{4}","ARNE4","HallowPumpkin-{4}","Amiga 2600 NTSC-{128}","Amiga 2600 PAL-{104}","Amiga 2600 SECAM-{8}","Amiga 7800 M.E.S.S-{256}","Amiga 7800-{256}","Amstrad CPC-{27}","Apple II-{15}","CGA-{16}","CGA Mode 0 [Low]-{4}","CGA Mode 0 [High]-{4}","CGA Mode 1 [Low]-{4}","CGA Mode 1 [High]-{4}","CGA Mode 2 [Low]-{4}","CGA Mode 2 [High]-{4}","Commodore 64 [Pepto Interpretation]-{16}","Commodore 64 [Colodore Interpretation]-{16}","Commodore VIC-20-{16}","Colecovision-{15}","Japanese Machine Palette-{16}","Macintosh II-{16}","NES-{52}","PICO-8-{16}","RISC OS-{16}","SAM Coupe-{128}","Thomson MO5-{16}","VGA-{244}","ZX Spectrum-{15}","GNOME 32-{32}","Electronic Crayon 22","Chip16","MSX-{15}","Deluxe Paint-{222}","Legacy Paint-{16}","XP Paint-{28}","Vista Paint-{28}")
-#@gui : X-Position = choice(1,"Left","Middle","Right")
-#@gui : Y-Position = choice(1,"Top","Middle","Bottom")
-#@gui : Palette Width = int(1,1,32)
-#@gui : Palette Scaling = int(1,1,25)
-#@gui : Flip Palette Rows = bool(0)
-#@gui : Palette Rotation = choice(0,"0","90","270)
-#@gui : Mirror X-Axis Palette = bool(0)
-#@gui : Mirror Y-Axis Palette = bool(0)
-#@gui : Blend Palette to Image(s)? = bool(1)
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui : sep = separator(), note = note("<b>Palette CLI Information</b>\n\n <i>Main Source of Palettes - </i><a href=\"https://lospec.com/palette-list\"> LoSpec Palette List</a>\n\nPalette Number -- pal number_id = pal name_id -- Full Palette Name by Author[if mentioned]\n\n1 -- pal 0 = pal bw -- Black & White\n2 -- pal 1 = pal rgb -- Red-Green-Blue\n3 -- pal 2 = pal b_rgb -- Black w/ Red-Green-Blue\n4 -- pal 3 = pal bw_rgb -- Black & White w/ Red-Green-Blue\n5 -- pal 4 = pal cmy -- Cyan-Magenta-Yellow\n6 -- pal 5 = pal cmyk -- Cyan-Magenta-Yellow-Black\n7 -- pal 6 = pal wcmyk -- White-Cyan-Magenta-Yellow-Black\n8 -- pal 7 = pal rgbcmy -- Red-Green-Blue w/ Cyan-Magenta-Yellow\n9 -- pal 8 = pal 1bitrgb -- 1 BPC RGB\n10 -- pal 9 = pal aurora -- Aurora by GrafxKid\n11 -- pal 10 = pal playpal -- PLAYPAL by id Tech 1/DOOM Engine\n12 -- pal 11 = pal srb2 -- Sonic Robo Blast 2\n13 -- pal 12 = pal famicube -- Famicube by Arne\n14 -- pal 13 = pal kens16 -- Andrew Kensler - 16 by Andrew Kensler\n15 -- pal 14 = pal kens32 -- Andrew Kensler - 32 by Andrew Kensler\n16 -- pal 15 = pal kens54 -- Andrew Kensler - 54 by Andrew Kensler\n17 -- pal 16 = pal aap12 -- AAP-Micro 12 by Adigun A. Polack\n18 -- pal 17 = pal aap16 -- AAP-16 by Adigun A. Polack\n19 -- pal 18 = pal aap64 -- AAP-64 by Adigun A. Polack\n20 -- pal 19 = pal aap128 -- AAP-SPLENDOR128 by Adigun A. Polack\n21 -- pal 20 = pal db8 -- DB8 by DawnBringer\n22 -- pal 21 = pal db16 -- DB16 by DawnBringer\n23 -- pal 22 = pal db32 -- DB32 by DawnBringer\n24 -- pal 23 = pal db_iso22 -- DB-ISO22 by DawnBringer\n25 -- pal 24 = pal dimwid17 -- DimWiddy 17 by DimWiddy\n26 -- pal 25 = pal dimwid23 -- DimWiddy 23 by DimWiddy\n27 -- pal 26 = pal edg4 -- Endesga-4 by Endesga\n28 -- pal 27 = pal edg8 -- Endesga-8 by Endesga\n29 -- pal 28 = pal edg16 -- Endesga-16 by Endesga\n30 -- pal 29 = pal edg32 -- Endesga-32 by Endesga\n31 -- pal 30 = pal edg36 -- Endesga-36 by Endesga\n32 -- pal 31 = pal edg64 -- Endesga-64 by Endesga\n33 -- pal 32 = pal juicy32 -- Juicy-32 by Real Juice\n34 -- pal 33 = pal juicy56 -- Juicy-56 by Real Juice\n35 -- pal 34 = pal xaiue -- XAIUE-22 by xaiue\n36 -- pal 35 = pal 15pdx -- 15P-DX by GrafxKid\n37 -- pal 36 = pal 20pdx -- 20P-DX by GrafxKid\n38 -- pal 37 = pal 24pdx -- 24P-DX by GrafxKid\n39 -- pal 38 = pal cabana64 -- Cabana-64 by Crabby\n40 -- pal 39 = pal fant16 -- Fantasy 16 by Brettybooop\n41 -- pal 40 = pal fant24 -- Fantasy 24 by Gabriel C.\n42 -- pal 41 = pal tf23 -- Tranquil Fantasy 23 by windfall.apples\n43 -- pal 42 = pal tfp39 -- Tranquility Plus 39 by windfall.apples\n44 -- pal 43 = pal faraway48 -- Faraway 48 by Igor Ferreira.\n45 -- pal 44 = pal fleja_m -- Fleja Master Palette by Fleja\n46 -- pal 45 = pal koni 32 -- Koni32 by Konic\n47 -- pal 46 = pal linearbasic -- Linear Color Palette Basic by GrafxKid\n48 -- pal 47 = pal vinelinear -- Vines Flexible Linear Ramps by Vine 2D\n49 -- pal 48 = pal arcade29 -- Arcade Standard 29 by GrafxKid\n50 -- pal 49 = pal arq16 -- ARQ16 by Endesga\n51 -- pal 50 = pal blk36 -- BLK 36 by BlackedIRL.\n52 -- pal 51 = pal blkneo -- BLK-NEO by BlackedIRL.\n53 -- pal 52 = pal brokefac -- Broken Facility by u/telepathic-melon\n54 -- pal 53 = pal bubblegum -- Bubblegum-16 by PineTreePizza\n55 -- pal 54 = pal cade15 -- Cade 15 by MonstersGoBoom\n56 -- pal 55 = pal calder8 -- Calder 8 by Philip Dodderige\n57 -- pal 56 = pal chrom16 -- Chromatic16 by DragonDePlatino\n58 -- pal 57 = pal cdbac -- CD-BAC by DimWiddy\n59 -- pal 58 = pal cgarne -- CG Arne by Arne Niklas Jansson\n60 -- pal 59 = pal cpcboy -- CPC BOY by Arne Niklas Jansson\n61 -- pal 60 = pal dino -- Dinoknight 16 by Retrospec\n62 -- pal 61 = pal 4l -- ||||-22 by ||||\n63 -- pal 62 = pal ftzeth16 -- FZT Ethereal 16 by Fusionnist\n64 -- pal 63 = pal gzxp -- GZXP by GrafxKid\n65 -- pal 64 = pal indc -- Indecision by Nelson SMG\n66 -- pal 65 = pal island16 -- Island Joy 16 by Kerrie Lake\n67 -- pal 66 = pal journey -- Journey by PineTreePizza\n68 -- pal 67 = pal juicy -- Juicy 17 by JerryPie\n69 -- pal 68 = pal oak -- Oak21 by Dan Oak\n70 -- pal 69 = pal nature55 -- Nature's Embrace 55 by GrafxKid\n71 -- pal 70 = pal nauris16 -- Nauris-16 by Nauris\n72 -- pal 71 = pal pear36 -- Pear 36 by PineTreePizza\n73 -- pal 72 = pal peach -- Peachy Pop 16 by Kerrie Lake\n74 -- pal 73 = pal pineapple32 -- Pineapple 32 by PineTreePizza\n75 -- pal 74 = pal resurrect -- Resurrect 32 by Kerrie Lake\n76 -- pal 75 = pal rosy42 -- Rosy 42 by PineTreePizza\n77 -- pal 76 = pal slso -- SLSO-CLR17 by Luis Miguel Maldonado\n78 -- pal 77 = pal softy15 -- Softy 15 by Eggy\n79 -- pal 78 = pal spec12 -- SPEC12 by Smalls\n80 -- pal 79 = pal starmancer -- Starmancer by Ominux Games\n81 -- pal 80 = pal sup8 -- Superb 8 by BigPotato\n82 -- pal 81 = pal superfuture -- SuperFuture25 by Endesga\n83 -- pal 82 = pal sweetie16 -- Sweetie 16 by GrafxKid\n84 -- pal 83 = pal taffy16 -- Taffy 16 by PineTreePizza\n85 -- pal 84 = pal todayland -- Todayland Palette V2 by GrafxKid\n86 -- pal 85 = pal vivid17 -- Vivid-17 by Irenaart\n87 -- pal 86 = pal voodo -- Voodo34 by Shamaboy\n88 -- pal 87 = pal zu32 -- Zughy 32 by Zughy\n89 -- pal 88 = pal enos16 -- ENOS16 by Endesga\n90 -- pal 89 = pal undertones -- Undertones-17 by Irenaart\n91 -- pal 90 = pal equpix15 -- Equpix 15 by Night\n92 -- pal 91 = pal night16 -- Night 16 by Night\n93 -- pal 92 = pal star29 -- Star 29 by Starlane\n94 -- pal 93 = pal star34 -- Star 34 by Starlane\n95 -- pal 94 = pal stilllife -- Still-Life by cure\n96 -- pal 95 = pal simjpc16 -- SimpleJPC-16 by Adigun A. Polack\n97 -- pal 96 = pal acid15 -- Acid 15 by pyrometal\n98 -- pal 97 = pal battery24 -- Battery 24 by Battery Jellyfish\n99 -- pal 98 = pal clump18 -- Clumpy 18 by windfall.apples\n100 -- pal 99 = pal cthul -- Cthulhu by Starlane\n101 -- pal 100 = pal crimso11 -- Crimso 11 by Crimso\n102 -- pal 101 = pal coptec -- Copper-Tech by Arne Niklas Jansson\n103 -- pal 102 = pal drz15 -- DRZ15A by Drazille\n104 -- pal 103 = pal eggy15 -- Eggy 15 by Eggy\n105 -- pal 104 = pal eroge -- Eroge-Copper by Arne Niklas Jansson\n106 -- pal 105 = pal europa -- Europa 16 by Starlane\n107 -- pal 106 = pal greyt -- GreyT-bit by Sam Keddy\n108 -- pal 107 = pal jewel -- Jewel by AprilSundae\n109 -- pal 108 = pal polar11 -- Polar 11 by Smalls\n110 -- pal 109 = pal sheltzy -- Sheltzy 32 by Please Check - NatTorpedia\n111 -- pal 110 = pal rube-goldberg -- Rube-Goldberg\n112 -- pal 111 = pal boomboom -- BoomBoom by Salman_Shh\n113 -- pal 112 = pal g8 -- Generic-8 by GrafxKid\n114 -- pal 113 = pal matriax8c -- Matriax8c by Davit Masia\n115 -- pal 114 = pal nt1h -- NT1H by NatTorpedia\n116 -- pal 115 = pal au15 -- Autum 15 by jok\n117 -- pal 116 = pal au15y -- Autum 15 [Yellow] by jok\n118 -- pal 117 = pal jerrypie22 -- JerryPie 22 by JerryPie\n119 -- pal 118 = pal naji16 -- Naji 16 by Naji\n120 -- pal 119 = pal blessing -- Blessing by Maruki\n121 -- pal 120 = pal crayola -- Crayola Blind\n122 -- pal 121 = pal easter -- Easter Island by skamocore\n123 -- pal 122 = pal fairy -- Fairy Tales by lollige\n124 -- pal 123 = pal fuzz4 -- Fuzzy Four by P-Tux7\n125 -- pal 124 = pal xdb_01 -- 0xdb-01 by 0xDB\n126 -- pal 125 = pal ocaso -- Ocaso by Minord\n127 -- pal 126 = pal pastel -- Oh Hell, Pastel by StarlitSunset\n128 -- pal 127 = pal pastel17 -- 17 Pastels by Irenaart\n129 -- pal 128 = pal pollen8 -- Pollen-8 by Conker\n130 -- pal 129 = pal nopal -- Nopal-12 by BlackedIRL.\n131 -- pal 130 = pal sy17 -- Sy17 by xaiue\n132 -- pal 131 = pal syz15 -- Syz15 by Fusionnist\n133 -- pal 132 = pal tui15 -- TUI-15 by Jeremy\n134 -- pal 133 = pal cave -- Cave by PineTreePizza\n135 -- pal 134 = pal psygnosia -- Psygnosia by Arne Niklas Jansson\n136 -- pal 135 = pal marshmellow32 -- MarshMellow32 by FormalPrejudice\n137 -- pal 136 = pal rabbit7 -- Rabbit 7 by GrafxKid\n138 -- pal 137 = pal finlal11 -- Finlal 11 by Finlal\n139 -- pal 138 = pal vinik24 -- Vinik 24 by Vinik\n140 -- pal 139 = pal ykb22 -- YKB-22 by yahkehbu\n141 -- pal 140 = pal graveyard -- Graveyard-21 by AprilSundae\n142 -- pal 141 = pal steamlords -- Steam Lords by Slynyrd\n143 -- pal 142 = pal aaprad -- AAP-RadiantXV by Adigun A. Polack\n144 -- pal 143 = pal aapmaj -- AAP-Majesty XVII by Adigun A. Polack\n145 -- pal 144 = pal daruda -- Daruda 22 by daruda\n146 -- pal 145 = pal rust6 -- Rust-6 by Blue Phoenix\n147 -- pal 146 = pal xaiue_rad -- XAIUE-Radiant by xaiue\n148 -- pal 147 = pal firestorm -- Firestorm by theartistjulian\n149 -- pal 148 = pal supernova7 -- SuperNova 7 by Blue Phoenix\n150 -- pal 149 = pal nyx8 -- NYX8 by Javier Guerrero\n151 -- pal 150 = pal oil6 -- OIL6 by GrafxKid\n152 -- pal 151 = pal sgm -- SGM-Palette 2 by s.g.m\n153 -- pal 152 = pal fornaxvoid1 -- Fornax Void I by Fornax Void\n154 -- pal 153 = pal fornaxvoid2 -- Fornax Void II by Fornax Void\n155 -- pal 154 = pal pixelwave -- Pixelwave by Reptorian\n156 -- pal 155 = pal spaceyeaster -- Spacey Easter by Spark Norris\n157 -- pal 156 = pal moon39 -- Moonlit-39 by theartistjulian\n158 -- pal 157 = pal pet8 -- Petite-8 by Adigun A. Polack\n159 -- pal 158 = pal pet8d -- Petite-8 Afterdark by Adigun A. Polack\n160 -- pal 159 = pal autochrome -- Autochrome 3 by Reptorian\n161 -- pal 160 = pal autochrome5 -- Autochrome 5 by Reptorian\n162 -- pal 161 = pal gb_d_1 -- GB Default #1\n163 -- pal 162 = pal gb_d_2 -- GB Default #2\n164 -- pal 163 = pal gb_andrade -- GB Andrade by Andrade\n165 -- pal 164 = pal gb_blue -- GB Blue Seni by WildLeoKnight\n166 -- pal 165 = pal gb_bz -- GB Blackzone\n167 -- pal 166 = pal gb_crimson -- GB Crimson by WildLeoKnight\n168 -- pal 167 = pal gb_didi -- GB Didi by DidiGameboy\n169 -- pal 168 = pal gb_dirty -- GB Dirty by WildLeoKnight\n170 -- pal 169 = pal gb_arne -- GB Arne by Arne\n171 -- pal 170 = pal gb_easy -- GB Easy by GrafxKid\n172 -- pal 171 = pal gb_forest -- GB Forest\n173 -- pal 172 = pal gb_hg -- GB Harsh Green by WildLeoKnight\n174 -- pal 173 = pal gb_lg -- GB Light Green by WildLeoKnight\n175 -- pal 174 = pal gb_nostalgia -- GB Nostalgia by WildLeoKnight\n176 -- pal 175 = pal gb_platinum -- GB Platinum by WildLeoKnight\n177 -- pal 176 = pal gb_kirokaze -- GB Kirokaze by Kirokaze\n178 -- pal 177 = pal gb_pj -- GB PJ\n179 -- pal 178 = pal gb_cyber -- GB Cyber\n180 -- pal 179 = pal gb_wish -- GB Wish by Kerrie Lake\n181 -- pal 180 = pal gb_grapefruit -- GB Grapefruit by GrafxKid\n182 -- pal 181 = pal gb_ice_cream -- GB Ice Cream by Kerrie Lake\n183 -- pal 182 = pal gb_rb -- GB Red_Blue\n184 -- pal 183 = pal gb_space -- GB Spacehaze by WildLeoKnight\n185 -- pal 184 = pal gb_choco -- GB Chocolate by GrafxKid\n186 -- pal 185 = pal gb_purpdawn -- GB Purple Dawn by WildLeoKnight\n187 -- pal 186 = pal gb_gray -- GB Gray by GrafxKid\n188 -- pal 187 = pal arne4 -- ARNE4 by Arne\n189 -- pal 188 = pal hal4 -- HallowPumpkin by WildLeoKnight\n190 -- pal 189 = pal amiga2600ntsc -- Amiga 2600 NTSC\n191 -- pal 190 = pal amiga2600pal -- Amiga 2600 PAL\n192 -- pal 191 = pal amiga2600secam -- Amiga 2600 SECAM\n193 -- pal 192 = pal amiga7800mess -- Amiga 7800 M.E.S.S by Nabuko78\n194 -- pal 193 = pal amiga7800 -- Amiga 7800\n195 -- pal 194 = pal amstrad_cpc -- Amstrad CPC\n196 -- pal 195 = pal apple2 -- Apple II\n197 -- pal 196 = pal cga -- CGA\n198 -- pal 197 = pal cga00 -- CGA Mode 0 [Low]\n199 -- pal 198 = pal cga01 -- CGA Mode 0 [High]\n200 -- pal 199 = pal cga10 -- CGA Mode 1 [Low]\n201 -- pal 200 = pal cga11 -- CGA Mode 1 [High]\n202 -- pal 201 = pal cga20 -- CGA Mode 2 [Low]\n203 -- pal 202 = pal cga21 -- CGA Mode 2 [High]\n204 -- pal 203 = pal c64_pepto -- Commodore 64 [<a href="https://www.pepto.de/projects/colorvic/2001/">Pepto Interpretation</a>]\n205 -- pal 204 = pal c64_colodore -- Commodore 64 [<a href="https://www.pepto.de/projects/colorvic/">Colodore Interpretation</a>]\n206 -- pal 205 = pal com_vic_20 -- Commodore VIC-20\n207 -- pal 206 = pal colecovision -- Colecovision\n208 -- pal 207 = pal jmp -- Japanese Machine Palette by Arne Niklas Jansson\n209 -- pal 208 = pal mac2 -- Macintosh II\n210 -- pal 209 = pal nes -- NES\n211 -- pal 210 = pal pico_8 -- PICO-8 by Lexaloffle Games\n212 -- pal 211 = pal risc -- RISC OS\n213 -- pal 212 = pal samcoupe -- SAM Coupe\n214 -- pal 213 = pal mo5 -- Thomson MO5\n215 -- pal 214 = pal vga -- VGA\n216 -- pal 215 = pal zx -- ZX Spectrum\n217 -- pal 216 = pal gnome32 -- GNOME 32\n218 -- pal 217 = pal elc22 -- Electronic Crayon 22\n219 -- pal 218 = pal chip16 -- Chip16\n220 -- pal 219 = pal msx -- MSX\n221 -- pal 220 = pal deluxepaint -- Deluxe Paint\n222 -- pal 221 = pal lms -- Legacy Paint\n223 -- pal 222 = pal msxp -- XP Paint\n224 -- pal 223 = pal vis -- Vista Paint")
-#@gui : sep = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2019/5/18</i>.</small>")
+#@gui : note=note("This filter creates palettes. Credits are given below. "), sep=separator()
+#@gui : Palette=choice(10,"BW-{2}","RGB-{3}","B-RGB-{4}","BW-RGB-{5}","CMY-{3}","CMYK-{4}","W-CMYK-{5}","RGBCMY-{6}","1-Bit-RGB-{8}","Aurora-{256}","PLAYPAL-{249}","Sonic Robo Blast 2-{256}","Famicube-{64}","Andrew Kensler - 16","Andrew Kensler - 32","Andrew Kensler - 54","AAP-Micro 12","AAP-16","AAP-64","AAP-SPLENDOR128","DB8","DB16","DB32","DB-ISO22","DimWiddy 17","DimWiddy 23","Endesga-4","Endesga-8","Endesga-16","Endesga-32","Endesga-36","Endesga-64","Juicy-32","Juicy-56","XAIUE-22","15P-DX","20P-DX","24P-DX","Cabana-64","Fantasy 16","Fantasy 24","Tranquil Fantasy 23","Tranquility Plus 39","Faraway 48","Fleja Master Palette-{33}","Koni32","Linear Color Palette Basic-{31}","Vines Flexible Linear Ramps-{38}","Arcade Standard 29","ARQ16","BLK 36","BLK-NEO-{46}","Broken Facility","Bubblegum-16","Cade 15","Calder 8-{11}","Chromatic16","CD-BAC-{16}","CG Arne-{16}","CPC BOY-{32}","Dinoknight 16","||||-22","FZT Ethereal 16","GZXP-{11}","Indecision-{17}","Island Joy 16","Journey-{64}","Juicy 17","Oak21","Nature's Embrace 55","Nauris-16","Pear 36","Peachy Pop 16-{16}","Pineapple 32","Resurrect 32-{32}","Rosy 42","SLSO-CLR17","Softy 15","SPEC12","Starmancer-{52}","Superb 8","SuperFuture25","Sweetie 16","Taffy 16","Todayland Palette V2-{25}","Vivid-17","Voodo34","Zughy 32","ENOS16","Undertones-17","Equpix 15","Night 16","Star 29","Star 34","Still-Life-{14}","SimpleJPC-16","Acid 15","Battery 24","Clumpy 18","Cthulhu-{16}","Crimso 11","Copper-Tech-{16}","DRZ15A","Eggy 15","Eroge-Copper","Europa 16-{16}","GreyT-bit-{8}","Jewel-{15}","Polar 11","Sheltzy 32","Rube-Goldberg-{9}","BoomBoom-{7}","Generic-8","Matriax8c","NT1H-{26}","Autum 15","Autum 15 [Yellow]","JerryPie 22","Naji 16","Blessing-{5}","Crayola Blind-{9}","Easter Island-{16}","Fairy Tales-{8}","Fuzzy Four-{4}","0xdb-01-{17}","Ocaso-{17}","Pastel-{15}","17 Pastels","Pollen-8","Nopal-12","Sy17","Syz15","TUI-15","Cave-{8}","Psygnosia-{16}","MarshMellow32","Rabbit 7","Finlal 11","Vinik 24","YKB-22","Graveyard-21","Steam Lords-{16}","AAP-RadiantXV-{15}","AAP-Majesty XVII-{17}","Daruda 22","Rust-6","XAIUE-Radiant-{22}","Firestorm-{9}","SuperNova 7","NYX8","OIL6","SGM-Palette 2-{17}","Fornax Void I-{256}","Fornax Void II-{128}","Pixelwave-{12}","Spacey Easter-{17}","Moonlit-39","Petite-8","Petite-8 Afterdark","Autochrome 3","Autochrome 5","GB Default #1-{4}","GB Default #2-{4}","GB Andrade-{4}","GB Blue Seni-{4}","GB Blackzone-{4}","GB Crimson-{4}","GB Didi-{4}","GB Dirty-{4}","GB Arne-{4}","GB Easy-{4}","GB Forest-{4}","GB Harsh Green-{4}","GB Light Green-{4}","GB Nostalgia-{4}","GB Platinum-{4}","GB Kirokaze-{4}","GB PJ-{4}","GB Cyber-{4}","GB Wish-{4}","GB Grapefruit-{4}","GB Ice Cream-{4}","GB Red_Blue-{4}","GB Spacehaze-{4}","GB Chocolate-{4}","GB Purple Dawn-{4}","GB Gray-{4}","ARNE4","HallowPumpkin-{4}","Amiga 2600 NTSC-{128}","Amiga 2600 PAL-{104}","Amiga 2600 SECAM-{8}","Amiga 7800 M.E.S.S-{256}","Amiga 7800-{256}","Amstrad CPC-{27}","Apple II-{15}","CGA-{16}","CGA Mode 0 [Low]-{4}","CGA Mode 0 [High]-{4}","CGA Mode 1 [Low]-{4}","CGA Mode 1 [High]-{4}","CGA Mode 2 [Low]-{4}","CGA Mode 2 [High]-{4}","Commodore 64 [Pepto Interpretation]-{16}","Commodore 64 [Colodore Interpretation]-{16}","Commodore VIC-20-{16}","Colecovision-{15}","Japanese Machine Palette-{16}","Macintosh II-{16}","NES-{52}","PICO-8-{16}","RISC OS-{16}","SAM Coupe-{128}","Thomson MO5-{16}","VGA-{244}","ZX Spectrum-{15}","GNOME 32-{32}","Electronic Crayon 22","Chip16","MSX-{15}","Deluxe Paint-{222}","Legacy Paint-{16}","XP Paint-{28}","Vista Paint-{28}")
+#@gui : X-Position=choice(1,"Left","Middle","Right")
+#@gui : Y-Position=choice(1,"Top","Middle","Bottom")
+#@gui : Palette Width=int(1,1,32)
+#@gui : Palette Scaling=int(1,1,25)
+#@gui : Flip Palette Rows=bool(0)
+#@gui : Palette Rotation=choice(0,"0","90","270)
+#@gui : Mirror X-Axis Palette=bool(0)
+#@gui : Mirror Y-Axis Palette=bool(0)
+#@gui : Blend Palette to Image(s)?=bool(1)
+#@gui : sep=separator(),Preview type=choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(),note=note("<b>Palette CLI Information</b>\n\n <i>Main Source of Palettes - </i><a href=\"https://lospec.com/palette-list\"> LoSpec Palette List</a>\n\nPalette Number -- pal number_id = pal name_id -- Full Palette Name by Author[if mentioned]\n\n1 -- pal 0 = pal bw -- Black & White\n2 -- pal 1 = pal rgb -- Red-Green-Blue\n3 -- pal 2 = pal b_rgb -- Black w/ Red-Green-Blue\n4 -- pal 3 = pal bw_rgb -- Black & White w/ Red-Green-Blue\n5 -- pal 4 = pal cmy -- Cyan-Magenta-Yellow\n6 -- pal 5 = pal cmyk -- Cyan-Magenta-Yellow-Black\n7 -- pal 6 = pal wcmyk -- White-Cyan-Magenta-Yellow-Black\n8 -- pal 7 = pal rgbcmy -- Red-Green-Blue w/ Cyan-Magenta-Yellow\n9 -- pal 8 = pal 1bitrgb -- 1 BPC RGB\n10 -- pal 9 = pal aurora -- Aurora by GrafxKid\n11 -- pal 10 = pal playpal -- PLAYPAL by id Tech 1/DOOM Engine\n12 -- pal 11 = pal srb2 -- Sonic Robo Blast 2\n13 -- pal 12 = pal famicube -- Famicube by Arne\n14 -- pal 13 = pal kens16 -- Andrew Kensler - 16 by Andrew Kensler\n15 -- pal 14 = pal kens32 -- Andrew Kensler - 32 by Andrew Kensler\n16 -- pal 15 = pal kens54 -- Andrew Kensler - 54 by Andrew Kensler\n17 -- pal 16 = pal aap12 -- AAP-Micro 12 by Adigun A. Polack\n18 -- pal 17 = pal aap16 -- AAP-16 by Adigun A. Polack\n19 -- pal 18 = pal aap64 -- AAP-64 by Adigun A. Polack\n20 -- pal 19 = pal aap128 -- AAP-SPLENDOR128 by Adigun A. Polack\n21 -- pal 20 = pal db8 -- DB8 by DawnBringer\n22 -- pal 21 = pal db16 -- DB16 by DawnBringer\n23 -- pal 22 = pal db32 -- DB32 by DawnBringer\n24 -- pal 23 = pal db_iso22 -- DB-ISO22 by DawnBringer\n25 -- pal 24 = pal dimwid17 -- DimWiddy 17 by DimWiddy\n26 -- pal 25 = pal dimwid23 -- DimWiddy 23 by DimWiddy\n27 -- pal 26 = pal edg4 -- Endesga-4 by Endesga\n28 -- pal 27 = pal edg8 -- Endesga-8 by Endesga\n29 -- pal 28 = pal edg16 -- Endesga-16 by Endesga\n30 -- pal 29 = pal edg32 -- Endesga-32 by Endesga\n31 -- pal 30 = pal edg36 -- Endesga-36 by Endesga\n32 -- pal 31 = pal edg64 -- Endesga-64 by Endesga\n33 -- pal 32 = pal juicy32 -- Juicy-32 by Real Juice\n34 -- pal 33 = pal juicy56 -- Juicy-56 by Real Juice\n35 -- pal 34 = pal xaiue -- XAIUE-22 by xaiue\n36 -- pal 35 = pal 15pdx -- 15P-DX by GrafxKid\n37 -- pal 36 = pal 20pdx -- 20P-DX by GrafxKid\n38 -- pal 37 = pal 24pdx -- 24P-DX by GrafxKid\n39 -- pal 38 = pal cabana64 -- Cabana-64 by Crabby\n40 -- pal 39 = pal fant16 -- Fantasy 16 by Brettybooop\n41 -- pal 40 = pal fant24 -- Fantasy 24 by Gabriel C.\n42 -- pal 41 = pal tf23 -- Tranquil Fantasy 23 by windfall.apples\n43 -- pal 42 = pal tfp39 -- Tranquility Plus 39 by windfall.apples\n44 -- pal 43 = pal faraway48 -- Faraway 48 by Igor Ferreira.\n45 -- pal 44 = pal fleja_m -- Fleja Master Palette by Fleja\n46 -- pal 45 = pal koni 32 -- Koni32 by Konic\n47 -- pal 46 = pal linearbasic -- Linear Color Palette Basic by GrafxKid\n48 -- pal 47 = pal vinelinear -- Vines Flexible Linear Ramps by Vine 2D\n49 -- pal 48 = pal arcade29 -- Arcade Standard 29 by GrafxKid\n50 -- pal 49 = pal arq16 -- ARQ16 by Endesga\n51 -- pal 50 = pal blk36 -- BLK 36 by BlackedIRL.\n52 -- pal 51 = pal blkneo -- BLK-NEO by BlackedIRL.\n53 -- pal 52 = pal brokefac -- Broken Facility by u/telepathic-melon\n54 -- pal 53 = pal bubblegum -- Bubblegum-16 by PineTreePizza\n55 -- pal 54 = pal cade15 -- Cade 15 by MonstersGoBoom\n56 -- pal 55 = pal calder8 -- Calder 8 by Philip Dodderige\n57 -- pal 56 = pal chrom16 -- Chromatic16 by DragonDePlatino\n58 -- pal 57 = pal cdbac -- CD-BAC by DimWiddy\n59 -- pal 58 = pal cgarne -- CG Arne by Arne Niklas Jansson\n60 -- pal 59 = pal cpcboy -- CPC BOY by Arne Niklas Jansson\n61 -- pal 60 = pal dino -- Dinoknight 16 by Retrospec\n62 -- pal 61 = pal 4l -- ||||-22 by ||||\n63 -- pal 62 = pal ftzeth16 -- FZT Ethereal 16 by Fusionnist\n64 -- pal 63 = pal gzxp -- GZXP by GrafxKid\n65 -- pal 64 = pal indc -- Indecision by Nelson SMG\n66 -- pal 65 = pal island16 -- Island Joy 16 by Kerrie Lake\n67 -- pal 66 = pal journey -- Journey by PineTreePizza\n68 -- pal 67 = pal juicy -- Juicy 17 by JerryPie\n69 -- pal 68 = pal oak -- Oak21 by Dan Oak\n70 -- pal 69 = pal nature55 -- Nature's Embrace 55 by GrafxKid\n71 -- pal 70 = pal nauris16 -- Nauris-16 by Nauris\n72 -- pal 71 = pal pear36 -- Pear 36 by PineTreePizza\n73 -- pal 72 = pal peach -- Peachy Pop 16 by Kerrie Lake\n74 -- pal 73 = pal pineapple32 -- Pineapple 32 by PineTreePizza\n75 -- pal 74 = pal resurrect -- Resurrect 32 by Kerrie Lake\n76 -- pal 75 = pal rosy42 -- Rosy 42 by PineTreePizza\n77 -- pal 76 = pal slso -- SLSO-CLR17 by Luis Miguel Maldonado\n78 -- pal 77 = pal softy15 -- Softy 15 by Eggy\n79 -- pal 78 = pal spec12 -- SPEC12 by Smalls\n80 -- pal 79 = pal starmancer -- Starmancer by Ominux Games\n81 -- pal 80 = pal sup8 -- Superb 8 by BigPotato\n82 -- pal 81 = pal superfuture -- SuperFuture25 by Endesga\n83 -- pal 82 = pal sweetie16 -- Sweetie 16 by GrafxKid\n84 -- pal 83 = pal taffy16 -- Taffy 16 by PineTreePizza\n85 -- pal 84 = pal todayland -- Todayland Palette V2 by GrafxKid\n86 -- pal 85 = pal vivid17 -- Vivid-17 by Irenaart\n87 -- pal 86 = pal voodo -- Voodo34 by Shamaboy\n88 -- pal 87 = pal zu32 -- Zughy 32 by Zughy\n89 -- pal 88 = pal enos16 -- ENOS16 by Endesga\n90 -- pal 89 = pal undertones -- Undertones-17 by Irenaart\n91 -- pal 90 = pal equpix15 -- Equpix 15 by Night\n92 -- pal 91 = pal night16 -- Night 16 by Night\n93 -- pal 92 = pal star29 -- Star 29 by Starlane\n94 -- pal 93 = pal star34 -- Star 34 by Starlane\n95 -- pal 94 = pal stilllife -- Still-Life by cure\n96 -- pal 95 = pal simjpc16 -- SimpleJPC-16 by Adigun A. Polack\n97 -- pal 96 = pal acid15 -- Acid 15 by pyrometal\n98 -- pal 97 = pal battery24 -- Battery 24 by Battery Jellyfish\n99 -- pal 98 = pal clump18 -- Clumpy 18 by windfall.apples\n100 -- pal 99 = pal cthul -- Cthulhu by Starlane\n101 -- pal 100 = pal crimso11 -- Crimso 11 by Crimso\n102 -- pal 101 = pal coptec -- Copper-Tech by Arne Niklas Jansson\n103 -- pal 102 = pal drz15 -- DRZ15A by Drazille\n104 -- pal 103 = pal eggy15 -- Eggy 15 by Eggy\n105 -- pal 104 = pal eroge -- Eroge-Copper by Arne Niklas Jansson\n106 -- pal 105 = pal europa -- Europa 16 by Starlane\n107 -- pal 106 = pal greyt -- GreyT-bit by Sam Keddy\n108 -- pal 107 = pal jewel -- Jewel by AprilSundae\n109 -- pal 108 = pal polar11 -- Polar 11 by Smalls\n110 -- pal 109 = pal sheltzy -- Sheltzy 32 by Please Check - NatTorpedia\n111 -- pal 110 = pal rube-goldberg -- Rube-Goldberg\n112 -- pal 111 = pal boomboom -- BoomBoom by Salman_Shh\n113 -- pal 112 = pal g8 -- Generic-8 by GrafxKid\n114 -- pal 113 = pal matriax8c -- Matriax8c by Davit Masia\n115 -- pal 114 = pal nt1h -- NT1H by NatTorpedia\n116 -- pal 115 = pal au15 -- Autum 15 by jok\n117 -- pal 116 = pal au15y -- Autum 15 [Yellow] by jok\n118 -- pal 117 = pal jerrypie22 -- JerryPie 22 by JerryPie\n119 -- pal 118 = pal naji16 -- Naji 16 by Naji\n120 -- pal 119 = pal blessing -- Blessing by Maruki\n121 -- pal 120 = pal crayola -- Crayola Blind\n122 -- pal 121 = pal easter -- Easter Island by skamocore\n123 -- pal 122 = pal fairy -- Fairy Tales by lollige\n124 -- pal 123 = pal fuzz4 -- Fuzzy Four by P-Tux7\n125 -- pal 124 = pal xdb_01 -- 0xdb-01 by 0xDB\n126 -- pal 125 = pal ocaso -- Ocaso by Minord\n127 -- pal 126 = pal pastel -- Oh Hell, Pastel by StarlitSunset\n128 -- pal 127 = pal pastel17 -- 17 Pastels by Irenaart\n129 -- pal 128 = pal pollen8 -- Pollen-8 by Conker\n130 -- pal 129 = pal nopal -- Nopal-12 by BlackedIRL.\n131 -- pal 130 = pal sy17 -- Sy17 by xaiue\n132 -- pal 131 = pal syz15 -- Syz15 by Fusionnist\n133 -- pal 132 = pal tui15 -- TUI-15 by Jeremy\n134 -- pal 133 = pal cave -- Cave by PineTreePizza\n135 -- pal 134 = pal psygnosia -- Psygnosia by Arne Niklas Jansson\n136 -- pal 135 = pal marshmellow32 -- MarshMellow32 by FormalPrejudice\n137 -- pal 136 = pal rabbit7 -- Rabbit 7 by GrafxKid\n138 -- pal 137 = pal finlal11 -- Finlal 11 by Finlal\n139 -- pal 138 = pal vinik24 -- Vinik 24 by Vinik\n140 -- pal 139 = pal ykb22 -- YKB-22 by yahkehbu\n141 -- pal 140 = pal graveyard -- Graveyard-21 by AprilSundae\n142 -- pal 141 = pal steamlords -- Steam Lords by Slynyrd\n143 -- pal 142 = pal aaprad -- AAP-RadiantXV by Adigun A. Polack\n144 -- pal 143 = pal aapmaj -- AAP-Majesty XVII by Adigun A. Polack\n145 -- pal 144 = pal daruda -- Daruda 22 by daruda\n146 -- pal 145 = pal rust6 -- Rust-6 by Blue Phoenix\n147 -- pal 146 = pal xaiue_rad -- XAIUE-Radiant by xaiue\n148 -- pal 147 = pal firestorm -- Firestorm by theartistjulian\n149 -- pal 148 = pal supernova7 -- SuperNova 7 by Blue Phoenix\n150 -- pal 149 = pal nyx8 -- NYX8 by Javier Guerrero\n151 -- pal 150 = pal oil6 -- OIL6 by GrafxKid\n152 -- pal 151 = pal sgm -- SGM-Palette 2 by s.g.m\n153 -- pal 152 = pal fornaxvoid1 -- Fornax Void I by Fornax Void\n154 -- pal 153 = pal fornaxvoid2 -- Fornax Void II by Fornax Void\n155 -- pal 154 = pal pixelwave -- Pixelwave by Reptorian\n156 -- pal 155 = pal spaceyeaster -- Spacey Easter by Spark Norris\n157 -- pal 156 = pal moon39 -- Moonlit-39 by theartistjulian\n158 -- pal 157 = pal pet8 -- Petite-8 by Adigun A. Polack\n159 -- pal 158 = pal pet8d -- Petite-8 Afterdark by Adigun A. Polack\n160 -- pal 159 = pal autochrome -- Autochrome 3 by Reptorian\n161 -- pal 160 = pal autochrome5 -- Autochrome 5 by Reptorian\n162 -- pal 161 = pal gb_d_1 -- GB Default #1\n163 -- pal 162 = pal gb_d_2 -- GB Default #2\n164 -- pal 163 = pal gb_andrade -- GB Andrade by Andrade\n165 -- pal 164 = pal gb_blue -- GB Blue Seni by WildLeoKnight\n166 -- pal 165 = pal gb_bz -- GB Blackzone\n167 -- pal 166 = pal gb_crimson -- GB Crimson by WildLeoKnight\n168 -- pal 167 = pal gb_didi -- GB Didi by DidiGameboy\n169 -- pal 168 = pal gb_dirty -- GB Dirty by WildLeoKnight\n170 -- pal 169 = pal gb_arne -- GB Arne by Arne\n171 -- pal 170 = pal gb_easy -- GB Easy by GrafxKid\n172 -- pal 171 = pal gb_forest -- GB Forest\n173 -- pal 172 = pal gb_hg -- GB Harsh Green by WildLeoKnight\n174 -- pal 173 = pal gb_lg -- GB Light Green by WildLeoKnight\n175 -- pal 174 = pal gb_nostalgia -- GB Nostalgia by WildLeoKnight\n176 -- pal 175 = pal gb_platinum -- GB Platinum by WildLeoKnight\n177 -- pal 176 = pal gb_kirokaze -- GB Kirokaze by Kirokaze\n178 -- pal 177 = pal gb_pj -- GB PJ\n179 -- pal 178 = pal gb_cyber -- GB Cyber\n180 -- pal 179 = pal gb_wish -- GB Wish by Kerrie Lake\n181 -- pal 180 = pal gb_grapefruit -- GB Grapefruit by GrafxKid\n182 -- pal 181 = pal gb_ice_cream -- GB Ice Cream by Kerrie Lake\n183 -- pal 182 = pal gb_rb -- GB Red_Blue\n184 -- pal 183 = pal gb_space -- GB Spacehaze by WildLeoKnight\n185 -- pal 184 = pal gb_choco -- GB Chocolate by GrafxKid\n186 -- pal 185 = pal gb_purpdawn -- GB Purple Dawn by WildLeoKnight\n187 -- pal 186 = pal gb_gray -- GB Gray by GrafxKid\n188 -- pal 187 = pal arne4 -- ARNE4 by Arne\n189 -- pal 188 = pal hal4 -- HallowPumpkin by WildLeoKnight\n190 -- pal 189 = pal amiga2600ntsc -- Amiga 2600 NTSC\n191 -- pal 190 = pal amiga2600pal -- Amiga 2600 PAL\n192 -- pal 191 = pal amiga2600secam -- Amiga 2600 SECAM\n193 -- pal 192 = pal amiga7800mess -- Amiga 7800 M.E.S.S by Nabuko78\n194 -- pal 193 = pal amiga7800 -- Amiga 7800\n195 -- pal 194 = pal amstrad_cpc -- Amstrad CPC\n196 -- pal 195 = pal apple2 -- Apple II\n197 -- pal 196 = pal cga -- CGA\n198 -- pal 197 = pal cga00 -- CGA Mode 0 [Low]\n199 -- pal 198 = pal cga01 -- CGA Mode 0 [High]\n200 -- pal 199 = pal cga10 -- CGA Mode 1 [Low]\n201 -- pal 200 = pal cga11 -- CGA Mode 1 [High]\n202 -- pal 201 = pal cga20 -- CGA Mode 2 [Low]\n203 -- pal 202 = pal cga21 -- CGA Mode 2 [High]\n204 -- pal 203 = pal c64_pepto -- Commodore 64 [<a href="https://www.pepto.de/projects/colorvic/2001/">Pepto Interpretation</a>]\n205 -- pal 204 = pal c64_colodore -- Commodore 64 [<a href="https://www.pepto.de/projects/colorvic/">Colodore Interpretation</a>]\n206 -- pal 205 = pal com_vic_20 -- Commodore VIC-20\n207 -- pal 206 = pal colecovision -- Colecovision\n208 -- pal 207 = pal jmp -- Japanese Machine Palette by Arne Niklas Jansson\n209 -- pal 208 = pal mac2 -- Macintosh II\n210 -- pal 209 = pal nes -- NES\n211 -- pal 210 = pal pico_8 -- PICO-8 by Lexaloffle Games\n212 -- pal 211 = pal risc -- RISC OS\n213 -- pal 212 = pal samcoupe -- SAM Coupe\n214 -- pal 213 = pal mo5 -- Thomson MO5\n215 -- pal 214 = pal vga -- VGA\n216 -- pal 215 = pal zx -- ZX Spectrum\n217 -- pal 216 = pal gnome32 -- GNOME 32\n218 -- pal 217 = pal elc22 -- Electronic Crayon 22\n219 -- pal 218 = pal chip16 -- Chip16\n220 -- pal 219 = pal msx -- MSX\n221 -- pal 220 = pal deluxepaint -- Deluxe Paint\n222 -- pal 221 = pal lms -- Legacy Paint\n223 -- pal 222 = pal msxp -- XP Paint\n224 -- pal 223 = pal vis -- Vista Paint")
+#@gui : sep=separator(),note=note("<small>Author: <i>Reptorian</i> Latest update: <i>2019/5/18</i>.</small>")
 _palgen: palgen $1,{$2-1},{($3-1)*-1},{$4},{$5+1},${6-10}
 palgen:
 repeat $! l[$>]
@@ -3127,38 +3227,38 @@ endl done
 _palgen_preview:
 _palgen $*
 #@gui Transfer Colors [Reduced Colors] : tcrc, tcrc_preview(0)
-#@gui : note = note("<b>- Notes -</b> \n\nThis filter is used to stimulate pixel art or can be used for testing palettes. If you picked Auto for method of color transfer, that means palettes are automatically generated from images, and depending on your input layer choices, the top could be the reference image or the target image.\n\nWhen using pre-made palettes, the order of layers don't really matter unless you picked image as a reference for palette.In the case that you picked a image as a reference, you must make sure that the image in question is only 1px vertically, and the width is no more than 256 colors."), sep=separator()
-#@gui : note = note("<b>Color-mapping Preliminary Setup</b>")
-#@gui : 1. Method of Color Transfer = choice(0,"Auto","Palette")
-#@gui : 2. Palette to Use = choice(10,"By Layer","BW-{2}","RGB-{3}","B-RGB-{4}","BW-RGB-{5}","CMY-{3}","CMYK-{4}","W-CMYK-{5}","RGBCMY-{6}","1-Bit-RGB-{8}","Aurora-{256}","PLAYPAL-{249}","Sonic Robo Blast 2-{256}","Famicube-{64}","Andrew Kensler - 16","Andrew Kensler - 32","Andrew Kensler - 54","AAP-Micro 12","AAP-16","AAP-64","AAP-SPLENDOR128","DB8","DB16","DB32","DB-ISO22","DimWiddy 17","DimWiddy 23","Endesga-4","Endesga-8","Endesga-16","Endesga-32","Endesga-36","Endesga-64","Juicy-32","Juicy-56","XAIUE-22","15P-DX","20P-DX","24P-DX","Cabana-64","Fantasy 16","Fantasy 24","Tranquil Fantasy 23","Tranquility Plus 39","Faraway 48","Fleja Master Palette-{33}","Koni32","Linear Color Palette Basic-{31}","Vines Flexible Linear Ramps-{38}","Arcade Standard 29","ARQ16","BLK 36","BLK-NEO-{46}","Broken Facility","Bubblegum-16","Cade 15","Calder 8-{11}","Chromatic16","CD-BAC-{16}","CG Arne-{16}","CPC BOY-{32}","Dinoknight 16","||||-22","FZT Ethereal 16","GZXP-{11}","Indecision-{17}","Island Joy 16","Journey-{64}","Juicy 17","Oak21","Nature's Embrace 55","Nauris-16","Pear 36","Peachy Pop 16-{16}","Pineapple 32","Resurrect 32-{32}","Rosy 42","SLSO-CLR17","Softy 15","SPEC12","Starmancer-{52}","Superb 8","SuperFuture25","Sweetie 16","Taffy 16","Todayland Palette V2-{25}","Vivid-17","Voodo34","Zughy 32","ENOS16","Undertones-17","Equpix 15","Night 16","Star 29","Star 34","Still-Life-{14}","SimpleJPC-16","Acid 15","Battery 24","Clumpy 18","Cthulhu-{16}","Crimso 11","Copper-Tech-{16}","DRZ15A","Eggy 15","Eroge-Copper","Europa 16-{16}","GreyT-bit-{8}","Jewel-{15}","Polar 11","Sheltzy 32","Rube-Goldberg-{9}","BoomBoom-{7}","Generic-8","Matriax8c","NT1H-{26}","Autum 15","Autum 15 [Yellow]","JerryPie 22","Naji 16","Blessing-{5}","Crayola Blind-{9}","Easter Island-{16}","Fairy Tales-{8}","Fuzzy Four-{4}","0xdb-01-{17}","Ocaso-{17}","Pastel-{15}","17 Pastels","Pollen-8","Nopal-12","Sy17","Syz15","TUI-15","Cave-{8}","Psygnosia-{16}","MarshMellow32","Rabbit 7","Finlal 11","Vinik 24","YKB-22","Graveyard-21","Steam Lords-{16}","AAP-RadiantXV-{15}","AAP-Majesty XVII-{17}","Daruda 22","Rust-6","XAIUE-Radiant-{22}","Firestorm-{9}","SuperNova 7","NYX8","OIL6","SGM-Palette 2-{17}","Fornax Void I-{256}","Fornax Void II-{128}","Pixelwave-{12}","Spacey Easter-{17}","Moonlit-39","Petite-8","Petite-8 Afterdark","Autochrome 3","Autochrome 5","GB Default #1-{4}","GB Default #2-{4}","GB Andrade-{4}","GB Blue Seni-{4}","GB Blackzone-{4}","GB Crimson-{4}","GB Didi-{4}","GB Dirty-{4}","GB Arne-{4}","GB Easy-{4}","GB Forest-{4}","GB Harsh Green-{4}","GB Light Green-{4}","GB Nostalgia-{4}","GB Platinum-{4}","GB Kirokaze-{4}","GB PJ-{4}","GB Cyber-{4}","GB Wish-{4}","GB Grapefruit-{4}","GB Ice Cream-{4}","GB Red_Blue-{4}","GB Spacehaze-{4}","GB Chocolate-{4}","GB Purple Dawn-{4}","GB Gray-{4}","ARNE4","HallowPumpkin-{4}","Amiga 2600 NTSC-{128}","Amiga 2600 PAL-{104}","Amiga 2600 SECAM-{8}","Amiga 7800 M.E.S.S-{256}","Amiga 7800-{256}","Amstrad CPC-{27}","Apple II-{15}","CGA-{16}","CGA Mode 0 [Low]-{4}","CGA Mode 0 [High]-{4}","CGA Mode 1 [Low]-{4}","CGA Mode 1 [High]-{4}","CGA Mode 2 [Low]-{4}","CGA Mode 2 [High]-{4}","Commodore 64 [Pepto Interpretation]-{16}","Commodore 64 [Colodore Interpretation]-{16}","Commodore VIC-20-{16}","Colecovision-{15}","Japanese Machine Palette-{16}","Macintosh II-{16}","NES-{52}","PICO-8-{16}","RISC OS-{16}","SAM Coupe-{128}","Thomson MO5-{16}","VGA-{244}","ZX Spectrum-{15}","GNOME 32-{32}","Electronic Crayon 22","Chip16","MSX-{15}","Deluxe Paint-{222}","Legacy Paint-{16}","XP Paint-{28}","Vista Paint-{28}")
-#@gui : 3. Layer to Use = choice(0,"Top Layer","Bottom Layer")
-#@gui : 4. Indexing Style = choice(0,"Regular [No Special Effect]","Noise","Luminance-Indexing","Vertical","Horizontal")
-#@gui : 5. Color Count = int(16,2,256)
-#@gui : 6.Color Dithering (%) = float(50,0,100)
-#@gui : 7.Transfer Color to Target Image? = bool(0)
-#@gui : 8. Alpha Count = int(2,1,256)
-#@gui : 9. Alpha Dithering (%) = float(50,0,100)
-#@gui : 10. Special Effect (%) = float(50,0,100)
-#@gui : sep = separator(), note = note("<b>Pixel Ratio and Interpolation</b")
-#@gui : 11. Initial Rescale Method = choice(0,"Disabled","Nearest","Average","Linear","Grid","Bicubic","Lanczos")
-#@gui : 12. Upscale? = bool(0)
-#@gui : 13. Pixel Width = int(2,1,16)
-#@gui : 14. Pixel Height = int(2,1,16)
-#@gui : sep = separator(), note = note("<b>Hardware Restriction Stimulation</b>\nWarning: This is computationally intensive!")
-#@gui : 15. Hardware Stimulation? = bool(0)
-#@gui : 16. Hardware Stimulation Precision Factor = int(2,2,32)
-#@gui : sep = separator(), note = note("<i>Preliminary Processing Area for Hardware Stimulation</i>")
-#@gui : 17. Hardware Restriction Data Size = choice(2,"By Width","By Height","Specified Width and Height")
-#@gui : 18. Row/Column Thickness  = int(1,1,16)
-#@gui : 19. Tile Width = int(16,2,16)
-#@gui : 20. Tile Height = int(16,2,16)
-#@gui : sep = separator()note = note("<i>Color Restrictions Information</i>")
-#@gui : 21. Hardware Color Restriction = int(2,2,16)
-#@gui : 22. Hardware Color Mapping = choice(1,"Median Cut","Median Cut and K-Means")
-#@gui : 23. Alpha Precision = int(2,2,32)
-#@gui : 24. Alpha Mapping = choice(1,"Median Cut","Median Cut and K-Means")
-#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/5/18</i>.</small>")
+#@gui : note=note("<b>- Notes -</b> \n\nThis filter is used to stimulate pixel art or can be used for testing palettes. If you picked Auto for method of color transfer, that means palettes are automatically generated from images, and depending on your input layer choices, the top could be the reference image or the target image.\n\nWhen using pre-made palettes, the order of layers don't really matter unless you picked image as a reference for palette.In the case that you picked a image as a reference, you must make sure that the image in question is only 1px vertically, and the width is no more than 256 colors."), sep=separator()
+#@gui : note=note("<b>Color-mapping Preliminary Setup</b>")
+#@gui : Method of Color Transfer=choice(0,"Auto","Palette")
+#@gui : Palette to Use=choice(10,"By Layer","BW-{2}","RGB-{3}","B-RGB-{4}","BW-RGB-{5}","CMY-{3}","CMYK-{4}","W-CMYK-{5}","RGBCMY-{6}","1-Bit-RGB-{8}","Aurora-{256}","PLAYPAL-{249}","Sonic Robo Blast 2-{256}","Famicube-{64}","Andrew Kensler - 16","Andrew Kensler - 32","Andrew Kensler - 54","AAP-Micro 12","AAP-16","AAP-64","AAP-SPLENDOR128","DB8","DB16","DB32","DB-ISO22","DimWiddy 17","DimWiddy 23","Endesga-4","Endesga-8","Endesga-16","Endesga-32","Endesga-36","Endesga-64","Juicy-32","Juicy-56","XAIUE-22","15P-DX","20P-DX","24P-DX","Cabana-64","Fantasy 16","Fantasy 24","Tranquil Fantasy 23","Tranquility Plus 39","Faraway 48","Fleja Master Palette-{33}","Koni32","Linear Color Palette Basic-{31}","Vines Flexible Linear Ramps-{38}","Arcade Standard 29","ARQ16","BLK 36","BLK-NEO-{46}","Broken Facility","Bubblegum-16","Cade 15","Calder 8-{11}","Chromatic16","CD-BAC-{16}","CG Arne-{16}","CPC BOY-{32}","Dinoknight 16","||||-22","FZT Ethereal 16","GZXP-{11}","Indecision-{17}","Island Joy 16","Journey-{64}","Juicy 17","Oak21","Nature's Embrace 55","Nauris-16","Pear 36","Peachy Pop 16-{16}","Pineapple 32","Resurrect 32-{32}","Rosy 42","SLSO-CLR17","Softy 15","SPEC12","Starmancer-{52}","Superb 8","SuperFuture25","Sweetie 16","Taffy 16","Todayland Palette V2-{25}","Vivid-17","Voodo34","Zughy 32","ENOS16","Undertones-17","Equpix 15","Night 16","Star 29","Star 34","Still-Life-{14}","SimpleJPC-16","Acid 15","Battery 24","Clumpy 18","Cthulhu-{16}","Crimso 11","Copper-Tech-{16}","DRZ15A","Eggy 15","Eroge-Copper","Europa 16-{16}","GreyT-bit-{8}","Jewel-{15}","Polar 11","Sheltzy 32","Rube-Goldberg-{9}","BoomBoom-{7}","Generic-8","Matriax8c","NT1H-{26}","Autum 15","Autum 15 [Yellow]","JerryPie 22","Naji 16","Blessing-{5}","Crayola Blind-{9}","Easter Island-{16}","Fairy Tales-{8}","Fuzzy Four-{4}","0xdb-01-{17}","Ocaso-{17}","Pastel-{15}","17 Pastels","Pollen-8","Nopal-12","Sy17","Syz15","TUI-15","Cave-{8}","Psygnosia-{16}","MarshMellow32","Rabbit 7","Finlal 11","Vinik 24","YKB-22","Graveyard-21","Steam Lords-{16}","AAP-RadiantXV-{15}","AAP-Majesty XVII-{17}","Daruda 22","Rust-6","XAIUE-Radiant-{22}","Firestorm-{9}","SuperNova 7","NYX8","OIL6","SGM-Palette 2-{17}","Fornax Void I-{256}","Fornax Void II-{128}","Pixelwave-{12}","Spacey Easter-{17}","Moonlit-39","Petite-8","Petite-8 Afterdark","Autochrome 3","Autochrome 5","GB Default #1-{4}","GB Default #2-{4}","GB Andrade-{4}","GB Blue Seni-{4}","GB Blackzone-{4}","GB Crimson-{4}","GB Didi-{4}","GB Dirty-{4}","GB Arne-{4}","GB Easy-{4}","GB Forest-{4}","GB Harsh Green-{4}","GB Light Green-{4}","GB Nostalgia-{4}","GB Platinum-{4}","GB Kirokaze-{4}","GB PJ-{4}","GB Cyber-{4}","GB Wish-{4}","GB Grapefruit-{4}","GB Ice Cream-{4}","GB Red_Blue-{4}","GB Spacehaze-{4}","GB Chocolate-{4}","GB Purple Dawn-{4}","GB Gray-{4}","ARNE4","HallowPumpkin-{4}","Amiga 2600 NTSC-{128}","Amiga 2600 PAL-{104}","Amiga 2600 SECAM-{8}","Amiga 7800 M.E.S.S-{256}","Amiga 7800-{256}","Amstrad CPC-{27}","Apple II-{15}","CGA-{16}","CGA Mode 0 [Low]-{4}","CGA Mode 0 [High]-{4}","CGA Mode 1 [Low]-{4}","CGA Mode 1 [High]-{4}","CGA Mode 2 [Low]-{4}","CGA Mode 2 [High]-{4}","Commodore 64 [Pepto Interpretation]-{16}","Commodore 64 [Colodore Interpretation]-{16}","Commodore VIC-20-{16}","Colecovision-{15}","Japanese Machine Palette-{16}","Macintosh II-{16}","NES-{52}","PICO-8-{16}","RISC OS-{16}","SAM Coupe-{128}","Thomson MO5-{16}","VGA-{244}","ZX Spectrum-{15}","GNOME 32-{32}","Electronic Crayon 22","Chip16","MSX-{15}","Deluxe Paint-{222}","Legacy Paint-{16}","XP Paint-{28}","Vista Paint-{28}")
+#@gui : Layer to Use=choice(0,"Top Layer","Bottom Layer")
+#@gui : Indexing Style=choice(0,"Regular [No Special Effect]","Noise","Luminance-Indexing","Vertical","Horizontal")
+#@gui : Color Count=int(16,2,256)
+#@gui : Color Dithering (%)=float(50,0,100)
+#@gui : Transfer Color to Target Image?=bool(0)
+#@gui : Alpha Count=int(2,1,256)
+#@gui : Alpha Dithering (%)=float(50,0,100)
+#@gui : Special Effect (%)=float(50,0,100)
+#@gui : sep=separator(), note=note("<b>Pixel Ratio and Interpolation</b")
+#@gui : Initial Rescale Method=choice(0,"Disabled","Nearest","Average","Linear","Grid","Bicubic","Lanczos")
+#@gui : Upscale?=bool(0)
+#@gui : Pixel Width=int(2,1,16)
+#@gui : Pixel Height=int(2,1,16)
+#@gui : sep=separator(), note=note("<b>Hardware Restriction Stimulation</b>\nWarning: This is computationally intensive!")
+#@gui : Hardware Stimulation?=bool(0)
+#@gui : Hardware Stimulation Precision Factor=int(2,2,32)
+#@gui : sep=separator(), note=note("<i>Preliminary Processing Area for Hardware Stimulation</i>")
+#@gui : Hardware Restriction Data Size=choice(2,"By Width","By Height","Specified Width and Height")
+#@gui : Row/Column Thickness=int(1,1,16)
+#@gui : Tile Width=int(16,2,16)
+#@gui : Tile Height=int(16,2,16)
+#@gui : sep=separator()note=note("<i>Color Restrictions Information</i>")
+#@gui : Hardware Color Restriction=int(2,2,16)
+#@gui : Hardware Color Mapping=choice(1,"Median Cut","Median Cut and K-Means")
+#@gui : Alpha Precision=int(2,2,32)
+#@gui : Alpha Mapping=choice(1,"Median Cut","Median Cut and K-Means")
+#@gui : sep=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(),note=note("<small>Author: Reptorian. Latest Update: <i>2019/5/18</i>.</small>")
 tcrc: if {$1==0} if {$3==1} rv fi repeat {$!-1} l[0,{$>+1}] +colormap.. $5,1,1 to_rgb. pal_t[^0] -1,$4,{$6/100},0,$8,{$9/100},{$10/100},$11,$12,$13,$14,$15,$16,{$17==2?$19:($17==0?$18:{w})},{$17==2?$20:($17==0?{h}:$18)},$21,$22,$23,$24 rv endl done if {$!>2} rv[{$!-1},1] fi if {$3==1} rv fi else if {$2!=0} repeat $! l[$>]  pal_t {$2-1},$4,{$6/100},$7,$8,{$9/100},{$10/100},$11,$12,$13,$14,$15,$16,{$17==2?$19:($17==0?$18:{w})},{$17==2?$20:($17==0?{h}:$18)},$21,$22,$23,$24 endl done else if {$3==1} rv fi repeat {$!-1} l[0,{$>+1}] [0] pal_t[^0] -1,$4,{$6/100},$7,$8,{$9/100},{$10/100},$11,$12,$13,$14,$15,$16,{$17==2?$19:($17==0?$18:{w})},{$17==2?$20:($17==0?{h}:$18)},$21,$22,$23,$24 endl done if {$3!=1} rv fi fi fi
 tcrc_preview:
 tcrc $*
@@ -3189,80 +3289,80 @@ u "{$1}"\
 "{$25}{$26,$27}"
 
 #@gui Goofy Resampling: goof_res,goof_res_preview(0)
-#@gui : note = note("This filter is inspired by a method to divide images with a pasta maker, and alternate the strips of a picture which was cut using a pasta maker."),sep = separator()
-#@gui : Amount of Cut-Out = int(8,4,64)
-#@gui : Line Cutout Direction = choice(0,"Horizontal","Vertical")
-#@gui : End Connectin Direction = choice(0,"Horizontal","Vertical")
-#@gui : Reverse Ordering? = bool(0)
-#@gui : sep = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2019/2/22</i>.</small>")
+#@gui : note=note("This filter is inspired by a method to divide images with a pasta maker, and alternate the strips of a picture which was cut using a pasta maker."),sep=separator()
+#@gui : Amount of Cut-Out=int(8,4,64)
+#@gui : Line Cutout Direction=choice(0,"Horizontal","Vertical")
+#@gui : End Connectin Direction=choice(0,"Horizontal","Vertical")
+#@gui : Reverse Ordering?=bool(0)
+#@gui : sep=separator(),note=note("<small>Author: <i>Reptorian</i> Latest update: <i>2019/2/22</i>.</small>")
 goof_res: repeat $! l[$>] if $2 s x,$1 repeat {$1/2-1} a[0,{$>+2}] x done a[^0] x if $4 rv fi if $3 a y else a x fi else  $2 s y,$1 repeat {$1/2-1} a[0,{$>+2}] y done a[^0] y if $4 rv fi if $3 a y else a x fi fi endl done
 goof_res_preview: goof_res $*
 
 #@gui Color Modulo Texture: gui_rep_colmt,gui_rep_colmt_preview
-#@gui : note = note("This filter is inspired by <a href="https://forums.getpaint.net/topic/111782-color-modulo-texture-tool-ymd20170922/">Color Modulo</a> plugin made by <b>MadJik</b> for <a href="https://www.getpaint.net/">Paint.NET</a> software.\n\nPreview is inaccurate! Use 100% Zoom Preview for most accuracy!"), sep = separator()
-#@gui : note = note("<b>Colour and Channel Setting</b>"), sep = separator()
-#@gui : note = note("- Colour Space and Alpha Setting -")
-#@gui : Colour Space = choice(0,"RGB-8","RYB-8","CMY-8","CMYK-8","HSI-8","HSL-8","HSV-8","LAB-8","LCH-8","YIQ-8","YUV-8","YCbCr-8","YCbCrGLIC-8","XYZ-8")
-#@gui : Contain Alpha? = bool(0)
-#@gui : sep = separator(), note = note("- Channel Setting -")
-#@gui : Channel Order = choice(0,"1-2-3-4","1-2-4-3","1-3-2-4","1-3-4-2","1-4-2-3","1-4-3-2","2-1-3-4","2-1-4-3","2-3-1-4","2-3-4-1","2-4-1-3","2-4-3-1","3-1-2-4","3-1-4-2","3-2-1-4","3-2-4-1","3-4-1-2","3-4-2-1","4-1-2-3","4-1-3-2","4-2-1-3","4-2-3-1","4-3-1-2","4-3-2-1")
-#@gui : Channel Order = choice(0,"1-2-3","1-3-2","2-1-3","2-3-1","3-1-2","3-2-1")
-#@gui : Edit Multiple Channel Separately? = bool(1)
-#@gui : sep = separator(), note = note("<b>Diagonal Setting</b>"), sep = separator()
-#@gui : Flip Diagonal? = bool(0)
-#@gui : sep = separator(), note = note("<b>Modulo Texture Setting</b>")
-#@gui : sep = separator(), note = note("- Multichannel Editing-")
-#@gui : Modulo Mode = choice(3,"Regular Modulo","Continuous Regular Modulo","Divisive Modulo","Continuous Divisive Modulo")
-#@gui : Modulo Variable #1 = int(0,0,255)
-#@gui : Modulo Variable #2 = int(255,0,255)
-#@gui : Function Angle = float(0,-180,180)
-#@gui : Value Shift = int(0,0,255)
-#@gui : Centered = bool(0)
-#@gui : Negate = bool(0)
-#@gui : Normalize = bool(0)
-#@gui : note = note("<small>Option available when <u>Edit Multiple Channel Separately</u> is turned off</small>")
-#@gui : sep = separator(), note = note("- Separate Channel Editing -")
-#@gui : Channel Section = choice(0,"Channel #1","Channel #2","Channel #3","Channel #4")
-#@gui : Channel Section = choice(0,"Channel #1","Channel #2","Channel #3")
-#@gui : note = note("<small>Option available when <u>Edit Multiple Channel Separately</u> is turned on</small>"), sep = separator()
-#@gui : Modulo Mode = choice(3,"Regular Modulo","Continuous Regular Modulo","Divisive Modulo","Continuous Divisive Modulo")
-#@gui : Modulo Variable #1 = int(0,0,255)
-#@gui : Modulo Variable #2 = int(255,0,255)
-#@gui : Function Angle = float(0,-180,180)
-#@gui : Value Shift = int(0,0,255)
-#@gui : Centered = bool(0)
-#@gui : Negate = bool(0)
-#@gui : Normalize = bool(0)
-#@gui : Modulo Mode = choice(3,"Regular Modulo","Continuous Regular Modulo","Divisive Modulo","Continuous Divisive Modulo")
-#@gui : Modulo Variable #1 = int(0,0,255)
-#@gui : Modulo Variable #2 = int(255,0,255)
-#@gui : Function Angle = float(0,-180,180)
-#@gui : Value Shift = int(0,0,255)
-#@gui : Centered = bool(0)
-#@gui : Negate = bool(0)
-#@gui : Normalize = bool(0)
-#@gui : Modulo Mode = choice(3,"Regular Modulo","Continuous Regular Modulo","Divisive Modulo","Continuous Divisive Modulo")
-#@gui : Modulo Variable #1 = int(0,0,255)
-#@gui : Modulo Variable #2 = int(255,0,255)
-#@gui : Function Angle = float(0,-180,180)
-#@gui : Value Shift = int(0,0,255)
-#@gui : Centered = bool(0)
-#@gui : Negate = bool(0)
-#@gui : Normalize = bool(0)
-#@gui : Modulo Mode = choice(3,"Regular Modulo","Continuous Regular Modulo","Divisive Modulo","Continuous Divisive Modulo")
-#@gui : Modulo Variable #1 = int(0,0,255)
-#@gui : Modulo Variable #2 = int(255,0,255)
-#@gui : Function Angle = float(0,-180,180)
-#@gui : Value Shift = int(0,0,255)
-#@gui : Centered = bool(0)
-#@gui : Negate = bool(0)
-#@gui : Normalize = bool(0)
-#@gui : note = note("<small>Option available when <u>Edit Multiple Channel Separately</u> is turned on</small>")
-#@gui : sep = separator(), note = note("<b>Subpixel Processing Setting</b>"), sep = separator()
-#@gui : Subpixel Rendering Level = float(1,0,1)
-#@gui : Subpixel Interpolation = choice(5,"Nearest","Average","Grid","Linear","Bicubic","Lanczos")
-#@gui : sep = separator(), note = note("<b>Preview Setting</b>"), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/10/22</i>.</small>")
+#@gui : note=note("This filter is inspired by <a href="https://forums.getpaint.net/topic/111782-color-modulo-texture-tool-ymd20170922/">Color Modulo</a> plugin made by <b>MadJik</b> for <a href="https://www.getpaint.net/">Paint.NET</a> software.\n\nPreview is inaccurate! Use 100% Zoom Preview for most accuracy!"), sep=separator()
+#@gui : note=note("<b>Colour and Channel Setting</b>"), sep=separator()
+#@gui : note=note("- Colour Space and Alpha Setting -")
+#@gui : Colour Space=choice(0,"RGB-8","RYB-8","CMY-8","CMYK-8","HSI-8","HSL-8","HSV-8","LAB-8","LCH-8","YIQ-8","YUV-8","YCbCr-8","YCbCrGLIC-8","XYZ-8")
+#@gui : Contain Alpha?=bool(0)
+#@gui : sep=separator(), note=note("- Channel Setting -")
+#@gui : Channel Order=choice(0,"1-2-3-4","1-2-4-3","1-3-2-4","1-3-4-2","1-4-2-3","1-4-3-2","2-1-3-4","2-1-4-3","2-3-1-4","2-3-4-1","2-4-1-3","2-4-3-1","3-1-2-4","3-1-4-2","3-2-1-4","3-2-4-1","3-4-1-2","3-4-2-1","4-1-2-3","4-1-3-2","4-2-1-3","4-2-3-1","4-3-1-2","4-3-2-1")
+#@gui : Channel Order=choice(0,"1-2-3","1-3-2","2-1-3","2-3-1","3-1-2","3-2-1")
+#@gui : Edit Multiple Channel Separately?=bool(1)
+#@gui : sep=separator(), note=note("<b>Diagonal Setting</b>"), sep=separator()
+#@gui : Flip Diagonal?=bool(0)
+#@gui : sep=separator(), note=note("<b>Modulo Texture Setting</b>")
+#@gui : sep=separator(), note=note("- Multichannel Editing-")
+#@gui : Modulo Mode=choice(3,"Regular Modulo","Continuous Regular Modulo","Divisive Modulo","Continuous Divisive Modulo")
+#@gui : Modulo Variable #1=int(0,0,255)
+#@gui : Modulo Variable #2=int(255,0,255)
+#@gui : Function Angle=float(0,-180,180)
+#@gui : Value Shift=int(0,0,255)
+#@gui : Centered=bool(0)
+#@gui : Negate=bool(0)
+#@gui : Normalize=bool(0)
+#@gui : note=note("<small>Option available when <u>Edit Multiple Channel Separately</u> is turned off</small>")
+#@gui : sep=separator(), note=note("- Separate Channel Editing -")
+#@gui : Channel Section=choice(0,"Channel #1","Channel #2","Channel #3","Channel #4")
+#@gui : Channel Section=choice(0,"Channel #1","Channel #2","Channel #3")
+#@gui : note=note("<small>Option available when <u>Edit Multiple Channel Separately</u> is turned on</small>"), sep=separator()
+#@gui : Modulo Mode=choice(3,"Regular Modulo","Continuous Regular Modulo","Divisive Modulo","Continuous Divisive Modulo")
+#@gui : Modulo Variable #1=int(0,0,255)
+#@gui : Modulo Variable #2=int(255,0,255)
+#@gui : Function Angle=float(0,-180,180)
+#@gui : Value Shift=int(0,0,255)
+#@gui : Centered=bool(0)
+#@gui : Negate=bool(0)
+#@gui : Normalize=bool(0)
+#@gui : Modulo Mode=choice(3,"Regular Modulo","Continuous Regular Modulo","Divisive Modulo","Continuous Divisive Modulo")
+#@gui : Modulo Variable #1=int(0,0,255)
+#@gui : Modulo Variable #2=int(255,0,255)
+#@gui : Function Angle=float(0,-180,180)
+#@gui : Value Shift=int(0,0,255)
+#@gui : Centered=bool(0)
+#@gui : Negate=bool(0)
+#@gui : Normalize=bool(0)
+#@gui : Modulo Mode=choice(3,"Regular Modulo","Continuous Regular Modulo","Divisive Modulo","Continuous Divisive Modulo")
+#@gui : Modulo Variable #1=int(0,0,255)
+#@gui : Modulo Variable #2=int(255,0,255)
+#@gui : Function Angle=float(0,-180,180)
+#@gui : Value Shift=int(0,0,255)
+#@gui : Centered=bool(0)
+#@gui : Negate=bool(0)
+#@gui : Normalize=bool(0)
+#@gui : Modulo Mode=choice(3,"Regular Modulo","Continuous Regular Modulo","Divisive Modulo","Continuous Divisive Modulo")
+#@gui : Modulo Variable #1=int(0,0,255)
+#@gui : Modulo Variable #2=int(255,0,255)
+#@gui : Function Angle=float(0,-180,180)
+#@gui : Value Shift=int(0,0,255)
+#@gui : Centered=bool(0)
+#@gui : Negate=bool(0)
+#@gui : Normalize=bool(0)
+#@gui : note=note("<small>Option available when <u>Edit Multiple Channel Separately</u> is turned on</small>")
+#@gui : sep=separator(), note=note("<b>Subpixel Processing Setting</b>"), sep=separator()
+#@gui : Subpixel Rendering Level=float(1,0,1)
+#@gui : Subpixel Interpolation=choice(5,"Nearest","Average","Grid","Linear","Bicubic","Lanczos")
+#@gui : sep=separator(), note=note("<b>Preview Setting</b>"), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(), note=note("<small>Author: Reptorian. Latest Update: <i>2019/10/22</i>.</small>")
 gui_rep_colmt:
 cs=$1
 alp=$2
@@ -3367,21 +3467,21 @@ u "{$1}"\
 "{$51}"\
 "{$52,53}"
 #@gui Picture Mosaic : fx_rep_pmos,_fx_rep_pmos_preview(0)
-#@gui : note = note("<b>- Information -</b>\n\n<b>Do not be alarmed when multiple command prompt shows up when using folder input as it is a normal process!</b>\n\nThis filter is used for generation of mosaic pictures. Also, the mosaic cli command cannot support a number of images that is less than 3, so this gui filter will automatically use folder input option instead. So, you need at least 2 images inside a folder for the mosaic filter to work when using folder input. For more information, see below.\n\n<b>-Software Usage -</b>\n\n<b>For Krita, and GIMP: </b> Set to input layers to <b>All</b> assuming 3 or more layers are in your file to create mosaic using the top image as a mosaic target.If you are using folder input instead, it is recommended to set layer input to <b>Active</b>.\n\n<b>For Paint.NET: </b> Using 3 or more layer is unsupported due to the Paint.NET plugin restriction, so you can only use folder input. This is a workaround as G'MIC itself supports more than 2 layers.\n\nRight now because of certain issues, split_preview is not functional as of now."), sep = separator()
-#@gui : note = note("<b>- Folder Input -<b>")
-#@gui : Folder Input Instead? = bool(0)
+#@gui : note=note("<b>- Information -</b>\n\n<b>Do not be alarmed when multiple command prompt shows up when using folder input as it is a normal process!</b>\n\nThis filter is used for generation of mosaic pictures. Also, the mosaic cli command cannot support a number of images that is less than 3, so this gui filter will automatically use folder input option instead. So, you need at least 2 images inside a folder for the mosaic filter to work when using folder input. For more information, see below.\n\n<b>-Software Usage -</b>\n\n<b>For Krita, and GIMP: </b> Set to input layers to <b>All</b> assuming 3 or more layers are in your file to create mosaic using the top image as a mosaic target.If you are using folder input instead, it is recommended to set layer input to <b>Active</b>.\n\n<b>For Paint.NET: </b> Using 3 or more layer is unsupported due to the Paint.NET plugin restriction, so you can only use folder input. This is a workaround as G'MIC itself supports more than 2 layers.\n\nRight now because of certain issues, split_preview is not functional as of now."), sep=separator()
+#@gui : note=note("<b>- Folder Input -<b>")
+#@gui : Folder Input Instead?=bool(0)
 #@gui : Mosaic Tile Pictures = folder()
-#@gui : sep = separator()
-#@gui : note = note("<b>- Mosaic Generation Options -</b>\n\n<small><i>Note: When tile_height is equal to 0, it will automatically create the tile ratio based on which side is smaller.</i></small>")
-#@gui : Target Layer = choice(0,"Top Layer","Bottom Layer")
-#@gui : Tile Width = int(15,2,50)
-#@gui : Tile Height = int(0,0,50)
-#@gui : Dithering (%) = float(50,0,100)
-#@gui : Scaling Interpolation = choice(0,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
-#@gui : Autocrop-By-Median = bool(0)
-#@gui : Preserve Original Dimension = bool(0)
-#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/3/31</i>.</small>")
+#@gui : sep=separator()
+#@gui : note=note("<b>- Mosaic Generation Options -</b>\n\n<small><i>Note: When tile_height is equal to 0, it will automatically create the tile ratio based on which side is smaller.</i></small>")
+#@gui : Target Layer=choice(0,"Top Layer","Bottom Layer")
+#@gui : Tile Width=int(15,2,50)
+#@gui : Tile Height=int(0,0,50)
+#@gui : Dithering (%)=float(50,0,100)
+#@gui : Scaling Interpolation=choice(0,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
+#@gui : Autocrop-By-Median=bool(0)
+#@gui : Preserve Original Dimension=bool(0)
+#@gui : sep=separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(), note=note("<small>Author: Reptorian. Latest Update: <i>2019/3/31</i>.</small>")
 fx_rep_pmos: if {$!>2&&$1==0} rep_mosaic_gen $4,$5,{$6/100},{$7+1},$8,$9 elif {$!>2&&$1==1} repeat $! l[$>] rep_mosaic_gen $4,$5,{$6/100},{$7+1},$8,$9,1,$2 rv endl done else rep_mosaic_gen $4,$5,{$6/100},{$7+1},$8,$9,1,$2 fi
 _fx_rep_pmos_preview:
 image={$!}
@@ -3397,65 +3497,65 @@ u "{$1}_"{$image>2?2:0}\
 "{$9}"\
 "{$10}{$11,$12}"
 #@gui Non-Convolution Edge Extraction : fx_ncee, fx_ncee_preview(0)
-#@gui : note = note("Based off PS Embossing filtering. The way it works is that you duplicate once and then shift with wrap-around using original image data using an angle and offset. Then finally, you invert one of the layer, and average those values. In this filter, you have several options when it comes to alpha and how the image wrap-around. Also, CMYK mode may be fixed later as I'm trying to avoid the problem with Alpha mode and CMYK mode.")
-#@gui : sep = separator()
-#@gui : 1. Colour Space = choice(0,"RGB8","RYB8","CMY8","CMYK8","HSI8","HSL8","HSV8","LAB8","LCH8","YIQ8","YUV8","XYZ8")
-#@gui : sep = separator()
-#@gui : 2. Angle = float(0,0,360)
-#@gui : 3. Offset = float(1,.5,256)
-#@gui : 4. Contrast Factor [%] = float(100,0,500)
-#@gui : 5. Wraparound Mode = choice(2,"Dirichlet","Neumann","Periodic","Mirror")
-#@gui : 6. Interpolation = bool(0)
-#@gui : sep = separator(), note = note("Alpha Processing")
-#@gui : 7. Alpha Mode = choice(0,"Preserve Original Alpha","Multiply Alphas")
-#@gui : sep = separator(), note = note("Blending Processing\n\n<i>If you're looking for normal blending mode, you do not need to touch this and if you did, set mode to alpha and opacity to 100.</i>")
-#@gui : 8. Blending Mode = choice(1,"add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor")
-#@gui : 9. Blending Opacity = float(100,0,100)
-#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui : sep = separator(), note = note("<small>Author: Reptorian      Latest Update: <i>2019/4/25</i>.</small>")
+#@gui : note=note("Based off PS Embossing filtering. The way it works is that you duplicate once and then shift with wrap-around using original image data using an angle and offset. Then finally, you invert one of the layer, and average those values. In this filter, you have several options when it comes to alpha and how the image wrap-around. Also, CMYK mode may be fixed later as I'm trying to avoid the problem with Alpha mode and CMYK mode.")
+#@gui : sep=separator()
+#@gui : Colour Space=choice(0,"RGB8","RYB8","CMY8","CMYK8","HSI8","HSL8","HSV8","LAB8","LCH8","YIQ8","YUV8","XYZ8")
+#@gui : sep=separator()
+#@gui : Angle=float(0,0,360)
+#@gui : Offset=float(1,.5,256)
+#@gui : Contrast Factor [%]=float(100,0,500)
+#@gui : Wraparound Mode=choice(2,"Dirichlet","Neumann","Periodic","Mirror")
+#@gui : Interpolation=bool(0)
+#@gui : sep=separator(), note=note("Alpha Processing")
+#@gui : Alpha Mode=choice(0,"Preserve Original Alpha","Multiply Alphas")
+#@gui : sep=separator(), note=note("Blending Processing\n\n<i>If you're looking for normal blending mode, you do not need to touch this and if you did, set mode to alpha and opacity to 100.</i>")
+#@gui : Blending Mode=choice(1,"add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor")
+#@gui : 9. Blending Opacity=float(100,0,100)
+#@gui : sep=separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(), note=note("<small>Author: Reptorian Latest Update: <i>2019/4/25</i>.</small>")
 fx_ncee:
 repeat $! l[$>] rep_ncee $3,$2,$5,$6,{$4/100},$7,$1,$8,{$9/100} endl done
 fx_ncee_preview:
 gui_split_preview "fx_ncee $*",${-3--1}
 #@gui Fragment Blur : gui_rep_frblur,gui_rep_frblur_preview(0)
-#@gui : note = note("Inspired by the Paint.NET Fragment Blur filter, this implementation improves upon it by adding color space options, preservation of original image as a option, boundary condition option, and interpolation option.\n\n<b>Warning -</b> Preview may not be accurate with image with completely opaque images. The output will not show any transparency regardless."), sep = separator(), note = note("<b>Main Setting</b>")
-#@gui : Color Space = choice(0,"RGB","sRGB","RYB","CMYK","HCY","HSI","HSL","HSV","LAB","LCH")
-#@gui : Additional Duplicates Count = int(10,2,100)
-#@gui : Percent of image hypotenuse (%) = float(5,0,100)
-#@gui : Angle = float(0,-180,180)
-#@gui : Superimpose with Original? = bool(0)
-#@gui : sep = separator(), note = note("<b>Secondary Setting</b>")
-#@gui : Boundary = choice(1,"None","Neumann","Periodic","Mirror")
-#@gui : Shift Linear Interpolation?  = bool(0)
-#@gui :  sep  = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui : sep = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2019/9/26</i>.</small>")
+#@gui : note=note("Inspired by the Paint.NET Fragment Blur filter, this implementation improves upon it by adding color space options, preservation of original image as a option, boundary condition option, and interpolation option.\n\n<b>Warning -</b> Preview may not be accurate with image with completely opaque images. The output will not show any transparency regardless."), sep=separator(), note=note("<b>Main Setting</b>")
+#@gui : Color Space=choice(0,"RGB","sRGB","RYB","CMYK","HCY","HSI","HSL","HSV","LAB","LCH")
+#@gui : Additional Duplicates Count=int(10,2,100)
+#@gui : Percent of image hypotenuse (%)=float(5,0,100)
+#@gui : Angle=float(0,-180,180)
+#@gui : Superimpose with Original?=bool(0)
+#@gui : sep=separator(), note=note("<b>Secondary Setting</b>")
+#@gui : Boundary=choice(1,"None","Neumann","Periodic","Mirror")
+#@gui : Shift Linear Interpolation? =bool(0)
+#@gui :  sep  = separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(), note=note("<small>Author : <i>Reptorian</i>      Latest update: <i>2019/9/26</i>.</small>")
 gui_rep_frblur: rep_frblur $2,$3%,$4,$5,$6,$7,$1
 gui_rep_frblur_preview: gui_split_preview "gui_rep_frblur $*",${-3--1}
 #@gui Nebulous : fx_rep_nebulous,fx_rep_nebulous_preview
-#@gui : note = note("Based off <a href="https://forums.getpaint.net/topic/111774-nebulous-texture-update-ymd20170922/?tab=comments#comment-535865">MadJik's PDN Nebulous plugin</a>. This G'MIC version allows you to manipulate the result by angle within the main surface and the distortion surface, and allows you to shift the positioning of the Nebulous surface. Furthermore, the G'MIC version of Nebulous doesn't use integer on the output of surface."), sep = separator()
-#@gui : note = note("<b>Surface Theme</b>"), Colour Space Mode = choice (0,"RGB8","RYB8","HSI8","HSL8","HSV8","LAB8","LCH8","YIQ8","YUV8","XYZ8"), sep = separator()
-#@gui : note = note("<b>Surface Generation</b>")
-#@gui : XY-Factor = float(4,.1,1000)
-#@gui : X-Factor = float(10,.01,1000)
-#@gui : Y-Factor = float(10,.01,1000)
-#@gui : X-Shift (%) = float(0,-10,10)
-#@gui : Y-Shift (%) = float(0,-10,10)
-#@gui : Angle of Main Nebulous Surface = float(0,-180,180)
-#@gui : Wave(s) = float(1,-25,25)
-#@gui : Lighting Angle = float(0,-180,180)
-#@gui : Surface Disturbance = float(0,0,2000)
-#@gui : Surface Disturbance Multiplier = float(1,1,500)
-#@gui : Disturbance X = float(0,0,1000)
-#@gui : Disturbance Y = float(0,0,1000)
-#@gui : Angle of Disturbance Surface = float(0,-180,180)
-#@gui : Disturbance Scale-By-Factor = bool(0)
-#@gui : Output Mode = choice(2,"Built-in Gray","Luminosity from Color","Color")
-#@gui : Alpha Mode = choice(0,"None","Hard Light","Hard Dark","Smooth Light","Smooth Dark")
-#@gui : sep = separator()
-#@gui : note = note("<b>Subpixel Processing</b>\n\n You do not need to touch this unless you want higher amount of precision, but the difference is small. If you are using a very small surface or hard alpha mode, then it makes sense to touch subpixel processing variables.")
-#@gui : Subpixel Level = int(1,0,3)
-#@gui : Subpixel Interpolation = choice(3,"Average","Linear","Grid","Bicubic","Lanczos")
-#@gui : sep = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2019/5/11</i>.</small>")
+#@gui : note=note("Based off <a href="https://forums.getpaint.net/topic/111774-nebulous-texture-update-ymd20170922/?tab=comments#comment-535865">MadJik's PDN Nebulous plugin</a>. This G'MIC version allows you to manipulate the result by angle within the main surface and the distortion surface, and allows you to shift the positioning of the Nebulous surface. Furthermore, the G'MIC version of Nebulous doesn't use integer on the output of surface."), sep=separator()
+#@gui : note=note("<b>Surface Theme</b>"), Colour Space Mode=choice (0,"RGB8","RYB8","HSI8","HSL8","HSV8","LAB8","LCH8","YIQ8","YUV8","XYZ8"), sep=separator()
+#@gui : note=note("<b>Surface Generation</b>")
+#@gui : XY-Factor=float(4,.1,1000)
+#@gui : X-Factor=float(10,.01,1000)
+#@gui : Y-Factor=float(10,.01,1000)
+#@gui : X-Shift (%)=float(0,-10,10)
+#@gui : Y-Shift (%)=float(0,-10,10)
+#@gui : Angle of Main Nebulous Surface=float(0,-180,180)
+#@gui : Wave(s)=float(1,-25,25)
+#@gui : Lighting Angle=float(0,-180,180)
+#@gui : Surface Disturbance=float(0,0,2000)
+#@gui : Surface Disturbance Multiplier=float(1,1,500)
+#@gui : Disturbance X=float(0,0,1000)
+#@gui : Disturbance Y=float(0,0,1000)
+#@gui : Angle of Disturbance Surface=float(0,-180,180)
+#@gui : Disturbance Scale-By-Factor=bool(0)
+#@gui : Output Mode=choice(2,"Built-in Gray","Luminosity from Color","Color")
+#@gui : Alpha Mode=choice(0,"None","Hard Light","Hard Dark","Smooth Light","Smooth Dark")
+#@gui : sep=separator()
+#@gui : note=note("<b>Subpixel Processing</b>\n\n You do not need to touch this unless you want higher amount of precision, but the difference is small. If you are using a very small surface or hard alpha mode, then it makes sense to touch subpixel processing variables.")
+#@gui : Subpixel Level=int(1,0,3)
+#@gui : Subpixel Interpolation=choice(3,"Average","Linear","Grid","Bicubic","Lanczos")
+#@gui : sep=separator(),note=note("<small>Author: <i>Reptorian</i> Latest update: <i>2019/5/11</i>.</small>")
 fx_rep_nebulous:
 repeat $! l[$>]
 rep_nebulous ${2-8},{$1>4&&$1<9?$9+180:$9},{$10*$11},${12-16},{$1>4&&$1<9?$17!=0?($17>=3?3+(4-$17):1+(2-$17)):$17},{$18+1},$19 + 1 * 127.5
@@ -3478,13 +3578,13 @@ endl done
 fx_rep_nebulous_preview:
 fx_rep_nebulous $*
 #@gui Grouped Pixel Axis-Based Shift: fx_rep_sptbwgp,fx_rep_sptbwgp_preview
-#@gui : note = note("Based off MadJik's Paint.NET Gravity Plugin. New feature are shift position, and influence factor."), sep = separator()
-#@gui : Shift Position (%) = float(0,-100,100)
-#@gui : Influence Factor = float(0,0,100)
-#@gui : Threshold (%) = float(0,0,100)
-#@gui : Axis = choice(0,"Horizontal","Vertical")
-#@gui :  sep  = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui :  sep  = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/5/14</i>.</small>")
+#@gui : note=note("Based off MadJik's Paint.NET Gravity Plugin. New feature are shift position, and influence factor."), sep=separator()
+#@gui : Shift Position (%)=float(0,-100,100)
+#@gui : Influence Factor=float(0,0,100)
+#@gui : Threshold (%)=float(0,0,100)
+#@gui : Axis=choice(0,"Horizontal","Vertical")
+#@gui :  sep=separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui :  sep=separator(), note=note("<small>Author: Reptorian. Latest Update: <i>2019/5/14</i>.</small>")
 fx_rep_sptbwgp:
 to_rgba
 rep_sptbwgp {$1/100},$4,{$2/100},{$3/100}
@@ -3504,10 +3604,10 @@ gui_split_preview "fx_rep_sptbwgp $*",${-3--1}
 #@gui : Y-Flip=bool(0)
 #@gui : Number Modulo=int(256,256,2048)
 #@gui : Internal Normalize=int(255,255,2048)
-#@gui : Internal Normalization = bool(1)
+#@gui : Internal Normalization=bool(1)
 #@gui : Number Modulo=int(361,256,2048)
 #@gui : Internal Normalize=int(361,360,2048)
-#@gui : sep  = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2018/12/19</i>.</small>")
+#@gui : sep=separator(),note=note("<small>Author: <i>Reptorian</i> Latest update: <i>2018/12/19</i>.</small>")
 rep_binary_quaddro_basic_gui:
 if $1==0
 rep_binaltquad ${2-12} % 256
@@ -3533,82 +3633,82 @@ u "{$1}"\
 "{$13}_"{$1==1?2:0}\
 "{$14}_"{$1==1?2:0}
 #@gui Binary Alternating Quaddro Texture [MultiChannel]:rep_binary_quaddro_mc_gui, rep_binary_quaddro_mc_gui_preview(0)
-#@gui : note = note("This filter is a extended version of a filter found in<a href="https://forums.getpaint.net/topic/6845-asmageddon-tools-pack-v3/">Asmageddon Tools Pack v3</a>. Translated to G'MIC using a source code, and then extended. It is a mixture of two texture filters."),sep=separator()
-#@gui : note = note("<b>Configuration</b>")
-#@gui : 1.Color Space = choice(0,"RGB","RYB","CMY","CMYK","HSI","HSV","HSL","LAB","LCH","YCbCr","YCbCrGLIC","YIQ","YUV","XYZ")
-#@gui : 2.Contain Alpha? = bool(0)
-#@gui : 3.8-Bit Mode? = bool(0)
-#@gui : sep = separator()
-#@gui : note = note("<b>Channel Order</b>")
-#@gui : 4.Channel #1 = choice(0,"0","1","2")
-#@gui : 5.Channel #2 = choice(1,"0","1","2")
-#@gui : 6.Channel #3 = choice(2,"0","1","2")
-#@gui : 7.Channel #1 = choice(0,"0","1","2","3")
-#@gui : 8.Channel #2 = choice(1,"0","1","2","3")
-#@gui : 9.Channel #3 = choice(2,"0","1","2","3")
-#@gui : 10.Channel #4 = choice(3,"0","1","2","3")
-#@gui : 11.Channel #1 = choice(0,"0","1","2","3","4")
-#@gui : 12.Channel #2 = choice(1,"0","1","2","3","4")
-#@gui : 13.Channel #3 = choice(2,"0","1","2","3","4")
-#@gui : 14.Channel #4 = choice(3,"0","1","2","3","4")
-#@gui : 15.Channel #5 = choice(4,"0","1","2","3","4")
-#@gui : sep = separator()
-#@gui : note = note("<b>Main Texture Processing</b>")
-#@gui : note = note("<i>Channel #1</i>")
-#@gui : 16.Style = choice(0,"Bumping Alternating Texture","Alternating Glasses","Simple")
-#@gui : 17.Variable#1 = int(8,-512,512)
-#@gui : 18.Variable#2 = int(8,-512,512)
-#@gui : 19.Variable#3 = int(128,-200,200)
-#@gui : 20.Operand = choice(2,"AND","OR","XOR")
-#@gui : 21.Angle = float(0,-180,180)
-#@gui : 22.X-Flip = bool(0)
-#@gui : 23.Y-Flip = bool(0)
-#@gui : 24.Normalize = bool(1)
+#@gui : note=note("This filter is a extended version of a filter found in<a href="https://forums.getpaint.net/topic/6845-asmageddon-tools-pack-v3/">Asmageddon Tools Pack v3</a>. Translated to G'MIC using a source code, and then extended. It is a mixture of two texture filters."),sep=separator()
+#@gui : note=note("<b>Configuration</b>")
+#@gui : Color Space=choice(0,"RGB","RYB","CMY","CMYK","HSI","HSV","HSL","LAB","LCH","YCbCr","YCbCrGLIC","YIQ","YUV","XYZ")
+#@gui : Contain Alpha?=bool(0)
+#@gui : 8-Bit Mode?=bool(0)
 #@gui : sep=separator()
-#@gui : note = note("<i>Channel #2</i>")
-#@gui : 25.Style = choice(0,"Bumping Alternating Texture","Alternating Glasses","Simple")
-#@gui : 26.Variable#1 = int(8,-512,512)
-#@gui : 27.Variable#2 = int(8,-512,512)
-#@gui : 28.Variable#3 = int(128,-200,200)
-#@gui : 29.Operand = choice(2,"AND","OR","XOR")
-#@gui : 30.Angle = float(0,-180,180)
-#@gui : 31.X-Flip = bool(0)
-#@gui : 32.Y-Flip = bool(0)
-#@gui : 33.Normalize = bool(1)
+#@gui : note=note("<b>Channel Order</b>")
+#@gui : Channel #1=choice(0,"0","1","2")
+#@gui : Channel #2=choice(1,"0","1","2")
+#@gui : Channel #3=choice(2,"0","1","2")
+#@gui : Channel #1=choice(0,"0","1","2","3")
+#@gui : Channel #2=choice(1,"0","1","2","3")
+#@gui : Channel #3=choice(2,"0","1","2","3")
+#@gui : Channel #4=choice(3,"0","1","2","3")
+#@gui : Channel #1=choice(0,"0","1","2","3","4")
+#@gui : Channel #2=choice(1,"0","1","2","3","4")
+#@gui : Channel #3=choice(2,"0","1","2","3","4")
+#@gui : Channel #4=choice(3,"0","1","2","3","4")
+#@gui : Channel #5=choice(4,"0","1","2","3","4")
+#@gui : sep=separator()
+#@gui : note=note("<b>Main Texture Processing</b>")
+#@gui : note=note("<i>Channel #1</i>")
+#@gui : Style=choice(0,"Bumping Alternating Texture","Alternating Glasses","Simple")
+#@gui : Variable#1=int(8,-512,512)
+#@gui : Variable#2=int(8,-512,512)
+#@gui : Variable#3=int(128,-200,200)
+#@gui : Operand=choice(2,"AND","OR","XOR")
+#@gui : Angle=float(0,-180,180)
+#@gui : X-Flip=bool(0)
+#@gui : Y-Flip=bool(0)
+#@gui : Normalize=bool(1)
+#@gui : sep=separator()
+#@gui : note=note("<i>Channel #2</i>")
+#@gui : Style=choice(0,"Bumping Alternating Texture","Alternating Glasses","Simple")
+#@gui : Variable#1=int(8,-512,512)
+#@gui : Variable#2=int(8,-512,512)
+#@gui : Variable#3=int(128,-200,200)
+#@gui : Operand=choice(2,"AND","OR","XOR")
+#@gui : Angle=float(0,-180,180)
+#@gui : X-Flip=bool(0)
+#@gui : Y-Flip=bool(0)
+#@gui : Normalize=bool(1)
 #@gui : sep = separator()
-#@gui : note = note("<i>Channel #3</i>")
-#@gui : 34.Style = choice(0,"Bumping Alternating Texture","Alternating Glasses","Simple")
-#@gui : 35.Variable#1 = int(8,-512,512)
-#@gui : 36.Variable#2 = int(8,-512,512)
-#@gui : 37.Variable#3 = int(128,-200,200)
-#@gui : 38.Operand = choice(2,"AND","OR","XOR")
-#@gui : 39.Angle = float(0,-180,180)
-#@gui : 40.X-Flip = bool(0)
-#@gui : 41.Y-Flip = bool(0)
-#@gui : 42.Normalize = bool(1)
+#@gui : note=note("<i>Channel #3</i>")
+#@gui : Style=choice(0,"Bumping Alternating Texture","Alternating Glasses","Simple")
+#@gui : Variable#1=int(8,-512,512)
+#@gui : Variable#2=int(8,-512,512)
+#@gui : Variable#3=int(128,-200,200)
+#@gui : Operand=choice(2,"AND","OR","XOR")
+#@gui : Angle=float(0,-180,180)
+#@gui : X-Flip=bool(0)
+#@gui : Y-Flip=bool(0)
+#@gui : Normalize=bool(1)
 #@gui : sep = separator()
-#@gui : note = note("<i>Channel #4</i>")
-#@gui : 43.Style = choice(0,"Bumping Alternating Texture","Alternating Glasses","Simple")
-#@gui : 44.Variable#1 = int(8,-512,512)
-#@gui : 45.Variable#2 = int(8,-512,512)
-#@gui : 46.Variable#3 = int(128,-200,200)
-#@gui : 47.Operand = choice(2,"AND","OR","XOR")
-#@gui : 48.Angle = float(0,-180,180)
-#@gui : 49.X-Flip = bool(0)
-#@gui : 50.Y-Flip = bool(0)
-#@gui : 51.Normalize = bool(1)
+#@gui : note=note("<i>Channel #4</i>")
+#@gui : Style=choice(0,"Bumping Alternating Texture","Alternating Glasses","Simple")
+#@gui : Variable#1=int(8,-512,512)
+#@gui : Variable#2=int(8,-512,512)
+#@gui : Variable#3=int(128,-200,200)
+#@gui : Operand=choice(2,"AND","OR","XOR")
+#@gui : Angle=float(0,-180,180)
+#@gui : X-Flip=bool(0)
+#@gui : Y-Flip=bool(0)
+#@gui : Normalize=bool(1)
 #@gui : sep = separator()
-#@gui : note = note("<i>Channel #5</i>")
-#@gui : 52.Style = choice(0,"Bumping Alternating Texture","Alternating Glasses","Simple")
-#@gui : 53.Variable#1 = int(8,-512,512)
-#@gui : 54.Variable#2 = int(8,-512,512)
-#@gui : 55.Variable#3 = int(128,-200,200)
-#@gui : 56.Operand = choice(2,"AND","OR","XOR")
-#@gui : 57.Angle = float(0,-180,180)
-#@gui : 58.X-Flip = bool(0)
-#@gui : 59.Y-Flip = bool(0)
-#@gui : 60.Normalize = bool(1)
-#@gui:sep = separator(), note = note("<small>Author : <i>Reptorian</i>      Latest update: <i>2018/12/19</i>.</small>")
+#@gui : note=note("<i>Channel #5</i>")
+#@gui : Style=choice(0,"Bumping Alternating Texture","Alternating Glasses","Simple")
+#@gui : Variable#1=int(8,-512,512)
+#@gui : Variable#2=int(8,-512,512)
+#@gui : Variable#3=int(128,-200,200)
+#@gui : Operand=choice(2,"AND","OR","XOR")
+#@gui : Angle=float(0,-180,180)
+#@gui : X-Flip=bool(0)
+#@gui : Y-Flip=bool(0)
+#@gui : Normalize=bool(1)
+#@gui : sep=separator(),note=note("<small>Author: <i>Reptorian</i> Latest update: <i>2018/12/19</i>.</small>")
 rep_binary_quaddro_mc_gui:
 cs_mode=$1
 cmyk_mode={$cs_mode==3?4:3}
@@ -3684,116 +3784,116 @@ u "{$1}"\
 "{$58}_"{$tch>=5?2:0}\
 "{$59}_"{$tch>=5?2:0}\
 "{$60}_"{$tch>=5?2:0}
-#@gui Sinusoidal Water Distortion : rep_sinowaterdist_gui,rep_sinowaterdist_gui_preview(0)
-#@gui : X-Balance = float(0,-100,100)
-#@gui : Y-Balance = float(0,-100,100)
-#@gui : Scale = float(.5,.1,100)
-#@gui : Interpolation = choice(2,"Nearest","Linear","Bicubic")
-#@gui : Boundary Condition = choice(0,"Periodic","Mirror")
-#@gui :  sep  = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui :  sep  = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/6/4</i>.</small>")
+#@gui Sinusoidal Water Distortion: rep_sinowaterdist_gui,rep_sinowaterdist_gui_preview(0)
+#@gui : X-Balance=float(0,-100,100)
+#@gui : Y-Balance=float(0,-100,100)
+#@gui : Scale=float(.5,.1,100)
+#@gui : Interpolation=choice(2,"Nearest","Linear","Bicubic")
+#@gui : Boundary Condition=choice(0,"Periodic","Mirror")
+#@gui : sep=separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split=point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(), note=note("<small>Author: Reptorian. Latest Update: <i>2019/6/4</i>.</small>")
 rep_sinowaterdist_gui:
 rep_sinowaterdist $1,$2,{($3/100)*(w>h?w:h)},$4,$5
 rep_sinowaterdist_gui_preview:
 gui_split_preview "rep_sinowaterdist_gui $*",${-3--1}
-#@gui Strange Bulger : rep_strbul,rep_strbul_preview(0)
-#@gui : Angle = float(0,-180,180)
-#@gui : Axis = choice(0,"X-Axis","Y-Axis")
-#@gui : Interpolation = choice(2,"Nearest","Linear","Bicubic")
-#@gui : Boundary Condition = choice(0,"Periodic","Mirror")
-#@gui :  sep  = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui :  sep  = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/6/4</i>.</small>")
+#@gui Strange Bulger: rep_strbul,rep_strbul_preview(0)
+#@gui : Angle=float(0,-180,180)
+#@gui : Axis=choice(0,"X-Axis","Y-Axis")
+#@gui : Interpolation=choice(2,"Nearest","Linear","Bicubic")
+#@gui : Boundary Condition=choice(0,"Periodic","Mirror")
+#@gui : sep=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(),note=note("<small>Author: Reptorian. Latest Update: <i>2019/6/4</i>.</small>")
 rep_strbul_preview:
 gui_split_preview "rep_strbul $*",${-3--1}
 #@gui Strange Bulger Kaleidoscope: rep_strbulkal_gui, rep_strbulkal_gui_preview(0)
-#@gui : note = note("This filter is a extended version of the filters named 'Strange Bulger A', and 'Strange Bulger B' found in<a href="https://forums.getpaint.net/topic/6845-asmageddon-tools-pack-v3/">Asmageddon Tools Pack v3</a>. Translated to G'MIC using source code for Asmageddon's tool, and then extended."),sep=separator()
-#@gui : Bulge Angle = float(0,-180,180)
-#@gui : Axis of Bulge = choice(0,"X-Axis","Y-Axis")
-#@gui : Scale = float(1,.1,10)
+#@gui : note=note("This filter is a extended version of the filters named 'Strange Bulger A', and 'Strange Bulger B' found in<a href="https://forums.getpaint.net/topic/6845-asmageddon-tools-pack-v3/">Asmageddon Tools Pack v3</a>. Translated to G'MIC using source code for Asmageddon's tool, and then extended."),sep=separator()
+#@gui : Bulge Angle=float(0,-180,180)
+#@gui : Axis of Bulge=choice(0,"X-Axis","Y-Axis")
+#@gui : Scale=float(1,.1,10)
 #@gui : Preliminary Surface Shift = point(50,50,0,1,128,128,128,255)
 #@gui : Distortion Surface Position = point(50,50,0,1,255,255,255,255)
-#@gui : Distortion Surface Angle = float(0,0,360)
-#@gui : Placement = choice(0,"Inside-Out","Outside-In")
-#@gui : Boundary Condition = choice(0,"Periodic","Mirror")
-#@gui : Interpolation = choice(2,"Nearest","Linear","Bicubic")
-#@gui : Base Reference Dimension = int(1024,10,4096)
-#@gui :  sep  = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui :  sep  = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/6/4</i>.</small>")
+#@gui : Distortion Surface Angle=float(0,0,360)
+#@gui : Placement=choice(0,"Inside-Out","Outside-In")
+#@gui : Boundary Condition=choice(0,"Periodic","Mirror")
+#@gui : Interpolation=choice(2,"Nearest","Linear","Bicubic")
+#@gui : Base Reference Dimension=int(1024,10,4096)
+#@gui :  sep  = separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui :  sep  = separator(), note=note("<small>Author: Reptorian.      Latest Update: <i>2019/6/4</i>.</small>")
 rep_strbulkal_gui:
 rep_strbulkal ${1-3},{(($4/100)-.5)*2},{(($5/100)-.5)*-2},{(($6/100)-.5)*2},{(($7/100)-.5)*-2},${8-12}
 rep_strbulkal_gui_preview:
 gui_split_preview "rep_strbulkal_gui $*",${-3--1}
 #@gui Logarithmic Distortion: rep_logpindis_gui, rep_logpindis_gui_preview(0)
-#@gui : Distortion Factor = float(1,.1,1000)
+#@gui : Distortion Factor=float(1,.1,1000)
 #@gui : Preliminary Surface Shift = point(50,50,0,1,128,128,128,255)
 #@gui : Distortion Surface Position = point(50,50,0,1,255,255,255,255)
-#@gui : Preliminary X-Axis Scaling = float(1,.1,10)
-#@gui : Preliminary Y-Axis Scaling = float(1,.1,10)
-#@gui : Effect X-Axis Scaling = float(1,.1,10)
-#@gui : Effect Y-Axis Scaling = float(1,.1,10)
-#@gui : Distortion Surface Angle = float(0,0,360)
-#@gui : Placement = choice(0,"Inside-Out","Outside-In")
-#@gui : Logarithmic Distortion Axis Combination for X-Axis = choice(0,"Different Axis","Same Axis")
-#@gui : Logarithmic Distortion Axis combination for y-Axis = choice(0,"Different Axis","Same Axis")
-#@gui : Logarithmic Distortion X-Axis Direction = choice(0,"Negative","Positive")
-#@gui : Logarithmic Distortion Y-Axis Direction = choice(0,"Negative","Positive")
-#@gui : Boundary Condition = choice(0,"Periodic","Mirror")
-#@gui : Interpolation = choice(2,"Nearest","Linear","Bicubic")
-#@gui : Base Reference Dimension = int(1024,10,4096)
-#@gui :  sep  = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui :  sep  = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/6/4</i>.</small>")
+#@gui : Preliminary X-Axis Scaling=float(1,.1,10)
+#@gui : Preliminary Y-Axis Scaling=float(1,.1,10)
+#@gui : Effect X-Axis Scaling=float(1,.1,10)
+#@gui : Effect Y-Axis Scaling=float(1,.1,10)
+#@gui : Distortion Surface Angle=float(0,0,360)
+#@gui : Placement=choice(0,"Inside-Out","Outside-In")
+#@gui : Logarithmic Distortion Axis Combination for X-Axis=choice(0,"Different Axis","Same Axis")
+#@gui : Logarithmic Distortion Axis combination for y-Axis=choice(0,"Different Axis","Same Axis")
+#@gui : Logarithmic Distortion X-Axis Direction=choice(0,"Negative","Positive")
+#@gui : Logarithmic Distortion Y-Axis Direction=choice(0,"Negative","Positive")
+#@gui : Boundary Condition=choice(0,"Periodic","Mirror")
+#@gui : Interpolation=choice(2,"Nearest","Linear","Bicubic")
+#@gui : Base Reference Dimension=int(1024,10,4096)
+#@gui : sep=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(),note=note("<small>Author: Reptorian.      Latest Update: <i>2019/6/4</i>.</small>")
 rep_logpindis_gui:
 rep_logpindis $1,{(($2/100)-.5)*2},{(($3/100)-.5)*-2},{(($4/100)-.5)*2},{(($5/100)-.5)*-2},${6-18}
 rep_logpindis_gui_preview:
 gui_split_preview "rep_logpindis_gui $*",${-3--1}
 #@gui Squareroot - Logarithmic Distortion: rep_sqrlogpindis_gui, rep_sqrlogpindis_gui_preview(0)
-#@gui : Distortion Factor = float(1,.1,1000)
+#@gui : Distortion Factor=float(1,.1,1000)
 #@gui : Preliminary Surface Shift = point(50,50,0,1,128,128,128,255)
 #@gui : Distortion Surface Position = point(50,50,0,1,255,255,255,255)
-#@gui : Preliminary X-Axis Scaling = float(1,.1,10)
-#@gui : Preliminary Y-Axis Scaling = float(1,.1,10)
-#@gui : Effect X-Axis Scaling = float(1,.1,10)
-#@gui : Effect Y-Axis Scaling = float(1,.1,10)
-#@gui : Distortion Surface Angle = float(0,0,360)
-#@gui : Placement = choice(0,"Inside-Out","Outside-In")
-#@gui : Logarithmic Distortion Axis Combination for X-Axis = choice(0,"Different Axis","Same Axis")
-#@gui : Logarithmic Distortion Axis combination for y-Axis = choice(0,"Different Axis","Same Axis")
-#@gui : Logarithmic Distortion X-Axis Direction = choice(0,"Negative","Positive")
-#@gui : Logarithmic Distortion Y-Axis Direction = choice(0,"Negative","Positive")
-#@gui : Boundary Condition = choice(0,"Periodic","Mirror")
-#@gui : Interpolation = choice(2,"Nearest","Linear","Bicubic")
-#@gui : Base Reference Dimension = int(1024,10,4096)
-#@gui :  sep  = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui :  sep  = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/6/4</i>.</small>")
+#@gui : Preliminary X-Axis Scaling=float(1,.1,10)
+#@gui : Preliminary Y-Axis Scaling=float(1,.1,10)
+#@gui : Effect X-Axis Scaling=float(1,.1,10)
+#@gui : Effect Y-Axis Scaling=float(1,.1,10)
+#@gui : Distortion Surface Angle=float(0,0,360)
+#@gui : Placement=choice(0,"Inside-Out","Outside-In")
+#@gui : Logarithmic Distortion Axis Combination for X-Axis=choice(0,"Different Axis","Same Axis")
+#@gui : Logarithmic Distortion Axis combination for y-Axis=choice(0,"Different Axis","Same Axis")
+#@gui : Logarithmic Distortion X-Axis Direction=choice(0,"Negative","Positive")
+#@gui : Logarithmic Distortion Y-Axis Direction=choice(0,"Negative","Positive")
+#@gui : Boundary Condition=choice(0,"Periodic","Mirror")
+#@gui : Interpolation=choice(2,"Nearest","Linear","Bicubic")
+#@gui : Base Reference Dimension=int(1024,10,4096)
+#@gui :  sep  = separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui :  sep  = separator(), note=note("<small>Author: Reptorian.      Latest Update: <i>2019/6/4</i>.</small>")
 rep_sqrlogpindis_gui:
 rep_sqrlogpindis $1,{(($2/100)-.5)*2},{(($3/100)-.5)*-2},{(($4/100)-.5)*2},{(($5/100)-.5)*-2},${6-18}
 rep_sqrlogpindis_gui_preview:
 gui_split_preview "rep_sqrlogpindis_gui $*",${-3--1}
 #@gui Stitch : rep_stitch_gui, rep_stitch_gui_preview(0)
-#@gui : note = note("This is a extended version of a existing filter within the Paint.NET software named <a href="https://forums.getpaint.net/topic/5936-stitch/">Stitch</a> which was made by pyrochild. The extension would be that it supports 1 angle, and it can support more than 2 angles. Anti-aliasing via interpolation and subpixel processing, along with boundary options are also supported.\n\n<i>Warning!Preview is only for giving a idea on the result!</i>"), sep = separator()
-#@gui : 1.Pixel Offset of Hypothenuse (%) = float(5,0,100)
-#@gui : 2.Thickness of Stitches = float(3,1,20)
-#@gui : 3.Stitches Repeat Pattern (0 means no repeat) = int(10,0,500)
-#@gui : 4.Interpolation = choice(4,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
-#@gui : 5.Boundary = choice(1,"None","Neumann","Repeat","Mirror")
-#@gui : 6.Subpixel Processing Level = float(1,0,5)
-#@gui : 7.Randomize Stitching? = bool(0), sep = separator()
-#@gui : note = note("<b>Angle Inputs</b>\n\nOnly numbers are accepted!")
-#@gui : 8.Angle Count = int(2, 1, 12)
-#@gui : 9.Angle#1 = float(45,-180,180)
-#@gui : 10.Angle#2 = float(-45,-180,180)
-#@gui : 11.Angle#3 = float(90,-180,180)
-#@gui : 12.Angle#4 = float(0,-180,180)
-#@gui : 13.Angle#5 = float(60,-180,180)
-#@gui : 14.Angle#6 = float(-60,-180,180)
-#@gui : 15.Angle#7 = float(15,-180,180)
-#@gui : 16.Angle#8 = float(-15,-180,180)
-#@gui : 17.Angle#9 = float(30,-180,180)
-#@gui : 18.Angle#10 = float(-30,-180,180)
-#@gui : 19.Angle#11 = float(5,-180,180)
-#@gui : 20.Angle#12 = float(-5,-180,180)
-#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui :  sep  = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/7/24</i>.</small>")
+#@gui : note=note("This is a extended version of a existing filter within the Paint.NET software named <a href="https://forums.getpaint.net/topic/5936-stitch/">Stitch</a> which was made by pyrochild. The extension would be that it supports 1 angle, and it can support more than 2 angles. Anti-aliasing via interpolation and subpixel processing, along with boundary options are also supported.\n\n<i>Warning!Preview is only for giving a idea on the result!</i>"), sep = separator()
+#@gui : Pixel Offset of Hypothenuse (%)=float(5,0,100)
+#@gui : Thickness of Stitches=float(3,1,20)
+#@gui : Stitches Repeat Pattern (0 means no repeat)=int(10,0,500)
+#@gui : Interpolation=choice(4,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
+#@gui : Boundary=choice(1,"None","Neumann","Repeat","Mirror")
+#@gui : Subpixel Processing Level=float(1,0,5)
+#@gui : Randomize Stitching?=bool(0), sep = separator()
+#@gui : note=note("<b>Angle Inputs</b>\n\nOnly numbers are accepted!")
+#@gui : Angle Count=int(2, 1, 12)
+#@gui : Angle#1=float(45,-180,180)
+#@gui : Angle#2=float(-45,-180,180)
+#@gui : Angle#3=float(90,-180,180)
+#@gui : Angle#4=float(0,-180,180)
+#@gui : Angle#5=float(60,-180,180)
+#@gui : Angle#6=float(-60,-180,180)
+#@gui : Angle#7=float(15,-180,180)
+#@gui : Angle#8=float(-15,-180,180)
+#@gui : Angle#9=float(30,-180,180)
+#@gui : Angle#10=float(-30,-180,180)
+#@gui : Angle#11=float(5,-180,180)
+#@gui : Angle#12=float(-5,-180,180)
+#@gui : sep=separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split=point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(), note=note("<small>Author: Reptorian. Latest Update: <i>2019/7/24</i>.</small>")
 rep_stitch_gui:
 hypo={sqrt(w^2+h^2)*($1/100)}
 if $8==1 rep_stitch $hypo,${2-7},$9
@@ -3833,36 +3933,36 @@ u "{$1}"\
 "{$20}_"{$8>=12?2:0}\
 "{$21}"\
 "{$22}"
-#@gui Kaleidoscope [Polar] : gui_rep_polkal,gui_rep_polkal
-#@gui : Angle Cut = float(2,.01,100)
-#@gui : Radius Cut = float(1,.01,100)
-#@gui : Surface Angle = float(0,-180,180)
-#@gui : Center (%) = point(50,50)
-#@gui : Flip Angle Direction? = bool(0)
-#@gui : Flip Radial Direction? = bool(0)
-#@gui : Angle Edge Behaviour = choice(1,"Repeat","Alternating")
-#@gui : Radial Edge Behaviour = choice(2,"None","Repeat","Alternating")
-#@gui : Fit Radial End to Min/Max Dimension = choice(0,"Minimum Dimension","Maximum Dimension")
-#@gui : Conical Start at 0? = bool(1)
-#@gui : note = note("<small>Conical start is only used for matching other software filter behavior with conical gradients</small>")
-#@gui : sep = separator()
-#@gui : Sublevel = float(.5,0,3)
-#@gui : Interpolation = choice(2,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
-#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/9/7</i>.</small>")
+#@gui Kaleidoscope [Polar]: gui_rep_polkal,gui_rep_polkal
+#@gui : Angle Cut=float(2,.01,100)
+#@gui : Radius Cut=float(1,.01,100)
+#@gui : Surface Angle=float(0,-180,180)
+#@gui : Center (%)=point(50,50)
+#@gui : Flip Angle Direction?=bool(0)
+#@gui : Flip Radial Direction?=bool(0)
+#@gui : Angle Edge Behaviour=choice(1,"Repeat","Alternating")
+#@gui : Radial Edge Behaviour=choice(2,"None","Repeat","Alternating")
+#@gui : Fit Radial End to Min/Max Dimension=choice(0,"Minimum Dimension","Maximum Dimension")
+#@gui : Conical Start at 0?=bool(1)
+#@gui : note=note("<small>Conical start is only used for matching other software filter behavior with conical gradients</small>")
+#@gui : sep=separator()
+#@gui : Sublevel=float(.5,0,3)
+#@gui : Interpolation=choice(2,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
+#@gui : sep=separator(), note=note("<small>Author: Reptorian.      Latest Update: <i>2019/9/7</i>.</small>")
 gui_rep_polkal: rep_polkal ${1-3},{($4-50)*2}%,{($5-50)*-2}%,${6--1}
 #@gui Object Size Filtering: gui_rep_objvf,gui_rep_objvf_preview(0)
-#@gui : note = note("The purpose of this filter is to filter objects based on their volume. It is based on the principle of the <a href="https://forums.getpaint.net/topic/113962-object-pruner/">Object Pruner plugin</a> for Paint.NET made by <b>MJW</b>."), sep = separator()
-#@gui : Mode of Object Filtering = choice(0,"Alpha-Based","Colour - 3 Channels","Colour - 4 Channels")
-#@gui : sep = separator(), note = note("<b>Object Filtering Options</b>")
-#@gui : Volume 1 (%) = float(0,0,100)
-#@gui : Volume 2 (%) = float(100,0,100)
-#@gui : Boundary Elimination = choice(0,"Eliminate Inclusive","Eliminate Exclusive")
-#@gui : Colour = color(0,0,0)
-#@gui : Colour = color(0,0,0,0)
-#@gui : sep = separator(), note = note("<b>Preview Settings</b>")
-#@gui : Reveal Erased Objects? = bool(1)
-#@gui : Colour of Erased Object = color(0,0,0)
-#@gui : sep  = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/9/8</i>.</small>")
+#@gui : note=note("The purpose of this filter is to filter objects based on their volume. It is based on the principle of the <a href="https://forums.getpaint.net/topic/113962-object-pruner/">Object Pruner plugin</a> for Paint.NET made by <b>MJW</b>."), sep = separator()
+#@gui : Mode of Object Filtering=choice(0,"Alpha-Based","Colour - 3 Channels","Colour - 4 Channels")
+#@gui : sep=separator(), note=note("<b>Object Filtering Options</b>")
+#@gui : Volume 1 (%)=float(0,0,100)
+#@gui : Volume 2 (%)=float(100,0,100)
+#@gui : Boundary Elimination=choice(0,"Eliminate Inclusive","Eliminate Exclusive")
+#@gui : Colour=color(0,0,0)
+#@gui : Colour=color(0,0,0,0)
+#@gui : sep=separator(), note=note("<b>Preview Settings</b>")
+#@gui : Reveal Erased Objects?=bool(1)
+#@gui : Colour of Erased Object=color(0,0,0)
+#@gui : sep=separator(),note=note("<small>Author: Reptorian. Latest Update: <i>2019/9/8</i>.</small>")
 gui_rep_objvf:
 if $1==0 rep_objvf {$2/100},{$3/100},$4
 elif $1==1 rep_objvf {$2/100},{$3/100},$4,${5-7}
@@ -3890,38 +3990,38 @@ u "{$1}"\
 "{$12}"\
 "{$13,$14,$15}_"{$12?2:0}
 #@gui Tiled Form : gui_rep_form_pixel, gui_rep_form_pixel_preview(0)
-#@gui : note  = note("Original idea comes from <a href="https://forums.getpaint.net/topic/26758-trs-tiled-pixels-v12/">TR's Tiled Pixels V1.2</a> plugin by <b>TechnoRobbo</b> for Paint.NET. This version is a extended version utilizing average sampling per area per tile. Dynamic shapes are also supported by this filter.\n\nDynamic Shapes - Fern, Gear, Polygon, Snowflake, Star\n\nShape that are dynamic are labeled with -[D] next to their name.\n\n<small>Note - You may want to sharp your picture due to the average sampling per area per tile algorithm applied by this filter. The reason being is that the contour of the shape would be more discernible after filter is processed.</small>"), sep = separator()
-#@gui : note  = note("<b>Color Space Processing</b>")
-#@gui : Colour Space   = choice(0,"RGB","RYB","CMYK","HCY","HSI","HSL","HSV","LAB","LCH")
-#@gui : sep  = separator(), note = note("<b>Shape Option</b>")
-#@gui : Tiled Shape  = choice(1,"By Layer","Australia","Barbedwire","Circle","Crosshair","Cupid","Diamond","Dragonfly","Fern-[D]","Flip","Gear-[D]","Gumleaf","Heart","Information","Kookaburra","Mail","Mapleleaf","Paint Splat","Paw","Phone","Polygon-[D]","Rooster","Shopping Cart","Snowflake-[D]","Star-[D]")
-#@gui : Reverse Layer  = bool(0)
-#@gui : note  = note("<small>For the first option, you must use at least 2 layer to use layer as shape reference, else it'll use the only image itself as shape reference. Reverse Layer option might have to be used to generate the proper result when using first option.</small>")
-#@gui : sep  = separator(), note = note("<b>Tile Options</b>")
-#@gui : Shape Width (px)  = int(30,4,100)
-#@gui : Shape Height (px)  = int(30,4,100)
-#@gui : Shape Ratio (%)  = float(100,5,100)
-#@gui : Shape Rotation  = float(0,-180,180)
-#@gui : Shape Mirror Axis  = choice(0,"None","X","Y")
-#@gui : Subpixel Level  = float(.5,0,2)
-#@gui : Interpolation  = choice(5,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
-#@gui : sep  = separator(), note = note("<b>Dynamic Options</b>")
-#@gui : Fern Type  = choice("Asplenium Adiantum-Nigrum","Thelypteridaceae")
-#@gui : Fern Density (%)  = float(100,0,300)
-#@gui : Gear Teeth Count  = int(8,3,32)
-#@gui : Gear Height (%)  = float(25,0.1,100)
-#@gui : Gear Offset Teeth (%)  = float(0,0,100)
-#@gui : Gear Inner Ratio (%)  = float(50,0.1,100)
-#@gui : Polygon Vertices  = int(5,3,100)
-#@gui : Snowflake Recursion  = int(5,1,6)
-#@gui : Star Branches  = int(3,5,100)
-#@gui : Star Thickness (%)  = float(38,.1,100)
-#@gui : note  = note("<small>Options are only visible for dynamic shapes!</small>")
-#@gui : sep = separator() note = note("<b>Preservation of Image Size</b>")
-#@gui : Preserve Image Size = bool(0)
-#@gui : note = note("<small>It is recommended to use this for blending mode and/or if you're using Paint.NET")
-#@gui :  sep   = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui :  sep   = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/5/18</i>.</small>")
+#@gui : note=note("Original idea comes from <a href="https://forums.getpaint.net/topic/26758-trs-tiled-pixels-v12/">TR's Tiled Pixels V1.2</a> plugin by <b>TechnoRobbo</b> for Paint.NET. This version is a extended version utilizing average sampling per area per tile. Dynamic shapes are also supported by this filter.\n\nDynamic Shapes - Fern, Gear, Polygon, Snowflake, Star\n\nShape that are dynamic are labeled with -[D] next to their name.\n\n<small>Note - You may want to sharp your picture due to the average sampling per area per tile algorithm applied by this filter. The reason being is that the contour of the shape would be more discernible after filter is processed.</small>"), sep = separator()
+#@gui : note=note("<b>Color Space Processing</b>")
+#@gui : Colour Space=choice(0,"RGB","RYB","CMYK","HCY","HSI","HSL","HSV","LAB","LCH")
+#@gui : sep=separator(), note=note("<b>Shape Option</b>")
+#@gui : Tiled Shape=choice(1,"By Layer","Australia","Barbedwire","Circle","Crosshair","Cupid","Diamond","Dragonfly","Fern-[D]","Flip","Gear-[D]","Gumleaf","Heart","Information","Kookaburra","Mail","Mapleleaf","Paint Splat","Paw","Phone","Polygon-[D]","Rooster","Shopping Cart","Snowflake-[D]","Star-[D]")
+#@gui : Reverse Layer =bool(0)
+#@gui : note=note("<small>For the first option, you must use at least 2 layer to use layer as shape reference, else it'll use the only image itself as shape reference. Reverse Layer option might have to be used to generate the proper result when using first option.</small>")
+#@gui : sep=separator(), note=note("<b>Tile Options</b>")
+#@gui : Shape Width (px)=int(30,4,100)
+#@gui : Shape Height (px)=int(30,4,100)
+#@gui : Shape Ratio (%)=float(100,5,100)
+#@gui : Shape Rotation=float(0,-180,180)
+#@gui : Shape Mirror Axis=choice(0,"None","X","Y")
+#@gui : Subpixel Level=float(.5,0,2)
+#@gui : Interpolation=choice(5,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
+#@gui : sep=separator(), note=note("<b>Dynamic Options</b>")
+#@gui : Fern Type=choice("Asplenium Adiantum-Nigrum","Thelypteridaceae")
+#@gui : Fern Density (%)=float(100,0,300)
+#@gui : Gear Teeth Count=int(8,3,32)
+#@gui : Gear Height (%)=float(25,0.1,100)
+#@gui : Gear Offset Teeth (%)=float(0,0,100)
+#@gui : Gear Inner Ratio (%)=float(50,0.1,100)
+#@gui : Polygon Vertices=int(5,3,100)
+#@gui : Snowflake Recursion=int(5,1,6)
+#@gui : Star Branches=int(3,5,100)
+#@gui : Star Thickness (%)=float(38,.1,100)
+#@gui : note=note("<small>Options are only visible for dynamic shapes!</small>")
+#@gui : sep=separator() note=note("<b>Preservation of Image Size</b>")
+#@gui : Preserve Image Size=bool(0)
+#@gui : note=note("<small>It is recommended to use this for blending mode and/or if you're using Paint.NET")
+#@gui : sep=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(),note=note("<small>Author: Reptorian. Latest Update: <i>2019/5/18</i>.</small>")
 gui_rep_form_pixel:
 if $3&&!$2 rv fi
 if $1!=2&&$1!=0
@@ -3999,20 +4099,20 @@ u "{$1}"\
 "{$22}"\
 "{$23}"
 #@gui Color Existence Distribution [RGB-8]: rep_color_existence_distribution_rgb8,rep_color_existence_distribution_rgb8
-#@gui : note = note("This filter is used to find colors that does or does not exist within a image.\n\n For <b>Paint.NET users</b>, please refer to this tutorial named <a href="https://forums.getpaint.net/topic/115124-finding-millions-of-colors-that-does-or-does-not-exist-gmic-qt-tutorial/?tab=comments#comment-562927">Finding millions of colors that does or does not exist - G'MIC QT Tutorial</a>")
-#@gui : sep = separator()
-#@gui : Set of Color(s) = choice(1,"Nonexistent Colors","Existing Colors")
-#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/9/20</i>.</small>")
+#@gui : note=note("This filter is used to find colors that does or does not exist within a image.\n\n For <b>Paint.NET users</b>, please refer to this tutorial named <a href="https://forums.getpaint.net/topic/115124-finding-millions-of-colors-that-does-or-does-not-exist-gmic-qt-tutorial/?tab=comments#comment-562927">Finding millions of colors that does or does not exist - G'MIC QT Tutorial</a>")
+#@gui : sep separator()
+#@gui : Set of Color(s)=choice(1,"Nonexistent Colors","Existing Colors")
+#@gui : sep=separator(),note=note("<small>Author: Reptorian.      Latest Update: <i>2019/9/20</i>.</small>")
 #@gui Gradient Mapping Reverse Engineering : gui_rep_regm, gui_rep_regm_preview(0)
 #@gui : note=note("<b>Instruction:</b>\n\nFor <b>GIMP</b> and <b>Krita</b> Users: If you're using <u>Per Two layers</u>, you need to paste grayscale image for every first layer per 2 layer. <u>You must have a even amount of layers</u> when using <u>Per Two Layers</u> option.\n\nFor <b>Paint.NET Users</b>: It is recommended that you set do not use <u>Per Two Layers</u> for ease of usage with this filter, otherwise you would have to use Active and Below.\n\n<i>Warning!</i> Result will <u>not resize</u> in Paint.NET, so apply this filter into a image where both dimensions are bigger than 256!\n\nIn the case of using Active and Below: The Reverse Layer option is used to determine the result given by the preview, pick the one which leads into the reverse-engineered gradient."), sep=separator()
-#@gui : note = note("<b>Processing Setting</b>")
+#@gui : note=note("<b>Processing Setting</b>")
 #@gui : Background Color = color(0,0,0)
-#@gui : Layer Processing Mode = choice(0,"Per Two layers","Autocrop components","Split Width into 2","Split Height into 2")
-#@gui : Gradient Thickness = int(10,1,100)
-#@gui : Reverse Layers? = bool(0)
-#@gui : sep = separator(), note = note("<b>Preview Setting</b>")
-#@gui : Preview all gradient at once? = bool(1)
-#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/9/20</i>.</small>")
+#@gui : Layer Processing Mode=choice(0,"Per Two layers","Autocrop components","Split Width into 2","Split Height into 2")
+#@gui : Gradient Thickness=int(10,1,100)
+#@gui : Reverse Layers?=bool(0)
+#@gui : sep=separator(), note=note("<b>Preview Setting</b>")
+#@gui : Preview all gradient at once?=bool(1)
+#@gui : sep=separator(),note=note("<small>Author: Reptorian. Latest Update: <i>2019/9/20</i>.</small>")
 gui_rep_regm:
 to_a
 ww={w}
@@ -4085,50 +4185,50 @@ else
     gui_rep_regm ${1--2}
 fi
 #@gui Autofill Coloring Book : gui_rep_acb,gui_rep_acb_preview(0)
-#@gui : note = note("This filter is specifically designed to autofill areas with random colors that only appear once.\n\n<b>Don't trust the preview for colors, test the result first!</b>")
+#@gui : note=note("This filter is specifically designed to autofill areas with random colors that only appear once.\n\n<b>Don't trust the preview for colors, test the result first!</b>")
 #@gui : sep = separator()
-#@gui : Line Threshold = int(180,1,254)
-#@gui : Dilate/Erode = int(0,-3,3)
-#@gui : Line Mode = choice(1,"Hard","Soft")
-#@gui : Alpha Threshold = int(0,0,254)
-#@gui : Coloring Seed = int(250000,0,500000)
-#@gui :   sep   = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui :   sep   = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/6/4</i>.</small>")
+#@gui : Line Threshold=int(180,1,254)
+#@gui : Dilate/Erode=int(0,-3,3)
+#@gui : Line Mode=choice(1,"Hard","Soft")
+#@gui : Alpha Threshold=int(0,0,254)
+#@gui : Coloring Seed=int(250000,0,500000)
+#@gui : sep=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(),note=note("<small>Author: Reptorian. Latest Update: <i>2019/6/4</i>.</small>")
 gui_rep_acb: rep_acb {$1/255},$2,$3,{$4/255},$5
 gui_rep_acb_preview:
 gui_split_preview "gui_rep_acb $*",${-3--1}
 #@gui Thorn Fractal - Secant Sea: gui_rep_tfrac,gui_rep_tfrac_preview
-#@gui : note = note("Thorn Fractal is the fractal attributed to Andrew Wayne Graff, alternatively named the "Secant Sea".\nThe code was adapted from <a href="http://paulbourke.net/fractals/thorn/thorn_code.c">Sample C source code</a> provided by Adam Majewski.\n\nDocumentation - <a href="http://paulbourke.net/fractals/thorn/#dane">Thorn Fractal</a> by <a href="http://paulbourke.net/fractals/">Paul Bourke</a>\n\nAlternating Chaos formula are made by <a href="https://forums.getpaint.net/profile/45895-madjik/">MadJik</a>, and they are originally used in <a href="https://forums.getpaint.net/topic/111491-fractal-attractor-ymd170628/">Fractal Attractor</a> plugin for Paint.NET software."), sep=separator()
-#@gui : note = note("<b>Style Setting</b>")
-#@gui : Predefined Formula = choice(0,"Normal","Normal Inverted","Tanh Stroke 1","Tanh Stroke 2","Asymphological Vibrato","Asymphological Basic","Asymphological Basic 2","Asymphochaos","Petallian","Semi-Thorny Petallian","Thorny Petal 1,"Thorny Petal 2","Inflation","Inflation 2","Earthing","Acrylic Earthing","Unearthing Origami","Cubic Unearthing","Webbing Cubic Unearthing","Chaotic Hooks","Echo Wide","Echo Squircle","Echo Hall","Echo Hall 2","Liquid Parabolic","Chaos-Vibrato","Chaos Deep-Vibrato","Chaos Spacetime","Parabolic","Parabolic Chaos","Cubic-Diamond Chaos","C-Line","Contour Chaos","Spiderweb-Diamond","Acrylica","Refractive Space","Smooth-Artistry","Ferrofluid","Triangular Interweaving","Fabric Chaos","Reverse Tangent Division","Chaotic Tangent","Alternating Chaos 1","Alternating Chaos 2","Alternating Chaos 3","Alternating Chaos 4")
-#@gui : Utilize Custom Formula Instead? = bool(0),sep = separator()
-#@gui : note = note("<b>Fractal Calculation Constraints</b>")
-#@gui : note = note("<small>Information at bottom of filter. Some predefined formulas requires you to use low values. You may need to type in values from 5-1024 manually.</small>")
-#@gui : Escape Value = int(10000,5,1000000)
-#@gui : Loop Limitation = int(255,1,1024)
-#@gui : Subsampling Level = float(3,1,10)
-#@gui : sep = separator(), note = note("<b>Distortion Factors</b>")
-#@gui : Distortion X = float(0,-50,50)
-#@gui : Distortion Y = float(0,-50,50)
-#@gui : sep = separator(), note = note("<b>Transformations</b>"), note = note("- Scaling -")
-#@gui : Scaling XY-Axis = float(1,.1,15)
-#@gui : Scaling X-Axis = float(1,.1,15)
-#@gui : Scaling Y-Axis = float(1,.1,15)
-#@gui : PI-Based Scaling = bool(1), sep = separator(), note = note("- Displacement -")
-#@gui : Offset X-Transformation = float(0,-5,5)
-#@gui : Offset Y-Transformation = float(0,-5,5)
-#@gui : sep = separator(), note = note("- Rotation -")
-#@gui : Function Angle = float(0,-180,180)
-#@gui : sep = separator(), note = note("<b>Custom Formula</b>)
-#@gui : note = note("<small>See bottom of this filter to see instruction of usage</small>")
-#@gui : Distortion X Formula-[VX] = text{atan2(a^2,b^2)/cos(b)}
-#@gui : Distortion Y Formula-[VY] = text{b/sin(a)}
-#@gui : sep = separator(), note = note("<b>Colour Setting</b>)
-#@gui : Fractal Mapping = choice(0,"Grayscale","Hue","Random Color Map")
-#@gui : Colours = int(3,3,8)
-#@gui : Colour Generation Seed = int(0,0,5000)
-#@gui : sep = separator(), note = note("<b>Information of Thorn Fractal - Secant Sea filter</b>"), sep = separator(), note = note("<i>Fractal Calculation Constraints</i>\n\n<b>Escape Value</b> defines the minimum value to escape from the loop used to determine the amount of iteration needed to be bigger than the specified value per pixels. The lower the value, the more contrast at a sacrifise of details.\n\n<b>Iterations</b> defines the maximum possible amount of loop per pixels when escape value is not reached. The lower the value, the more contrast and the more posterization of values.\n\n<b>Subsampling Level</b> is used to alter the dimensions before calculation of fractal, and it is resized to the original dimension after the fractal has been generated. The bigger the value, the more computationally intensive it is. In fact, this has the most consistent impact on performance."), sep = separator(),note = note("<i>Custom Formula</i>\n\nTo use this, type in a formula utilizing the syntax given by the G'MIC reference manual. Use notes given the information provided below.\n\nMultiple expressions are supported, and they are separated by \";\" character. If it the only expression, then it would be used for calculation of vx or vy. Otherwise, the first expression may be the only one used for calculation of vx or vy.\n\n<i>Available adjustible variable - </i> vx,vy,a,b\n\n<b>vx</b> - Distortion formula for x-axis.\n\n<b>vy</b> - Distortion formula for y-axis.\n\n<b>a</b> - Value of <b>a</b> is given by vx equation based on the number of repeats needed to escape from the iterative loop to check when resulting value is greater than escape number.\n\n<b>b</b> - Value of <b>b</b> is given by vx equation based on the number of repeats needed to escape from the iterative loop to check when resulting value is greater than escape number.")
-#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/10/6</i>.</small>")
+#@gui : note=note("Thorn Fractal is the fractal attributed to Andrew Wayne Graff, alternatively named the "Secant Sea".\nThe code was adapted from <a href="http://paulbourke.net/fractals/thorn/thorn_code.c">Sample C source code</a> provided by Adam Majewski.\n\nDocumentation - <a href="http://paulbourke.net/fractals/thorn/#dane">Thorn Fractal</a> by <a href="http://paulbourke.net/fractals/">Paul Bourke</a>\n\nAlternating Chaos formula are made by <a href="https://forums.getpaint.net/profile/45895-madjik/">MadJik</a>, and they are originally used in <a href="https://forums.getpaint.net/topic/111491-fractal-attractor-ymd170628/">Fractal Attractor</a> plugin for Paint.NET software."), sep=separator()
+#@gui : note=note("<b>Style Setting</b>")
+#@gui : Predefined Formula=choice(0,"Normal","Normal Inverted","Tanh Stroke 1","Tanh Stroke 2","Asymphological Vibrato","Asymphological Basic","Asymphological Basic 2","Asymphochaos","Petallian","Semi-Thorny Petallian","Thorny Petal 1,"Thorny Petal 2","Inflation","Inflation 2","Earthing","Acrylic Earthing","Unearthing Origami","Cubic Unearthing","Webbing Cubic Unearthing","Chaotic Hooks","Echo Wide","Echo Squircle","Echo Hall","Echo Hall 2","Liquid Parabolic","Chaos-Vibrato","Chaos Deep-Vibrato","Chaos Spacetime","Parabolic","Parabolic Chaos","Cubic-Diamond Chaos","C-Line","Contour Chaos","Spiderweb-Diamond","Acrylica","Refractive Space","Smooth-Artistry","Ferrofluid","Triangular Interweaving","Fabric Chaos","Reverse Tangent Division","Chaotic Tangent","Alternating Chaos 1","Alternating Chaos 2","Alternating Chaos 3","Alternating Chaos 4")
+#@gui : Utilize Custom Formula Instead?=bool(0),sep = separator()
+#@gui : note=note("<b>Fractal Calculation Constraints</b>")
+#@gui : note=note("<small>Information at bottom of filter. Some predefined formulas requires you to use low values. You may need to type in values from 5-1024 manually.</small>")
+#@gui : Escape Value=int(10000,5,1000000)
+#@gui : Loop Limitation=int(255,1,1024)
+#@gui : Subsampling Level=float(3,1,10)
+#@gui : sep = separator(), note=note("<b>Distortion Factors</b>")
+#@gui : Distortion X=float(0,-50,50)
+#@gui : Distortion Y=float(0,-50,50)
+#@gui : sep = separator(), note=note("<b>Transformations</b>"), note=note("- Scaling -")
+#@gui : Scaling XY-Axis=float(1,.1,15)
+#@gui : Scaling X-Axis=float(1,.1,15)
+#@gui : Scaling Y-Axis=float(1,.1,15)
+#@gui : PI-Based Scaling=bool(1), sep=separator(), note=note("- Displacement -")
+#@gui : Offset X-Transformation=float(0,-5,5)
+#@gui : Offset Y-Transformation=float(0,-5,5)
+#@gui : sep = separator(), note=note("- Rotation -")
+#@gui : Function Angle=float(0,-180,180)
+#@gui : sep = separator(), note=note("<b>Custom Formula</b>)
+#@gui : note=note("<small>See bottom of this filter to see instruction of usage</small>")
+#@gui : Distortion X Formula-[VX]=text{atan2(a^2,b^2)/cos(b)}
+#@gui : Distortion Y Formula-[VY]= text{b/sin(a)}
+#@gui : sep=separator(), note=note("<b>Colour Setting</b>)
+#@gui : Fractal Mapping=choice(0,"Grayscale","Hue","Random Color Map")
+#@gui : Colours=int(3,3,8)
+#@gui : Colour Generation Seed=int(0,0,5000)
+#@gui : sep=separator(), note=note("<b>Information of Thorn Fractal - Secant Sea filter</b>"),sep=separator(), note=note("<i>Fractal Calculation Constraints</i>\n\n<b>Escape Value</b> defines the minimum value to escape from the loop used to determine the amount of iteration needed to be bigger than the specified value per pixels. The lower the value, the more contrast at a sacrifise of details.\n\n<b>Iterations</b> defines the maximum possible amount of loop per pixels when escape value is not reached. The lower the value, the more contrast and the more posterization of values.\n\n<b>Subsampling Level</b> is used to alter the dimensions before calculation of fractal, and it is resized to the original dimension after the fractal has been generated. The bigger the value, the more computationally intensive it is. In fact, this has the most consistent impact on performance."), sep = separator(),note=note("<i>Custom Formula</i>\n\nTo use this, type in a formula utilizing the syntax given by the G'MIC reference manual. Use notes given the information provided below.\n\nMultiple expressions are supported, and they are separated by \";\" character. If it the only expression, then it would be used for calculation of vx or vy. Otherwise, the first expression may be the only one used for calculation of vx or vy.\n\n<i>Available adjustible variable - </i> vx,vy,a,b\n\n<b>vx</b> - Distortion formula for x-axis.\n\n<b>vy</b> - Distortion formula for y-axis.\n\n<b>a</b> - Value of <b>a</b> is given by vx equation based on the number of repeats needed to escape from the iterative loop to check when resulting value is greater than escape number.\n\n<b>b</b> - Value of <b>b</b> is given by vx equation based on the number of repeats needed to escape from the iterative loop to check when resulting value is greater than escape number.")
+#@gui : sep=separator(), note=note("<small>Author: Reptorian. Latest Update: <i>2019/10/6</i>.</small>")
 gui_rep_tfrac:
 srand $19
 if !$2 rep_thorn_fractal $1,${3-14} else rep_thorn_fractal -1,${3-14},1,"$15","$16" fi
@@ -4158,33 +4258,33 @@ u "{$1}_"{!$2?2:1}\
 "{$18}_"{$17==2?2:0}\
 "{$19}_"{$17==2?2:0}
 #@gui Z-Time : rep_z_render
-#@gui : note = note("Z-Time Rendering is a filter that utilize the value of a layer to represent the frame where frames are interpolated and normalized to the value of that layer. In other word, the reference layer can be seen as a representative of time.<b>Note:</b>Try to use a gradient for top or bottom layer depending on option you use.\n\n<b>Z-Depth Values</b> is recommended to be altered when using float image as reference. Use values less than 255 in order to posterize.\n\n<b>This filter do not work with Paint.NET as you need 3 images!</b>"), sep = separator()
-#@gui : Layer to use as time reference? = choice(0,"Top Layer","Bottom Layer")
-#@gui : Z-Depth Values = int(255,3,1024)
-#@gui : Mirror Frame Ordering? = bool(0)
-#@gui : Separate time by channels? = bool(0)
-#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/10/13</i>.</small>")
+#@gui : note=note("Z-Time Rendering is a filter that utilize the value of a layer to represent the frame where frames are interpolated and normalized to the value of that layer. In other word, the reference layer can be seen as a representative of time.<b>Note:</b>Try to use a gradient for top or bottom layer depending on option you use.\n\n<b>Z-Depth Values</b> is recommended to be altered when using float image as reference. Use values less than 255 in order to posterize.\n\n<b>This filter do not work with Paint.NET as you need 3 images!</b>"), sep = separator()
+#@gui : Layer to use as time reference?=choice(0,"Top Layer","Bottom Layer")
+#@gui : Z-Depth Values=int(255,3,1024)
+#@gui : Mirror Frame Ordering?=bool(0)
+#@gui : Separate time by channels?=bool(0)
+#@gui : sep=separator(), note=note("<small>Author: Reptorian.      Latest Update: <i>2019/10/13</i>.</small>")
 #@gui Bricks: gui_rep_shape_brick
-#@gui : note = note("This filter on the <a href="https://forums.getpaint.net/topic/8251-bricks-updated-with-examples/">Bricks plugin for Paint.NET</a> made by <a href="https://forums.getpaint.net/profile/49909-jchunn/">Jesse Chunn</a> as part of his <a href="https://forums.getpaint.net/index.php?/topic/8408-jesse-chunn-plugin-pack-march-8-2008/">plugin pack</a>.\n\n This is a extended version of the bricks filter with bevel options, and blending mode option.")
-#@gui : sep = separator(), note = note("<b>Brick Main Setting</b>")
-#@gui : Brick Width (px) = int(150,4,2048)
-#@gui : Brick Height (px) = int(150,4,2048)
-#@gui : Mortar Width (px) = int(5,0,512)
-#@gui : Mortar Height (px) = int(5,0,512)
-#@gui : Outline (px) = int(0,0,50)
-#@gui : sep = separator(), note = note("<b>Offset Setting</b>)
-#@gui : Brick Offset (%) = float(0,-100,100)
-#@gui : Offset Direction = choice(0,"Horizontal","Vertical")
-#@gui : Reverse Offset = bool(0)
-#@gui : sep = separator(), note = note("<b>Bevel Setting</b>)
-#@gui : Bevel Radius (px) = int(0,0,50)
-#@gui : Bevel Style = choice(0,"Round","Inverse Round","Chamfer")
-#@gui : sep = separator(), note = note("<b>Colouring and Blending Options</b>")
-#@gui : Brick Colour = color(170,0,0,255)
-#@gui : Brick Outline = color(85,0,0,255)
-#@gui : Mortar Colour = color(121,77,2,255)
-#@gui : Use Blending Mode? = bool(0)
-#@gui : Blending Mode = choice(41,"add","alpha","and","average","blue","burn","darken",
+#@gui : note=note("This filter on the <a href="https://forums.getpaint.net/topic/8251-bricks-updated-with-examples/">Bricks plugin for Paint.NET</a> made by <a href="https://forums.getpaint.net/profile/49909-jchunn/">Jesse Chunn</a> as part of his <a href="https://forums.getpaint.net/index.php?/topic/8408-jesse-chunn-plugin-pack-march-8-2008/">plugin pack</a>.\n\n This is a extended version of the bricks filter with bevel options, and blending mode option.")
+#@gui : sep=separator(), note=note("<b>Brick Main Setting</b>")
+#@gui : Brick Width (px)=int(150,4,2048)
+#@gui : Brick Height (px)=int(150,4,2048)
+#@gui : Mortar Width (px)=int(5,0,512)
+#@gui : Mortar Height (px)=int(5,0,512)
+#@gui : Outline (px)=int(0,0,50)
+#@gui : sep=separator(),note=note("<b>Offset Setting</b>)
+#@gui : Brick Offset (%)=float(0,-100,100)
+#@gui : Offset Direction=choice(0,"Horizontal","Vertical")
+#@gui : Reverse Offset=bool(0)
+#@gui : sep=separator(), note=note("<b>Bevel Setting</b>)
+#@gui : Bevel Radius (px)=int(0,0,50)
+#@gui : Bevel Style=choice(0,"Round","Inverse Round","Chamfer")
+#@gui : sep=separator(), note=note("<b>Colouring and Blending Options</b>")
+#@gui : Brick Colour=color(170,0,0,255)
+#@gui : Brick Outline=color(85,0,0,255)
+#@gui : Mortar Colour=color(121,77,2,255)
+#@gui : Use Blending Mode?=bool(0)
+#@gui : Blending Mode=choice(41,"add","alpha","and","average","blue","burn","darken",
 #@gui : "difference","divide","dodge","exclusion","freeze",
 #@gui : "grainextract","grainmerge","green","hardlight","hardmix",
 #@gui : "hue","interpolation","lighten","lightness","linearburn",
@@ -4192,10 +4292,10 @@ u "{$1}_"{!$2?2:1}\
 #@gui : "overlay","pinlight","red","reflect","saturation","screen",
 #@gui : "shapeaverage","softburn","softdodge","softlight","stamp",
 #@gui : "subtract","value","vividlight","xor")
-#@gui : Opacity (%) = float(100,0,100)
-#@gui : sep = separator(), note = note("<b>Antialias</b>)
-#@gui : Antialias Level = float(0,0,3)
-#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/10/15</i>.</small>")
+#@gui : Opacity (%)=float(100,0,100)
+#@gui : sep=separator(), note=note("<b>Antialias</b>)
+#@gui : Antialias Level=float(0,0,3)
+#@gui : sep=separator(),note=note("<small>Author: Reptorian.      Latest Update: <i>2019/10/15</i>.</small>")
 gui_rep_shape_brick:
 -m "MergeChoice : $""=_mode" -MergeChoice "add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor","edges","error"
 repeat $! l[$>]
@@ -4212,30 +4312,30 @@ if $23 blend ${_mode{$24+1}},{$25%}
 else k. fi
 endl done
 #@gui TR's Intense Filtration: gui_rep_trif,gui_rep_trif_preview(0)
-#@gui : Hue = float(0,0,360)
-#@gui : Image Coefficient (%) = float(100,0,200)
-#@gui : Mix Factor (%) = float(50,0,100)
-#@gui : Style Base = choice(0,"Based from Original Image","Based on Grayscale","Based on Hue")
-#@gui : sep = separator(), note = note("<b>Preview Setting</b>"), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui : sep = separator(), note = note("<b>TR's Intense Filtration</b> is a filter that filters out colors and augment a color based on hue. The formula for the filter is created by <b>TechnoRobbo</b>. The code for this filter is based on the <a href="https://forums.getpaint.net/topic/30148-trs-intense-filtration-v-13-oct-092014/">source code</a> of <b>TechnoRobbo's Intense Filtration v1.3</b> plugin for <b>Paint.NET.</b>")
-#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/11/1</i>.</small>")
+#@gui : Hue=float(0,0,360)
+#@gui : Image Coefficient (%)=float(100,0,200)
+#@gui : Mix Factor (%)=float(50,0,100)
+#@gui : Style Base=choice(0,"Based from Original Image","Based on Grayscale","Based on Hue")
+#@gui : sep = separator(), note=note("<b>Preview Setting</b>"), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), note=note("<b>TR's Intense Filtration</b> is a filter that filters out colors and augment a color based on hue. The formula for the filter is created by <b>TechnoRobbo</b>. The code for this filter is based on the <a href="https://forums.getpaint.net/topic/30148-trs-intense-filtration-v-13-oct-092014/">source code</a> of <b>TechnoRobbo's Intense Filtration v1.3</b> plugin for <b>Paint.NET.</b>")
+#@gui : sep = separator(), note=note("<small>Author: Reptorian.      Latest Update: <i>2019/11/1</i>.</small>")
 gui_rep_trif: rep_trif $1,$2%,$3%,$4
 gui_rep_trif_preview: gui_split_preview "gui_rep_trif ${1-4}",${-3--1}
 #@gui TR's Pixel Sharpener: gui_rep_trps,gui_rep_trps_preview(0)
-#@gui : Sharpening = float(0,0,50)
-#@gui : Internal Blurring = int(0,0,4)
-#@gui : Blur Type = choice(0,"Photo","Horizontal","Vertical","Angle - One Axis","Angle - Two Axis")
+#@gui : Sharpening=float(0,0,50)
+#@gui : Internal Blurring=int(0,0,4)
+#@gui : Blur Type=choice(0,"Photo","Horizontal","Vertical","Angle - One Axis","Angle - Two Axis")
 #@gui : Angle = float(0,-180,180)
-#@gui : Channel(s) = choice(11,"All","RGBA [All]","RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","RGBA [Alpha]",
+#@gui : Channel(s)=choice(11,"All","RGBA [All]","RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","RGBA [Alpha]",
 #@gui : "Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]",
 #@gui : "YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]",
 #@gui : "YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]",
 #@gui : "Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]",
 #@gui : "HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]",
 #@gui : "CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]","RYB [All]","RYB [Red]","RYB [Yellow]","RYB [Blue]")
-#@gui : sep = separator(), note = note("This is a extended filter which was based on a Paint.NET plugin that was created by <b>TechnoRobbo</b> - <a href="https://forums.getpaint.net/topic/26783-trs-pixel-sharpener-plugin-v20-dec-21-2014/">TR's Pixel Sharpener</a>")
-#@gui : sep = separator(), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui : sep = separator(), note = note("<small>Author: Reptorian.      Latest Update: <i>2019/11/2</i>.</small>")
+#@gui : sep = separator(), note=note("This is a extended filter which was based on a Paint.NET plugin that was created by <b>TechnoRobbo</b> - <a href="https://forums.getpaint.net/topic/26783-trs-pixel-sharpener-plugin-v20-dec-21-2014/">TR's Pixel Sharpener</a>")
+#@gui : sep = separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), note=note("<small>Author: Reptorian.      Latest Update: <i>2019/11/2</i>.</small>")
 gui_rep_trps: ac "rep_tr_pixel_sharpener ${1-4}",$5
 gui_rep_trps_preview: gui_split_preview "gui_rep_trps ${1-5}",${-3--1}
 u "{$1}"\
@@ -4255,12 +4355,12 @@ u "{$1}"\
 #@gui : note=note("<small><i>Preliminary Image Transformations</i></small>")
 #@gui : Preliminary Image Shift=point(50,50,0,1,128,128,128,255)
 #@gui : Image Additional Zoom (%)=float(0,0,500)
-#@gui : Image Angle = float(0,-180,180)
+#@gui : Image Angle=float(0,-180,180)
 #@gui : sep=separator(),note=note("<small><i>Distortion Transformations</i></small>")
 #@gui : Distortion Scale by X-Axis (%)=float(100,0,1000)
 #@gui : Distortion Scale by Y-Axis (%)=float(100,0,1000)
 #@gui : Distortion Scale by XY-Axis (%)=float(100,0.01,500)
-#@gui : Distortion Angle = float(0,-180,180)
+#@gui : Distortion Angle=float(0,-180,180)
 #@gui : Distortion Offset=point(50,50,0,1,255,255,255,255)
 #@gui : note=note("<small><i>When Distortion Scale by X-Axis and/or Y-Axis is 0, then distortion will be based on image ratio.</i></small>")
 #@gui : sep=separator(),note=note("<b>Processing Settings</b>")
@@ -4268,7 +4368,7 @@ u "{$1}"\
 #@gui : Boundary=choice(3,"None","Neumann","Periodic","Mirror")
 #@gui : Interpolation=choice(5,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
 #@gui : Subpixel=float(1,1,2)
-#@gui : sep=separator(),note=note("<b>Preview Settings</b>"), Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(),note=note("<b>Preview Settings</b>"), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui : sep=separator(), note=note("<small>Author: Reptorian.      Latest Update: <i>2019/11/7</i>.</small>")
 gui_rep_gv: rep_gv $1%,$2%,$3%,{$4-50}%,{$5-50}%,$6%,$7,$8%,$9%,$10%,$11,{$12+50}%,{$13+50}%,${14-17}
 gui_rep_gv_preview: gui_split_preview "gui_rep_gv ${1-17}",${-3--1}
@@ -4290,7 +4390,7 @@ gui_rep_gv_preview: gui_split_preview "gui_rep_gv ${1-17}",${-3--1}
 #@gui : Color Random Ordering Seed=int(2500,0,5000)
 #@gui : Cycle Color(%)=float(0,0,100)
 #@gui : Negate?=bool(0)
-#@gui : sep = separator(), note = note("<small>Author: Reptorian. Latest Update: <i>2019/11/11</i>.</small>")
+#@gui : sep=separator(),note=note("<small>Author: Reptorian. Latest Update: <i>2019/11/11</i>.</small>")
 #@gui : sep=separator(),note=note("<u>- Guide for Paint.NET Users -</u>\n\nDue to the <i>Paint.NET</i> API, option for creating new layer using plugins is not supported!\n\nIf you prefer a filter based on <i>Fibonacci Sequence</i> as a individual plugin rather than a G'MIC filter, you can download <a href="https://forums.getpaint.net/topic/28522-fibonacci-fill/">Fibonacci Fill plugin</a> for <i>Paint.NET</i>.")
 gui_rep_fibo:
 srand $13
@@ -4346,6 +4446,44 @@ u "{$1}"\
 "{$13}_"{$12?2:1}\
 "{$14}"\
 "{$15}"
+#@gui Spiral Distortion: gui_rep_sd,gui_rep_sd_preview(0)
+#@gui : note=note("Transform image using spiral gradient for x-coordinate, and radial gradient for y-coordinate."),sep=separator()
+#@gui : Revolution=float(1,.1,10)
+#@gui : Spiral Height=float(1,.5,10)
+#@gui : Refraction Power=float(0,-.99,2)
+#@gui : Direction=choice(0,"Clockwise","Counterclockwise")
+#@gui : Angle=float(0,-180,180)
+#@gui : Spiral Mode=choice(0,"Periodic","Continuous")
+#@gui : Preshift Position=point(50,50,0,1,200,200,200,255)
+#@gui : Preshift Boundary=choice(0,"Periodic","Mirror")
+#@gui : Skew Position (%)=point(50,50,0,1,100,100,100,255)
+#@gui : Skew Multiplier=float(1,-.5,3)
+#@gui : Offset (%)=point(50,50,0,1,255,255,255,255)
+#@gui : Scale X-Coordinate (%)=float(100,1,1000)
+#@gui : Scale Y-Coordinate (%)=float(100,1,1000)
+#@gui : Boundary Condition=choice(3,"None","Neumann","Periodic","Mirror")
+#@gui : Interpolation=choice(4,"Nearest","Average","Linear","Bicubic","Lanczos")
+#@gui : sep=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"),Preview Split=point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(),note=note("<small>Author: Reptorian. Latest Update: <i>2019/10/15</i>.</small>")
+gui_rep_sd: rep_sd ${1-6},{($7-50)*2}%,{($8-50)*2}%,$9,{($10-50)*2}%,{($11-50)*-2}%,$12,{($15-50)*2}%,{($16-50)*2}%,{($13-50)*2}%,{($14-50)*2}%,$17,$18
+gui_rep_sd_preview: gui_split_preview "gui_rep_sd ${1-18}",${-3--1}
+u "{$1}"\
+"{$2}"\
+"{$3}"\
+"{$4}"\
+"{$5}"\
+"{$6}"\
+"{$7,$8}"\
+"{$9}_"{($7!=50)||($8!=50)?2:1}\
+"{$10,$11}_"{$1==1?2:0}\
+"{$12}_"{($10!=50)||($11!=50)?2:1}\
+"{$13,$14}"\
+"{$15}"\
+"{$16}"\
+"{$17}"\
+"{$18}"\
+"{$19}"\
+"{$20,21}"
 ######################
 
 # Local Variables:
