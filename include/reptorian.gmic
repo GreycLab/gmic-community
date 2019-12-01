@@ -3,7 +3,7 @@
 #  File        : reptorian.gmic
 #                ( G'MIC commands file )
 #
-#  Description : The author of these filter generally recreate filters that exists in one or few softwares in order to help other users access filters. Sometimes, inspired by existing filters found in Paint.NET forum or elsewhere.
+#  Description : The author of these filter generally recreate filters that exists in one or few softwares to break through the software barrier. No reverse engineering has been applied without permission.
 #
 #  Copyright   : Reptorian
 #                ( https://discuss.pixls.us/u/reptorian/summary )
@@ -44,10 +44,197 @@
 #
 #-------------------------------
 
-#@cli rep_sd: (eq. to rep_spiral_distort)
+#@cli rep_polrectrans_inv : eq. to 'rep_polar_rectangular_transform_inverse'. : (+)
+rep_polrectrans_inv: rep_polar_rectangular_transform_inverse $*
+#@cli rep_polar_rectangular_transform_inverse : -1>=_xpos<=1,-1>=_ypos<=1,_from_preserved_details={ 0=false | 1=true },orientation_0={ 0=landscape | 1=portrait },...,orientation_n
+#@cli : Transform rectangular polar images into cartesian coordinates.
+#@cli : (eq. to 'rep_polrectrans_inv').\n
+#@cli : Warning: Without preservation of details, artifacts is a lot more visible.
+#@cli : Default values: '_xpos=0','_ypos=0','_from_preserved_details=1'
+rep_polar_rectangular_transform_inverse:
+skip ${1=0},${2=0},${3=1}
+if $1<-1||$1>1 error "($1>=-1&&$1<=1)=0" fi
+if $2<-1||$2>1 error "($2>=-1&&$2<=1)=0" fi
+repeat $! l[$>]
+    ov={[im,iM]}
+    if $3
+        $=val
+        orientation=${val{$>+4}}
+        half_perimeter={w/2}
+        length_1={$half_perimeter-h}
+        length_2={$half_perimeter-$length_1}
+        if $orientation
+            width={min($length_1,$length_2)}
+            height={max($length_1,$length_2)}
+        else
+            width={max($length_1,$length_2)}
+            height={min($length_1,$length_2)}
+        fi
+        $width,$height,{d},{s},"
+        begin(
+            ww=w#0;
+            hh=h#0;
+            ox="$width";
+            oy="$height";
+            sd=max(ox,oy)/min(ox,oy);
+            if("$orientation",
+                sxf=ox<oy?1:sd;
+                syf=ox<oy?sd:1;
+                ,
+                sxf=ox<oy?sd:1;
+                syf=ox<oy?1:sd;
+            );
+            cx=.5+$1*.5;
+            cy=.5+$2*.5;
+            px=cx*ww;
+            py=(1-cy)*hh;
+            sxl=(ww/2)/px;
+            sxr=(ww/2)/(ww-px);
+            syt=(hh/2)/py;
+            syb=(hh/2)/(hh-py);
+        );
+        xx=(x/(w-1))*ww;xx+=(xx/(ww-1)-.5)*-1;
+        yy=(y/h)*(hh+1);
+        xl=-1+(xx/ww)*2*sxl;
+        xr=1-(1-xx/ww)*2*sxr;
+        yt=-1+(yy/hh)*2*syt;
+        yb=1-(1-yy/hh)*2*syb;
+        nxx=xx>px?xr:xl;
+        nyy=yy>py?yb:yt;
+        ay=max(abs(nxx),abs(nyy));
+        ax=(atan2((yy/hh-(1-cy))*syf,(xx/ww-cx)*sxf)+pi)/(2*pi);
+        i(#0,ax*ww,ay*hh,z,c,2,1);
+        "
+        cut. $ov
+        k.
+    else
+        ov={[im,iM]}
+        f "
+        begin(
+            ww=w-1;
+            hh=h-1;
+            sd=max(w,h)/min(w,h);
+            sx=w>h?sd:1;
+            sy=w>h?1:sd;
+            cx=.5+$1*.5;
+            cy=.5+$2*.5;
+            px=cx*w;
+            py=(1-cy)*h;
+            sxl=(w/2)/px;
+            sxr=(w/2)/(w-px);
+            syt=(h/2)/py;
+            syb=(h/2)/(h-py);
+        );
+        atx=(x/ww-cx)*sx;
+        aty=(y/hh-(1-cy))*sy;
+        sur_atan=(atan2(aty,atx)+pi)/(2*pi);
+        xl=-1+(x/ww)*2*sxl;
+        xr=1-(1-x/ww)*2*sxr;
+        yt=-1+(y/hh)*2*syt;
+        yb=1-(1-y/hh)*2*syb;
+        xx=x>=px?xr:xl;
+        yy=y>=py?yb:yt;
+        sur_max=max(abs(xx),abs(yy));
+        i(sur_atan*w,sur_max*h,z,c,2,1);
+        "
+        cut $ov
+    fi
+endl done
+#@cli rep_polrectrans : eq. to 'rep_polar_rectangular_transform'. : (+)
+rep_polrectrans: rep_polar_rectangular_transform $*
+#@cli rep_polar_rectangular_transform : -1>=_xpos<=1,-1>=_ypos<=1,_preserve_details={ 0=false | 1=true }
+#@cli : Transform image into rectangular polar coordinates.
+#@cli : (eq. to 'rep_polrectrans').\n
+#@cli : Default values: '_xpos=0','_ypos=0','_preserve_details=1'
+rep_polar_rectangular_transform:
+skip ${1=0},${2=0},${3=1}
+if $1<-1||$1>1 error "($1>=-1&&$1<=1)=0" fi
+if $2<-1||$2>1 error "($2>=-1&&$2<=1)=0" fi
+repeat $! l[$>]
+    ov={[im,iM]}
+    if $3
+        maxlength={max(w,h)}
+        perimeter={(w+h)*2}        
+        $perimeter,$maxlength,{d},{s},"
+        begin(
+            ww=w#0;
+            hh=h#0;
+            point_x=(($1*-1)*.5+.5)*ww;
+            point_y=($2*.5+.5)*hh;
+            inv_point_x=ww-point_x;
+            inv_point_y=hh-point_y;
+            cut_ang_s0=abs(atan2(inv_point_y,inv_point_x)*180/pi);
+            cut_ang_s1=180-abs(atan2(inv_point_y,point_x)*180/pi);
+            cut_ang_s2=180+abs(atan2(point_y,point_x)*180/pi);
+            cut_ang_s3=360-abs(atan2(point_y,inv_point_x)*180/pi);
+            distanceaway(value)=(
+                    if(value==0,ww-point_x,
+                    if(value==1,hh-point_y,
+                    if(value==2,point_x,
+                    if(value==3,point_y
+                    );
+                    );
+                    );
+                    );
+                );
+            );
+        surface_angle=(x/w)*360;
+        if(surface_angle>cut_ang_s0&&surface_angle<=cut_ang_s1,side=1,
+        if(surface_angle>cut_ang_s1&&surface_angle<=cut_ang_s2,side=2,
+        if(surface_angle>cut_ang_s2&&surface_angle<=cut_ang_s3,side=3,
+                                                               side=0;
+                                                                    );
+                                                                    );
+                                                                    );
+        mdist=abs(side%2?1/sin((surface_angle/180)*pi):1/cos((surface_angle/180)*pi));
+        dix=(point_x+cos((surface_angle/180)*pi)*distanceaway(side)*mdist*y/h)*((ww-1)/ww);
+        diy=(point_y+sin((surface_angle/180)*pi)*distanceaway(side)*mdist*y/h)*((hh-1)/hh);
+        i(#0,ww-(dix+1),hh-(diy+1),z,c,2);
+        "
+        k.
+    else
+        f "
+        begin(
+            point_x=(($1*-1)*.5+.5)*w;
+            point_y=($2*.5+.5)*h;
+            inv_point_x=w-point_x;
+            inv_point_y=h-point_y;
+            cut_ang_s0=abs(atan2(inv_point_y,inv_point_x)*180/pi);
+            cut_ang_s1=180-abs(atan2(inv_point_y,point_x)*180/pi);
+            cut_ang_s2=180+abs(atan2(point_y,point_x)*180/pi);
+            cut_ang_s3=360-abs(atan2(point_y,inv_point_x)*180/pi);
+            distanceaway(value)=(
+                if(value==0,w-point_x,
+                if(value==1,h-point_y,
+                if(value==2,point_x,
+                if(value==3,point_y
+                );
+                );
+                );
+                );
+            );
+        );
+        surface_angle=(x/w)*360; #Convert into angle surface using x-coordinate#
+        if(surface_angle>cut_ang_s0&&surface_angle<=cut_ang_s1,side=1,
+        if(surface_angle>cut_ang_s1&&surface_angle<=cut_ang_s2,side=2,
+        if(surface_angle>cut_ang_s2&&surface_angle<=cut_ang_s3,side=3,
+                                                               side=0;
+                                                                    );
+                                                                    );
+                                                                    );
+        mdist=abs(side%2?1/sin((surface_angle/180)*pi):1/cos((surface_angle/180)*pi));
+        dix=(point_x+cos((surface_angle/180)*pi)*distanceaway(side)*mdist*y/h)*((w-1)/w);
+        diy=(point_y+sin((surface_angle/180)*pi)*distanceaway(side)*mdist*y/h)*((h-1)/h);
+        i(w-(dix+1),h-(diy+1),z,c,2); #Output using pixel coordinate with linear interpolation#
+        "
+    fi
+    cut $ov
+endl done
+#@cli rep_sd: eq. to 'rep_spiral_distort'. : (+)
 rep_sd: rep_spiral_distort $*
 #@cli rep_spiral_distort: _revolution!=0,_height!=0,_refraction>0,_direction={ 0=clockwise | 1=counterclockwise },_angle,_continuous_spiral={ 0=periodic | 1=continuous },-1<=_preshift_x<=1,-1<=_preshift_y<=1,_preshift_boundary={ 0=periodic | 1=mirror },_skew_x,_skew_y,_skew_m,_scale_coord_x,_scale_coord_y,_offx,_offy,_spiral_boundary={ 0=none | 1=neumann | 2=periodic | 3=mirror },_interpolation={ 0=nearest | 1=average | 2=linear | 3=bicubic | 4=lanczos }
-#@cli : Transform images into spiral by using spiral gradient for x coordinate, and radial gradient for y coordinate.\n
+#@cli : Transform images into spiral by using spiral gradient for x coordinate, and radial gradient for y coordinate.
+#@cli : (eq. to 'rep_sd').\n
 #@cli : '_revolution' defines the number of revolution within the spiral assuming coordinates range of [-1,1].
 #@cli : '_height' is the height of spiral. The higher the height of the spiral, the more duplicates will repeat within one revolution.
 #@cli : '_refraction' refers to the logarithmic distortion within spiral.
@@ -142,10 +329,11 @@ i((es^(1+$3))*w*$2,radial*h,z,c,interpolation,boundary);
 "
 if abs($18)>1 r2dx 50%,{abs($18)>2?abs($18)+2:abs($18)+1} fi
 v -
-#@cli rep_fibosq: (eq. to rep_fibonacci_squares)
+#@cli rep_fibosq: eq. to 'rep_fibonacci_squares'. : (+)
 rep_fibosq: rep_fibonacci_squares $*
 #@cli rep_fibonacci_squares: iterations,_corner_location>=0, _spiral_mode={ 0= non-spiral | 1= spiral_fill }
-#@cli : Generate a new fibonacci image(s). The value of each squares are increased by 1 starting from 0 while the size of the squares are increased by Fibonacci iterations starting from 1.\n
+#@cli : Generate a new fibonacci image(s). The value of each squares are increased by 1 starting from 0 while the size of the squares are increased by Fibonacci iterations starting from 1.
+#@cli : (eq. to 'rep_fibosq').\n
 #@cli : Default values: '_corner_location=0','_spiral_mode=1'
 rep_fibonacci_squares:
 size1=0 size2=1 nextterm=0 wi=0
@@ -178,10 +366,11 @@ do
     wi+=1
     if $3 switch+=1 fi
 while $wi<$1
-#@cli rep_fibofill: (eq. to rep_fibonacci_fill)
+#@cli rep_fibofill: eq. to 'rep_fibonacci_fill'. : (+)
 rep_fibofill: rep_fibonacci_fill $*
 #@cli rep_fibonacci_fill: _corner_location={ 0= top left | 1= top right | 2= bottom left | 3= bottom right }, _spiral_mode={ 0= non-spiral | 1= spiral_fill },_fill_images_with_fibonacci_fill= { 0= Adds fibonacci fill image | 1= Replaces all current images with fibonacci fill }, -1<=_spiral_place_center_x<=1,-1<=_spiral_place_center_y<=1
-#@cli : Generates fibonacci filled image(s) based on dimensions of existing image(s). The value of each squares are increased by 1 starting from 0 while the size of the squares are increased by Fibonacci iterations starting from 1.\n
+#@cli : Generates fibonacci filled image(s) based on dimensions of existing image(s). The value of each squares are increased by 1 starting from 0 while the size of the squares are increased by Fibonacci iterations starting from 1.
+#@cli : (eq. to 'rep_fibonacci_fill').\n
 #@cli : Note: Last two variables or _spiral_place_center variables series only works for spiral cases.\n
 #@cli : Default values: '_corner_location=0','_spiral_mode=1','_fill_images_with_fibonacci_fill=0','_spiral_place_center_x=0','_spiral_place_center_y=0'
 rep_fibonacci_fill:
@@ -270,10 +459,11 @@ channels 0
     fi
     rm.
 fi
-#@cli rep_gv: (eq. to rep_glass_vignette)
+#@cli rep_gv: eq. to 'rep_glass_vignette'. : (+)
 rep_gv: rep_glass_vignette $*
 #@cli rep_glass_vignette: refraction,_refraction_power,_chromatic_aberration,-100%<=_preliminary_shift_x<=100%,-100%<=_preliminary_shift_y<=100%,_image_additional_zoom>0,-360<=_image_angle<=360,_distortion_scale_x,_distortion_scale_y,_distortion_scale_xy>0,-360<=_distortion_angle<=360,_distortion_offset_x,_distortion_offset_y,0<=_colorspace<=1,_boundary={ 0=none | 1=neumann | 2=periodic | 3=mirror },_interpolation={ 0=nearest | 1=average | 2=linear | 3=grid | 4=bicubic | 5=lanczos },_subpixel>0
-#@cli : Distorts images as if it is based from the view of a bulged car mirror or camera len. This G'MIC filter is a heavily extended version of TR's Glass Vignette plugin made for Paint.NET by TechnoRobbo. It can also be used for generating abstract art as well.\n
+#@cli : Distorts images as if it is based from the view of a bulged car mirror or camera len. This G'MIC filter is a heavily extended version of TR's Glass Vignette plugin made for Paint.NET by TechnoRobbo. It can also be used for generating abstract art as well.
+#@cli : (eq. to 'rep_gv').\n
 #@cli : 'refraction' defines the strength of distortion. The farther the values from 0, the greater the distortion is. It is recommended to use percentage alongside a number.
 #@cli : '_refraction_power' defines the distortion factor within the refraction. The farther the values from 0, the greater the distortion is. It is recommended to use percentage alongside a number.
 #@cli : '_chromatic_aberration' is the degree of aberration within channels. The farther the values from 0, the greater the distortion per channels would be. It is recommended to use percentage alongside a number.
@@ -428,10 +618,11 @@ fi
 fi
 endl done
 v -
-#@cli rep_equi2cube: (eq. to rep_equirectangular_panorama_to_cube_map)
+#@cli rep_equi2cube: eq. to 'rep_equirectangular_panorama_to_cube_map'. : (+)
 rep_equi2cube: rep_equirectangular_panorama_to_cube_map $*
 #@cli rep_equirectangular_panorama_to_cube_map: 0<=_top_face_placement<=3,_bottom_face_placement
 #@cli : An extension of a code provided by 'Salix alba' at stackoverflow to solve conversion from eqirectangular panorama to cube map. Source: https://stackoverflow.com/questions/29678510/convert-21-equirectangular-panorama-to-cube-map
+#@cli : (eq. to 'rep_equi2cube').\n
 #@cli : Note: _bottom_face_placement will use placement of _top_face_placement when not specified.
 #@cli : Default values: '_top_face_placement=1'
 rep_equirectangular_panorama_to_cube_map:
@@ -485,10 +676,11 @@ if(y<edge*2,if((x>=edge*$1&&x<edge*($1+1))||(y>=edge&&y<edge*2),i(#0,uf,vf,z,c,2
 "
 rm..
 endl done
-#@cli rep_trps: (eq. to rep_tr_pixel_sharpener)
+#@cli rep_trps: eq. to 'rep_tr_pixel_sharpener'. : (+)
 rep_trps: rep_tr_pixel_sharpener $*
 #@cli rep_tr_pixel_sharpener: sharpen,_internal_blur>=0,_type= { 0=Photo | 1= Horizontal | 2= Vertical | 3= One-Axis Angle | 4= Two-Axis Angle },-360<=_sharpening_angle<=360
-#@cli : Extended version of the original TR's Pixel Sharpener for Paint.NET. Some code were changed to make more sense or is more practical. Negative values are enabled for first variable in the G'MIC version. The original code this was based on was created by TechnoRobbo. Source code - https://forums.getpaint.net/topic/26783-trs-pixel-sharpener-plugin-v20-dec-21-2014/\n
+#@cli : Extended version of the original TR's Pixel Sharpener for Paint.NET. Some code were changed to make more sense or is more practical. Negative values are enabled for first variable in the G'MIC version. The original code this was based on was created by TechnoRobbo. Source code - https://forums.getpaint.net/topic/26783-trs-pixel-sharpener-plugin-v20-dec-21-2014/
+#@cli : (eq. to 'rep_trps').\n
 #@cli : Default values: '_internal_blur=0','_blur_type=0','_sharpening_angle=0'
 rep_tr_pixel_sharpener:
 skip ${2=0},${3=0},${4=0}
@@ -521,10 +713,11 @@ sum-=nfcalc*coeff;
 );
 sum;
 "
-#@cli rep_trif: (eq. to rep_technorobbo_intense_filtration)
+#@cli rep_trif: eq. to 'rep_technorobbo_intense_filtration'. : (+)
 rep_trif: rep_technorobbo_intense_filtration $*
 #@cli rep_technorobbo_intense_filtration: 0<=hue<=360,_gain,_mix,_style_based_on={ 0=Original | 1=Grayscale | 2=Hue },_use_255={ 0=1 | 1=255 }
-#@cli : This command is a color filter and augmenter. The code is based from TechnoRobbo's Intense Filtration source code - https://forums.getpaint.net/topic/30148-trs-intense-filtration-v-13-oct-092014/\n
+#@cli : This command is a color filter and augmenter. The code is based from TechnoRobbo's Intense Filtration source code - https://forums.getpaint.net/topic/30148-trs-intense-filtration-v-13-oct-092014/
+#@cli : (eq. to 'rep_trif').\n
 #@cli : Warning: This command only works on images with 3 or 4 channel image. It doesn't discriminate between CMYK and RGBA image! So, make sure they're all RGB/RGBA images before using this command!\n
 #@cli : 'hue' defines the color to augment.
 #@cli : '_gain' defines the coefficient of image or number to multiple on data based on original image.
@@ -563,10 +756,11 @@ repeat $!-1
     fi
 done
 rm.
-#@cli rep_colmt: (eq. to rep_color_modulo_texture)
+#@cli rep_colmt: eq. to 'rep_color_modulo_texture'. : (+)
 rep_colmt: rep_color_modulo_texture $*
 #@cli rep_color_modulo_texture: _modulo_method_1= { 0=Mod | 1=Reflected Mod | 2=Divmod | 3=Reflected Divmod },_modulo_value_a_1>0,_modulo_value_b_1>0,_angle_1<=360,_value_shift_1>0,_centered_1= { 0=Not centered | 1=Centered },_negate_mod_1= { 0=Not Negated | 1=Negated },_normalize_bool_1= { 0=Do not Normalize | 1=Normalize },_modulo_method_2= { 0=Mod | 1=Reflected Mod | 2=Divmod | 3=Reflected Divmod },_modulo_value_a_2>0,_modulo_value_b_2>0,_angle_2<=360,_value_shift_2>0,_centered_2= { 0=Not centered | 1=Centered },_negate_mod_2= { 0=Not Negated | 1=Negated },_normalize_bool_2= { 0=Do not Normalize | 1=Normalize },_modulo_method_3= { 0=Mod | 1=Reflected Mod | 2=Divmod | 3=Reflected Divmod },_modulo_value_a_3>0,_modulo_value_b_3>0,_angle_3<=360,_value_shift_3>0,_centered_3= { 0=Not centered | 1=Centered },_negate_mod_3= { 0=Not Negated | 1=Negated },_normalize_bool_3= { 0=Do not Normalize | 1=Normalize },_modulo_method_4= { 0=Mod | 1=Reflected Mod | 2=Divmod | 3=Reflected Divmod },_modulo_value_a_4>0,_modulo_value_b_4>0,_angle_4<=360,_value_shift_4>0,_centered_4= { 0=Not centered | 1=Centered },_negate_mod_4= { 0=Not Negated | 1=Negated },_normalize_bool_4= { 0=Do not Normalize | 1=Normalize },_diagonal_flip= { 0=not flipped | 1 = flipped },0<=_colorspacemode<=11,_contain_alpha= { 0=no_alpha | 1=alpha },_subpixel_processing_level>0,_interpolation= { 0=Nearest | 1=Average | 2=Linear | 3=Grid | 4=Bicubic | 5=Lanczos },0<=_channel_num_1<=4,0<=_channel_num_2<=4,0<=_channel_num_3<=4,0<=_channel_num_4<=4
-#@cli : Inspired by MadJik's Color Modulo Texture for Paint.NET, this is a extension of that filter converted into G'MIC form. New features is being able to change color space, allow alpha, and anti-aliasing.\n
+#@cli : Inspired by MadJik's Color Modulo Texture for Paint.NET, this is a extension of that filter converted into G'MIC form. New features is being able to change color space, allow alpha, and anti-aliasing.
+#@cli : (eq. to 'rep_colmt').\n
 #@cli : '_modulo_method' defines what method of modulo operation would be applied to each channel.
 #@cli : '_modulo_value_a' and 'modulo_value_b' is value used for calculation of modulo of function per channel.
 #@cli : '_angle' defines the function angle.
@@ -890,10 +1084,11 @@ if $3
     f.. i*i0#-1
     rm.
 fi
-#@cli rep_regm: (eq. to rep_reverse_engineer_gradient_map)
+#@cli rep_regm: eq. to 'rep_reverse_engineer_gradient_map'. : (+)
 rep_regm: rep_reverse_engineer_gradient_map $*
 #@cli rep_reverse_engineer_gradient_map: _array_size>0
 #@cli : The array size is used to define the depth of gradient map, if you're using float, then you need to scale image to something higher than 256. The only instruction is to have two images of same width and height dimension with the first one being a grayscale image.
+#@cli : (eq. to 'rep_regm').\n
 #@cli : Default values: '_array_size=256'
 rep_reverse_engineer_gradient_map:
 skip ${1=256}
@@ -939,10 +1134,11 @@ if abs($4)==1 mirror. x
 elif abs($4)==2 mirror. y
 fi
 rep_isprime.
-#@cli rep_ced8: (eq. to rep_color_existence_distribution_rgb8)
+#@cli rep_ced8: eq. to 'rep_color_existence_distribution_rgb8'. : (+)
 rep_ced8: rep_color_existence_distribution_rgb8 $*
 #@cli rep_color_existence_distribution_rgb8: _bool_found= { 0=colour_nonexistence | colour_existence }
 #@cli : This cli command is used to find which colors exist within the color lookup table generated from 8-bit positive-only colors that ranges from 0-255. Millions of colors that does not exist within a image can be picked from a image generated with this command.
+#@cli : (eq. to 'rep_ced8').
 rep_color_existence_distribution_rgb8:
 nk=$1
 nk_1={$nk?255:0}
@@ -951,10 +1147,11 @@ repeat $! l[$>]
     256,256,256 eval.. "++i(#-1,R,G,B)" k.
     4096,4096,1,4,[x%256,y%256,floor(x/256)+(floor(y/256)*16),i(#-1,x%256,y%256,floor(x/256)+(floor(y/256)*16))?$nk_1:$nk_2] k.
 endl done
-#@cli rep_sdaxy: (eq. to rep_shift_angle_distance)
+#@cli rep_sdaxy: eq. to 'rep_shift_angle_distance'. : (+)
 rep_sdaxy: rep_shift_distance_angle_xy $*
 #@cli rep_shift_distance_angle_xy: _offset>0,_angle,_boundary_condition = { 0=None | 1=Neumann | 2=Periodic | 3=Mirror },_interpolation={ 0=nearest_neighbor | 1=linear }
-#@cli : Offset images at angle and distance.\n
+#@cli : Offset images at angle and distance.
+#@cli : (eq. to 'rep_sdaxy').\n
 #@cli : _offset refers to the displacement of image.\n
 #@cli : Default value: 'boundary_conditions=3','interpolation=1'
 rep_shift_distance_angle_xy:
@@ -965,10 +1162,11 @@ Dis=$1
 DisX={cos($rad_ang)*$Dis}
 DisY={sin($rad_ang)*$Dis}
 shift $DisX,$DisY,0,0,$3,$4
-#@cli rep_dupsdaxy: (eq. to rep_duplicate_by_shift_angle_distance_xy)
+#@cli rep_dupsdaxy: eq. to 'rep_duplicate_by_shift_angle_distance_xy'. : (+)
 rep_dupsdaxy: rep_duplicate_by_shift_distance_angle_xy $*
 #@cli rep_duplicate_by_shift_distance_angle_xy: duplicates_count>=2,_radius_offset>0,_offset_angle,_keep_original = { 0=remove_original | 1=keep_original },_boundary_condition = { 0=None | 1=Neumann | 2=Periodic | 3=Mirror },_interpolation={ 0=nearest_neighbor | 1=linear }
-#@cli : Creates copies of image at a distance from original point.\n
+#@cli : Creates copies of image at a distance from original point.
+#@cli : (eq. to 'rep_dupsdaxy').\n
 #@cli : _radius_offset refers to the distance the duplicates are from the original image. Each circular duplicates are of the same distance. radius_offset can be in percentage form, or in integer form. When it is in percentage form, the length of each duplicates offset is equal to the percentage of hypotenuse of image.
 #@cli : _offset_angle refers to the starting angle the original duplicate is at. The primary duplicate starts from the right.\n
 #@cli : Default value: '_radius_offset={sqrt(w^2+h^2)*.05}','_offset_angle=0','_keep_original=0','_boundary_condition=0','_interpolation=1'
@@ -977,10 +1175,11 @@ skip ${2={sqrt(w^2+h^2)*.05}},${3=0},${4=0},${5=1},${6=1}
 if {$1<2} v + error "Invalid duplicate numbers!" fi
 aang={360/$1}
 repeat $1 +rep_sdaxy[0] $2,{$>*$aang+$3},$5,$6 done if {$4==0} rm[0] fi
-#@cli rep_frblur: (eq. to rep_fragment_blur)
+#@cli rep_frblur: eq. to 'rep_fragment_blur'. : (+)
 rep_frblur: rep_fragment_blur $*
 #@cli rep_fragment_blur: duplicates_count>=2,_radius_offset>0,_offset_angle,_keep_original = { 0=remove_original | 1=keep_original },_boundary_condition = { 0=None | 1=Neumann | 2=Periodic | 3=Mirror },_interpolation={ 0=nearest_neighbor | 1=linear },_color_space = { 0=RGB | 1=SRGB | 2=RYB | 3=CMYK | 4=HCY | 5=HSI | 6=HSL | 7=HSV | 8=LAB | 9=LCH }
-#@cli : Fragment Blur is a effect that originated from the Windows software named Paint.NET. Copies or "fragments" of images are superimposed over their respective images. Copies are redrawn at a distance, and starting copy starts from the right at 0. \n
+#@cli : Fragment Blur is a effect that originated from the Windows software named Paint.NET. Copies or "fragments" of images are superimposed over their respective images. Copies are redrawn at a distance, and starting copy starts from the right at 0.
+#@cli : (eq. to 'rep_frblur').\n
 #@cli : _radius_offset refers to the distance the duplicates are from the original image. Each circular duplicates are of the same distance. radius_offset can be in percentage form, or in integer form. When it is in percentage form, the length of each duplicates offset is equal to the percentage of hypotenuse of image.
 #@cli : _offset_angle refers to the starting angle the original duplicate is at. The primary duplicate starts from the right.
 #@cli : _keep_original options is to keep the original image as a duplicate without offsetting it.\n
@@ -1587,10 +1786,11 @@ _pal_msxp:(0,128,192,255,128,255,128,255,0,0,0,0,0,0,128,255,128,255,0,0,0,128,0
 _pal_jmp:(0,25,70,161,69,118,131,158,220,225,214,233,33,211,175,245^0,16,175,214,62,100,49,194,83,141,185,216,108,101,170,244^0,40,69,133,120,254,41,232,75,121,123,161,75,200,185,235)
 _pal_mac2:(255,255,255,220,255,54,0,0,0,0,101,151,185,134,69,0^255,255,101,0,0,0,0,151,168,101,54,101,185,134,69,0^255,0,0,0,151,151,202,255,0,0,0,54,185,134,69,0)
 _pal_jewel: (50,102,184,210,242,240,223,188,121,86,74,77,115,116,156^30,36,40,106,197,232,183,123,65,96,143,193,227,130,172^45,49,28,18,60,156,127,98,107,148,169,179,123,161,186)
-#@cli pal_t : eq. to 'palette_transfer'
+#@cli pal_t : eq. to 'palette_transfer'. : (+)
 pal_t: palette_transfer $*
 #@cli palette_transfer : 0<=_palette_id<=142,0<=_indexing_style<=4,0<=_color_dithering[%]<=1,_transfer_rgb={0=No | 1=Yes },0<=_alpha_count,0<=_alpha_dithering<=1,_special_effect_factor>=0,0<=_initial_resize_method<=5,_activate_upscaling_stimulation={ 0=Does not activate | 1=Activate Upscale},_pixel_width>=1,_pixel_height>=1,_activate_hardware_stimulation={ 0=Does not activate | 1= Stimulate hardware restriction },1<=_color_section_of_hardware_restriction_precision_factor,_hardware_restriction_by_tile_width>0,_hardware_restriction_by_tile_height>0,_hardware_color_precision>2,_hardware_color_mapping_method={0=Median Cut | Median Cut and K-Means},alpha_precion_factor>2,alpha_mapping_method_for_hardware_stimulation={0=Median Cut | Median Cut and K-Means}
 #@cli : Transfer Colors to images using a palette. If using negative number or "i" for first variable, there must be exactly two layers.
+#@cli : (eq. to 'pal_t').\n
 #@cli : Default value: 'transfer_rgb=0', 'alpha_count=0', 'alpha_dithering=0%', 'special_effect_factor=.5', 'initial_resize_method=0','activate_upscaling_stimulation=0','pixel_width=1','pixel_height=1','activate_hardware_stimulation=0','color_section_of_hardware_restriction_precision_factor=10','hardware_restriction_by_tile_width=5','hardware_restriction_by_tile_height=5','_hardware_color_precision=4','hardware_color_mapping_method=1','alpha_precion_factor=10','alpha_mapping_method_for_hardware_stimulation=1'
 #@cli : For 2 layers where one is a palette - $ palette_transfer -1,0,.5 ,
 #@cli : To apply palette colors to multiple layers - $ repeat $! l[$<] palette_transfer db32,0,.5 endl done ,
@@ -1621,23 +1821,26 @@ pal_l :
 repeat $! l[$>]
 _iw={w}
 if {h=1} repeat {${_iw}-1} [0] done repeat ${_iw} crop[$>] $>,0,$>,0 done else v + error "This is not a palette!" fi endl done
-#@cli ahre_rgb: (eq. to auto_hardware_restriction_emulation_RGB)
+#@cli ahre_rgb: eq. to 'auto_hardware_restriction_emulation_RGB'. : (+)
 ahre_rgb : auto_hardware_restriction_emulation_RGB $*
 #@cli auto_hardware_restriction_emulation_RGB : _precision_factor>1,_tile_size_width>0,_tile_size_height>0,_colors_per_tiles>0,dithering[%]>=1,mapping_method={0=median-cut | 1=median-cut and k-means}
 #@cli : Emulates hardware restriction automatically being based on the image using spectrum of 3.
+#@cli : (eq. to 'ahre_rgb').
 auto_hardware_restriction_emulation_RGB :
 repeat $! l[$>] remove_opacity to_rgba repeat $1 [0] done l[$1] +colormap $1,0,0 at[0] "s c f "ia" a c",$2,$3,,,,,3 index.. .,0,1 pal_l. r[1-{$1}] {w#0},{h#0},1,4,1 l[0] repeat {$1-1} [0] done endl repeat $1 l[$>,{$>+$1}] f[0] "i#0==i#1?255:0" endl done k[0-{$1-1}] to_gray endl to_rgb[0-{$1-1}] repeat $1 a[$>,$1] c done repeat $1 l[$>] +solidify 0,0,0,0,0 blend normal endl done ac "autoindex $4,$5,$6",rgb blend alpha to_rgb endl done
-#@cli ahre_bw: (eq. to auto_hardware_restriction_emulation_BW)
+#@cli ahre_bw: eq. to 'auto_hardware_restriction_emulation_BW'. : (+)
 ahre_bw: auto_hardware_restriction_emulation_BW $*
 #@cli auto_hardware_restriction_emulation_BW : _precision_factor>1,_tile_size_width>0,_tile_size_height>0,_shades_per_tiles>0,dithering[%]>=1,mapping_method={0=median-cut | 1=median-cut and k-means}
 #@cli : Emulates hardware restriction automatically being based on the image using spectrum of 1.
+#@cli : (eq. to 'ahre_bw').
 auto_hardware_restriction_emulation_BW : repeat $! l[$>]
 to_gray _l={im} _h={iM} $1,1,1,1 f. "x" n. 0,255 +at.. "f "ia"",$3,$4,,,,,3 index. ..,0,1 rv[^0] pal_l. r[^0-1] {w#0},{h#0},1,1,1 repeat $1 l[1,{$>+2}] f[1] "i#0==i#1?255:0" endl done rm[1] repeat $1 +a[0,{$>+1}] c done rm[0-5] repeat $1 l[$>] +solidify 0,0,0,0,0 blend normal endl done ac "autoindex $5,$6,$7",rgb blend alpha to_gray n ${_l},${_h} $2,1,1,1 f. "x" n. 0,255 index.. .,0,1 rm. to_gray endl done
-#@cli sol : eq. to '_solarize'.
+#@cli sol : eq. to '_solarize'. : (+)
 sol :
 _solarize
 #@cli _solarize :
 #@cli : Solarize values. If values are greater than .5 (0-1 range assumed), then the values becomes inverted. Finally, it is normalized. Note that this doesn't work on -1,1 though.
+#@cli : (eq. to 'sol').
 _solarize :
 +negate
 blend darken mul 2
@@ -1669,10 +1872,11 @@ elif {$1==3} f "eps=10^-8;img=i#0;vp=$4==1?i#1/$2:$3;ivp=1/vp;simg=ivp*img;maxm=
 elif {$1==4} f "eps=10^-8;img=i#0;vp=$4==1?i#1/$2:$3;vpi=vp*$2;fimg=img+vpi;maxm=$2+eps;fimg-maxm*floor(fimg/maxm)"
 elif {$1==5} f "eps=10^-8;img=i#0;vp=$4==1?i#1/$2:$3;vpi=vp*$2;fimg=img+vpi;maxm=$2+eps;f=fimg-maxm*floor(fimg/maxm);cinv=fimg>maxm?$2:0;cinv>0?maxm-f:f" fi
 #@cli em:
-#@cli : (eq. to 'emboss_image')
+#@cli : eq. to 'emboss_image' : (+)
 #@cli : $ em 90,0,1
 em : emboss_image $*
 #@cli emboss_image : 0<=_angle<=360, 0<=_depth, _smoothness>=0,
+#@cli : (eq. to 'em').\n
 #@cli : Default values: 'depth=1','smoothness=0'
 #@cli : $ emboss_image 90,0,1 ,
 emboss_image: -skip ${2=1},${3=0}
@@ -1684,10 +1888,11 @@ repeat 2 l[$>] rgb2hsv s c l[0] + {$1+($>*180)} % 360 endl a c hsv2rgb to_rgb s 
 l[0] n 128,255 endl l[1] negate n 0,128 endl
 +fill_color[0] 128,128,128,255 rv blend grainmerge - 128 mul $2 + 128 cut 0,255
 endl
-#@cli rep_bchstatfunc: (eq. to rep_by_channel_statistical_function)
+#@cli rep_bchstatfunc: eq. to 'rep_by_channel_statistical_function'. : (+)
 rep_bchstatfunc : rep_by_channel_statistical_function $*
 #@cli rep_by_channel_statistical_function: _variable,_resize_bool={ 0=Do not resize | 1= Resize to 1x1 }
 #@cli : Creates 1x1 image based on defined variables that depends on image value (minimum, maximum, average, variance, sum, product and median)
+#@cli : (eq. to 'rep_bchstatfunc').\n
 #@cli : Default value: 'resize_bool=0'
 rep_by_channel_statistical_function:
 v - _gmic_s="$?" v +
@@ -1718,10 +1923,11 @@ _rep_bchstatfunc_pro : repeat s sh $> f. ip#-1 rm. done if $1 r 1,1,1,{s},0 fi
 _rep_bchstatfunc_ic : _rep_bchstatfunc_med $1
 _rep_bchstatfunc_median : _rep_bchstatfunc_med $1
 _rep_bchstatfunc_med : repeat s sh $> f. ic#-1 rm. done if $1 r 1,1,1,{s},0 fi
-#@cli rep_lbchstatfunc_to_pal: (eq. to rep_layers_by_channel_statistical_function_to_palette)
+#@cli rep_lbchstatfunc_to_pal: eq. to 'rep_layers_by_channel_statistical_function_to_palette'. : (+)
 rep_lbchstatfunc_to_pal: rep_layers_by_channel_statistical_function_to_palette $*
 #@cli rep_layers_by_channel_statistical_function_to_palette: _variable
 #@cli : Converts layers to palette using statistical function by channels per layers into 1x1 tile, then append them.
+#@cli : (eq. to 'rep_layers_by_channel_statistical_function_to_palette').
 rep_layers_by_channel_statistical_function_to_palette: rep_bchstatfunc $1 a x to_rgb
 #@cli rep_mosaic_gen : _tile_width>=0,_tile_height>=0,_dithering<=1,1<=_interpolation<=6,_autocrop-by-median_bool={ 0=Do not autocrop by median | 1=Autocrop by median },_out_original_dimension={ 0=Do not output original dimension | 1= Output Original Dimension },use_folder={ 0=Do not use folder | 1=Use folder },folder_location="location_in_computer"
 #@cli : Generates mosaic using multiple pictures using indexing methodology, and uses average to determine the mapping based on colors. Tile_Width and Tile_Height cannot be both zero!
@@ -1937,10 +2143,11 @@ vx=x+cos(balanceY)*$1;
 vy=y+sin(balanceX)*$2;
 i(vx,vy,z,c,$4,($5?3:2));
 "
-#@cli rep_binaltquad: (eq. to rep_binary_alterating_quad_texture)
+#@cli rep_binaltquad: eq. to 'rep_binary_alterating_quad_texture'. : (+)
 rep_binaltquad: rep_binary_alterating_quad_texture $*
 #@cli rep_binary_alterating_quad_texture: _style={ 0 = Horizontal , 1 = Diagonal , 2 = Simple },_variable_1>=0,_variable_2>=0,_variable_3>=0,0<=_operand<=2,0<=_angle<=360,_x_dir= { 0 = normal | 1 = inverted },_y_dir= { 0=normal | 1 = inverted },_modnum>0
 #@cli : Generates a texture full of alternating quadrilateral shapes using binary logic. Converted, and extended from Asmageddon Quaddro Bumperoo/Inverto Paint.NET source code.
+#@cli : (eq. to 'rep_binaltquad').
 rep_binary_alterating_quad_texture:
 skip ${4=128},${5=2},${6=0},${7=0},${8=0},${9=256},${10=255},${11=1}
 channels 0
@@ -1957,7 +2164,7 @@ normalize=$10
 allow_normal=$11
 f begin(ang=pi*($angle/180);sd=w/h;);ix=((x/w)-.5)/(h>w?1/sd:1);iy=((y/h)-.5)/(w>h?sd:1);IX=ix*cos(ang)-iy*sin(ang);IY=ix*sin(ang)+iy*cos(ang);ix=IX;iy=IY;ix+=.5/(h>w?1/sd:1);iy+=.5/(w>h?sd:1);ix=(w>h?ix*w:ix*h);iy=(w>h?iy*w:iy*h);ix=round(ix)+1;iy=round(iy)+1;$style==2?((!$x_dir?xor(ix,$var_1):xor(w-ix,$var_1))+(!$y_dir?xor(iy,$var_2):xor(h-iy,$var_2)))%$modnum:(int(((($style==1?($operand?($operand==1?(((($x_dir?w-ix:ix)|int($var_1))+(($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(($x_dir?w-ix:ix),int($var_1))+xor(($y_dir?h-iy:iy),int($var_2)))%$modnum):((($x_dir?w-ix:ix)&int($var_1))+(($y_dir?h-iy:iy)&int($var_2)))):($operand?($operand==1?(((-($x_dir?w-ix:ix)|int($var_1))+(-($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(-($x_dir?w-ix:ix),int($var_1))+xor(-($y_dir?h-iy:iy),int($var_2)))%$modnum):((-($x_dir?w-ix:ix)&int($var_1))+(-($y_dir?h-iy:iy)&int($var_2)))))/(int($operand!=2?$var_3:-$var_3)*2))-int(($style==1?($operand?($operand==1?(((($x_dir?w-ix:ix)|int($var_1))+(($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(($x_dir?w-ix:ix),int($var_1))+xor(($y_dir?h-iy:iy),int($var_2)))%$modnum):((($x_dir?w-ix:ix)&int($var_1))+(($y_dir?h-iy:iy)&int($var_2)))):($operand?($operand==1?(((-($x_dir?w-ix:ix)|int($var_1))+(-($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(-($x_dir?w-ix:ix),int($var_1))+xor(-($y_dir?h-iy:iy),int($var_2)))%$modnum):((-($x_dir?w-ix:ix)&int($var_1))+(-($y_dir?h-iy:iy)&int($var_2)))))/(int($operand!=2?$var_3:-$var_3)*2)))*($style==1?($operand?($operand==1?(((($x_dir?w-ix:ix)|int($var_1))+(($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(($x_dir?w-ix:ix),int($var_1))+xor(($y_dir?h-iy:iy),int($var_2)))%$modnum):((($x_dir?w-ix:ix)&int($var_1))+(($y_dir?h-iy:iy)&int($var_2)))):($operand?($operand==1?(((-($x_dir?w-ix:ix)|int($var_1))+(-($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(-($x_dir?w-ix:ix),int($var_1))+xor(-($y_dir?h-iy:iy),int($var_2)))%$modnum):((-($x_dir?w-ix:ix)&int($var_1))+(-($y_dir?h-iy:iy)&int($var_2))))))<int($operand!=2?$var_3:-$var_3)?($style==1?($operand?($operand==1?(abs($modnum)-1)-(((($x_dir?w-ix:ix)|int($var_1))+(-($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(($x_dir?w-ix:ix),int($var_1))+xor(-($y_dir?h-iy:iy),int($var_2)))%$modnum):((($x_dir?w-ix:ix)&int($var_1))+(-($y_dir?h-iy:iy)&int($var_2)))%$modnum):($operand?($operand==1?(abs($modnum)-1)-(((($x_dir?w-ix:ix)|int($var_1))+(($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(($x_dir?w-ix:ix),int($var_1))+xor(($y_dir?h-iy:iy),int($var_2)))%$modnum):((($x_dir?w-ix:ix)&int($var_1))+(($y_dir?h-iy:iy)&int($var_2)))%$modnum)):($style==1?($operand?($operand==1?(abs($modnum)-1)-(((-($x_dir?w-ix:ix)|int($var_1))+(($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(-($x_dir?w-ix:ix),int($var_1))+xor(($y_dir?h-iy:iy),int($var_2)))%$modnum):((-($x_dir?w-ix:ix)&int($var_1))+(($y_dir?h-iy:iy)&int($var_2)))%$modnum):($operand?($operand==1?(abs($modnum)-1)-(((-($x_dir?w-ix:ix)|int($var_1))+(-($y_dir?h-iy:iy)|int($var_2)))%$modnum):(xor(-($x_dir?w-ix:ix),int($var_1))+xor(-($y_dir?h-iy:iy),int($var_2)))%$modnum):((-($x_dir?w-ix:ix)&int($var_1))+(-($y_dir?h-iy:iy)&int($var_2)))%$modnum)))
 if $allow_normal n 0,$normalize fi
-#@cli rep_binaltquadc: (eq. to rep_binary_alterating_quad_c)
+#@cli rep_binaltquadc: eq. to 'rep_binary_alterating_quad_c'. : (+)
 rep_binaltquadc: rep_binary_alterating_quad_c $*
 #@cli rep_binary_alterating_quad_c: 0<=_colorspace<=13,_contain_alpha= { 0=No Alpha | 1=Alpha Included },_8bitmode= { 0=Not 8-Bit Value | 1=8-Bit Value } \ 0<=_channel_order<=5,0<=_channel_order<=5,0<=_channel_order<=5,0<=_channel_order<=5,0<=_channel_order<=5, \
 _variable_1>=0,_variable_2>=0,_variable_3>=0,_style={ 0 = Horizontal | 1 = Diagonal },0<=_operand<=2,0<=_angle<=360,_x_dir= { 0 = normal | 1 = inverted },_y_dir= { 0=normal | 1 = inverted }, \
@@ -1966,6 +2173,7 @@ _variable_1>=0,_variable_2>=0,_variable_3>=0,_style={ 0 = Horizontal | 1 = Diago
 _variable_1>=0,_variable_2>=0,_variable_3>=0,_style={ 0 = Horizontal | 1 = Diagonal },0<=_operand<=2,0<=_angle<=360,_x_dir= { 0 = normal | 1 = inverted },_y_dir= { 0=normal | 1 = inverted }, \
 _variable_1>=0,_variable_2>=0,_variable_3>=0,_style={ 0 = Horizontal | 1 = Diagonal },0<=_operand<=2,0<=_angle<=360,_x_dir= { 0 = normal | 1 = inverted },_y_dir= { 0=normal | 1 = inverted }
 #@cli : Generates a texture full of alternating quadrilateral shapes using binary logic. Converted, and extended from Asmageddon Quaddro Bumperoo/Inverto Paint.NET source code.
+#@cli : (eq. to 'rep_binaltquadc').
 rep_binary_alterating_quad_c:
 repeat $! l[$>]
 cs_mode=$1
@@ -2066,10 +2274,13 @@ else
     fi
 fi
 endl done
-#@cli rep_strbul: (eq. to rep_strange_bulger)
+#@cli rep_strbul: eq. to 'rep_strange_bulger'. : (+)
 rep_strbul: rep_strange_bulger $*
 #@cli rep_strange_bulger : 0<=_angle<=360,_axis={ 0 = X-Axis | 1 = Y-Axis },_interpolation,_boundary_condition
 #@cli : Performs a bulge effect found in Strange Bulger Series made by Asmageddon for Paint.NET.
+#@cli : (eq. to 'rep_strbul').\n
+#@cli : _angle refers to the angle of distortion.
+#@cli : _axis_of_bulge refers to the axis that is the distortion is based from.
 rep_strange_bulger:
 f "begin(
 BulgeAng=$1*(pi/180);
@@ -2084,9 +2295,11 @@ vx=(x+(x-vx)*cos(BulgeAng)+(y-vy)*sin(BulgeAng));
 vy=(y+(x-vx)*sin(BulgeAng)+(y-vy)*cos(BulgeAng));
 i(vx,vy,z,c,$3,($4?3:2));
 "
-#@cli rep_strbulkal: (eq. to rep_strange_bulger_kaleidoscope)
+#@cli rep_strbulkal: eq. to 'rep_strange_bulger_kaleidoscope'. : (+)
 rep_strbulkal:rep_strange_bulger_kaleidoscope $*
 #@cli rep_strange_bulger_kaleidoscope: 0<=_bulge_ang<=360,_axis_of_bulge= { 0=horizontal | 1=vertical },_scale>0,-1<_offset_main_x<=1,-1<_offset_main_y<=1,-1<_offset_kaleido_x<=1,-1<_offset_kaleido_y,-360<=surface_ang<=360,_mirror_placement= { 0=inside-out | 1=outside-in },_boundary_condition= { 0=Periodic | 1=Mirror },1<=_interpolation<=5,_dimension_reference>0
+#@cli : Distorts image using bulge effect found in Strange Bulger Series made by Asmageddon for Paint.NET. This is the Kaleidoscope version of Strange Bulger.
+#@cli : (eq. to 'rep_strbulkal').\n
 #@cli : _bulge_ang refers to the angle of distortion.
 #@cli : _axis_of_bulge refers to the axis that is the distortion is based from.
 #@cli : _scale refers to the scaling of the distortion. The larger the _scale value is, the more areas is revealed.
@@ -2150,9 +2363,10 @@ vy*=h/ed;
 i(vx,vy,z,c,$11,($10?3:2));
 "
 if $9 shift 50%,50%,0,0,3,1 fi
-#@cli rep_logpindis: (eq. to rep_logarithmic_pinching_distortion)
+#@cli rep_logpindis: eq. to 'rep_logarithmic_pinching_distortion'. : (+)
 rep_logpindis: rep_logarithmic_pinching_distortion $*
 #@cli rep_logarithmic_pinching_distortion: _distortion_main>=0,-1<=_preshift_x<=1,-1<=_preshift_y<=1,-1<=_effposition_x<=1,-1<=_effposition_y<=1,_prescale_x,_prescale_y,_afterscale_x,_afterscale_y,0<=_angle<=360,_mirror_placement= { 0=outside-in | 1=inside-out },_lx_axis= { 0=different axis | 1=same axis},_ly_axis= { 0=different axis | 1=same axis},ix_dir={ 0=negative | 1=positive },iy_dir={ 0=negative | 1=positive },_boundary= { 0=Periodic | 1=Mirror },1<=_interpolation<=5,_dimension_ref>0
+#@cli : (eq. to 'rep_logpindis').
 rep_logarithmic_pinching_distortion:
 skip ${2=0},${3=0},${4=0},${5=0},${6=1},${7=1},${8=1},${9=1},${10=0},${11=0},${12=1},${13=0},${14=1},${15=0},${16=0},${17=5},${18=1024}
 if $6==0||$7==0||$8==0||$9==0 v + error "Scale cannot be 0!" v - fi
@@ -2196,9 +2410,10 @@ iy*=$9;
 i(ix,iy,z,c,$17,($16?3:2));
 "
 if $11 shift 50%,50%,0,0,3,1 fi
-#@cli rep_sqrlogpindis: (eq. to rep_square_root_logarithmic_pinching_distortion)
+#@cli rep_sqrlogpindis: eq. to rep_square_root_logarithmic_pinching_distortion : (+)
 rep_sqrlogpindis: rep_square_root_logarithmic_pinching_distortion $*
 #@cli rep_square_root_logarithmic_pinching_distortion: _distortion_main>=0,-1<=_preshift_x<=1,-1<=_preshift_y<=1,-1<=_effposition_x<=1,-1<=_effposition_y<=1,_prescale_x,_prescale_y,_afterscale_x,_afterscale_y,0<=_angle<=360,_mirror_placement= { 0=outside-in | 1=inside-out },_lx_axis= { 0=different axis | 1=same axis},_ly_axis= { 0=different axis | 1=same axis},ix_dir={ 0=negative | 1=positive },iy_dir={ 0=negative | 1=positive },_boundary= { 0=Periodic | 1=Mirror },1<=_interpolation<=5,_dimension_ref>0
+#@cli : (eq. to 'rep_sqrlogpindis').
 rep_square_root_logarithmic_pinching_distortion:
 skip ${2=0},${3=0},${4=0},${5=0},${6=1},${7=1},${8=1},${9=1},${10=0},${11=0},${12=1},${13=0},${14=1},${15=0},${16=0},${17=5},${18=1024}
 if $6==0||$7==0||$8==0||$9==0 v + error "Scale cannot be 0!" v - fi
@@ -2335,10 +2550,11 @@ polkal_b=i(xs*w,ys*h,z,c,1,1);
 $9?polkal_b:polkal_a;
 "
 r2dx {(1/($12+1))*100}%,$13
-#@cli rep_objvf: (eq. to rep_objvolumefilt)
+#@cli rep_objvf: eq. to 'rep_objvolumefilt' : (+)
 rep_objvf: rep_objvolumefilt $*
 #@cli rep_objvolumefilt: 0<=_v1<=1,0<=_v2<=1,_mode= { 0=eliminate_interior || 1=eliminate_exterior },_colour1...
 #@cli : _v1 and _v2 refers to boundary in percent. By default, this command use alpha as reference unless all channel values are specified next to mode.
+#@cli : (eq. to 'rep_objvf').\n
 #@cli : Default value: '_mode=1'
 rep_objvolumefilt:
 skip ${3=1}
@@ -2517,13 +2733,13 @@ a x
 endl
 endl done
 rm[0]
-#@cli rep_tfrac: (eq. to rep_thorn_fractal)
+#@cli rep_tfrac: eq. to 'rep_thorn_fractal' : (+)
 rep_tfrac: rep_thorn_fractal $*
 #@cli rep_thorn_fractal: style= { -1= Custom Formula | 0= Normal | 1= Normal Inverted | 2= Tanh Stroke 1 | 3= Tanh Stroke 2 | 4= Asymphological Vibrato | 5= Asymphological Basic | 6= Asymphological Basic 2 | 7= Asymphochaos | 8= Petallian | 9= Semi-Thorny Petallian | 10= Thorny Petal 1| 11= Thorny Petal 2 | 12= Inflation | 13= Inflation 2 | 14= Earthing | 15= Acrylic Earthing | 16= Unearthing Origami | 17= Cubic Unearthing | 18= Webbing Cubic Unearthing | 19= Chaotic Hooks | 20= Echo Wide | 21= Echo Squircle | 22= Echo Hall | 23= Echo Hall 2 | 24= Liquid Parabolic | 25= Chaos-Vibrato | 26= Chaos Deep-Vibrato | 27= Chaos Spacetime | 28= Parabolic | 29= Parabolic Chaos | 30= Cubic-Diamond Chaos | 31= C-Line | 32= Contour Chaos | 33= Spiderweb-Diamond | 34= Acrylica | 35= Refractive Space | 36= Smooth-Artistry | 37= Ferrofluid | 38= Triangular Interweaving | 39= Fabric Chaos | 40= Reverse Tangent Division | 41= Chaotic Tangent | 42= Alternating Chaos 1 | 43= Alternating Chaos 2 | 44= Alternating Chaos 3 | 45= Alternating Chaos 4 },_escape>0,_iteration>0,_subsampling_level>=1,_cx,_cy,_r_xy>0,_r_x>0,_r_y>0,_r_pi= { 0=r_xy multiplied by 1 | 1=r_xy multiplied by pi },_o_x,_o_y,_function_angle,_norm_01,_custom_x,_custom_y
 #@cli : Thorn Fractal is the fractal attributed to Andrew Wayne Graff, alternatively named the "Secant Sea". The code was adapted from Sample C source code provided by Adam Majewski.\n
 #@cli : Source - http://paulbourke.net/fractals/thorn/#dane\n
 #@cli : Alternating Chaos Formula are alternating formula founded by MadJik and are originally implemented in Fractal Attractor Plugin for Paint.NET.
-#@cli : \n
+#@cli : (eq. to 'rep_tfrac').\n
 #@cli : 'style' variable is used to define how the thorn fractal will look like with predefined formula. Use a value less than 0 to use custom formula.
 #@cli : 'escape' variable is used to define the minimum value to escape from the iterative loop.
 #@cli : 'iteration' variable defines how much repetition of loop used to find the end value.
