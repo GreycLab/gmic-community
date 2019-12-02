@@ -44,20 +44,20 @@
 #
 #-------------------------------
 
-#@cli rep_polrectrans_inv : eq. to 'rep_polar_rectangular_transform_inverse'. : (+)
-rep_polrectrans_inv: rep_polar_rectangular_transform_inverse $*
-#@cli rep_polar_rectangular_transform_inverse : -1>=_xpos<=1,-1>=_ypos<=1,_from_preserved_details={ 0=false | 1=true },orientation_0={ 0=landscape | 1=portrait },...,orientation_n
-#@cli : Transform rectangular polar images into cartesian coordinates.
-#@cli : (eq. to 'rep_polrectrans_inv').\n
+#@cli rep_polrectrans : eq. to 'rep_polar_rectangular_transform'. : (+)
+rep_polrectrans: rep_polar_rectangular_transform $*
+#@cli rep_polar_rectangular_transform : -1>=_xpos<=1,-1>=_ypos<=1,_fromto_preserved_details={ -1=from_preserve_details_polar_rectangular | 0=n/a | 1=to_preserved_details_polar_rectangular },orientation_0={ 0=landscape | 1=portrait },...,orientation_n
+#@cli : Transform cartesian coordinates into rectangular polar coordinates.
+#@cli : (eq. to 'rep_polrectrans').\n
 #@cli : Warning: Without preservation of details, artifacts is a lot more visible.
 #@cli : Default values: '_xpos=0','_ypos=0','_from_preserved_details=1'
-rep_polar_rectangular_transform_inverse:
+rep_polar_rectangular_transform:
 skip ${1=0},${2=0},${3=1}
 if $1<-1||$1>1 error "($1>=-1&&$1<=1)=0" fi
 if $2<-1||$2>1 error "($2>=-1&&$2<=1)=0" fi
 repeat $! l[$>]
     ov={[im,iM]}
-    if $3
+    if $3>0
         $=val
         orientation=${val{$>+4}}
         half_perimeter={w/2}
@@ -108,7 +108,7 @@ repeat $! l[$>]
         cut. $ov
         k.
     else
-        ov={[im,iM]}
+        if $3<0 r2dx 200%,6 fi
         f "
         begin(
             ww=w-1;
@@ -137,22 +137,24 @@ repeat $! l[$>]
         sur_max=max(abs(xx),abs(yy));
         i(sur_atan*w,sur_max*h,z,c,2,1);
         "
-        cut $ov
+        if $3<0 sharpen 2 fi
     fi
+    cut $ov
 endl done
-#@cli rep_polrectrans : eq. to 'rep_polar_rectangular_transform'. : (+)
-rep_polrectrans: rep_polar_rectangular_transform $*
-#@cli rep_polar_rectangular_transform : -1>=_xpos<=1,-1>=_ypos<=1,_preserve_details={ 0=false | 1=true }
-#@cli : Transform image into rectangular polar coordinates.
-#@cli : (eq. to 'rep_polrectrans').\n
-#@cli : Default values: '_xpos=0','_ypos=0','_preserve_details=1'
-rep_polar_rectangular_transform:
+#@cli rep_polrectrans_inv : eq. to 'rep_polar_rectangular_transform_inverse'. : (+)
+rep_polrectrans_inv: rep_polar_rectangular_transform_inverse $*
+#@cli rep_polar_rectangular_transform_inverse : -1>=_xpos<=1,-1>=_ypos<=1,_fromto_preserved_details={ -1=from_preserve_details_cartesian | 0=n/a | 1=to_preserved_details_cartesian }
+#@cli : Transform cartesian coordinates into rectangular polar coordinates.
+#@cli : (eq. to 'rep_polrectrans_inv').\n
+#@cli : Warning: Without preservation of details, artifacts is a lot more visible.
+#@cli : Default values: '_xpos=0','_ypos=0','_from_preserved_details=1'
+rep_polar_rectangular_transform_inverse:
 skip ${1=0},${2=0},${3=1}
 if $1<-1||$1>1 error "($1>=-1&&$1<=1)=0" fi
 if $2<-1||$2>1 error "($2>=-1&&$2<=1)=0" fi
 repeat $! l[$>]
     ov={[im,iM]}
-    if $3
+    if $3>0
         maxlength={max(w,h)}
         perimeter={(w+h)*2}        
         $perimeter,$maxlength,{d},{s},"
@@ -170,19 +172,18 @@ repeat $! l[$>]
             distanceaway(value)=(
                     if(value==0,ww-point_x,
                     if(value==1,hh-point_y,
-                    if(value==2,point_x,
-                    if(value==3,point_y
-                    );
-                    );
-                    );
-                    );
+                    if(value==2,   point_x,
+                                   point_y
+                                         );
+                                         );
+                                         );
                 );
             );
         surface_angle=(x/w)*360;
         if(surface_angle>cut_ang_s0&&surface_angle<=cut_ang_s1,side=1,
         if(surface_angle>cut_ang_s1&&surface_angle<=cut_ang_s2,side=2,
         if(surface_angle>cut_ang_s2&&surface_angle<=cut_ang_s3,side=3,
-                                                               side=0;
+                                                               side=0
                                                                     );
                                                                     );
                                                                     );
@@ -206,27 +207,27 @@ repeat $! l[$>]
             distanceaway(value)=(
                 if(value==0,w-point_x,
                 if(value==1,h-point_y,
-                if(value==2,point_x,
-                if(value==3,point_y
-                );
-                );
-                );
-                );
+                if(value==2,  point_x,
+                              point_y;
+                                    );
+                                    );
+                                    );
             );
         );
-        surface_angle=(x/w)*360; #Convert into angle surface using x-coordinate#
+        surface_angle=(x/w)*360;
         if(surface_angle>cut_ang_s0&&surface_angle<=cut_ang_s1,side=1,
         if(surface_angle>cut_ang_s1&&surface_angle<=cut_ang_s2,side=2,
         if(surface_angle>cut_ang_s2&&surface_angle<=cut_ang_s3,side=3,
-                                                               side=0;
+                                                               side=0
                                                                     );
                                                                     );
                                                                     );
         mdist=abs(side%2?1/sin((surface_angle/180)*pi):1/cos((surface_angle/180)*pi));
         dix=(point_x+cos((surface_angle/180)*pi)*distanceaway(side)*mdist*y/h)*((w-1)/w);
         diy=(point_y+sin((surface_angle/180)*pi)*distanceaway(side)*mdist*y/h)*((h-1)/h);
-        i(w-(dix+1),h-(diy+1),z,c,2); #Output using pixel coordinate with linear interpolation#
+        i(w-(dix+1),h-(diy+1),z,c,2);
         "
+        if $3<0 r2dx 50%,6 fi
     fi
     cut $ov
 endl done
