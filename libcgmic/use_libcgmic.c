@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
   // And here is the actual call to the G'MIC library!
   // In this example, it will get the input buffer we created, divide only the red channel by 2
   // and then display the result.
-  gmic_call("v 0 apply_channels \"div 2\",rgba_r polaroid 5,30 rotate 20 drop_shadow , drgba display",
+  gmic_call("v + apply_channels \"div 2\",rgba_r polaroid 5,30 rotate 20 drop_shadow , drgba display",
             &nofImages, &images[0], &options);
 
   // We have to dispose output images we got back from the gmic_call that were
