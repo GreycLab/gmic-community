@@ -44,117 +44,167 @@
 #
 #-------------------------------
 
-#@cli rep_polrectrans : eq. to 'rep_polar_rectangular_transform'. : (+)
-rep_polrectrans: rep_polar_rectangular_transform $*
-#@cli rep_polar_rectangular_transform : -1>=_xpos<=1,-1>=_ypos<=1,_fromto_preserved_details={ -1=from_preserve_details_polar_rectangular | 0=n/a | 1=to_preserved_details_polar_rectangular },orientation_0={ 0=landscape | 1=portrait },...,orientation_n
-#@cli : Transform cartesian coordinates into rectangular polar coordinates.
-#@cli : (eq. to 'rep_polrectrans').\n
-#@cli : Warning: Without preservation of details, artifacts is a lot more visible.
-#@cli : Default values: '_xpos=0','_ypos=0','_from_preserved_details=1'
-rep_polar_rectangular_transform:
-skip ${1=0},${2=0},${3=1}
-if $1<-1||$1>1 error "($1>=-1&&$1<=1)=0" fi
-if $2<-1||$2>1 error "($2>=-1&&$2<=1)=0" fi
+#@cli rep_axis_streak_distance: orientation,direction,_alpha_exponential_factor
+#@cli : Streaks pixels based on distance away from center and placement of visible objects.
+#@cli : '_alpha_exponential_factor' is used to manipulate the alpha mixing within pixels. The more power that is assigned to the alpha, the less mixing there would be. 
+rep_axis_streak_distance:
+skip ${3=0}
 repeat $! l[$>]
-    ov={[im,iM]}
-    if $3>0
-        $=val
-        orientation=${val{$>+4}}
-        half_perimeter={w/2}
-        length_1={$half_perimeter-h}
-        length_2={$half_perimeter-$length_1}
-        if $orientation
-            width={min($length_1,$length_2)}
-            height={max($length_1,$length_2)}
-        else
-            width={max($length_1,$length_2)}
-            height={min($length_1,$length_2)}
-        fi
-        $width,$height,{d},{s},"
-        begin(
-            ww=w#0;
-            hh=h#0;
-            ox="$width";
-            oy="$height";
-            sd=max(ox,oy)/min(ox,oy);
-            if("$orientation",
-                sxf=ox<oy?1:sd;
-                syf=ox<oy?sd:1;
-                ,
-                sxf=ox<oy?sd:1;
-                syf=ox<oy?1:sd;
-            );
-            cx=.5+$1*.5;
-            cy=.5+$2*.5;
-            px=cx*ww;
-            py=(1-cy)*hh;
-            sxl=(ww/2)/px;
-            sxr=(ww/2)/(ww-px);
-            syt=(hh/2)/py;
-            syb=(hh/2)/(hh-py);
-        );
-        xx=(x/(w-1))*ww;xx+=(xx/(ww-1)-.5)*-1;
-        yy=(y/h)*(hh+1);
-        xl=-1+(xx/ww)*2*sxl;
-        xr=1-(1-xx/ww)*2*sxr;
-        yt=-1+(yy/hh)*2*syt;
-        yb=1-(1-yy/hh)*2*syb;
-        nxx=xx>px?xr:xl;
-        nyy=yy>py?yb:yt;
-        ay=max(abs(nxx),abs(nyy));
-        ax=(atan2((yy/hh-(1-cy))*syf,(xx/ww-cx)*sxf)+pi)/(2*pi);
-        i(#0,ax*ww,ay*hh,z,c,2,1);
-        "
-        cut. $ov
-        k.
-    else
-        if $3<0 r2dx 200%,6 fi
-        f "
-        begin(
-            ww=w-1;
-            hh=h-1;
-            sd=max(w,h)/min(w,h);
-            sx=w>h?sd:1;
-            sy=w>h?1:sd;
-            cx=.5+$1*.5;
-            cy=.5+$2*.5;
-            px=cx*w;
-            py=(1-cy)*h;
-            sxl=(w/2)/px;
-            sxr=(w/2)/(w-px);
-            syt=(h/2)/py;
-            syb=(h/2)/(h-py);
-        );
-        atx=(x/ww-cx)*sx;
-        aty=(y/hh-(1-cy))*sy;
-        sur_atan=(atan2(aty,atx)+pi)/(2*pi);
-        xl=-1+(x/ww)*2*sxl;
-        xr=1-(1-x/ww)*2*sxr;
-        yt=-1+(y/hh)*2*syt;
-        yb=1-(1-y/hh)*2*syb;
-        xx=x>=px?xr:xl;
-        yy=y>=py?yb:yt;
-        sur_max=max(abs(xx),abs(yy));
-        i(sur_atan*w,sur_max*h,z,c,2,1);
-        "
-        if $3<0 sharpen 2 fi
-    fi
-    cut $ov
+        channels {s-1}
+        alp={iM}
+        / $alp
+        if $3<=-1 exp_f={1-10^-8} else exp_f=3 fi
+        f i^(1+$exp_f)
+        eval ${-math_lib}"
+            const hh=h-1;
+            const ww=w-1;
+            orientation=$1;
+            direction=$2;
+            if(orientation #x,y#
+               ,if(direction
+                        ,for(xx=0,xx<=ww,xx++,break=0;
+                                for(yy=hh,yy>=0,yy--,
+                                    if(!break,if(i(xx,yy),break=1));if(break==1,z_level=hh;break+=1;alp=i(xx,yy));if(break==2,alp=alp+(1-alp)*i(xx,yy);z_level=yy*i(xx,yy)+(1-i(xx,yy))*z_level;if(yy,i(xx,yy)=(yy/z_level)*alp;););
+                                );
+                            );
+                        ,for(xx=0,xx<=ww,xx++,break=0;
+                                for(yy=0,yy<=hh,yy++,
+                                    if(!break,if(i(xx,yy),break=1));if(break==1,z_level=hh;break+=1;alp=i(xx,yy));if(break==2,alp=alp+(1-alp)*i(xx,yy);z_level=(hh-yy)*i(xx,yy)+(1-i(xx,yy))*z_level;if(hh-yy,i(xx,yy)=((hh-yy)/z_level)*alp;););
+                                );
+                            );
+                    );
+               ,if(direction
+                        ,for(yy=0,yy<=hh,yy++,break=0;
+                                for(xx=0,xx<=ww,xx++,
+                                    if(!break,if(i(xx,yy),break=1));if(break==1,z_level=ww;break+=1;alp=i(xx,yy));if(break==2,alp=alp+(1-alp)*i(xx,yy);z_level=(ww-xx)*i(xx,yy)+(1-i(xx,yy))*z_level;if(ww-xx,i(xx,yy)=((ww-xx)/z_level)*alp;););
+                                );
+                            );
+                        ,for(yy=0,yy<=hh,yy++,break=0;
+                                for(xx=ww,xx>=0,xx--,
+                                    if(!break,if(i(xx,yy),break=1));if(break==1,z_level=ww;break+=1;alp=i(xx,yy));if(break==2,alp=alp+(1-alp)*i(xx,yy);z_level=xx*i(xx,yy)+(1-i(xx,yy))*z_level;if(xx,i(xx,yy)=(xx/z_level)*alp;););
+                                );
+                            );
+                    );
+               );
+    "
 endl done
-#@cli rep_polrectrans_inv : eq. to 'rep_polar_rectangular_transform_inverse'. : (+)
-rep_polrectrans_inv: rep_polar_rectangular_transform_inverse $*
-#@cli rep_polar_rectangular_transform_inverse : -1>=_xpos<=1,-1>=_ypos<=1,_fromto_preserved_details={ -1=from_preserve_details_cartesian | 0=n/a | 1=to_preserved_details_cartesian }
-#@cli : Transform cartesian coordinates into rectangular polar coordinates.
-#@cli : (eq. to 'rep_polrectrans_inv').\n
-#@cli : Warning: Without preservation of details, artifacts is a lot more visible.
-#@cli : Default values: '_xpos=0','_ypos=0','_from_preserved_details=1'
-rep_polar_rectangular_transform_inverse:
-skip ${1=0},${2=0},${3=1}
+#@cli rep_axis_streak: orientation,direction,_alpha_exponential_factor
+#@cli : Streaks pixels taking into account of opacity.
+#@cli : '_alpha_exponential_factor' is used to manipulate the alpha mixing within pixels. The more power that is assigned to the alpha, the less mixing there would be. 
+rep_axis_streak:
+skip ${3=0}
+repeat $! l[$>]
+    vv=0
+    repeat s#0
+        sh[0] $>
+        tvv={iv#-1}
+        vv+=$tvv
+        rm.
+    done
+    if $vv
+        sh 0,{s-2}
+        sh.. {s}
+        f.. i(#-1,x,y,z,0)==0?0:i
+        alp={iM#-1}
+        /. $alp
+        f. i^(1+abs($3))
+        
+        eval ${-math_lib}"
+            const hh=h-1;
+            const ww=w-1;
+            orientation=$1;
+            direction=$2;
+            if(orientation #x,y#
+                ,if(direction
+                        ,for(xx=0,xx<=ww,xx++,
+                                for(yy=hh,yy>=0,yy--,
+                                    if(yy==hh,col=I(#-2,xx,yy);alp=i(#-1,xx,yy);
+                                        ,newcol=I(#-2,xx,yy);newalp=i(#-1,xx,yy);if(newalp==0,I(#-2,xx,yy)=col;i(#-1,xx,yy)=alp;,
+                                                                                    if(newalp==1,col=I(#-2,xx,yy);alp=i(#-1,xx,yy);
+                                                                                    ,if(newalp!=alp,if(newcol!=col,I(#-2,xx,yy)=newcol*newalp+(1-newalp)*col;i(#-1,xx,yy)=alp+newalp*(1-alp);col=I(#-2,xx,yy);alp=i(#-1,xx,yy);
+                                                                                                    ,i(#-1,xx,yy)=alp+newalp*(1-alp);col=I(#-2,xx,yy);alp=i(#-1,xx,yy););
+                                                                                        ,if(newcol!=col,I(#-2,xx,yy)=newcol*newalp+(1-newalp)*col;i(#-1,xx,yy)=alp+newalp*(1-alp);col=I(#-2,xx,yy);alp=i(#-1,xx,yy););
+                                                                                        );
+                                                                                    );
+                                                                                );
+                                        );
+                                    );
+                                );
+                        ,for(xx=0,xx<=ww,xx++,
+                                for(yy=0,yy<=hh,yy++,
+                                    if(yy==0,col=I(#-2,xx,yy);alp=i(#-1,xx,yy);
+                                        ,newcol=I(#-2,xx,yy);newalp=i(#-1,xx,yy);if(newalp==0,I(#-2,xx,yy)=col;i(#-1,xx,yy)=alp;,
+                                                                                    if(newalp==1,col=I(#-2,xx,yy);alp=i(#-1,xx,yy);
+                                                                                    ,if(newalp!=alp,if(newcol!=col,I(#-2,xx,yy)=newcol*newalp+(1-newalp)*col;i(#-1,xx,yy)=alp+newalp*(1-alp);col=I(#-2,xx,yy);alp=i(#-1,xx,yy);
+                                                                                                    ,i(#-1,xx,yy)=alp+newalp*(1-alp);col=I(#-2,xx,yy);alp=i(#-1,xx,yy););
+                                                                                        ,if(newcol!=col,I(#-2,xx,yy)=newcol*newalp+(1-newalp)*col;i(#-1,xx,yy)=alp+newalp*(1-alp);col=I(#-2,xx,yy);alp=i(#-1,xx,yy););
+                                                                                        );
+                                                                                    );
+                                                                                );
+                                        );
+                                    );
+                                );
+                    );
+                ,if(direction #left,right#
+                        ,for(yy=0,yy<=hh,yy++,
+                                for(xx=0,xx<=ww,xx++,
+                                    if(xx==0,col=I(#-2,xx,yy);alp=i(#-1,xx,yy);
+                                        ,newcol=I(#-2,xx,yy);newalp=i(#-1,xx,yy);if(newalp==0,I(#-2,xx,yy)=col;i(#-1,xx,yy)=alp;,
+                                                                                    if(newalp==1,col=I(#-2,xx,yy);alp=i(#-1,xx,yy);
+                                                                                    ,if(newalp!=alp,if(newcol!=col,I(#-2,xx,yy)=newcol*newalp+(1-newalp)*col;i(#-1,xx,yy)=alp+newalp*(1-alp);col=I(#-2,xx,yy);alp=i(#-1,xx,yy);
+                                                                                                    ,i(#-1,xx,yy)=alp+newalp*(1-alp);col=I(#-2,xx,yy);alp=i(#-1,xx,yy););
+                                                                                        ,if(newcol!=col,I(#-2,xx,yy)=newcol*newalp+(1-newalp)*col;i(#-1,xx,yy)=alp+newalp*(1-alp);col=I(#-2,xx,yy);alp=i(#-1,xx,yy););
+                                                                                        );
+                                                                                    );
+                                                                                );
+                                        );
+                                    );
+                                );
+                        ,for(yy=0,yy<=hh,yy++,
+                                for(xx=ww,xx>=0,xx--,
+                                    if(xx==ww,col=I(#-2,xx,yy);alp=i(#-1,xx,yy);
+                                        ,newcol=I(#-2,xx,yy);newalp=i(#-1,xx,yy);if(newalp==0,I(#-2,xx,yy)=col;i(#-1,xx,yy)=alp;,
+                                                                                    if(newalp==1,col=I(#-2,xx,yy);alp=i(#-1,xx,yy);
+                                                                                    ,if(newalp!=alp,if(newcol!=col,I(#-2,xx,yy)=newcol*newalp+(1-newalp)*col;i(#-1,xx,yy)=alp+newalp*(1-alp);col=I(#-2,xx,yy);alp=i(#-1,xx,yy);
+                                                                                                    ,i(#-1,xx,yy)=alp+newalp*(1-alp);col=I(#-2,xx,yy);alp=i(#-1,xx,yy););
+                                                                                        ,if(newcol!=col,I(#-2,xx,yy)=newcol*newalp+(1-newalp)*col;i(#-1,xx,yy)=alp+newalp*(1-alp);col=I(#-2,xx,yy);alp=i(#-1,xx,yy););
+                                                                                        );
+                                                                                    );
+                                                                                );
+                                        );
+                                    );
+                                );
+                    );
+                );
+    "
+    *. $alp
+    rm[-2,-1]
+    fi
+endl done
+#@cli rep_ol: eq. to 'rep_orientation_list'. : (+)
+#@cli : Return dimensions of selected images.
+rep_ol: rep_orientation_list
+#@cli rep_orientation_list:
+#@cli : Return orientation of selected images.
+#@cli : (eq. to rep_ol).
+rep_orientation_list: v - _rep_orientation_list v +
+_rep_orientation_list:
+ti={$!}
+u {"ro=vector"$ti"(0);for (k=0,k<"$ti",++k,if(w#k>h#k,ro[k]=0,ro[k]=1););(ro)"}
+#@cli rep_recpoltrans: eq. to 'rep_rectangular_polar_transformation'. : (+)
+rep_recpoltrans: rep_rectangular_polar_transformation $*
+#@cli rep_rectangular_polar_transformation : -1>=_xpos<=1,-1>=_ypos<=1,_fromto={ -3=to_inverted_rectangular_polar_preserved_details | -2=from_rectangular_polar_preserved_details_to_cartesian | -1=to_inverted_rectangular_polar | 0=to_rectangular_polar | 1=to_rectangular_polar_preserved_details| 2=from_preserved_details_inverted_rectangular_polar },orientation_0={ 0=landscape | 1=portrait },...,orientation_n
+#@cli : Converts images to inversion of rectangular polar format or to rectangular polar format. Adapted for development of perspective filters. The first two variables defines the coordinates of revolution based on -1,1 ranges. 1,1 means the point of revolution is on top-right part of the image.
+#@cli : (eq. to rep_recpoltrans).\n
+#@cli : Note: When using 2 for $3, you need to define the orientation of every images. For every images, insert one argument per image after $3.
+#@cli : Default values: '_xpos=0','_ypos=0','_fromto=0'
+rep_rectangular_polar_transformation:
+skip ${1=0},${2=0},${3=0}
 if $1<-1||$1>1 error "($1>=-1&&$1<=1)=0" fi
 if $2<-1||$2>1 error "($2>=-1&&$2<=1)=0" fi
 repeat $! l[$>]
     ov={[im,iM]}
-    if $3>0
+    if $3==-3
         maxlength={max(w,h)}
         perimeter={(w+h)*2}        
         $perimeter,$maxlength,{d},{s},"
@@ -193,7 +243,7 @@ repeat $! l[$>]
         i(#0,ww-(dix+1),hh-(diy+1),z,c,2);
         "
         k.
-    else
+    elif $3==-1||$3==-2
         f "
         begin(
             point_x=(($1*-1)*.5+.5)*w;
@@ -227,7 +277,88 @@ repeat $! l[$>]
         diy=(point_y+sin((surface_angle/180)*pi)*distanceaway(side)*mdist*y/h)*((h-1)/h);
         i(w-(dix+1),h-(diy+1),z,c,2);
         "
-        if $3<0 r2dx 50%,6 fi
+        if $3<-1 r2dx 50%,6 fi
+    elif $3==0||$3==1
+        if $3>0 r2dx 200%,6 fi
+        f "
+        begin(
+            ww=w-1;
+            hh=h-1;
+            sd=max(w,h)/min(w,h);
+            sx=w>h?sd:1;
+            sy=w>h?1:sd;
+            cx=.5+$1*.5;
+            cy=.5+$2*.5;
+            px=cx*w;
+            py=(1-cy)*h;
+            sxl=(w/2)/px;
+            sxr=(w/2)/(w-px);
+            syt=(h/2)/py;
+            syb=(h/2)/(h-py);
+        );
+        atx=(x/ww-cx)*sx;
+        aty=(y/hh-(1-cy))*sy;
+        sur_atan=(atan2(aty,atx)+pi)/(2*pi);
+        xl=-1+(x/ww)*2*sxl;
+        xr=1-(1-x/ww)*2*sxr;
+        yt=-1+(y/hh)*2*syt;
+        yb=1-(1-y/hh)*2*syb;
+        xx=x>=px?xr:xl;
+        yy=y>=py?yb:yt;
+        sur_max=max(abs(xx),abs(yy));
+        i(sur_atan*w,sur_max*h,z,c,2,2);
+        "
+        if $3>0 sharpen 2 fi
+    elif $3==2
+        $=val
+        orientation=${val{$>+4}}
+        half_perimeter={w/2}
+        length_1={$half_perimeter-h}
+        length_2={$half_perimeter-$length_1}
+        if $orientation
+            width={min($length_1,$length_2)}
+            height={max($length_1,$length_2)}
+        else
+            width={max($length_1,$length_2)}
+            height={min($length_1,$length_2)}
+        fi
+        $width,$height,{d},{s},"
+        begin(
+            ww=w#0;
+            hh=h#0;
+            ox="$width";
+            oy="$height";
+            sd=max(ox,oy)/min(ox,oy);
+            if("$orientation",
+                sxf=ox<oy?sd:1;
+                syf=ox<oy?1:sd;
+                ,
+                sxf=ox<oy?1:sd;
+                syf=ox<oy?sd:1;
+            );
+            cx=.5+$1*.5;
+            cy=.5+$2*.5;
+            px=cx*ww;
+            py=(1-cy)*hh;
+            sxl=(ww/2)/px;
+            sxr=(ww/2)/(ww-px);
+            syt=(hh/2)/py;
+            syb=(hh/2)/(hh-py);
+        );
+        xx=(x/(w-1))*ww;
+        yy=(y/(h-1))*hh;
+        xl=-1+(xx/ww)*2*sxl;
+        xr=1-(1-xx/ww)*2*sxr;
+        yt=-1+(yy/hh)*2*syt;
+        yb=1-(1-yy/hh)*2*syb;
+        nxx=xx>px?xr:xl;
+        nyy=yy>py?yb:yt;
+        ay=max(abs(nxx),abs(nyy));
+        ax=(atan2((yy/hh-(1-cy))*syf,(xx/ww-cx)*sxf)+pi)/(2*pi);
+        i(#0,abs(ax*ww),abs(ay*hh),z,c,2,1); #TODO:Fix boundary to remove boundary requirement#
+        "
+        k.
+    else error "$3|"$"3!=intnum[-3,2]"
     fi
     cut $ov
 endl done
