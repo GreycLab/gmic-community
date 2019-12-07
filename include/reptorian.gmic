@@ -44,8 +44,55 @@
 #
 #-------------------------------
 
-#@cli rep_axis_streak_distance: orientation,direction,_alpha_exponential_factor
+#@cli rep_pstrk: eq. to 'rep_perspective_streak' : (+)
+rep_pstrk: rep_perspective_streak $*
+#@cli rep_perspective_streak: -1<=_xpos<=1,-1<=_ypos<=1,-1<=_alpha_exponential_factor,0<_threshold<1,_direction={ 0=out | 1=in },_streak_mode={ 0=color | 1=gray | 2=binary }
+rep_perspective_streak:
+skip ${1=0},${2=0},${3=0},${4=1},${5=1},${6=0}
+point={[$1,$2]}
+repeat $! l[$>]
+    if h>w orientation=1
+    else orientation=0
+    fi
+    rep_recpoltrans $point,-3
+        if $6||s==1
+            channels {s-1}
+            rep_axis_streak 1,$5,$3
+            if $4>0&&$4<1
+                f i>(1-$4)?i:(1-$4)
+                f i>(1-$4)?i:(1-$4)
+            fi
+        else
+            if $4>0&&$4<1 
+                +channels {s-1} 
+                rep_axis_streak. 1,$5,$3
+                f. i>(1-$4)?i:(1-$4)
+                f. i>(1-$4)?i:(1-$4)
+                n. 0,1
+                f. i>0?1:0
+            fi
+            rep_axis_streak[0] 1,$5,$3
+            if $4>0&&$4<1
+                sh[0] {s#0-1}
+                rv[-2,-1]
+                rm.
+            fi
+        fi
+    rep_recpoltrans $point,2,$orientation
+    if $6==2 f i>0?1:0 fi
+endl done
+#@cli rep_axis_streak: orientation,direction,_alpha_exponential_factor
 #@cli : Streaks pixels based on distance away from center and placement of visible objects.
+#@cli : '_alpha_exponential_factor' is used to manipulate the alpha mixing within pixels. The more power that is assigned to the alpha, the less mixing there would be. 
+rep_axis_streak:
+skip ${3=0}
+repeat $! l[$>]
+    if s==2||s>3 rep_axis_streak_color ${1-3}
+    elif s==1 rep_axis_streak_distance ${1-3}
+    fi
+endl done
+#@cli rep_axis_streak_distance: orientation,direction,_alpha_exponential_factor
+#@cli : Streaks alpha pixels based on distance away from center and placement of visible objects.
 #@cli : '_alpha_exponential_factor' is used to manipulate the alpha mixing within pixels. The more power that is assigned to the alpha, the less mixing there would be. 
 rep_axis_streak_distance:
 skip ${3=0}
@@ -53,14 +100,14 @@ repeat $! l[$>]
         channels {s-1}
         alp={iM}
         / $alp
-        if $3<=-1 exp_f={1-10^-8} else exp_f=3 fi
+        if $3<=-1 exp_f={1-10^-8} else exp_f=$3 fi
         f i^(1+$exp_f)
         eval ${-math_lib}"
             const hh=h-1;
             const ww=w-1;
             orientation=$1;
             direction=$2;
-            if(orientation #x,y#
+            if(orientation
                ,if(direction
                         ,for(xx=0,xx<=ww,xx++,break=0;
                                 for(yy=hh,yy>=0,yy--,
@@ -88,10 +135,10 @@ repeat $! l[$>]
                );
     "
 endl done
-#@cli rep_axis_streak: orientation,direction,_alpha_exponential_factor
-#@cli : Streaks pixels taking into account of opacity.
+#@cli rep_axis_streak_color: orientation,direction,_alpha_exponential_factor
+#@cli : Streaks colored pixels taking into account of opacity.
 #@cli : '_alpha_exponential_factor' is used to manipulate the alpha mixing within pixels. The more power that is assigned to the alpha, the less mixing there would be. 
-rep_axis_streak:
+rep_axis_streak_color:
 skip ${3=0}
 repeat $! l[$>]
     vv=0
@@ -114,7 +161,7 @@ repeat $! l[$>]
             const ww=w-1;
             orientation=$1;
             direction=$2;
-            if(orientation #x,y#
+            if(orientation
                 ,if(direction
                         ,for(xx=0,xx<=ww,xx++,
                                 for(yy=hh,yy>=0,yy--,
@@ -129,8 +176,8 @@ repeat $! l[$>]
                                                                                 );
                                         );
                                     );
-                                );
-                        ,for(xx=0,xx<=ww,xx++,
+                            );
+                    ,for(xx=0,xx<=ww,xx++,
                                 for(yy=0,yy<=hh,yy++,
                                     if(yy==0,col=I(#-2,xx,yy);alp=i(#-1,xx,yy);
                                         ,newcol=I(#-2,xx,yy);newalp=i(#-1,xx,yy);if(newalp==0,I(#-2,xx,yy)=col;i(#-1,xx,yy)=alp;,
@@ -143,9 +190,9 @@ repeat $! l[$>]
                                                                                 );
                                         );
                                     );
-                                );
+                            );
                     );
-                ,if(direction #left,right#
+                ,if(direction
                         ,for(yy=0,yy<=hh,yy++,
                                 for(xx=0,xx<=ww,xx++,
                                     if(xx==0,col=I(#-2,xx,yy);alp=i(#-1,xx,yy);
@@ -159,8 +206,8 @@ repeat $! l[$>]
                                                                                 );
                                         );
                                     );
-                                );
-                        ,for(yy=0,yy<=hh,yy++,
+                            );
+                    ,for(yy=0,yy<=hh,yy++,
                                 for(xx=ww,xx>=0,xx--,
                                     if(xx==ww,col=I(#-2,xx,yy);alp=i(#-1,xx,yy);
                                         ,newcol=I(#-2,xx,yy);newalp=i(#-1,xx,yy);if(newalp==0,I(#-2,xx,yy)=col;i(#-1,xx,yy)=alp;,
@@ -173,7 +220,7 @@ repeat $! l[$>]
                                                                                 );
                                         );
                                     );
-                                );
+                            );
                     );
                 );
     "
@@ -181,16 +228,72 @@ repeat $! l[$>]
     rm[-2,-1]
     fi
 endl done
+#@cli rep_mn: eq. to 'rep_multinormalize'. : (+)
+rep_mn: rep_multinormalize $*
+#@cli rep_multinormalize: values
+#@cli : Cut based on channels using values.
+#@cli : (eq. to rep_mnormalize).
+rep_multicut:
+repeat $! l[$>]
+    repeat s
+        $=a
+        $=b
+        val_a=${a{$>*2+1}}
+        val_b=${b{$>*2+2}}
+        sh $>
+        normalize. $val_a,$val_b
+        rm.
+    done
+endl done
+#@cli rep_mc: eq. to 'rep_multicut'. : (+)
+rep_mc: rep_multicut $*
+#@cli rep_multicut: values
+#@cli : Cut based on channels using values.
+#@cli : (eq. to rep_mcut).
+rep_multicut:
+repeat $! l[$>]
+    repeat s
+        $=a
+        $=b
+        val_a=${a{$>*2+1}}
+        val_b=${b{$>*2+2}}
+        sh $>
+        cut. $val_a,$val_b
+        rm.
+    done
+endl done
+#@cli rep_2dcr: eq. to 'rep_2dcr'. : (+)
+rep_2dcr: rep_2dchannelsranges
+#@cli rep_2d_channels_ranges:
+#@cli : Return the minimal and maximum values per channels in a image.
+rep_2dchannelsranges: _rep_2dchannelsranges
+_rep_2dchannelsranges:
+if $!>1 error "Cannot be used on more than 1 images!" fi
+repeat s
+if $>==0
+sh $>
+minv={im#-1}
+maxv={iM#-1}
+cv=[$minv,$maxv]
+rm.
+else
+sh $>
+minv={im#-1}
+maxv={iM#-1}
+tcv=[$minv,$maxv]
+cv=[$cv,$tcv]
+rm.
+fi
+done
+u {"chv="$cv";(chv)"}
 #@cli rep_ol: eq. to 'rep_orientation_list'. : (+)
 #@cli : Return dimensions of selected images.
 rep_ol: rep_orientation_list
 #@cli rep_orientation_list:
 #@cli : Return orientation of selected images.
 #@cli : (eq. to rep_ol).
-rep_orientation_list: v - _rep_orientation_list v +
-_rep_orientation_list:
-ti={$!}
-u {"ro=vector"$ti"(0);for (k=0,k<"$ti",++k,if(w#k>h#k,ro[k]=0,ro[k]=1););(ro)"}
+rep_orientation_list: _rep_orientation_list
+_rep_orientation_list: ti={$!} u {"ro=vector"$ti"(0);for (k=0,k<"$ti",++k,if(h#k>w#k,ro[k]=1,ro[k]=0););(ro)"}
 #@cli rep_recpoltrans: eq. to 'rep_rectangular_polar_transformation'. : (+)
 rep_recpoltrans: rep_rectangular_polar_transformation $*
 #@cli rep_rectangular_polar_transformation : -1>=_xpos<=1,-1>=_ypos<=1,_fromto={ -3=to_inverted_rectangular_polar_preserved_details | -2=from_rectangular_polar_preserved_details_to_cartesian | -1=to_inverted_rectangular_polar | 0=to_rectangular_polar | 1=to_rectangular_polar_preserved_details| 2=from_preserved_details_inverted_rectangular_polar },orientation_0={ 0=landscape | 1=portrait },...,orientation_n
@@ -203,11 +306,11 @@ skip ${1=0},${2=0},${3=0}
 if $1<-1||$1>1 error "($1>=-1&&$1<=1)=0" fi
 if $2<-1||$2>1 error "($2>=-1&&$2<=1)=0" fi
 repeat $! l[$>]
-    ov={[im,iM]}
+    ov=${-rep_2dcr}
     if $3==-3
         maxlength={max(w,h)}
         perimeter={(w+h)*2}        
-        $perimeter,$maxlength,{d},{s},"
+        {$perimeter*2},{$maxlength*2},{d},{s},"
         begin(
             ww=w#0;
             hh=h#0;
@@ -265,9 +368,9 @@ repeat $! l[$>]
             );
         );
         surface_angle=(x/w)*360;
-        if(surface_angle>cut_ang_s0&&surface_angle<=cut_ang_s1,side=1,
-        if(surface_angle>cut_ang_s1&&surface_angle<=cut_ang_s2,side=2,
-        if(surface_angle>cut_ang_s2&&surface_angle<=cut_ang_s3,side=3,
+        if(surface_angle>=cut_ang_s0&&surface_angle<cut_ang_s1,side=1,
+        if(surface_angle>=cut_ang_s1&&surface_angle<cut_ang_s2,side=2,
+        if(surface_angle>=cut_ang_s2&&surface_angle<cut_ang_s3,side=3,
                                                                side=0
                                                                     );
                                                                     );
@@ -310,7 +413,7 @@ repeat $! l[$>]
         "
         if $3>0 sharpen 2 fi
     elif $3==2
-        $=val
+       $=val
         orientation=${val{$>+4}}
         half_perimeter={w/2}
         length_1={$half_perimeter-h}
@@ -329,10 +432,10 @@ repeat $! l[$>]
             ox="$width";
             oy="$height";
             sd=max(ox,oy)/min(ox,oy);
-            if("$orientation",
-                sxf=ox<oy?sd:1;
-                syf=ox<oy?1:sd;
-                ,
+            if(w>h,
+                sxf=ox>oy?sd:1;
+                syf=ox>oy?1:sd;
+            ,
                 sxf=ox<oy?1:sd;
                 syf=ox<oy?sd:1;
             );
@@ -355,12 +458,13 @@ repeat $! l[$>]
         nyy=yy>py?yb:yt;
         ay=max(abs(nxx),abs(nyy));
         ax=(atan2((yy/hh-(1-cy))*syf,(xx/ww-cx)*sxf)+pi)/(2*pi);
-        i(#0,abs(ax*ww),abs(ay*hh),z,c,2,1); #TODO:Fix boundary to remove boundary requirement#
+        i(#0,abs(ax*ww),abs(ay*hh),z,c,2,1);
         "
+        r2dx. 50%,6
         k.
     else error "$3|"$"3!=intnum[-3,2]"
     fi
-    cut $ov
+    rep_multicut $ov
 endl done
 #@cli rep_sd: eq. to 'rep_spiral_distort'. : (+)
 rep_sd: rep_spiral_distort $*
