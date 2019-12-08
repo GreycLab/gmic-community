@@ -46,12 +46,12 @@
 
 #@cli rep_pstrk: eq. to 'rep_perspective_streak' : (+)
 rep_pstrk: rep_perspective_streak $*
-#@cli rep_perspective_streak: -1<=_xpos<=1,-1<=_ypos<=1,-1<=_alpha_exponential_factor,0<_distance_threshold<=1,_direction={ 0=in | 1=out },_streak_mode={ 0=color | 1=gray | 2=binary | 3=gray+binary },_preserve_edges={ 0=do_not_preserve_edges | 1=preserve_edges }
+#@cli rep_perspective_streak: -1<=_xpos<=1,-1<=_ypos<=1,-1<=_alpha_exponential_factor,0<_distance_threshold<=1,0<_distance_start<=1,_direction={ 0=in | 1=out },_streak_mode={ 0=color | 1=gray | 2=binary | 3=gray+binary },_preserve_edges={ 0=do_not_preserve_edges | 1=preserve_edges }
 #@cli : Create perspective streak effect. _preserve_details only is applicable on non-binary mode.
 #@cli : (eq. to 'rep_pstrk').\n
-#@cli : Default values: '_xpos=0','_ypos=0','_alpha_exponential_factor=1','_distance_threshold=1','_direction=0','_streak_mode=0','_preserve_edges=1'
+#@cli : Default values: '_xpos=0','_ypos=0','_alpha_exponential_factor=1','_distance_threshold=1','_distance_start=0','_direction=0','_streak_mode=0','_preserve_edges=1'
 rep_perspective_streak:
-skip ${1=0},${2=0},${3=0},${4=1},${5=0},${6=0},${7=1}
+skip ${1=0},${2=0},${3=0},${4=1},${5=0},${6=0},${7=0},${8=1}
 point={[$1,$2]}
 if !$4 error "$4|"$"4>0" fi
 repeat $! l[$>]
@@ -61,22 +61,23 @@ repeat $! l[$>]
         else orientation=0
         fi
         rep_recpoltrans $point,-3
-            if $6||s==1
+            if $5>0&&$5<1 f begin(sy=1/(((1-$5)*h)/h););i(x,y*sy,z,c,2); fi
+            if $7||s==1
                 channels {s-1}
-                if $7 
-                    if $6==3||$6==1 . n. 0,1 l. +f 1 rv a c endl store. details
+                if $8 
+                    if $7==3||$7==1 . n. 0,1 l. +f 1 rv a c endl store. details
                     else echo "Details cannot be preserved using binary mode!"
                     fi
                 fi
-                rep_axis_streak 1,!$5,$3
+                rep_axis_streak 1,!$6,$3
                 if $4>0&&$4<1
                     f i>(1-$4)?i:(1-$4)
                     n 0,1
                 fi
-                if $6==2 f i>0?1:0 
-                elif $6==3 +f i>0?1:0 a c fi
-                if $7
-                    if $6==3||$6==1
+                if $7==2 f i>0?1:0 
+                elif $7==3 +f i>0?1:0 a c fi
+                if $8
+                    if $7==3||$7==1
                         $details
                         s. c,-{s-1}
                         j[-3] [-2],0,0,0,0,1,[-1],1
@@ -84,20 +85,20 @@ repeat $! l[$>]
                     fi
                 fi
             else
-                if $7 +store details fi
+                if $8 +store details fi
                 if $4>0&&$4<1 
                     +channels {s-1} 
-                    rep_axis_streak. 1,!$5,$3
+                    rep_axis_streak. 1,!$6,$3
                     f. i>(1-$4)?i:(1-$4)
                     f. i>im#-1?1:0
                 fi
-                rep_axis_streak[0] 1,!$5,$3
+                rep_axis_streak[0] 1,!$6,$3
                 if $4>0&&$4<1
                     sh[0] {s#0-1}
                     f. i0#-2*i
                     k[0]
                 fi
-                if $7
+                if $8
                     $details
                     s. c,-{s-1}
                     j[-3] [-2],0,0,0,0,1,[-1],{iM#-1}
@@ -5008,6 +5009,7 @@ u "{$1}"\
 #@gui : Vanishing Point (%)=point(50,50,0,1,128,128,128,255)
 #@gui : Alpha Exponential Factor (%)=float(0,-100,500)
 #@gui : Distance Threshold (%)=float(100,.1,100)
+#@gui : Distance Start (%)=float(0,0,99.99)
 #@gui : Streak Direction=choice(0,"Inside","Outside")
 #@gui : sep=separator(),note=note("<b>Info Output</b>")
 #@gui : Streak Mode=choice(0,"Color","Grayscale","Binary","Grayscale+Binary")
@@ -5015,7 +5017,7 @@ u "{$1}"\
 #@gui : note=note("<small>Preserve Edges are not available on binary mode.</small>")
 #@gui : sep=separator(),note=note("<b>Preview</b>")Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"),Preview Split=point(50,50,0,0,200,200,200,0,10)_0
 #@gui : sep=separator(),note=note("<b>- Instruction Notes-</b>\n\n<small><b>Note 1 - </b>To effectively use this filter, experiment using <b>Secondary Settings</b> on <u>multiple copies of original image[s]</u>.\n\n<b>Note 2 - </b>Use blending modes.\n\n<b>Note 3 - </b>If your software supports alpha inheritance, use that to advantage.</small>")
-#@gui : sep=separator(),note=note("<small>Author: Reptorian. Latest Update: <i>2019/12/7</i>.</small>")
+#@gui : sep=separator(),note=note("<small>Author: Reptorian. Latest Update: <i>2019/12/8</i>.</small>")
 gui_rep_perspective_streak:
 px={(($1-50)*2)/100}
 py={(($2-50)*-2)/100}
@@ -5025,18 +5027,19 @@ fi
 if $py<-1 px=-1
 elif $py>1 px=1
 fi
-rep_pstrk $px,$py,$3%,$4%,$5,$6,$7
-if $6 * 255 fi
+rep_pstrk $px,$py,$3%,$4%,$5%,$6,$7,$8
+if $7 * 255 fi
 gui_rep_perspective_streak_preview:
-gui_split_preview "gui_rep_perspective_streak ${1-7}",${-3--1}
+gui_split_preview "gui_rep_perspective_streak ${1-8}",${-3--1}
 u "{$1,$2}"\
 "{$3}"\
 "{$4}"\
 "{$5}"\
 "{$6}"\
-"{$7}_"{$6!=2?2:1}\
-"{$8,$9}"\
-"{$10}"
+"{$7}"\
+"{$8}_"{$7!=2?2:1}\
+"{$9,$10}"\
+"{$11}"
 #@gui Axis Streak: gui_axis_streak,gui_axis_streak_preview
 #@gui : note=note("Streaks pixel taking into account of opacity by blending pixels-by-pixels."),sep=separator()
 #@gui : Orientation=choice(0,"Horizontal","Vertical")
