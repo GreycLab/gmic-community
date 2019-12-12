@@ -214,10 +214,13 @@ afre_cleantext_preview :
 #---------------------
 
 #@cli afre_gnorm
-#@cli : Compute gradient norm of selected images.
+#@cli : Compute custom gradient norm of selected images.
 afre_gnorm :
-  e[] "[afre]^_^) gnorm: Compute gradient norm of image$?."
-  v - repeat $! l[$>] g sqr s c + sqrt endl done v +
+  e[] "[afre]^_^) gnorm: Compute custom gradient norm of image$?."
+  v - repeat $! l[$>]
+    +gradient_norm +afre_hnorm[0] afre_gui1[2] [0] rm[0]
+    +afre_softlight 0 rm[1] n 0,1 +
+  endl done v +
 
 #@cli afre_hnorm
 #@cli : Compute Hessian norm of selected images.
@@ -231,8 +234,8 @@ afre_reorder :
   e[] "[afre]^_^) reorder: Reposition images according to list $*."
   v - z 0,0,0,100%,100%,1 mirror z f z==0?1e6:i
   l ($*) onfail use_vt100 v + e[] ${_gmic_r}"[afre]>_<) reorder: Parameter must be a list of numbers; e.g., 0,2,4,1,3."${_gmic_n} error[] "" endl
-  repeat {-1,min(w,$!-1)} f[$>] z==0?{-1,i($>)}:i done rm.
-  sort_list + z 0,0,1,100%,100%,1 v +
+  repeat min(w,$!-1) f[$>] z==0?{i($>)}:i done
+  sort_list[0-{min(w,$!-1)-1}] + rm. z 0,0,1,100%,100%,1 v +
 
 #@cli afre_log2 : direction={ 0=reverse | 1=forward }
 #@cli : Transform selected images into or back from log2 space.
@@ -286,7 +289,7 @@ afre_gui0 : check "${1=1}>=1 && ${2=1e-2}>=0"
   v - repeat $! l[$>] nm={b} iM={iM} / $iM
     . +sqr[^0] afre_box[^0] $1 nm I,mI,mII
     +sqr[mI] *. -1 +. [mII] rm[mII] nm. vI
-    ++[vI] {-1,$2*ia+1e-6} /[vI] . rm. nm[vI] a
+    ++[vI] {$2*ia+1e-6} /[vI] . rm. nm[vI] a
     +*[a] [mI] *. -1 +. [mI] rm[mI] nm. b
     afre_box[^0] $1 nm[^0] ma,mb *[I] [ma] +[I] [mb] k[I]
   * $iM nm $nm endl done v +
@@ -305,7 +308,7 @@ afre_gui1 : check ${is_image_arg\ $1} skip ${2=1},${3=1e-2}
     . rv +*[1] [2] +sqr[1] afre_box[^0] $2 nm I,mI,mp,mIp,mII
     +*[mI] [mp] *. -1 +. [mIp] rm[mIp] nm. cIp
     +sqr[mI] *. -1 +. [mII] rm[mII] nm. vI
-    ++[vI] {-1,$3*ia+1e-6} /[cIp] . rm[vI,-1] nm[cIp] a
+    ++[vI] {$3*ia+1e-6} /[cIp] . rm[vI,-1] nm[cIp] a
     +*[a] [mI] *. -1 +. [mp] rm[mI,mp] nm. b
     afre_box[^0] $2 nm[^0] ma,mb *[ma] [I] +[ma] [mb] k[I,ma]
     nm[ma] ${nm$>} rv
@@ -327,8 +330,9 @@ afre_sharpenfft: check "${1=1}>=0 && ${2=1}>=0 && $1<=10 && $2<=5"
 afre_softlight : check "isbool(${1=0}) && isbool(${2=0}) && ${3=100}>=0 &&
     $3<=150"
   v - if $1 i="inverse softlight" else i="softlight" fi
+  if $2 o=" in reverse order" fi
   if $!==1 . v + e[] "[afre]^_^) softlight: Blend image$? with itself using "$i"." v -
-  else v + e[] "[afre]^_^) softlight: Blend last 2 images of image$? using "$i"." v - fi
+  else v + e[] "[afre]^_^) softlight: Blend last 2 images of image$?"${o}" using "$i"." v - fi
   l[-2,-1] if $2 rv fi r={0,[im,iM]} a={.5*$3/100+.5} to_colormode 0
     if w#0!=w#1||h#0!=h#1 if w#0>w#1||h#0>h#1 rr2d[1] {0,[w,h]},1,2 fi
       r[1] [0],[0],[0],100%,0,0,.5,.5
