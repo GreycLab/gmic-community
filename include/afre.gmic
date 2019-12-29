@@ -141,22 +141,41 @@ afre_vigcirc : check "${1=90}>=50 && ${2=75}>=-500 && ${3=50}>=0 && ${4=50}>=0 &
 afre_vigcirc_preview :
   afre_vigcirc $*
 
-#@gui Softlight : afrx_softlight, afrx_softlight_preview(0)
-#@gui : note = note("<strong>Blend 1-2 images using softlight. &nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019.</strong>\n<hr />
-#@gui : <strong>Instructions:</strong>\n\n
-#@gui : Set the <strong>Input layers</strong> option below to handle multiple layers:\n\n
-#@gui : * <strong>Active</strong> blends the active layer with itself.\n\n
-#@gui : * <strong>Active and below</strong>, or <strong>Active and above</strong>, blends layers together. <strong>Reverse Order</strong> determines the blending order.\n\n
-#@gui : * <strong>Bug alert</strong> * &nbsp; To fix preview alignment or crop issues, press the <strong>Reset zoom</strong> button.\n\n")
+#@gui Softlight : afre_softlight, afre_softlight_preview(0)
+#@gui : note = note("<strong>Blend 1-2 images using softlight. &nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019</strong>.\n<hr />
+#@gui : <strong>Instructions</strong>\n\n
+#@gui : <strong>A. Self blend</strong>\n
+#@gui : 1. In the image editor, the active layer will be the base layer.\n
+#@gui : 2. Set <strong><i>Input layers</i></strong>&nbsp; to <strong><i>Active &#40;default&#41;</i></strong>.\n\n
+#@gui : <strong>B. Two image blend</strong>\n
+#@gui : 1. In the image editor, the active layer will be the base layer. The layer directly above will be the blending layer.\n
+#@gui : 2. Set <strong><i>Input layers</i></strong>&nbsp; to <strong><i>Active and above</i></strong>.\n\n
+#@gui : <strong>C. Optional</strong>\n
+#@gui : 3. Set <strong><i>Output mode</i></strong>&nbsp; to <strong><i>New layer&#40;s&#41;</i></strong>. This will allow you to output to a new layer, allowing you to preserve the input layers in case you would like to undo and redo the filter.\n\n
+#@gui : <strong>D. G'MIC plugin bugs</strong> &#40;&#62;_&#60;&#41;\n
+#@gui : a. It will crop the preview. To centre the crop, click the <strong><i>Reset zoom</i></strong>&nbsp; button. This will <strong><i>not</i></strong>&nbsp; affect the final output.\n
+#@gui : b. Do not use <strong><i>Active and below</i></strong>&nbsp; &#40;and other <strong><i>Input layer</i></strong>&nbsp; modes&#41;. The preview will have alignment issues</i></strong>.\n\n")
 #@gui : Inverse = bool(0)
 #@gui : Reverse Order = bool(0)
 #@gui : Amount = int(100,0,150)
-afrx_softlight :
-  if $!==2 l=0,1 elif $!==1 l=0 fi
-  afre_softlight[$l] $1,$2,$3
+#@cli afre_softlight : inverse={ 0 | 1 },_reverse_order={ 0 | 1 },0<=_amount<=150
+#@cli : Blend last 1-2 images of selection using softlight.
+#@cli : Default values: 'inverse=0', 'reverse_order=0' and 'amount=100'.
+afre_softlight : check "isbool(${1=0}) && isbool(${2=0}) && ${3=100}>=0 &&
+    $3<=150"
+  v - if $1 i="inverse softlight" else i="softlight" fi
+  if $2 o=" in reverse order" fi
+  if $!==1 . v + e[] "[afre]^_^) softlight: Blend image$? with itself using "$i"." v -
+  else v + e[] "[afre]^_^) softlight: Blend last 2 images of image$?"${o}" using "$i"." v - fi
+  l[-2,-1] if $2 rv fi r={0,[im,iM]} a={.5*$3/100+.5} to_colormode 0
+    if w#0!=w#1||h#0!=h#1 if w#0>w#1||h#0>h#1 rr2d[1] {0,[w,h]},1,2 fi
+      r[1] [0],[0],[0],100%,0,0,.5,.5
+    fi n 0,1 if $1 negate. fi *. -2 +. 1 f. i#0^(($a*2)^($a*i#1))
+  n $r nm {0,b} k. endl v +
 
-afrx_softlight_preview :
-  afrx_softlight $*
+afre_softlight_preview :
+  if $!==2 l=0,1 elif $!==1 l=0 fi
+  afre_softlight[$l] $1,!$2,$3
 
 #@gui Sharpen FFT : afre_sharpenfft, afre_sharpenfft_preview(0)
 #@gui : note = note("<strong>Sharpen with Fourier transform.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019.</strong>\n\n")
@@ -170,6 +189,9 @@ afre_sharpenfft: check "${1=10}>=0 && ${2=1}>=0 && $1<=10 && $2<=10"
   v - repeat $! l[$>] iM={iM} +l
     fftpolar +gaussian.. {100/$2}% negate. *[^1] ifftpolar * $1
   endl + c 0,$iM endl done v +
+
+afre_sharpenfft_preview :
+  afre_sharpenfft $*
 
 #@gui Contrast FFT : afre_contrastfft, afre_contrastfft_preview(0)
 #@gui : note = note("<strong>Enhance contrast with Fourier transform.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019.</strong>\n\n")
@@ -185,6 +207,9 @@ afre_contrastfft : check "${1=75}>=1 && ${2=50}>=0 && ${3=1}>=1 &&
   v - repeat $! l[$>] repeat $3
     +fftpolar ^.. {($1-.5)/100} ifftpolar[^0] afre_softlight ,,$2
   done endl done v +
+
+afre_contrastfft_preview :
+  afre_contrastfft $*
 
 #@gui Gamify : fx_gamify, fx_gamify_preview(0)
 #@gui : Lightness = int(50,50,60)
@@ -364,26 +389,11 @@ afre_gui1 : check ${is_image_arg\ $1} skip ${2=1},${3=1e-2}
   endl done rm.
   repeat $! *[$>] ${iM$>} done v +
 
-#@cli afre_softlight : inverse={ 0 | 1 },_reverse_order={ 0 | 1 },0<=_amount<=150
-#@cli : Blend last 1-2 images of selection using softlight.
-#@cli : Default values: 'inverse=0', 'reverse_order=0' and 'amount=100'.
-afre_softlight : check "isbool(${1=0}) && isbool(${2=0}) && ${3=100}>=0 &&
-    $3<=150"
-  v - if $1 i="inverse softlight" else i="softlight" fi
-  if $2 o=" in reverse order" fi
-  if $!==1 . v + e[] "[afre]^_^) softlight: Blend image$? with itself using "$i"." v -
-  else v + e[] "[afre]^_^) softlight: Blend last 2 images of image$?"${o}" using "$i"." v - fi
-  l[-2,-1] if $2 rv fi r={0,[im,iM]} a={.5*$3/100+.5} to_colormode 0
-    if w#0!=w#1||h#0!=h#1 if w#0>w#1||h#0>h#1 rr2d[1] {0,[w,h]},1,2 fi
-      r[1] [0],[0],[0],100%,0,0,.5,.5
-    fi n 0,1 if $1 negate. fi *. -2 +. 1 f. i#0^(($a*2)^($a*i#1))
-  n $r nm {0,b} k. endl v +
-
 
 #------------------------------
 # List of Commands and Filters
 #------------------------------
-# GUI CLI : afre_vigrect afre_vigcirc afre_softlight* afre_sharpenfft afre_contrastfft afre_edge afre_cleantext afre_gleam
+# GUI CLI : afre_vigrect afre_vigcirc afre_softlight afre_sharpenfft afre_contrastfft afre_edge afre_cleantext afre_gleam
 # CLI only: afre_gnorm afre_hnorm afre_y50 afre_reorder afre_log2 afre_orien afre_box afre_gui0 afre_gui1
 # GUI only: fx_darken_sky fx_gamify fx_hnorm
 # '*' = listed separately as afrx (GUI) and afre (CLI)
