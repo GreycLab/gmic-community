@@ -44,6 +44,142 @@
 #
 #-------------------------------
 
+#@cli rep_major: eq. to 'rep_majority' : (+)
+rep_major:rep_majority $*
+#@cli rep_majority: kernel_size,0<=tolerance[%]<=100,_booldir={ 0=less_than | 1=greater_than },_mode={ 0=soft | 1=hard },_colorspace
+#@cli : Calculate end result based on majority rule
+#@cli : (eq. to 'rep_major').\n
+#@cli : Custom Colour Space values can be specified with negative number for $5\n
+#@cli : Primary Source: https://web.archive.org/web/20080214191501/http://interstices.info/display.jsp?id=c_27035
+#@cli : Secondary Source: https://forums.getpaint.net/topic/3978-majority-color-effect-ymd100726/\n
+#@cli : Default values: '_booldir=0','_mode=1','_alpha','_colourspace',
+rep_majority:
+skip ${3=0},${4=1},${5=0},${6=0}
+remove_image=0
+
+if ($6>=0&&$6<=4)||($6==13||$6==14) colour="0,255"
+elif $6>=5||$6<=8                   colour="0,360,0,1,0,1"
+elif $6==9                          colour="0,100,-100,100,-100,100"
+elif $6==10                         colour="0,100,0,100,-pi,pi"
+elif $6==11                         colour="0,255,-100,100,-100,100"
+elif $6==12                         colour="0,1,-1,1,-1,1"
+elif $6==15                         colour="0,1,0,1,0,1"
+elif $6<0                           colour=${7--1}
+fi
+
+if $6<0 if $#<6 error ""$#">6==F" fi fi
+
+tcr=3
+
+repeat $! l[$>]
+if (s==3||s==4)&&$6
+    convert_back=1
+    if $6!=4
+        sh 0,2
+        if $6==1 rgb2srgb.
+        elif $6==2 rgb2ryb.
+        elif $6==3 rgb2cmy.
+        elif $6==5 rgb2hcy.
+        elif $6==6 rgb2hsi.
+        elif $6==7 rgb2hsl.
+        elif $6==8 rgb2hsv.
+        elif $6==9 rgb2lab.
+        elif $6==10 rgb2lch.
+        elif $6==11 rgb2yiq.
+        elif $6==12 rgb2yuv.
+        elif $6==13 rgb2ycbcr.
+        elif $6==14 rgb2ycbcrglic.
+        elif $6==15 rgb2xyz.
+        fi
+        rm.
+    else
+        if s==3 rgb2cmyk tcr+=1
+        elif s==4 s c,-3 rgb2cmyk.. a c
+        fi
+    fi
+fi
+
+if !$5&&(s>$tcr||s==2) sh. 0,{s-2} remove_image=1 fi
+
+f. "
+begin(
+    const dc=$1;
+    const kern=dc*2+1;
+    const ts=s*2;
+    NEW_COL=vectors(0);
+    if($5,mm=vectorts("$colour",0,255);
+         ,mm=vectorts("$colour");
+    );
+    skip=1;
+);
+for(ss=0,ss<s,ss++,
+    N=crop(x-dc,y-dc,0,ss,kern,kern,1,1,1);
+    min_val=min(mm[ss*2],mm[ss*2+1]);
+    max_val=max(mm[ss*2],mm[ss*2+1]);
+    tolerance=$2*(max_val-min_val)+min_val;
+    if(skip,
+        if($3,
+                if($4
+                ,calc_newcol()=i(x,y,z,ss)<tolerance?min_val:max_val;
+                ,calc_newcol()=i(x,y,z,ss)<tolerance?min(N):max(N);
+                );
+            ,
+                if($4
+                ,calc_newcol()=i(x,y,z,ss)>tolerance?min_val:max_val;
+                ,calc_newcol()=i(x,y,z,ss)>tolerance?min(N):max(N);
+                );
+        );
+        skip--;
+    );
+    NEW_COL[ss]=calc_newcol();
+);
+
+NEW_COL;
+
+end(if(!skip,
+        if($3,
+                if($4
+                ,calc_newcol()=i(x,y,z,ss)<tolerance?min_val:max_val;
+                ,calc_newcol()=i(x,y,z,ss)<tolerance?min(N):max(N);
+                );
+            ,
+                if($4
+                ,calc_newcol()=i(x,y,z,ss)>tolerance?min_val:max_val;
+                ,calc_newcol()=i(x,y,z,ss)>tolerance?min(N):max(N);
+                );
+            );
+        );
+    );
+"
+
+if $remove_image rm. fi
+
+if $convert_back
+    if $6!=4
+        sh 0,2
+        if $6==1 srgb2rgb.
+        elif $6==2 ryb2rgb.
+        elif $6==3 cmy2rgb.
+        elif $6==5 hcy2rgb.
+        elif $6==6 hsi2rgb.
+        elif $6==7 hsl2rgb.
+        elif $6==8 hsv2rgb.
+        elif $6==9 lab2rgb.
+        elif $6==10 lch2rgb.
+        elif $6==11 yiq2rgb.
+        elif $6==12 yuv2rgb.
+        elif $6==13 ycbcr2rgb.
+        elif $6==14 ycbcrglic2rgb.
+        elif $6==15 xyz2rgb.
+        fi
+        rm.
+    else
+        if s==4 cmyk2rgb
+        elif s==5 s c,-4 cmyk2rgb.. a c
+        fi
+    fi
+fi
+endl done
 #@cli rep_pstrk: eq. to 'rep_perspective_streak' : (+)
 rep_pstrk: rep_perspective_streak $*
 #@cli rep_perspective_streak: -1<=_xpos<=1,-1<=_ypos<=1,-1<=_alpha_exponential_factor,0<_distance_threshold<=1,0<_distance_start<=1,_direction={ 0=in | 1=out },_streak_mode={ 0=color | 1=gray | 2=binary | 3=gray+binary },_preserve_edges={ 0=do_not_preserve_edges | 1=preserve_edges }
