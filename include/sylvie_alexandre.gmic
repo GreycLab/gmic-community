@@ -17,7 +17,7 @@
 ##
 ##	Les sources des filtres sylvie_alexandre.gmic sont disponibles à partir de ce lien :
 ##  https://github.com/dtschump/gmic-community/blob/master/include/sylvie_alexandre.gmic
-##	Vous pouvez tester, modifier, améliorer les filtres proposés en modifiant le nom du fichier "samj.gmic" en "user.gmic" pour Windows.
+##	Vous pouvez tester, modifier, améliorer les filtres proposés en modifiant le nom du fichier "sylvie_alexandre.gmic" en "user.gmic" pour Windows.
 
 ##	Pièges
 ##	titi=-30  toto={($titi)^2} -text_outline $toto,2,2,23,2,1,255 # donne 900 , méthode à utiliser avec les parenthèses
@@ -36,7 +36,7 @@
 #@gui : note = link("https://github.com/dtschump/gmic-community","https://github.com/dtschump/gmic-community")
 #@gui : note = note("Les filtres contenus dans ce r\303\251pertoire sont majoritairement traduits en fran\303\247ais et/ou en cours de d\303\251veloppement.")
 #@gui : note = note("The filters included in this directory are mostly translated into French and/or experimental.")
-#@gui : note = note("Version 2019/12/28 GMIC 2.8.1")
+#@gui : note = note("Version 2020/01/04 GMIC 2.8.1")
 
 samj_about :
 
@@ -9934,6 +9934,743 @@ samj_rien_rendering :
 
 #@gui _
 #@gui <b>Rendering</b>
+
+
+
+
+
+#################################################
+##                                             ##
+##         samj_Engrenages_Laser_LED           ##
+##                                             ##
+#################################################
+
+#@gui Engrenages Gears Laser : samj_Engrenages_Laser_LED, samj_Engrenages_Laser_LED_Preview
+#@gui : sep = separator(), note = note("<small><i>Engrenages Gears Laser Cutting Engraving</i></small>")
+#@gui : note = link("https://samjcreations.blogspot.com/2020/01/samuser-avec-gmic-gimp-engrenages.html","https://samjcreations.blogspot.com/2020/01/samuser-avec-gmic-gimp-engrenages.html")
+#@gui : sep = separator(), note = note("<span foreground="orangered">Param\303\250tres / Settings</span>")
+#@gui : note = link("https://fr.wikipedia.org/wiki/Engrenage","https://fr.wikipedia.org/wiki/Engrenage")
+#@gui : Module m [pixels] = int(80,10,200)
+#@gui : note = note("<small><span foreground="red">Diminuer Angle De Pression alpha pour inscrire Z1 ou Z2 dans cercle de t\303\252te [ 14.5 par exemple ] </span></small>")
+#@gui : Angle De Pression alpha / Pressure Angle [20 Degres]  = float(20,10,20)
+#@gui : Diam. trou central [pixels]  = int(12,12,600)
+#@gui : Nb de dents roue Z1 / Nb of teeth gear Z1  [13...17]  = int(14,7,151)
+#@gui : Nb de dents roue Z2 / Nb of teeth gear Z2 [13...39]  = int(17,7,151)
+#@gui : Contours +  = bool(1)
+#@gui : sep = separator(), note = note("<span foreground="orangered">Trous pour assemblage / Mechanical assembly</span>")
+#@gui : Nb. trous assemblage / Holes  = int(2,0,12)
+#@gui : Diam. trous assemblage / Holes [pixels]  = int(19,12,600)
+#@gui : Distance du centre / Center spacing [pixels]  = int(250,12,3000)
+#@gui : D&#233;calage Angulaire / Angular offset [degres]  = float(0,0,360)
+#@gui : sep = separator(), note = note("<span foreground="orangered">Mortaise clavette trou central / Keyway cutting</span>")
+#@gui : note = link("https://fr.wikipedia.org/wiki/Clavette_&#040;m&#233;canique&#041;","https://fr.wikipedia.org/wiki/Clavette_&#040;m&#233;canique&#041;")
+#@gui : Largeur / Width [pixels]  = int(0,0,150)
+#@gui : Hauteur / Height [pixels]  = int(0,0,100)
+#@gui : D&#233;calage Angulaire / Angular offset [degres]  = float(0,0,360)
+#@gui : sep = separator(), note = note("<span foreground="magenta">Ce script est lent car les engrenages sont dessin&#233;s point par point.</span>")
+#@gui : note = note("<span foreground="magenta">Le script donne 3 calques de dimensions identiques max. 7200 pixels : </span>")
+#@gui : note = note("<span foreground="magenta"> - 1 calque au fond transparent avec des  donn&#233;es techniques.</span>")
+#@gui : note = note("<span foreground="magenta"> - 1 calque blanc avec un dessin noir pour la roue Z2.</span>")
+#@gui : note = note("<span foreground="magenta"> - 1 calque blanc avec un dessin noir pour la roue Z1.</span>")
+#@gui : note = note("<span foreground="magenta">This script is slow because the gears are plotted point by point.</span>")
+#@gui : note = note("<span foreground="magenta">The script gives 3 layers of the same dimensions max.7200 pixels : </span>")
+#@gui : note = note("<span foreground="magenta"> - 1 layer with transparent background with technical data.</span>")
+#@gui : note = note("<span foreground="magenta"> - 1 white layer with a black outline for the Z2 wheel.</span>")
+#@gui : note = note("<span foreground="magenta"> - 1 white layer with a black outline for the Z1 wheel.</span>")
+#@gui : sep = separator(), note = note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2020/01/04</i>.</small>")
+
+samj_Engrenages_Laser_LED :
+
+Module_m={$1+1} # compensation boucle vérification dimensions
+Angle_De_Pression_alpha={round($2*10000)/10000}
+Diam_Trou_Arbre=$3
+Nb_Dents_Roue_Z1=$4
+Nb_Dents_Roue_Z2=$5
+Contours_Plus=$6
+Trous_Assemb_Nb=$7
+Trous_Assemb_Diam=$8
+Trous_Assemb_Distance_Centre=$9
+Trous_Assemb_Decalage_Angle={{pi}/180*$10}
+Rainure_Largeur=$11
+Rainure_Hauteur=$12
+Rainure_Decalage_Angle={{pi}/180*$13} # $13 utilisé dans infos.
+
+Echelle=1
+Dimension_Max_Image=7200 # pixels
+Reserve_Contour_Image=10  # pixels
+
+# correction automatique Module m
+Module_m_Origine={$Module_m-1}
+Dia_Primitif_Z1={$Echelle*$Module_m*$Nb_Dents_Roue_Z1}
+Dia_Tete_Z1={$Dia_Primitif_Z1+{2*$Echelle*$Module_m}}
+Dia_Primitif_Z2={$Echelle*$Module_m*$Nb_Dents_Roue_Z2}
+Dia_Tete_Z2={$Dia_Primitif_Z2+{2*$Echelle*$Module_m}}
+
+if {$Nb_Dents_Roue_Z1>$Nb_Dents_Roue_Z2}
+	do
+		Module_m={$Module_m-1}
+		Dia_Primitif_Z1={$Echelle*$Module_m*$Nb_Dents_Roue_Z1}
+		Dia_Tete_Z1={$Dia_Primitif_Z1+{2*$Echelle*$Module_m}}
+	while {$Dia_Tete_Z1>{$Dimension_Max_Image-{2*{$Reserve_Contour_Image}}}}
+else
+	do
+		Module_m={$Module_m-1}
+		Dia_Primitif_Z2={$Echelle*$Module_m*$Nb_Dents_Roue_Z2}
+		Dia_Tete_Z2={$Dia_Primitif_Z2+{2*$Echelle*$Module_m}}
+	while {$Dia_Tete_Z2>{$Dimension_Max_Image-{2*{$Reserve_Contour_Image}}}}
+endif	
+
+Dia_Primitif_Z1={$Echelle*$Module_m*$Nb_Dents_Roue_Z1}
+Dia_Tete_Z1={$Dia_Primitif_Z1+{2*$Echelle*$Module_m}}
+Dia_Pied_Z1={$Dia_Primitif_Z1-{2.5*$Echelle*$Module_m}}
+Dia_Primitif_Z2={$Echelle*$Module_m*$Nb_Dents_Roue_Z2}
+Dia_Tete_Z2={$Dia_Primitif_Z2+{2*$Echelle*$Module_m}}
+Dia_Pied_Z2={$Dia_Primitif_Z2-{2.5*$Echelle*$Module_m}}
+
+# correction automatique Angle De Pression alpha
+Angle_De_Pression_alpha_Origine=$Angle_De_Pression_alpha
+Angle_De_Pression_alpha={$Angle_De_Pression_alpha+0.1}
+if {$Nb_Dents_Roue_Z1>$Nb_Dents_Roue_Z2}
+	do
+		Angle_De_Pression_alpha={$Angle_De_Pression_alpha-0.1}
+		Diametre_Cercle_De_Base_Z1={$Dia_Primitif_Z1*cos({{pi}/180*$Angle_De_Pression_alpha})}
+		Rayon_Developpante_Z1={$Diametre_Cercle_De_Base_Z1/2}
+	while {{$Dia_Pied_Z1/2}>{$Rayon_Developpante_Z1}}
+else
+	do
+		Angle_De_Pression_alpha={$Angle_De_Pression_alpha-0.1}
+		Diametre_Cercle_De_Base_Z2={$Dia_Primitif_Z2*cos({{pi}/180*$Angle_De_Pression_alpha})}
+		Rayon_Developpante_Z2={$Diametre_Cercle_De_Base_Z2/2}
+	while {{$Dia_Pied_Z2/2}>{$Rayon_Developpante_Z2}}
+endif
+Angle_De_Pression_alpha={round($Angle_De_Pression_alpha*10000)/10000}
+
+Dia_Primitif_Z1={$Echelle*$Module_m*$Nb_Dents_Roue_Z1}
+Dia_Tete_Z1={$Dia_Primitif_Z1+{2*$Echelle*$Module_m}}
+Diametre_Cercle_De_Base_Z1={$Dia_Primitif_Z1*cos({{pi}/180*$Angle_De_Pression_alpha})}  # Base des calculs / Compris entre le cercle de pied et le cercle primitif
+Dia_Pied_Z1={$Dia_Primitif_Z1-{2.5*$Echelle*$Module_m}}
+Rayon_Developpante_Z1={$Diametre_Cercle_De_Base_Z1/2}
+Dia_Primitif_Z2={$Echelle*$Module_m*$Nb_Dents_Roue_Z2}
+Dia_Tete_Z2={$Dia_Primitif_Z2+{2*$Echelle*$Module_m}}
+Dia_Pied_Z2={$Dia_Primitif_Z2-{2.5*$Echelle*$Module_m}}
+Diametre_Cercle_De_Base_Z2={$Dia_Primitif_Z2*cos({{pi}/180*$Angle_De_Pression_alpha})}  # Base des calculs / Compris entre le cercle de pied et le cercle primitif
+Rayon_Developpante_Z2={$Diametre_Cercle_De_Base_Z2/2}
+
+##  Diametre_Cercle_Hauteur_Active_Z1=???  >>  À ajouter si norme  à ce sujet : modifier les raccords faits avec $Angle_Porte_Au_Cercle_Pied et ajouter arrondis au rendu
+
+# Dimensions Image
+if {$Nb_Dents_Roue_Z1>$Nb_Dents_Roue_Z2}
+	Largeur={round({$Dia_Tete_Z1+{2*{$Reserve_Contour_Image}}})}
+else
+	Largeur={round({$Dia_Tete_Z2+{2*{$Reserve_Contour_Image}}})}
+endif
+Hauteur=$Largeur
+
+Entraxe_Engrenages_theorique={{$Echelle*$Module_m*{$Nb_Dents_Roue_Z1+$Nb_Dents_Roue_Z2}}/2}
+
+# Vocabulaire engrenage http://www.zpag.net/Dessin_Technique/1980/EngrnagesCames/Definition_Formule_engre_droit.htm
+Creux_b={$Echelle*$Module_m*1.25}
+Saillie_a={$Echelle*$Module_m}
+Vide_Fond_De_Dent_c={$Creux_b-$Saillie_a}
+Hauteur_de_dent_ht={$Creux_b+$Saillie_a}
+Pas_Primitif_p={$Echelle*$Module_m*{pi}}
+Epaisseur_Circulaire_t={$Pas_Primitif_p/2}
+Hauteur_Active_hk={2*$Saillie_a}
+
+##### Tracer Z1
+
+X_Origine={$Largeur/2}
+Y_Origine={$Hauteur/2}
+
+Increment_Developpante={{pi}*0.0002}
+Precision_Tracage_Cercles=500
+
+rm[0]
+$Largeur,$Hauteur,1,4
+fill_color[-1] 255,255,255,255
+
+Rayon_Developpante={$Diametre_Cercle_De_Base_Z1/2}
+
+Dimension_Developpante=0
+Condition_Arret={$Dia_Tete_Z1/2}
+
+Angle_Rotation=0
+Increment_Rotation={2*{pi}/$Nb_Dents_Roue_Z1} # angle creux + dent
+Angle_Dent={{pi}/$Nb_Dents_Roue_Z1} # angle dent
+Base_Dent={2*{{$Diametre_Cercle_De_Base_Z1/2}*sin({{pi}/{$Nb_Dents_Roue_Z1*4}})}}
+Angle_Porte_Au_Cercle_Pied={2*asin($Base_Dent/$Dia_Pied_Z1)}
+Angle_Decalage_Rainure_Pied={{$Angle_Porte_Au_Cercle_Pied-{$Increment_Rotation/4}}/2}
+X_Developpante_Tracage=0
+Y_Developpante_Tracage=0
+Angle_Decalage_Developpante_B={{{pi}/{$Nb_Dents_Roue_Z1*2}}-{{pi}/2}+{{{pi}/$Nb_Dents_Roue_Z1}/2}}
+
+	repeat $Nb_Dents_Roue_Z1
+
+		Angle_Developpante_Rad=0
+		Nb_boucles=0
+
+		do
+			# développante	
+			X_Developpante={$Rayon_Developpante*{cos($Angle_Developpante_Rad)+{$Angle_Developpante_Rad*sin($Angle_Developpante_Rad)}}}
+			Y_Developpante={$Rayon_Developpante*{sin($Angle_Developpante_Rad)-{$Angle_Developpante_Rad*cos($Angle_Developpante_Rad)}}}
+
+			Dimension_Developpante={{{$X_Developpante^2}+{$Y_Developpante^2}}^0.5}
+
+			# rotation angulaire de la développante		
+			X_Developpante_Tracage={$X_Origine+{{$X_Developpante*cos($Angle_Rotation)}-{$Y_Developpante*sin($Angle_Rotation)}}}
+			Y_Developpante_Tracage={$Y_Origine+{{$X_Developpante*sin($Angle_Rotation)}+{$Y_Developpante*cos($Angle_Rotation)}}}
+
+			if {$Nb_boucles==0}
+				X_Debut_Developpante_Tracage_A=$X_Developpante_Tracage
+				Y_Debut_Developpante_Tracage_A=$Y_Developpante_Tracage
+			endif
+			X_Fin_Developpante_Tracage_A=$X_Developpante_Tracage
+			Y_Fin_Developpante_Tracage_A=$Y_Developpante_Tracage
+
+			# tracer developpante gauche
+			point[-1] $X_Developpante_Tracage,$Y_Developpante_Tracage,0,1,0,0,0,255
+
+			# développante
+			X_Developpante={$Rayon_Developpante*{sin($Angle_Developpante_Rad)-{$Angle_Developpante_Rad*cos($Angle_Developpante_Rad)}}}
+			Y_Developpante={$Rayon_Developpante*{cos($Angle_Developpante_Rad)+{$Angle_Developpante_Rad*sin($Angle_Developpante_Rad)}}}
+			# rotation angulaire de la développante
+			X_Developpante_Tracage={$X_Origine+{{$X_Developpante*cos($Angle_Rotation+$Angle_Decalage_Developpante_B)}-{$Y_Developpante*sin($Angle_Rotation+$Angle_Decalage_Developpante_B)}}}
+			Y_Developpante_Tracage={$Y_Origine+{{$X_Developpante*sin($Angle_Rotation+$Angle_Decalage_Developpante_B)}+{$Y_Developpante*cos($Angle_Rotation+$Angle_Decalage_Developpante_B)}}}		
+
+			if {$Nb_boucles==0}
+				X_Debut_Developpante_Tracage_B=$X_Developpante_Tracage
+				Y_Debut_Developpante_Tracage_B=$Y_Developpante_Tracage
+			endif
+			X_Fin_Developpante_Tracage_B=$X_Developpante_Tracage
+			Y_Fin_Developpante_Tracage_B=$Y_Developpante_Tracage
+
+			# tracer developpante droite
+			point[-1] $X_Developpante_Tracage,$Y_Developpante_Tracage,0,1,0,0,0,255
+
+			Angle_Developpante_Rad={$Angle_Developpante_Rad+$Increment_Developpante}
+			
+			Nb_boucles={$Nb_boucles+1}
+
+		while {$Dimension_Developpante<$Condition_Arret}
+
+
+		Angle_Fin_Developpante_Tracage_A={atan2({$Y_Fin_Developpante_Tracage_A-$Y_Origine},{$X_Fin_Developpante_Tracage_A-$X_Origine})}
+		Angle_Fin_Developpante_Tracage_B={atan2({$Y_Fin_Developpante_Tracage_B-$Y_Origine},{$X_Fin_Developpante_Tracage_B-$X_Origine})}
+		Angle_Tracage=$Angle_Fin_Developpante_Tracage_A
+		Increment_Angle_Tracage={{$Angle_Fin_Developpante_Tracage_B-$Angle_Fin_Developpante_Tracage_A}/$Precision_Tracage_Cercles}
+
+		# tracer sommets dents
+		repeat $Precision_Tracage_Cercles
+			point[-1] {$X_Origine+{{$Dia_Tete_Z1/2}*{cos($Angle_Tracage)}}},{$Y_Origine+{{$Dia_Tete_Z1/2}*{sin($Angle_Tracage)}}},0,1,0,0,0,255
+			Angle_Tracage={$Angle_Tracage+$Increment_Angle_Tracage}
+		done
+
+		# tracer rainure cercle de base - cercle de pied
+		Angle_Debut_Developpante_Tracage_A={atan2({$Y_Debut_Developpante_Tracage_A-$Y_Origine},{$X_Debut_Developpante_Tracage_A-$X_Origine})}
+		Angle_Debut_Developpante_Tracage_B={atan2({$Y_Debut_Developpante_Tracage_B-$Y_Origine},{$X_Debut_Developpante_Tracage_B-$X_Origine})}
+		Angle_Debut_Rainure_Pied={$Angle_Debut_Developpante_Tracage_A-$Angle_Decalage_Rainure_Pied}
+		Angle_Fin_Rainure_Pied={$Angle_Debut_Developpante_Tracage_B+$Angle_Decalage_Rainure_Pied}
+		X_Debut_Rainure_Pied={$X_Origine+{{$Dia_Pied_Z1/2}*{cos($Angle_Debut_Rainure_Pied)}}}
+		Y_Debut_Rainure_Pied={$Y_Origine+{{$Dia_Pied_Z1/2}*{sin($Angle_Debut_Rainure_Pied)}}}
+		X_Fin_Rainure_Pied={$X_Origine+{{$Dia_Pied_Z1/2}*{cos($Angle_Fin_Rainure_Pied)}}}
+		Y_Fin_Rainure_Pied={$Y_Origine+{{$Dia_Pied_Z1/2}*{sin($Angle_Fin_Rainure_Pied)}}}
+		line[-1] {$X_Origine+{{$Diametre_Cercle_De_Base_Z1/2}*{cos($Angle_Debut_Developpante_Tracage_A)}}},{$Y_Origine+{{$Diametre_Cercle_De_Base_Z1/2}*{sin($Angle_Debut_Developpante_Tracage_A)}}},$X_Debut_Rainure_Pied,$Y_Debut_Rainure_Pied,1,0,0,0,255
+		line[-1] {$X_Origine+{{$Diametre_Cercle_De_Base_Z1/2}*{cos($Angle_Debut_Developpante_Tracage_B)}}},{$Y_Origine+{{$Diametre_Cercle_De_Base_Z1/2}*{sin($Angle_Debut_Developpante_Tracage_B)}}},$X_Fin_Rainure_Pied,$Y_Fin_Rainure_Pied,1,0,0,0,255
+		
+		Angle_Debut_Rainure_Pied_Suivant={$Angle_Fin_Rainure_Pied+{$Increment_Rotation/2}-{$Angle_Decalage_Rainure_Pied*2}}
+		X_Debut_Rainure_Pied_Suivant={$X_Origine+{{$Dia_Pied_Z1/2}*{cos($Angle_Debut_Rainure_Pied_Suivant)}}}
+		Y_Debut_Rainure_Pied_Suivant={$Y_Origine+{{$Dia_Pied_Z1/2}*{sin($Angle_Debut_Rainure_Pied_Suivant)}}}
+		line[-1] $X_Debut_Rainure_Pied_Suivant,$Y_Debut_Rainure_Pied_Suivant,$X_Fin_Rainure_Pied,$Y_Fin_Rainure_Pied,1,0,0,0,255
+
+		Angle_Rotation={$Angle_Rotation+$Increment_Rotation}
+
+	done
+
+##### Tracer Z2
+
+X_Origine={$Largeur/2}
+Y_Origine={$Hauteur/2}
+
+Increment_Developpante={{pi}*0.0002}
+Precision_Tracage_Cercles=500
+
+$Largeur,$Hauteur,1,4
+fill_color[-1] 255,255,255,255
+
+Rayon_Developpante={$Diametre_Cercle_De_Base_Z2/2}
+
+Dimension_Developpante=0
+Condition_Arret={$Dia_Tete_Z2/2}
+
+Angle_Rotation=0
+Increment_Rotation={2*{pi}/$Nb_Dents_Roue_Z2} # angle creux + dent
+Angle_Dent={{pi}/$Nb_Dents_Roue_Z2} # angle dent
+Base_Dent={2*{{$Diametre_Cercle_De_Base_Z2/2}*sin({{pi}/{$Nb_Dents_Roue_Z2*4}})}}
+Angle_Porte_Au_Cercle_Pied={2*asin($Base_Dent/$Dia_Pied_Z2)}
+Angle_Decalage_Rainure_Pied={{$Angle_Porte_Au_Cercle_Pied-{$Increment_Rotation/4}}/2}
+X_Developpante_Tracage=0
+Y_Developpante_Tracage=0
+Angle_Decalage_Developpante_B={{{pi}/{$Nb_Dents_Roue_Z2*2}}-{{pi}/2}+{{{pi}/$Nb_Dents_Roue_Z2}/2}}
+
+
+
+	repeat $Nb_Dents_Roue_Z2
+
+		Angle_Developpante_Rad=0
+		Nb_boucles=0
+
+		do
+			# développante	
+			X_Developpante={$Rayon_Developpante*{cos($Angle_Developpante_Rad)+{$Angle_Developpante_Rad*sin($Angle_Developpante_Rad)}}}
+			Y_Developpante={$Rayon_Developpante*{sin($Angle_Developpante_Rad)-{$Angle_Developpante_Rad*cos($Angle_Developpante_Rad)}}}
+			
+			Dimension_Developpante={{{$X_Developpante^2}+{$Y_Developpante^2}}^0.5}
+			
+			# rotation angulaire de la développante		
+			X_Developpante_Tracage={$X_Origine+{{$X_Developpante*cos($Angle_Rotation)}-{$Y_Developpante*sin($Angle_Rotation)}}}
+			Y_Developpante_Tracage={$Y_Origine+{{$X_Developpante*sin($Angle_Rotation)}+{$Y_Developpante*cos($Angle_Rotation)}}}
+
+			if {$Nb_boucles==0}
+				X_Debut_Developpante_Tracage_A=$X_Developpante_Tracage
+				Y_Debut_Developpante_Tracage_A=$Y_Developpante_Tracage
+			endif
+			X_Fin_Developpante_Tracage_A=$X_Developpante_Tracage
+			Y_Fin_Developpante_Tracage_A=$Y_Developpante_Tracage
+
+			# tracer developpante gauche
+			point[-1] $X_Developpante_Tracage,$Y_Developpante_Tracage,0,1,0,0,0,255
+
+			# développante
+			X_Developpante={$Rayon_Developpante*{sin($Angle_Developpante_Rad)-{$Angle_Developpante_Rad*cos($Angle_Developpante_Rad)}}}
+			Y_Developpante={$Rayon_Developpante*{cos($Angle_Developpante_Rad)+{$Angle_Developpante_Rad*sin($Angle_Developpante_Rad)}}}
+			# rotation angulaire de la développante
+			X_Developpante_Tracage={$X_Origine+{{$X_Developpante*cos($Angle_Rotation+$Angle_Decalage_Developpante_B)}-{$Y_Developpante*sin($Angle_Rotation+$Angle_Decalage_Developpante_B)}}}
+			Y_Developpante_Tracage={$Y_Origine+{{$X_Developpante*sin($Angle_Rotation+$Angle_Decalage_Developpante_B)}+{$Y_Developpante*cos($Angle_Rotation+$Angle_Decalage_Developpante_B)}}}		
+
+			if {$Nb_boucles==0}
+				X_Debut_Developpante_Tracage_B=$X_Developpante_Tracage
+				Y_Debut_Developpante_Tracage_B=$Y_Developpante_Tracage
+			endif
+			X_Fin_Developpante_Tracage_B=$X_Developpante_Tracage
+			Y_Fin_Developpante_Tracage_B=$Y_Developpante_Tracage
+
+			# tracer developpante droite
+			point[-1] $X_Developpante_Tracage,$Y_Developpante_Tracage,0,1,0,0,0,255
+
+			Angle_Developpante_Rad={$Angle_Developpante_Rad+$Increment_Developpante}
+			
+			Nb_boucles={$Nb_boucles+1}
+
+		while {$Dimension_Developpante<$Condition_Arret}
+
+		Angle_Fin_Developpante_Tracage_A={atan2({$Y_Fin_Developpante_Tracage_A-$Y_Origine},{$X_Fin_Developpante_Tracage_A-$X_Origine})}
+		Angle_Fin_Developpante_Tracage_B={atan2({$Y_Fin_Developpante_Tracage_B-$Y_Origine},{$X_Fin_Developpante_Tracage_B-$X_Origine})}
+		Angle_Tracage=$Angle_Fin_Developpante_Tracage_A
+		Increment_Angle_Tracage={{$Angle_Fin_Developpante_Tracage_B-$Angle_Fin_Developpante_Tracage_A}/$Precision_Tracage_Cercles}
+
+		# tracer sommets dents
+		repeat $Precision_Tracage_Cercles
+			point[-1] {$X_Origine+{{$Dia_Tete_Z2/2}*{cos($Angle_Tracage)}}},{$Y_Origine+{{$Dia_Tete_Z2/2}*{sin($Angle_Tracage)}}},0,1,0,0,0,255
+			Angle_Tracage={$Angle_Tracage+$Increment_Angle_Tracage}
+		done
+
+		# tracer rainure cercle de base - cercle de pied
+		Angle_Debut_Developpante_Tracage_A={atan2({$Y_Debut_Developpante_Tracage_A-$Y_Origine},{$X_Debut_Developpante_Tracage_A-$X_Origine})}
+		Angle_Debut_Developpante_Tracage_B={atan2({$Y_Debut_Developpante_Tracage_B-$Y_Origine},{$X_Debut_Developpante_Tracage_B-$X_Origine})}
+		Angle_Debut_Rainure_Pied={$Angle_Debut_Developpante_Tracage_A-$Angle_Decalage_Rainure_Pied}
+		Angle_Fin_Rainure_Pied={$Angle_Debut_Developpante_Tracage_B+$Angle_Decalage_Rainure_Pied}
+		X_Debut_Rainure_Pied={$X_Origine+{{$Dia_Pied_Z2/2}*{cos($Angle_Debut_Rainure_Pied)}}}
+		Y_Debut_Rainure_Pied={$Y_Origine+{{$Dia_Pied_Z2/2}*{sin($Angle_Debut_Rainure_Pied)}}}
+		X_Fin_Rainure_Pied={$X_Origine+{{$Dia_Pied_Z2/2}*{cos($Angle_Fin_Rainure_Pied)}}}
+		Y_Fin_Rainure_Pied={$Y_Origine+{{$Dia_Pied_Z2/2}*{sin($Angle_Fin_Rainure_Pied)}}}
+		line[-1] {$X_Origine+{{$Diametre_Cercle_De_Base_Z2/2}*{cos($Angle_Debut_Developpante_Tracage_A)}}},{$Y_Origine+{{$Diametre_Cercle_De_Base_Z2/2}*{sin($Angle_Debut_Developpante_Tracage_A)}}},$X_Debut_Rainure_Pied,$Y_Debut_Rainure_Pied,1,0,0,0,255
+		line[-1] {$X_Origine+{{$Diametre_Cercle_De_Base_Z2/2}*{cos($Angle_Debut_Developpante_Tracage_B)}}},{$Y_Origine+{{$Diametre_Cercle_De_Base_Z2/2}*{sin($Angle_Debut_Developpante_Tracage_B)}}},$X_Fin_Rainure_Pied,$Y_Fin_Rainure_Pied,1,0,0,0,255
+		
+		Angle_Debut_Rainure_Pied_Suivant={$Angle_Fin_Rainure_Pied+{$Increment_Rotation/2}-{$Angle_Decalage_Rainure_Pied*2}}
+		X_Debut_Rainure_Pied_Suivant={$X_Origine+{{$Dia_Pied_Z2/2}*{cos($Angle_Debut_Rainure_Pied_Suivant)}}}
+		Y_Debut_Rainure_Pied_Suivant={$Y_Origine+{{$Dia_Pied_Z2/2}*{sin($Angle_Debut_Rainure_Pied_Suivant)}}}
+		line[-1] $X_Debut_Rainure_Pied_Suivant,$Y_Debut_Rainure_Pied_Suivant,$X_Fin_Rainure_Pied,$Y_Fin_Rainure_Pied,1,0,0,0,255
+
+		Angle_Rotation={$Angle_Rotation+$Increment_Rotation}
+
+	done
+
+# autres tracés
+
+	# calque paramètres
+	$Largeur,$Hauteur,1,4
+	fill_color[-1] 0,0,0,0
+
+	Angle_Rot=0
+	Inc_Angle={2*{pi}/$Trous_Assemb_Nb}
+	-repeat $Trous_Assemb_Nb
+		X_Centre={$X_Origine+{$Trous_Assemb_Distance_Centre*cos({$Trous_Assemb_Decalage_Angle+$Angle_Rot})}}
+		Y_Centre={$Y_Origine+{$Trous_Assemb_Distance_Centre*sin({$Trous_Assemb_Decalage_Angle+$Angle_Rot})}}
+		circle[-2,-3] $X_Centre,$Y_Centre,{$Trous_Assemb_Diam/2},1,0xFFFFFFFF,0,0,0,255
+		circle[-1] $X_Centre,$Y_Centre,{$Trous_Assemb_Diam/2},1,0xFFFFFFFF,255,0,255,255
+		Angle_Rot={$Angle_Rot+$Inc_Angle}
+	-done
+	circle[-1] $X_Origine,$Y_Origine,$Trous_Assemb_Distance_Centre,1,0xFFFFFFFF,255,0,255,255
+	Trous_Assemb_Erreur=0
+	if {{$Trous_Assemb_Distance_Centre+{$Trous_Assemb_Diam/2}}>{$Dia_Pied_Z1/2}} Trous_Assemb_Erreur={$Trous_Assemb_Erreur+1} endif
+	if {{$Trous_Assemb_Distance_Centre-{$Trous_Assemb_Diam/2}}<{$Diam_Trou_Arbre/2}} Trous_Assemb_Erreur={$Trous_Assemb_Erreur+10} endif
+	if {$Trous_Assemb_Nb>3}
+		# samj_Annular_Steiner_Chains
+		Rayon_Cercle_Exterieur={$Trous_Assemb_Distance_Centre+$Trous_Assemb_Diam}
+		Angle_Theta={pi/$Trous_Assemb_Nb}
+		Rayon_Cercle_Centre={{$Rayon_Cercle_Exterieur*{1-{sin($Angle_Theta)}}}/{{1+{sin($Angle_Theta)}}}}
+		Rayon_Cercles_Ext={{$Rayon_Cercle_Exterieur-$Rayon_Cercle_Centre}/2}
+		Rayon_Centres_C_Ext={$Rayon_Cercle_Centre+$Rayon_Cercles_Ext}
+		Rayon_Tang={{{$Rayon_Centres_C_Ext*$Rayon_Centres_C_Ext}-{$Rayon_Cercles_Ext*$Rayon_Cercles_Ext}}^0.5}
+		if {$Trous_Assemb_Distance_Centre<$Rayon_Tang} Trous_Assemb_Erreur={$Trous_Assemb_Erreur+100} endif	
+	endif
+
+	circle[-1,-2,-3] $X_Origine,$Y_Origine,{$Diam_Trou_Arbre/2},1,0xFFFFFFFF,0,0,0,255
+	polygon[-1,-2,-3] 4,2,2,{$Largeur-2},2,{$Largeur-2},{$Hauteur-2},2,{$Hauteur-2},1,0xFFFFFFFF,0,0,0,255
+
+	Erreur_Rainure=0
+	if {$Rainure_Hauteur>{{$Diam_Trou_Arbre/2}-1}}
+		Erreur_Rainure={$Erreur_Rainure+1}
+	endif
+	if {$Rainure_Largeur>{{$Diam_Trou_Arbre/2}-1}}
+		Erreur_Rainure={$Erreur_Rainure+10}
+	endif
+	if {{$Rainure_Largeur>0}&&{$Rainure_Hauteur>0}&&{$Rainure_Hauteur<{{$Diam_Trou_Arbre/2}-1}}&&{$Rainure_Largeur<{{$Diam_Trou_Arbre/2}-1}}}
+		Angle_Rainure={acos({{{{{$Diam_Trou_Arbre/2}^2}*2}-{{$Rainure_Largeur}^2}}/{2*{{$Diam_Trou_Arbre/2}^2}}})}
+		X_Sommet_A={$X_Origine+{{$Diam_Trou_Arbre/2}*cos({$Rainure_Decalage_Angle+$Angle_Rainure})}}
+		Y_Sommet_A={$Y_Origine+{{$Diam_Trou_Arbre/2}*sin({$Rainure_Decalage_Angle+$Angle_Rainure})}}
+		X_Sommet_B={$X_Origine+{{$Diam_Trou_Arbre/2}*cos($Rainure_Decalage_Angle)}}
+		Y_Sommet_B={$Y_Origine+{{$Diam_Trou_Arbre/2}*sin($Rainure_Decalage_Angle)}}
+		# effacer arc
+		Angle_Tracage=0
+		Increment_Angle_Tracage={$Angle_Rainure/$Precision_Tracage_Cercles}
+		repeat $Precision_Tracage_Cercles
+			point[-2,-3] {$X_Origine+{{$Diam_Trou_Arbre/2}*{cos($Rainure_Decalage_Angle+$Angle_Rainure+$Angle_Tracage)}}},{$Y_Origine+{{$Diam_Trou_Arbre/2}*{sin($Rainure_Decalage_Angle+$Angle_Rainure+$Angle_Tracage)}}},0,1,255,255,255,255
+			Angle_Tracage={$Angle_Tracage-$Increment_Angle_Tracage}
+		done
+		line[-1] $X_Sommet_A,$Y_Sommet_A,$X_Sommet_B,$Y_Sommet_B,1,0,255,255,255
+		Rayon_CD={{{{$Diam_Trou_Arbre/2}^2}+{{$Rainure_Hauteur}^2}-{2*{$Diam_Trou_Arbre/2}*$Rainure_Hauteur*cos({{{{pi}-$Angle_Rainure}/2}+{{pi}/2}})}}^0.5}
+		circle[-1] $X_Origine,$Y_Origine,$Rayon_CD,1,0xFFFFFFFF,0,255,255,255
+		Angle_CD={acos({{{{{$Rayon_CD}^2}*2}-{{$Rainure_Largeur}^2}}/{2*{{$Rayon_CD}^2}}})}
+		Angle_BC_DA={{$Angle_Rainure-$Angle_CD}/2}
+		X_Sommet_C={$X_Origine+{$Rayon_CD*cos({$Rainure_Decalage_Angle+$Angle_BC_DA})}}
+		Y_Sommet_C={$Y_Origine+{$Rayon_CD*sin({$Rainure_Decalage_Angle+$Angle_BC_DA})}}
+		X_Sommet_D={$X_Origine+{$Rayon_CD*cos($Rainure_Decalage_Angle+$Angle_BC_DA+$Angle_CD)}}
+		Y_Sommet_D={$Y_Origine+{$Rayon_CD*sin($Rainure_Decalage_Angle+$Angle_BC_DA+$Angle_CD)}}
+		line[-2,-3] $X_Sommet_C,$Y_Sommet_C,$X_Sommet_D,$Y_Sommet_D,1,0,0,0,255
+		line[-2,-3] $X_Sommet_C,$Y_Sommet_C,$X_Sommet_B,$Y_Sommet_B,1,0,0,0,255
+		line[-2,-3] $X_Sommet_A,$Y_Sommet_A,$X_Sommet_D,$Y_Sommet_D,1,0,0,0,255
+		line[-1] $X_Sommet_C,$Y_Sommet_C,$X_Sommet_D,$Y_Sommet_D,1,0,255,255,255
+		line[-1] $X_Sommet_C,$Y_Sommet_C,$X_Sommet_B,$Y_Sommet_B,1,0,255,255,255
+		line[-1] $X_Sommet_A,$Y_Sommet_A,$X_Sommet_D,$Y_Sommet_D,1,0,255,255,255
+	endif
+
+	#Tete
+	circle[-1] $X_Origine,$Y_Origine,{$Dia_Tete_Z1/2},1,0xFFFFFFFF,0,0,255,255
+	#Primitif
+	circle[-1] $X_Origine,$Y_Origine,{$Dia_Primitif_Z1/2},1,0xFFFFFFFF,255,0,0,255
+	#Pied
+	circle[-1] $X_Origine,$Y_Origine,{$Dia_Pied_Z1/2},1,0xFFFFFFFF,0,255,0,255
+	#Cercle De Base
+	circle[-1] $X_Origine,$Y_Origine,{$Diametre_Cercle_De_Base_Z1/2},1,0xFFFFFFFF,255,255,0,255
+
+	#Tete
+	circle[-1] $X_Origine,$Y_Origine,{$Dia_Tete_Z2/2},1,0xFFFFFFFF,0,0,255,255
+	#Primitif
+	circle[-1] $X_Origine,$Y_Origine,{$Dia_Primitif_Z2/2},1,0xFFFFFFFF,255,0,0,255
+	#Pied
+	circle[-1] $X_Origine,$Y_Origine,{$Dia_Pied_Z2/2},1,0xFFFFFFFF,0,255,0,255
+	#Cercle De Base
+	circle[-1] $X_Origine,$Y_Origine,{$Diametre_Cercle_De_Base_Z2/2},1,0xFFFFFFFF,255,255,0,255
+
+	if {$Contours_Plus==1} erode_circ[-2,-3] 2 endif
+
+	#centre
+	line[-1] {$X_Origine-5},$Y_Origine,{$X_Origine+5},$Y_Origine,1,170,85,255,255
+	line[-1] $X_Origine,{$Y_Origine-5},$X_Origine,{$Y_Origine+5},1,170,85,255,255
+
+L_O=10
+H_O=0
+I_T=32
+H_P=30
+R_P=0
+V_P=0
+B_P=0
+H_O={$H_O+$I_T}
+text[-1] "*****     Engrenages Gears Laser : samj_Engrenages_Laser_LED     *****",$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+H_O={$H_O+$I_T}
+if {$Module_m-$Module_m_Origine==0}
+	text[-1] "Module m : "$Module_m"   Demande/Settings : "$Module_m_Origine,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+else
+	text[-1] "Module m : "$Module_m"   Demande/Settings : "$Module_m_Origine,$L_O,$H_O,{$H_P+2},1,255,0,0,255
+endif	
+H_O={$H_O+$I_T}
+if {$Angle_De_Pression_alpha-$Angle_De_Pression_alpha_Origine==0}
+	text[-1] "Angle de Pression/Pressure Angle : "$Angle_De_Pression_alpha"   Demande/Settings : "$Angle_De_Pression_alpha_Origine,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+else
+	text[-1] "Angle de Pression/Pressure Angle : "$Angle_De_Pression_alpha"   Demande/Settings : "$Angle_De_Pression_alpha_Origine,$L_O,$H_O,{$H_P+2},1,255,0,0,255
+endif
+H_O={$H_O+$I_T}
+text[-1] "Diam. trou central [pixels] : "$Diam_Trou_Arbre,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Nb de dents roue Z1 / Nb of teeth gear Z1 : "$Nb_Dents_Roue_Z1,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Nb de dents roue Z2 / Nb of teeth gear Z2 : "$Nb_Dents_Roue_Z2,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+if {$Trous_Assemb_Erreur>0}
+	H_O={$H_O+$I_T}
+	text[-1] "Erreur : "$Trous_Assemb_Erreur" . Modifier section : Trous pour assemblage / Mechanical assembly.",$L_O,$H_O,{$H_P+2},1,255,0,0,255
+endif
+H_O={$H_O+$I_T}
+text[-1] "Nb. trous assemblage : "$Trous_Assemb_Nb,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Diam. trous assemblage [pixels] : "$Trous_Assemb_Diam,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Distance du centre [pixels] : "$Trous_Assemb_Distance_Centre,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Decalage angulaire trous [degres] : "$Trous_Assemb_Decalage_Angle,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+if {$Erreur_Rainure>0}
+	H_O={$H_O+$I_T}
+	text[-1] "Erreur : "$Erreur_Rainure" . Modifier section : Mortaise clavette trou central / Keyway cutting.",$L_O,$H_O,{$H_P+2},1,255,0,0,255
+endif
+H_O={$H_O+$I_T}
+text[-1] "Mortaise/Keyway Largeur / Width [pixels] : "$Rainure_Largeur,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Mortaise/Keyway Hauteur / Height [pixels] : "$Rainure_Hauteur,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Mortaise/Keyway Decalage Angulaire [degres] : "$13,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Creux b [pixels] : "$Creux_b,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Saillie a [pixels] : "$Saillie_a,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Vide Fond De Dent c [pixels] : "$Vide_Fond_De_Dent_c,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Hauteur de dent ht [pixels] : "$Hauteur_de_dent_ht,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Pas Primitif p [pixels] : "$Pas_Primitif_p,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Epaisseur Circulaire t [pixels] : "$Epaisseur_Circulaire_t,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Hauteur Active hk [pixels] : "$Hauteur_Active_hk,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Dia. Primitif Z1 Rouge/Red [pixels] : "$Dia_Primitif_Z1,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Dia. Cercle De Base Z1 Jaune/Yellow [pixels] : "$Diametre_Cercle_De_Base_Z1,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Dia. Tete Z1 Bleu/Blue [pixels] : "$Dia_Tete_Z1,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Dia. Pied Z1 Vert/Green [pixels] : "$Dia_Pied_Z1,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Dia. Primitif Z2 Rouge/Red [pixels] : "$Dia_Primitif_Z2,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Dia. Cercle De Base Z2 Jaune/Yellow [pixels] : "$Diametre_Cercle_De_Base_Z2,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Dia. Tete Z2 Bleu/Blue [pixels] : "$Dia_Tete_Z2,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Dia. Pied Z2 Vert/Green [pixels] : "$Dia_Pied_Z2,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+
+reverse[-1,-2,-3]
+
+
+################################################
+
+samj_Engrenages_Laser_LED_Preview :
+
+rm[0]
+1080,1080,1,4
+fill_color[-1] 255,255,255,255
+
+Module_m={$1+1} # compensation boucle vérification dimensions
+Angle_De_Pression_alpha={round($2*10000)/10000}
+Diam_Trou_Arbre=$3
+Nb_Dents_Roue_Z1=$4
+Nb_Dents_Roue_Z2=$5
+Contours_Plus=$6
+Trous_Assemb_Nb=$7
+Trous_Assemb_Diam=$8
+Trous_Assemb_Distance_Centre=$9
+Trous_Assemb_Decalage_Angle={{pi}/180*$10}
+Rainure_Largeur=$11
+Rainure_Hauteur=$12
+Rainure_Decalage_Angle={{pi}/180*$13}
+
+Echelle=1
+Dimension_Max_Image=7200 # pixels
+Reserve_Contour_Image=10  # pixels
+
+# correction automatique Module m
+Module_m_Origine={$Module_m-1}
+Dia_Primitif_Z1={$Echelle*$Module_m*$Nb_Dents_Roue_Z1}
+Dia_Tete_Z1={$Dia_Primitif_Z1+{2*$Echelle*$Module_m}}
+Dia_Primitif_Z2={$Echelle*$Module_m*$Nb_Dents_Roue_Z2}
+Dia_Tete_Z2={$Dia_Primitif_Z2+{2*$Echelle*$Module_m}}
+
+if {$Nb_Dents_Roue_Z1>$Nb_Dents_Roue_Z2}
+	do
+		Module_m={$Module_m-1}
+		Dia_Primitif_Z1={$Echelle*$Module_m*$Nb_Dents_Roue_Z1}
+		Dia_Tete_Z1={$Dia_Primitif_Z1+{2*$Echelle*$Module_m}}
+	while {$Dia_Tete_Z1>{$Dimension_Max_Image-{2*{$Reserve_Contour_Image}}}}
+else
+	do
+		Module_m={$Module_m-1}
+		Dia_Primitif_Z2={$Echelle*$Module_m*$Nb_Dents_Roue_Z2}
+		Dia_Tete_Z2={$Dia_Primitif_Z2+{2*$Echelle*$Module_m}}
+	while {$Dia_Tete_Z2>{$Dimension_Max_Image-{2*{$Reserve_Contour_Image}}}}
+endif	
+
+Dia_Primitif_Z1={$Echelle*$Module_m*$Nb_Dents_Roue_Z1}
+Dia_Tete_Z1={$Dia_Primitif_Z1+{2*$Echelle*$Module_m}}
+Dia_Pied_Z1={$Dia_Primitif_Z1-{2.5*$Echelle*$Module_m}}
+Dia_Primitif_Z2={$Echelle*$Module_m*$Nb_Dents_Roue_Z2}
+Dia_Tete_Z2={$Dia_Primitif_Z2+{2*$Echelle*$Module_m}}
+Dia_Pied_Z2={$Dia_Primitif_Z2-{2.5*$Echelle*$Module_m}}
+
+# correction automatique Angle De Pression alpha
+Angle_De_Pression_alpha_Origine=$Angle_De_Pression_alpha
+Angle_De_Pression_alpha={$Angle_De_Pression_alpha+0.1}
+if {$Nb_Dents_Roue_Z1>$Nb_Dents_Roue_Z2}
+	do
+		Angle_De_Pression_alpha={$Angle_De_Pression_alpha-0.1}
+		Diametre_Cercle_De_Base_Z1={$Dia_Primitif_Z1*cos({{pi}/180*$Angle_De_Pression_alpha})}
+		Rayon_Developpante_Z1={$Diametre_Cercle_De_Base_Z1/2}
+	while {{$Dia_Pied_Z1/2}>{$Rayon_Developpante_Z1}}
+else
+	do
+		Angle_De_Pression_alpha={$Angle_De_Pression_alpha-0.1}
+		Diametre_Cercle_De_Base_Z2={$Dia_Primitif_Z2*cos({{pi}/180*$Angle_De_Pression_alpha})}
+		Rayon_Developpante_Z2={$Diametre_Cercle_De_Base_Z2/2}
+	while {{$Dia_Pied_Z2/2}>{$Rayon_Developpante_Z2}}
+endif
+Angle_De_Pression_alpha={round($Angle_De_Pression_alpha*10000)/10000}
+
+Dia_Primitif_Z1={$Echelle*$Module_m*$Nb_Dents_Roue_Z1}
+Dia_Tete_Z1={$Dia_Primitif_Z1+{2*$Echelle*$Module_m}}
+Diametre_Cercle_De_Base_Z1={$Dia_Primitif_Z1*cos({{pi}/180*$Angle_De_Pression_alpha})}  # Base des calculs / Compris entre le cercle de pied et le cercle primitif
+Dia_Pied_Z1={$Dia_Primitif_Z1-{2.5*$Echelle*$Module_m}}
+Dia_Primitif_Z2={$Echelle*$Module_m*$Nb_Dents_Roue_Z2}
+Dia_Tete_Z2={$Dia_Primitif_Z2+{2*$Echelle*$Module_m}}
+Dia_Pied_Z2={$Dia_Primitif_Z2-{2.5*$Echelle*$Module_m}}
+Diametre_Cercle_De_Base_Z2={$Dia_Primitif_Z2*cos({{pi}/180*$Angle_De_Pression_alpha})}  # Base des calculs / Compris entre le cercle de pied et le cercle primitif
+
+# Vocabulaire engrenage http://www.zpag.net/Dessin_Technique/1980/EngrnagesCames/Definition_Formule_engre_droit.htm
+Creux_b={$Echelle*$Module_m*1.25}
+Saillie_a={$Echelle*$Module_m}
+Vide_Fond_De_Dent_c={$Creux_b-$Saillie_a}
+Hauteur_de_dent_ht={$Creux_b+$Saillie_a}
+Pas_Primitif_p={$Echelle*$Module_m*{pi}}
+Epaisseur_Circulaire_t={$Pas_Primitif_p/2}
+Hauteur_Active_hk={2*$Saillie_a}
+
+Trous_Assemb_Erreur=0
+if {{$Trous_Assemb_Distance_Centre+{$Trous_Assemb_Diam/2}}>{$Dia_Pied_Z1/2}} Trous_Assemb_Erreur={$Trous_Assemb_Erreur+1} endif
+if {{$Trous_Assemb_Distance_Centre-{$Trous_Assemb_Diam/2}}<{$Diam_Trou_Arbre/2}} Trous_Assemb_Erreur={$Trous_Assemb_Erreur+10} endif
+if {$Trous_Assemb_Nb>3}
+	# samj_Annular_Steiner_Chains
+	Rayon_Cercle_Exterieur={$Trous_Assemb_Distance_Centre+$Trous_Assemb_Diam}
+	Angle_Theta={pi/$Trous_Assemb_Nb}
+	Rayon_Cercle_Centre={{$Rayon_Cercle_Exterieur*{1-{sin($Angle_Theta)}}}/{{1+{sin($Angle_Theta)}}}}
+	Rayon_Cercles_Ext={{$Rayon_Cercle_Exterieur-$Rayon_Cercle_Centre}/2}
+	Rayon_Centres_C_Ext={$Rayon_Cercle_Centre+$Rayon_Cercles_Ext}
+	Rayon_Tang={{{$Rayon_Centres_C_Ext*$Rayon_Centres_C_Ext}-{$Rayon_Cercles_Ext*$Rayon_Cercles_Ext}}^0.5}
+	if {$Trous_Assemb_Distance_Centre<$Rayon_Tang} Trous_Assemb_Erreur={$Trous_Assemb_Erreur+100} endif	
+endif
+
+Erreur_Rainure=0
+if {$Rainure_Hauteur>{{$Diam_Trou_Arbre/2}-1}}
+	Erreur_Rainure={$Erreur_Rainure+1}
+endif
+if {$Rainure_Largeur>{{$Diam_Trou_Arbre/2}-1}}
+	Erreur_Rainure={$Erreur_Rainure+10}
+endif
+
+L_O=10
+H_O=0
+I_T=32
+H_P=30
+R_P=0
+V_P=0
+B_P=0
+H_O={$H_O+$I_T}
+text[-1] "*****     Engrenages Gears Laser : samj_Engrenages_Laser_LED     *****",$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+H_O={$H_O+$I_T}
+if {$Module_m-$Module_m_Origine==0}
+	text[-1] "Module m : "$Module_m"   Demande/Settings : "$Module_m_Origine,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+else
+	text[-1] "Module m : "$Module_m"   Demande/Settings : "$Module_m_Origine,$L_O,$H_O,{$H_P+2},1,255,0,0,255
+endif	
+H_O={$H_O+$I_T}
+if {$Angle_De_Pression_alpha-$Angle_De_Pression_alpha_Origine==0}
+	text[-1] "Angle de Pression/Pressure Angle : "$Angle_De_Pression_alpha"   Demande/Settings : "$Angle_De_Pression_alpha_Origine,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+else
+	text[-1] "Angle de Pression/Pressure Angle : "$Angle_De_Pression_alpha"   Demande/Settings : "$Angle_De_Pression_alpha_Origine,$L_O,$H_O,{$H_P+2},1,255,0,0,255
+endif
+H_O={$H_O+$I_T}
+text[-1] "Diam. trou central [pixels] : "$Diam_Trou_Arbre,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Nb de dents roue Z1 / Nb of teeth gear Z1 : "$Nb_Dents_Roue_Z1,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Nb de dents roue Z2 / Nb of teeth gear Z2 : "$Nb_Dents_Roue_Z2,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+if {$Trous_Assemb_Erreur>0}
+	H_O={$H_O+$I_T}
+	text[-1] "Erreur : "$Trous_Assemb_Erreur" . Modifier section : Trous pour assemblage / Mechanical assembly.",$L_O,$H_O,{$H_P+2},1,255,0,0,255
+endif
+H_O={$H_O+$I_T}
+text[-1] "Nb. trous assemblage : "$Trous_Assemb_Nb,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Diam. trous assemblage [pixels] : "$Trous_Assemb_Diam,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Distance du centre [pixels] : "$Trous_Assemb_Distance_Centre,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Decalage angulaire trous [degres] : "$Trous_Assemb_Decalage_Angle,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+if {$Erreur_Rainure>0}
+	H_O={$H_O+$I_T}
+	text[-1] "Erreur : "$Erreur_Rainure" . Modifier section : Mortaise clavette trou central / Keyway cutting.",$L_O,$H_O,{$H_P+2},1,255,0,0,255
+endif
+H_O={$H_O+$I_T}
+text[-1] "Mortaise/Keyway Largeur / Width [pixels] : "$Rainure_Largeur,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Mortaise/Keyway Hauteur / Height [pixels] : "$Rainure_Hauteur,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Mortaise/Keyway Decalage Angulaire [degres] : "$13,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Creux b [pixels] : "$Creux_b,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Saillie a [pixels] : "$Saillie_a,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Vide Fond De Dent c [pixels] : "$Vide_Fond_De_Dent_c,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Hauteur de dent ht [pixels] : "$Hauteur_de_dent_ht,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Pas Primitif p [pixels] : "$Pas_Primitif_p,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Epaisseur Circulaire t [pixels] : "$Epaisseur_Circulaire_t,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Hauteur Active hk [pixels] : "$Hauteur_Active_hk,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Dia. Primitif Z1 [pixels] : "$Dia_Primitif_Z1,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Dia. Cercle De Base Z1 [pixels] : "$Diametre_Cercle_De_Base_Z1,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Dia. Tete Z1 [pixels] : "$Dia_Tete_Z1,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Dia. Pied Z1 [pixels] : "$Dia_Pied_Z1,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Dia. Primitif Z2 [pixels] : "$Dia_Primitif_Z2,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Dia. Cercle De Base Z2 [pixels] : "$Diametre_Cercle_De_Base_Z2,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Dia. Tete Z2 [pixels] : "$Dia_Tete_Z2,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+H_O={$H_O+$I_T}
+text[-1] "Dia. Pied Z2 [pixels] : "$Dia_Pied_Z2,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+
+#################################################
+##                                             ##
+##       FIN samj_Engrenages_Laser_LED         ##
+##                                             ##
+#################################################
 
 
 
