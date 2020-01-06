@@ -36,7 +36,7 @@
 #@gui : note = link("https://github.com/dtschump/gmic-community","https://github.com/dtschump/gmic-community")
 #@gui : note = note("Les filtres contenus dans ce r\303\251pertoire sont majoritairement traduits en fran\303\247ais et/ou en cours de d\303\251veloppement.")
 #@gui : note = note("The filters included in this directory are mostly translated into French and/or experimental.")
-#@gui : note = note("Version 2020/01/05 GMIC 2.8.1")
+#@gui : note = note("Version 2020/01/06 GMIC 2.8.1")
 
 samj_about :
 
@@ -9944,7 +9944,7 @@ samj_rien_rendering :
 ##         samj_Engrenages_Laser_LED           ##
 ##                                             ##
 #################################################
-
+# modif 20200106 pour creux=dent sur cercle Primitif 
 #@gui Engrenages Gears Laser : samj_Engrenages_Laser_LED, samj_Engrenages_Laser_LED_Preview
 #@gui : sep = separator(), note = note("<small><i>Engrenages Gears Laser Cutting Engraving</i></small>")
 #@gui : note = link("https://samjcreations.blogspot.com/2020/01/samuser-avec-gmic-gimp-engrenages.html","https://samjcreations.blogspot.com/2020/01/samuser-avec-gmic-gimp-engrenages.html")
@@ -9956,6 +9956,7 @@ samj_rien_rendering :
 #@gui : Diam. trou central [pixels]  = int(12,12,600)
 #@gui : Nb de dents roue Z1 / Nb of teeth gear Z1  [13...17]  = int(14,7,151)
 #@gui : Nb de dents roue Z2 / Nb of teeth gear Z2 [13...39]  = int(17,7,151)
+#@gui : Forme = choice(0,"Dent=Creux sur Cercle Primitif","Dent plus petite - Calcul sur Cercle De Base")
 #@gui : Contours +  = bool(1)
 #@gui : sep = separator(), note = note("<span foreground="orangered">Trous pour assemblage / Mechanical assembly</span>")
 #@gui : Nb. trous assemblage / Holes  = int(2,0,12)
@@ -9977,7 +9978,7 @@ samj_rien_rendering :
 #@gui : note = note("<span foreground="magenta"> - 1 layer with transparent background with technical data.</span>")
 #@gui : note = note("<span foreground="magenta"> - 1 white layer with a black outline for the Z2 wheel.</span>")
 #@gui : note = note("<span foreground="magenta"> - 1 white layer with a black outline for the Z1 wheel.</span>")
-#@gui : sep = separator(), note = note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2020/01/05</i>.</small>")
+#@gui : sep = separator(), note = note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2020/01/06</i>.</small>")
 
 samj_Engrenages_Laser_LED :
 
@@ -9986,14 +9987,15 @@ Angle_De_Pression_alpha={round($2*10000)/10000}
 Diam_Trou_Arbre=$3
 Nb_Dents_Roue_Z1=$4
 Nb_Dents_Roue_Z2=$5
-Contours_Plus=$6
-Trous_Assemb_Nb=$7
-Trous_Assemb_Diam=$8
-Trous_Assemb_Distance_Centre=$9
-Trous_Assemb_Decalage_Angle={{pi}/180*$10}
-Rainure_Largeur=$11
-Rainure_Hauteur=$12
-Rainure_Decalage_Angle={{pi}/180*$13} # $13 utilisé dans infos.
+Egalite_Primitif=$6
+Contours_Plus=$7
+Trous_Assemb_Nb=$8
+Trous_Assemb_Diam=$9
+Trous_Assemb_Distance_Centre=$10
+Trous_Assemb_Decalage_Angle={{pi}/180*$11}
+Rainure_Largeur=$12
+Rainure_Hauteur=$13
+Rainure_Decalage_Angle={{pi}/180*$14} # $14 utilisé dans infos.
 
 Echelle=1
 Dimension_Max_Image=7200 # pixels
@@ -10104,6 +10106,42 @@ X_Developpante_Tracage=0
 Y_Developpante_Tracage=0
 Angle_Decalage_Developpante_B={{{pi}/{$Nb_Dents_Roue_Z1*2}}-{{pi}/2}+{{{pi}/$Nb_Dents_Roue_Z1}/2}}
 
+if {$Egalite_Primitif==1}
+	# determiner croisement avec cercle primitif et l'angle correspondant
+	Intersection_Developpante_Cercle_primitif=0
+	X_Developpante_Memo=0
+	Y_Developpante_Memo=0
+	X_Intersection=0
+	Y_Intersection=0
+	Angle_Developpante_Rad=0
+	Nb_boucles=0
+	do
+		# développante	
+		X_Developpante={$Rayon_Developpante*{cos($Angle_Developpante_Rad)+{$Angle_Developpante_Rad*sin($Angle_Developpante_Rad)}}}
+		Y_Developpante={$Rayon_Developpante*{sin($Angle_Developpante_Rad)-{$Angle_Developpante_Rad*cos($Angle_Developpante_Rad)}}}
+		Dimension_Developpante={({{($X_Developpante)^2}+{($Y_Developpante)^2}})^0.5}
+		# rotation angulaire de la développante		
+		X_Developpante_Tracage={$X_Origine+{{$X_Developpante*cos($Angle_Rotation)}-{$Y_Developpante*sin($Angle_Rotation)}}}
+		Y_Developpante_Tracage={$Y_Origine+{{$X_Developpante*sin($Angle_Rotation)}+{$Y_Developpante*cos($Angle_Rotation)}}}
+		if {$Intersection_Developpante_Cercle_primitif==0}
+			if {$Dimension_Developpante>{$Dia_Primitif_Z1/2}} # dépassement
+				Angle_Intersection={atan2({$Y_Developpante_Memo-$Y_Origine},{$X_Developpante_Memo-$X_Origine})}
+				Angle_Alpha_Base_Primitif={$Angle_Rotation-$Angle_Intersection}
+				Intersection_Developpante_Cercle_primitif=1
+			endif
+			X_Developpante_Memo=$X_Developpante_Tracage
+			Y_Developpante_Memo=$Y_Developpante_Tracage
+		endif
+		Angle_Developpante_Rad={$Angle_Developpante_Rad+$Increment_Developpante}
+		Nb_boucles={$Nb_boucles+1}
+	while {$Dimension_Developpante<$Condition_Arret}
+
+	Angle_Rotation=0
+	Dimension_Developpante=0
+	X_Developpante_Tracage=0
+	Y_Developpante_Tracage=0
+endif
+
 	repeat $Nb_Dents_Roue_Z1
 
 		Angle_Developpante_Rad=0
@@ -10134,8 +10172,14 @@ Angle_Decalage_Developpante_B={{{pi}/{$Nb_Dents_Roue_Z1*2}}-{{pi}/2}+{{{pi}/$Nb_
 			X_Developpante={$Rayon_Developpante*{sin($Angle_Developpante_Rad)-{$Angle_Developpante_Rad*cos($Angle_Developpante_Rad)}}}
 			Y_Developpante={$Rayon_Developpante*{cos($Angle_Developpante_Rad)+{$Angle_Developpante_Rad*sin($Angle_Developpante_Rad)}}}
 			# rotation angulaire de la développante
-			X_Developpante_Tracage={$X_Origine+{{$X_Developpante*cos($Angle_Rotation+$Angle_Decalage_Developpante_B)}-{$Y_Developpante*sin($Angle_Rotation+$Angle_Decalage_Developpante_B)}}}
-			Y_Developpante_Tracage={$Y_Origine+{{$X_Developpante*sin($Angle_Rotation+$Angle_Decalage_Developpante_B)}+{$Y_Developpante*cos($Angle_Rotation+$Angle_Decalage_Developpante_B)}}}		
+
+			if {$Egalite_Primitif==1}
+				X_Developpante_Tracage={$X_Origine+{{$X_Developpante*cos($Angle_Rotation-{2*$Angle_Alpha_Base_Primitif}+$Angle_Decalage_Developpante_B)}-{$Y_Developpante*sin($Angle_Rotation-{2*$Angle_Alpha_Base_Primitif}+$Angle_Decalage_Developpante_B)}}}
+				Y_Developpante_Tracage={$Y_Origine+{{$X_Developpante*sin($Angle_Rotation-{2*$Angle_Alpha_Base_Primitif}+$Angle_Decalage_Developpante_B)}+{$Y_Developpante*cos($Angle_Rotation-{2*$Angle_Alpha_Base_Primitif}+$Angle_Decalage_Developpante_B)}}}	
+			else
+				X_Developpante_Tracage={$X_Origine+{{$X_Developpante*cos($Angle_Rotation+$Angle_Decalage_Developpante_B)}-{$Y_Developpante*sin($Angle_Rotation+$Angle_Decalage_Developpante_B)}}}
+				Y_Developpante_Tracage={$Y_Origine+{{$X_Developpante*sin($Angle_Rotation+$Angle_Decalage_Developpante_B)}+{$Y_Developpante*cos($Angle_Rotation+$Angle_Decalage_Developpante_B)}}}		
+			endif
 
 			if {$Nb_boucles==0}
 				X_Debut_Developpante_Tracage_B=$X_Developpante_Tracage
@@ -10148,7 +10192,7 @@ Angle_Decalage_Developpante_B={{{pi}/{$Nb_Dents_Roue_Z1*2}}-{{pi}/2}+{{{pi}/$Nb_
 			point[-1] $X_Developpante_Tracage,$Y_Developpante_Tracage,0,1,0,0,0,255
 
 			Angle_Developpante_Rad={$Angle_Developpante_Rad+$Increment_Developpante}
-			
+
 			Nb_boucles={$Nb_boucles+1}
 
 		while {$Dimension_Developpante<$Condition_Arret}
@@ -10175,11 +10219,18 @@ Angle_Decalage_Developpante_B={{{pi}/{$Nb_Dents_Roue_Z1*2}}-{{pi}/2}+{{{pi}/$Nb_
 		Y_Fin_Rainure_Pied={$Y_Origine+{{$Dia_Pied_Z1/2}*{sin($Angle_Fin_Rainure_Pied)}}}
 		line[-1] {$X_Origine+{{$Diametre_Cercle_De_Base_Z1/2}*{cos($Angle_Debut_Developpante_Tracage_A)}}},{$Y_Origine+{{$Diametre_Cercle_De_Base_Z1/2}*{sin($Angle_Debut_Developpante_Tracage_A)}}},$X_Debut_Rainure_Pied,$Y_Debut_Rainure_Pied,1,0,0,0,255
 		line[-1] {$X_Origine+{{$Diametre_Cercle_De_Base_Z1/2}*{cos($Angle_Debut_Developpante_Tracage_B)}}},{$Y_Origine+{{$Diametre_Cercle_De_Base_Z1/2}*{sin($Angle_Debut_Developpante_Tracage_B)}}},$X_Fin_Rainure_Pied,$Y_Fin_Rainure_Pied,1,0,0,0,255
-		
+
 		Angle_Debut_Rainure_Pied_Suivant={$Angle_Fin_Rainure_Pied+{$Increment_Rotation/2}-{$Angle_Decalage_Rainure_Pied*2}}
-		X_Debut_Rainure_Pied_Suivant={$X_Origine+{{$Dia_Pied_Z1/2}*{cos($Angle_Debut_Rainure_Pied_Suivant)}}}
-		Y_Debut_Rainure_Pied_Suivant={$Y_Origine+{{$Dia_Pied_Z1/2}*{sin($Angle_Debut_Rainure_Pied_Suivant)}}}
-		line[-1] $X_Debut_Rainure_Pied_Suivant,$Y_Debut_Rainure_Pied_Suivant,$X_Fin_Rainure_Pied,$Y_Fin_Rainure_Pied,1,0,0,0,255
+
+		if {$Egalite_Primitif==1}
+			X_Debut_Rainure_Pied_Suivant={$X_Origine+{{$Dia_Pied_Z1/2}*{cos($Angle_Debut_Rainure_Pied_Suivant+{2*$Angle_Alpha_Base_Primitif})}}}			
+			Y_Debut_Rainure_Pied_Suivant={$Y_Origine+{{$Dia_Pied_Z1/2}*{sin($Angle_Debut_Rainure_Pied_Suivant+{2*$Angle_Alpha_Base_Primitif})}}}
+			line[-1] $X_Debut_Rainure_Pied_Suivant,$Y_Debut_Rainure_Pied_Suivant,$X_Fin_Rainure_Pied,$Y_Fin_Rainure_Pied,1,0,0,0,255
+		else
+			X_Debut_Rainure_Pied_Suivant={$X_Origine+{{$Dia_Pied_Z1/2}*{cos($Angle_Debut_Rainure_Pied_Suivant)}}}
+			Y_Debut_Rainure_Pied_Suivant={$Y_Origine+{{$Dia_Pied_Z1/2}*{sin($Angle_Debut_Rainure_Pied_Suivant)}}}
+			line[-1] $X_Debut_Rainure_Pied_Suivant,$Y_Debut_Rainure_Pied_Suivant,$X_Fin_Rainure_Pied,$Y_Fin_Rainure_Pied,1,0,0,0,255
+		endif
 
 		Angle_Rotation={$Angle_Rotation+$Increment_Rotation}
 
@@ -10211,7 +10262,41 @@ X_Developpante_Tracage=0
 Y_Developpante_Tracage=0
 Angle_Decalage_Developpante_B={{{pi}/{$Nb_Dents_Roue_Z2*2}}-{{pi}/2}+{{{pi}/$Nb_Dents_Roue_Z2}/2}}
 
+if {$Egalite_Primitif==1}
+	# determiner croisement avec cercle primitif et l'angle correspondant
+	Intersection_Developpante_Cercle_primitif=0
+	X_Developpante_Memo=0
+	Y_Developpante_Memo=0
+	X_Intersection=0
+	Y_Intersection=0
+	Angle_Developpante_Rad=0
+	Nb_boucles=0
+	do
+		# développante	
+		X_Developpante={$Rayon_Developpante*{cos($Angle_Developpante_Rad)+{$Angle_Developpante_Rad*sin($Angle_Developpante_Rad)}}}
+		Y_Developpante={$Rayon_Developpante*{sin($Angle_Developpante_Rad)-{$Angle_Developpante_Rad*cos($Angle_Developpante_Rad)}}}
+		Dimension_Developpante={({{($X_Developpante)^2}+{($Y_Developpante)^2}})^0.5}
+		# rotation angulaire de la développante		
+		X_Developpante_Tracage={$X_Origine+{{$X_Developpante*cos($Angle_Rotation)}-{$Y_Developpante*sin($Angle_Rotation)}}}
+		Y_Developpante_Tracage={$Y_Origine+{{$X_Developpante*sin($Angle_Rotation)}+{$Y_Developpante*cos($Angle_Rotation)}}}
+		if {$Intersection_Developpante_Cercle_primitif==0}
+			if {$Dimension_Developpante>{$Dia_Primitif_Z2/2}} # dépassement
+				Angle_Intersection={atan2({$Y_Developpante_Memo-$Y_Origine},{$X_Developpante_Memo-$X_Origine})}
+				Angle_Alpha_Base_Primitif={$Angle_Rotation-$Angle_Intersection}
+				Intersection_Developpante_Cercle_primitif=1
+			endif
+			X_Developpante_Memo=$X_Developpante_Tracage
+			Y_Developpante_Memo=$Y_Developpante_Tracage
+		endif
+		Angle_Developpante_Rad={$Angle_Developpante_Rad+$Increment_Developpante}
+		Nb_boucles={$Nb_boucles+1}
+	while {$Dimension_Developpante<$Condition_Arret}
 
+	Angle_Rotation=0
+	Dimension_Developpante=0
+	X_Developpante_Tracage=0
+	Y_Developpante_Tracage=0
+endif
 
 	repeat $Nb_Dents_Roue_Z2
 
@@ -10243,8 +10328,14 @@ Angle_Decalage_Developpante_B={{{pi}/{$Nb_Dents_Roue_Z2*2}}-{{pi}/2}+{{{pi}/$Nb_
 			X_Developpante={$Rayon_Developpante*{sin($Angle_Developpante_Rad)-{$Angle_Developpante_Rad*cos($Angle_Developpante_Rad)}}}
 			Y_Developpante={$Rayon_Developpante*{cos($Angle_Developpante_Rad)+{$Angle_Developpante_Rad*sin($Angle_Developpante_Rad)}}}
 			# rotation angulaire de la développante
-			X_Developpante_Tracage={$X_Origine+{{$X_Developpante*cos($Angle_Rotation+$Angle_Decalage_Developpante_B)}-{$Y_Developpante*sin($Angle_Rotation+$Angle_Decalage_Developpante_B)}}}
-			Y_Developpante_Tracage={$Y_Origine+{{$X_Developpante*sin($Angle_Rotation+$Angle_Decalage_Developpante_B)}+{$Y_Developpante*cos($Angle_Rotation+$Angle_Decalage_Developpante_B)}}}		
+
+			if {$Egalite_Primitif==1}
+				X_Developpante_Tracage={$X_Origine+{{$X_Developpante*cos($Angle_Rotation-{2*$Angle_Alpha_Base_Primitif}+$Angle_Decalage_Developpante_B)}-{$Y_Developpante*sin($Angle_Rotation-{2*$Angle_Alpha_Base_Primitif}+$Angle_Decalage_Developpante_B)}}}
+				Y_Developpante_Tracage={$Y_Origine+{{$X_Developpante*sin($Angle_Rotation-{2*$Angle_Alpha_Base_Primitif}+$Angle_Decalage_Developpante_B)}+{$Y_Developpante*cos($Angle_Rotation-{2*$Angle_Alpha_Base_Primitif}+$Angle_Decalage_Developpante_B)}}}	
+			else
+				X_Developpante_Tracage={$X_Origine+{{$X_Developpante*cos($Angle_Rotation+$Angle_Decalage_Developpante_B)}-{$Y_Developpante*sin($Angle_Rotation+$Angle_Decalage_Developpante_B)}}}
+				Y_Developpante_Tracage={$Y_Origine+{{$X_Developpante*sin($Angle_Rotation+$Angle_Decalage_Developpante_B)}+{$Y_Developpante*cos($Angle_Rotation+$Angle_Decalage_Developpante_B)}}}		
+			endif
 
 			if {$Nb_boucles==0}
 				X_Debut_Developpante_Tracage_B=$X_Developpante_Tracage
@@ -10286,9 +10377,16 @@ Angle_Decalage_Developpante_B={{{pi}/{$Nb_Dents_Roue_Z2*2}}-{{pi}/2}+{{{pi}/$Nb_
 		line[-1] {$X_Origine+{{$Diametre_Cercle_De_Base_Z2/2}*{cos($Angle_Debut_Developpante_Tracage_B)}}},{$Y_Origine+{{$Diametre_Cercle_De_Base_Z2/2}*{sin($Angle_Debut_Developpante_Tracage_B)}}},$X_Fin_Rainure_Pied,$Y_Fin_Rainure_Pied,1,0,0,0,255
 		
 		Angle_Debut_Rainure_Pied_Suivant={$Angle_Fin_Rainure_Pied+{$Increment_Rotation/2}-{$Angle_Decalage_Rainure_Pied*2}}
-		X_Debut_Rainure_Pied_Suivant={$X_Origine+{{$Dia_Pied_Z2/2}*{cos($Angle_Debut_Rainure_Pied_Suivant)}}}
-		Y_Debut_Rainure_Pied_Suivant={$Y_Origine+{{$Dia_Pied_Z2/2}*{sin($Angle_Debut_Rainure_Pied_Suivant)}}}
-		line[-1] $X_Debut_Rainure_Pied_Suivant,$Y_Debut_Rainure_Pied_Suivant,$X_Fin_Rainure_Pied,$Y_Fin_Rainure_Pied,1,0,0,0,255
+
+		if {$Egalite_Primitif==1}
+			X_Debut_Rainure_Pied_Suivant={$X_Origine+{{$Dia_Pied_Z2/2}*{cos($Angle_Debut_Rainure_Pied_Suivant+{2*$Angle_Alpha_Base_Primitif})}}}			
+			Y_Debut_Rainure_Pied_Suivant={$Y_Origine+{{$Dia_Pied_Z2/2}*{sin($Angle_Debut_Rainure_Pied_Suivant+{2*$Angle_Alpha_Base_Primitif})}}}
+			line[-1] $X_Debut_Rainure_Pied_Suivant,$Y_Debut_Rainure_Pied_Suivant,$X_Fin_Rainure_Pied,$Y_Fin_Rainure_Pied,1,0,0,0,255
+		else
+			X_Debut_Rainure_Pied_Suivant={$X_Origine+{{$Dia_Pied_Z2/2}*{cos($Angle_Debut_Rainure_Pied_Suivant)}}}
+			Y_Debut_Rainure_Pied_Suivant={$Y_Origine+{{$Dia_Pied_Z2/2}*{sin($Angle_Debut_Rainure_Pied_Suivant)}}}
+			line[-1] $X_Debut_Rainure_Pied_Suivant,$Y_Debut_Rainure_Pied_Suivant,$X_Fin_Rainure_Pied,$Y_Fin_Rainure_Pied,1,0,0,0,255
+		endif
 
 		Angle_Rotation={$Angle_Rotation+$Increment_Rotation}
 
@@ -10413,7 +10511,7 @@ text[-1] "Mortaise/Keyway Largeur / Width [pixels] : "$Rainure_Largeur,$L_O,$H_O
 H_O={$H_O+$I_T}
 text[-1] "Mortaise/Keyway Hauteur / Height [pixels] : "$Rainure_Hauteur,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
 H_O={$H_O+$I_T}
-text[-1] "Mortaise/Keyway Decalage Angulaire [degres] : "$13,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+text[-1] "Mortaise/Keyway Decalage Angulaire [degres] : "$14,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
 H_O={$H_O+$I_T}
 text[-1] "Creux b [pixels] : "$Creux_b,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
 H_O={$H_O+$I_T}
@@ -10486,14 +10584,15 @@ Angle_De_Pression_alpha={round($2*10000)/10000}
 Diam_Trou_Arbre=$3
 Nb_Dents_Roue_Z1=$4
 Nb_Dents_Roue_Z2=$5
-Contours_Plus=$6
-Trous_Assemb_Nb=$7
-Trous_Assemb_Diam=$8
-Trous_Assemb_Distance_Centre=$9
-Trous_Assemb_Decalage_Angle={{pi}/180*$10}
-Rainure_Largeur=$11
-Rainure_Hauteur=$12
-Rainure_Decalage_Angle={{pi}/180*$13}
+Egalite_Primitif=$6
+Contours_Plus=$7
+Trous_Assemb_Nb=$8
+Trous_Assemb_Diam=$9
+Trous_Assemb_Distance_Centre=$10
+Trous_Assemb_Decalage_Angle={{pi}/180*$11}
+Rainure_Largeur=$12
+Rainure_Hauteur=$13
+Rainure_Decalage_Angle={{pi}/180*$14}
 
 Echelle=1
 Dimension_Max_Image=7200 # pixels
@@ -10634,7 +10733,7 @@ text[-1] "Mortaise/Keyway Largeur / Width [pixels] : "$Rainure_Largeur,$L_O,$H_O
 H_O={$H_O+$I_T}
 text[-1] "Mortaise/Keyway Hauteur / Height [pixels] : "$Rainure_Hauteur,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
 H_O={$H_O+$I_T}
-text[-1] "Mortaise/Keyway Decalage Angulaire [degres] : "$13,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
+text[-1] "Mortaise/Keyway Decalage Angulaire [degres] : "$14,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
 H_O={$H_O+$I_T}
 text[-1] "Creux b [pixels] : "$Creux_b,$L_O,$H_O,$H_P,1,$R_P,$V_P,$B_P,255
 H_O={$H_O+$I_T}
