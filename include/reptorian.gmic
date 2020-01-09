@@ -44,6 +44,181 @@
 #
 #-------------------------------
 
+#@cli rep_rand_sqrrecfill: eq. to 'rep_random_square_rectangle_fill' : (+)
+rep_rand_sqrrecfill: rep_random_square_rectangle_fill $*
+#@cli rep_random_square_rectangle_fill: _palette,square_dimension>0,_rectangle_max_length_1>0,_rectangle_max_length_2>0,_erode,_output={ 0=none | 1=line },_reduce_nonrectangles={ 0=do_not_reduce_nonrectagles | 1=reduce_nonrectangles },_seed
+#@cli : Create texture with aligned rectangle and squares with colors being optional.
+#@cli : (eq. to 'rep_rand_sqrrecfill')
+#@cli : Default values: '_palette=0','_rectangle_length_2=1','_frequency_of_rectangle=1','_erode=0','_output=1','_reduce_nonrectangles=1','_seed='
+#@cli : Author: Reptorian.
+rep_random_square_rectangle_fill:
+skip ${1=0},${3=2},${4=1},${5=1},${6=0},${7=2},${8=1},${9=}
+if narg($9) srand $9 fi
+bool_state_pal=0
+if isint($1)&&isnum($1) if $1>0||$1<0 bool_state_pal=1 text_mode=0 fi
+else {narg($1)} bool_state_pal=1 text_mode=1
+fi
+rep_rand_sqrrectex ${2-6},{$bool_state_pal?(($1>0||$1<0)&&$7?3:1):2},${8-9}
+if $bool_state_pal 
+    if $text_mode pal $1 
+    else 
+        if $1>0 pal {$1+7}
+        else {iM+1},1,1,3,round(u(0,255))
+        fi
+    fi
+    l. 
+        s x 
+        repeat $! l[$<] 
+            if 
+                !{ia} rm 
+            fi 
+        endl done 
+        a x 
+    endl
+    {w#-1},1,1,1,u(0,1) 
+    pixelsort.. +,x,[-1] rm.
+    r. {iM#-2},100%,100%,100%,0,2
+    r. {w#-1+1},100%,100%,100%,0,0,1,1
+    map.. .
+    rm.
+fi
+#@cli rep_rand_sqrrecart: eq. to 'rep_random_square_rectangle_texture' : (+)
+rep_rand_sqrrecart: rep_random_square_rectangle_artistic $*
+#@cli rep_random_square_rectangle_artistic: square_dimension>0,_rectangle_max_length_1>0,_rectangle_max_length_2>0,_frequency_of_rectangle>0,_erode,_output={ 0=none | 1=line },_reduce_nonrectangles={ 0=do_not_reduce_nonrectagles | 1=reduce_nonrectangles },_distance_mode={ 0=regular_output | 1=distance_output },_seed,_output_resized={ 0=do_not_output_resized_original | 1=output_resized }
+#@cli : Create artistic rendering of image with aligned rectangle and squares.
+#@cli : (eq. to 'rep_rand_sqrrecart')
+#@cli : Default values: '_rectangle_max_length_1=2','_rectangle_length_2=1','_frequency_of_rectangle=1','_erode=0','_output=2','_reduce_nonrectangles=0','_seed=','_output_resized=0'
+#@cli : Author: Reptorian.
+rep_random_square_rectangle_artistic:
+skip ${2=2},${3=1},${4=1},${5=0},${6=1},${7=1},${8=0},${9=},${10=0}
+rep_rand_sqrrectex $1,$2,$3,$4,$5,{$8?2:abs($6)%2+1},$7,$9
+store. art_shape
+repeat $! l[$<]
+    $art_shape
+    rep_aspect_crop_2d[^-1] {w#-1},{h#-1}
+    r[^-1] {w#-1},{h#-1},100%,100%,2,2,.5,.5
+    if $10 +store. original_resized fi
+    blend shapeaverage0
+    if s==3||s==4 sh. 0,2
+    elif s==2 sh. 0
+    elif s==5 sh. 0,4
+    fi
+    if $8 $art_shape distance. 0% n. 0,1 *.. . fi
+    k[0]
+    if $10 $original_resized fi
+endl done
+#@cli rep_rand_sqrrectex: eq. to 'rep_random_square_rectangle_texture' : (+)
+rep_rand_sqrrectex: rep_random_square_rectangle_texture $*
+#@cli rep_random_square_rectangle_texture: square_dimension>0,_rectangle_max_length_1>0,_rectangle_max_length_2>0,_frequency_of_rectangle>0,_erode,_output={ 0=none | 1=filled_gray | 2=filled_line | 3=labeled_filled_line },_reduce_nonrectangles={ 0=do_not_reduce_nonrectagles | 1=reduce_nonrectangles },_seed
+#@cli : Create a texture with aligned rectangle and squares.
+#@cli : (eq. to 'rep_rand_sqrrectex')
+#@cli : Note: '_reduce_nonrectangles' cannot be used to completely clear vectors of nonrectangle due to the algorithm provided, and no solution in context of vector exist as of now.
+#@cli : Default values: '_rectangle_max_length=1','_rectangle_max_length=2','_frequency_of_rectangle=1','_erode=0','_output=2','_reduce_nonrectangles','_seed='
+#@cli : Author: Reptorian.
+#@cli : $ rep_random_square_rectangle_texture 20,3,3,2,,0
+rep_random_square_rectangle_texture:
+skip ${2=2},${3=1},${4=1},${5=0},${6=2},${7=1},${8=}
+
+if narg($8) srand $8 fi
+
+square_size=$1
+
+if abs($5) 
+    if $5>0 square_size+={abs($5)}
+    else square_size+=1
+    fi
+fi
+
+if $1<2 error ""$"1>1==F" fi
+
+mw=${-max_w}
+mh=${-max_h}
+nvw={ceil($mw/$square_size)}
+nvh={ceil($mh/$square_size)}
+
+$nvw,$nvh,1,1,"x+y*w"
+if abs(round($2))==1&&abs(round($3))==1 error ""$"2>1||"$"3>1==F" fi
+
+msize={sqrt(sqr(round($2)))+sqr(round(abs($3)))}
+
+if $1<2 error ""$"2>1==F" fi
+
+freq={int(avg(1/$msize,$4,.5)*(iM+1))}
+val={iM+1}
+
+repeat round($freq)
+    orientation={round(u(0,1))}
+    nsl_1={round(u(1,abs($2)))}
+    nsl_2={round(u(1,abs($3)))}
+    min_nsl={min($nsl_1,$nsl_2)}
+    max_nsl={max($nsl_1,$nsl_2)}
+    if $min_nsl==1&&$max_nsl==1 max_nsl={round(u(2,abs(max($2,$3))))} fi
+    px={round(u(0,w#-1-1))}
+    py={round(u(0,h#-1-1))}
+    if $orientation $min_nsl,$max_nsl,1,1,$val j.. .,$px,$py rm.
+    else $max_nsl,$min_nsl,1,1,$val j.. .,$px,$py rm.
+    fi
+    val+=1
+done
+
+label. 0,0
+
+if $7&&($2>1&&$3>1)
+repeat 2
+mirror. y
+f. "
+topleft   = i(x-1,y-1);
+topmiddle = i(x,  y-1);
+topright  = i(x+1,y-1);
+
+middleleft  = i(x-1,y);
+middle      = i;
+middleright = i(x+1,y);
+
+bottomleft    = i(x-1,y+1);
+bottommiddle  = i(x,  y+1);
+bottomright   = i(x+1,y+1);
+
+F=i;
+
+if( (  (avg(topmiddle,middleleft)==middle)
+    || (avg(topmiddle,middleright)==middle)
+    || (avg(bottommiddle,middleleft)==middle)
+    || (avg(bottommiddle,middleright)==middle)
+    )
+    
+    ||
+    
+    (  (avg(middleleft,topmiddle,middleright)==middle)
+    || (avg(middleleft,bottommiddle,middleright)==middle)
+    || (avg(bottommiddle,middleleft,topmiddle)==middle)
+    || (avg(bottommiddle,middleright,topmiddle)==middle)
+    )
+    
+    ||
+    
+    (  (avg(bottommiddle,bottomright,middleright)==middle)
+    || (avg(bottommiddle,bottomleft,middleleft)==middle)
+    || (avg(topmiddle,topright,middleright)==middle)
+    || (avg(topmiddle,topleft,middleleft)==middle)
+    )
+    
+    ,F*=-1;
+  );
+
+F;
+"
+label. 0,0
+done
+fi
+
+if $6
+    {$nvw*$square_size+1},{$nvh*$square_size+1},1,1,i(#-1,floor(x/$square_size),floor(y/$square_size)) rm..
+    if $6>1 f. "(x!=0&&x!=w-1&&y!=0&&y!=h-1)?(i(x-1,y-1,z,c,0,1)==i(x,y))*((i(x-1,y,z,c,0,1)==i(x,y))&&(i(x,y-1,z,c,0,1)==i(x,y))):0"
+        if $5 erode. {$5<0?(abs($5)>$1?$1:abs($5)):abs($5)} expand_xy. {int(abs($5)/2)},0 if !(abs($5)%2) r. {w#1-1},{h#-1-1} fi fi
+    fi
+    if $6>2 label_fg. 0,0 fi
+fi
 #@cli rep_gradf: eq. to 'rep_graduated_filter' : (+)
 rep_gradf: rep_graduated_filter $*
 #@cli rep_graduated_filter: 0<strength<=1,0<=_lumastrength<=1,0<=_placement<=1,-360<=_ang<=360,_gradiated_colorspace= { 0=RGB | 1=HSV | 2=YUV },_color1,_color2,_color3
@@ -2642,7 +2817,7 @@ if $6 r {$iw},{$ih},1,4,0 fi
 #@cli : Crop images based on specified aspect ratio.
 #@cli : Default value: 'shift_factor=0'
 rep_aspect_crop_2d:
-skip ${3=0}
+skip ${3=0},${4=0}
 repeat $! l[$>]
 A=$1
 B=$2
@@ -5564,6 +5739,46 @@ gui_split_preview "gui_rep_majority_threshold ${1-7}",${-3--1}
 fx_rep_graduated_filter: rep_graduated_filter $1%,$2%,$3%,$4,,${5-7}
 fx_rep_graduated_filter_preview: gui_split_preview "fx_rep_graduated_filter ${1-7}",${-3--1}
 #@gui_
+#@gui Rectangular-Square Fill: fx_rep_rand_sqrrecfill,fx_rep_rand_sqrrecfill
+#@gui : note=note("<b>Main</b>")
+#@gui : Palette=choice(0,"None","1-Bit-RGB-{8}","Aurora-{256}","PLAYPAL-{249}","Sonic Robo Blast 2-{256}","Famicube-{64}","Andrew Kensler - 16","Andrew Kensler - 32","Andrew Kensler - 54","AAP-Micro 12","AAP-16","AAP-64","AAP-SPLENDOR128","DB8","DB16","DB32","DB-ISO22","DimWiddy 17","DimWiddy 23","Endesga-4","Endesga-8","Endesga-16","Endesga-32","Endesga-36","Endesga-64","Juicy-32","Juicy-56","XAIUE-22","15P-DX","20P-DX","24P-DX","Cabana-64","Fantasy 16","Fantasy 24","Tranquil Fantasy 23","Tranquility Plus 39","Faraway 48","Fleja Master Palette-{33}","Koni32","Linear Color Palette Basic-{31}","Vines Flexible Linear Ramps-{38}","Arcade Standard 29","ARQ16","BLK 36","BLK-NEO-{46}","Broken Facility","Bubblegum-16","Cade 15","Calder 8-{11}","Chromatic16","CD-BAC-{16}","CG Arne-{16}","CPC BOY-{32}","Dinoknight 16","||||-22","FZT Ethereal 16","GZXP-{11}","Indecision-{17}","Island Joy 16","Journey-{64}","Juicy 17","Oak21","Nature's Embrace 55","Nauris-16","Pear 36","Peachy Pop 16-{16}","Pineapple 32","Resurrect 32-{32}","Rosy 42","SLSO-CLR17","Softy 15","SPEC12","Starmancer-{52}","Superb 8","SuperFuture25","Sweetie 16","Taffy 16","Todayland Palette V2-{25}","Vivid-17","Voodo34","Zughy 32","ENOS16","Undertones-17","Equpix 15","Night 16","Star 29","Star 34","Still-Life-{14}","SimpleJPC-16","Acid 15","Battery 24","Clumpy 18","Cthulhu-{16}","Crimso 11","Copper-Tech-{16}","DRZ15A","Eggy 15","Eroge-Copper","Europa 16-{16}","GreyT-bit-{8}","Jewel-{15}","Polar 11","Sheltzy 32","Rube-Goldberg-{9}","BoomBoom-{7}","Generic-8","Matriax8c","NT1H-{26}","Autum 15","Autum 15 [Yellow]","JerryPie 22","Naji 16","Blessing-{5}","Crayola Blind-{9}","Easter Island-{16}","Fairy Tales-{8}","Fuzzy Four-{4}","0xdb-01-{17}","Ocaso-{17}","Pastel-{15}","17 Pastels","Pollen-8","Nopal-12","Sy17","Syz15","TUI-15","Cave-{8}","Psygnosia-{16}","MarshMellow32","Rabbit 7","Finlal 11","Vinik 24","YKB-22","Graveyard-21","Steam Lords-{16}","AAP-RadiantXV-{15}","AAP-Majesty XVII-{17}","Daruda 22","Rust-6","XAIUE-Radiant-{22}","Firestorm-{9}","SuperNova 7","NYX8","OIL6","SGM-Palette 2-{17}","Fornax Void I-{256}","Fornax Void II-{128}","Pixelwave-{12}","Spacey Easter-{17}","Moonlit-39","Petite-8","Petite-8 Afterdark","Autochrome 3","Autochrome 5","GB Default #1-{4}","GB Default #2-{4}","GB Andrade-{4}","GB Blue Seni-{4}","GB Blackzone-{4}","GB Crimson-{4}","GB Didi-{4}","GB Dirty-{4}","GB Arne-{4}","GB Easy-{4}","GB Forest-{4}","GB Harsh Green-{4}","GB Light Green-{4}","GB Nostalgia-{4}","GB Platinum-{4}","GB Kirokaze-{4}","GB PJ-{4}","GB Cyber-{4}","GB Wish-{4}","GB Grapefruit-{4}","GB Ice Cream-{4}","GB Red_Blue-{4}","GB Spacehaze-{4}","GB Chocolate-{4}","GB Purple Dawn-{4}","GB Gray-{4}","ARNE4","HallowPumpkin-{4}","Amiga 2600 NTSC-{128}","Amiga 2600 PAL-{104}","Amiga 2600 SECAM-{8}","Amiga 7800 M.E.S.S-{256}","Amiga 7800-{256}","Amstrad CPC-{27}","Apple II-{15}","CGA-{16}","CGA Mode 0 [Low]-{4}","CGA Mode 0 [High]-{4}","CGA Mode 1 [Low]-{4}","CGA Mode 1 [High]-{4}","CGA Mode 2 [Low]-{4}","CGA Mode 2 [High]-{4}","Commodore 64 [Pepto Interpretation]-{16}","Commodore 64 [Colodore Interpretation]-{16}","Commodore VIC-20-{16}","Colecovision-{15}","Japanese Machine Palette-{16}","Macintosh II-{16}","NES-{52}","PICO-8-{16}","RISC OS-{16}","SAM Coupe-{128}","Thomson MO5-{16}","VGA-{244}","ZX Spectrum-{15}","GNOME 32-{32}","Electronic Crayon 22","Chip16","MSX-{15}","Deluxe Paint-{222}","Legacy Paint-{16}","XP Paint-{28}","Vista Paint-{28}")
+#@gui : Use Random Color Instead?=bool(0)
+#@gui : Square Size=int(15,2,150)
+#@gui : Max Primary Dimension of Rectangle=int(2,1,10)
+#@gui : Max Secondary Dimension of Rectangle=int(1,1,10)
+#@gui : Frequency of Rectangle=float(1,0,1)
+#@gui : Line Erosion=int(0,-15,15)
+#@gui : Line Output=bool(1)
+#@gui : Reduce Non-Rectangular Shape=bool(1)
+#@gui : Seed=int(0,0,50000)
+#@gui : sep=separator(),note=note("<b>Extra</b>")
+#@gui : Output Mode=choice(0,"Clipped","Enlarged","Shrinked")
+#@gui : sep=separator(),note=note("<small>Author: <i>Reptorian</i> Latest update: <i>2020/1/8</i>.</small>")
+fx_rep_rand_sqrrecfill:
+if $-1!=1
+    ww={w}
+    hh={h}
+    nw={floor((w-($7>0?$7*2:2))/$3)*$3}
+    nh={floor((h-($7>0?$7*2:2))/$3)*$3}
+    if $-1==2 r $nw,$nh,100%,100% fi
+fi
+if $2 rep_rand_sqrrecfill -1,${3--2}
+else rep_rand_sqrrecfill $1,${3--2} if $1==0 n. 0,255 fi
+fi
+
+if $-1!=1 if $-1==2 negate. fi r. $ww,$hh,100%,100%,0,0,.5,.5 if $-1==2 negate. fi fi
+k.
+u "{$1}_"{$2?1:2}\
+"{$2}"\
+"{$3}"\
+"{$4}"\
+"{$5}"\
+"{$6}"\
+"{$7}_"{(($1==0&&$2==0)?0:$8)?2:1}\
+"{$8}_"{$1==0&&$2==0?1:2}\
+"{$9}"\
+"{$10}"\
+"{$11}"
 ######################
 
 # Local Variables:
