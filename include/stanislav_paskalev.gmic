@@ -23,9 +23,10 @@
 #@gui _<b>Repair</b>
 
 #@cli unpurple : intensity, min_brightnes, min_red_to_blue, max_red_to_blue, blur_std_deviation, gentle_mode
-#@cli : Unpurple removes purple fringing, based on https://github.com/mjambon/purple-fringe
+#@cli : Unpurple removes purple fringing
+#@cli : Based on https://github.com/mjambon/purple-fringe by Martin Jambon.
 #@cli : This implementation works with RGB and RGBA images in any bit depth.
-#@cli : Note: the min_brightness and intensity are relative to the maximum blue value.
+#@cli : Note: the minimum brightness and intensity are relative to the maximum blue value.
 #@cli : Ported to G'MIC by Stanislav Paskalev <spaskalev@protonmail.com>
 #@cli : $ image.jpg +unpurple
 #@cli :
@@ -36,18 +37,19 @@
 #@gui : Maximum red:blue ratio in the fringe = float(0.33,0,1)
 #@gui : Blur standard deviation = int(5,1,10)
 #@gui : Gentle mode (overrides minimum brightness and minimun red:blue ratio) = bool(0)
+#@gui : Bit depth (hidden) = value(0)
 #@gui : sep = separator()
 #@gui : Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal",
 #@gui : "Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right",
 #@gui : "Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse")
 #@gui : Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui : sep = separator()
-#@gui : note = note("Unpurple removes purple fringing, based on
-#@gui : <a href="https://github.com/mjambon/purple-fringe">https://github.com/mjambon/purple-fringe</a>")
+#@gui : note = note("Unpurple removes purple fringing")
+#@gui : note = note("Based on <a href="https://github.com/mjambon/purple-fringe">https://github.com/mjambon/purple-fringe</a> by Martin Jambon.")
 #@gui : note = note("This implementation works with RGB and RGBA images in any bit depth.")
 #@gui : note = note("Note: the minimum brightness and intensity are relative to the maximum blue value.")
 #@gui : note = note("Ported to G'MIC by Stanislav Paskalev <spaskalev@protonmail.com>")
-unpurple : skip ${1=1},${2=0},${3=0},${4=0.33},${5=5},${6=0}
+unpurple : skip ${1=1},${2=0},${3=0},${4=0.33},${5=5},${6=0},${7=0}
 
    intensity=$1
    min_brightness=$2
@@ -55,6 +57,7 @@ unpurple : skip ${1=1},${2=0},${3=0},${4=0.33},${5=5},${6=0}
    max_red_to_blue_ratio=$4
    blur_std_variation=$5
    gentle=$6
+   precision=$7
 
    if $gentle
       min_brightness=0.8
@@ -84,17 +87,20 @@ unpurple : skip ${1=1},${2=0},${3=0},${4=0.33},${5=5},${6=0}
          # Store the maximum value from the blue image in order to
          # normalize the data for the relative treshold operation
          # and then restore it for the subtraction process
-         #
-         # The original code used a fixed constant of 255 for this,
-         # making it work only with 8-bit images. I can't find a way
-         # to get the input image bit depth, neither from the gmic
-         # command line nor from the gmic-qt plugin so making the
-         # operation relative to the maximum blue value available.
-         #
-         # This means that the minimum brightness and intensity
-         # parameters are now also relative to the image that is
-         # currently being processed. Caveat emptor.
-         max_blue.={iM}
+         if $precision
+            max_blue={(1<<$precision)-1}
+         else
+            # The original code used a fixed constant of 255 for this,
+            # making it work only with 8-bit images. I can't find a way
+            # to get the input image bit depth, neither from the gmic
+            # command line nor from the gmic-qt plugin so making the
+            # operation relative to the maximum blue value available.
+            #
+            # This means that the minimum brightness and intensity
+            # parameters are now also relative to the image that is
+            # currently being processed. Caveat emptor.
+            max_blue.={iM}
+         endif
 
          # generate a blurred mask from the the blue image, taking
          # the selected threshold and intensity into account
@@ -162,7 +168,8 @@ unpurple_preview :
           "{$5}"\
           "{$6}"\
           "{$7}"\
-          "{$8}"
+          "{$8}"\
+          "{$9}"
 
 # Local Variables:
 # mode: sh
