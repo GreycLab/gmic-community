@@ -2,8 +2,8 @@
  #
  #  File        : RFX_Utils.h
  #
- #  Description : A self-contained header file with helper functions to make    
- #                handling and adressing pixel data a bit easier    
+ #  Description : A self-contained header file with helper functions to make
+ #                handling and adressing pixel data a bit easier
  #
  #  Copyright   : Tobias Fleischer / reduxFX Productions (http://www.reduxfx.com)
  #
@@ -12,17 +12,17 @@
  #
  #                    CeCILL-C
  #                    The CeCILL-C license is close to the GNU LGPL.
- #                    ( http://www.cecill.info/licences/Licence_CeCILL-C_V1-en.html )
+ #                    ( http://cecill.info/licences/Licence_CeCILL-C_V1-en.html )
  #
  #                or  CeCILL v2.0
  #                    The CeCILL license is compatible with the GNU GPL.
- #                    ( http://www.cecill.info/licences/Licence_CeCILL_V2-en.html )
+ #                    ( http://cecill.info/licences/Licence_CeCILL_V2-en.html )
  #
  #  This software is governed either by the CeCILL or the CeCILL-C license
  #  under French law and abiding by the rules of distribution of free software.
  #  You can  use, modify and or redistribute the software under the terms of
  #  the CeCILL or CeCILL-C licenses as circulated by CEA, CNRS and INRIA
- #  at the following URL: "http://www.cecill.info".
+ #  at the following URL: "http://cecill.info".
  #
  #  As a counterpart to the access to the source code and  rights to copy,
  #  modify and redistribute granted by the license, users are provided only
@@ -97,8 +97,8 @@ inline float smootherStep(float edge0, float edge1, float x)
 	return x*x*x*(x*(x*6.0f - 15.0f) + 10.0f);
 }
 inline int round(float d)
-{ 
-	return (int)floor(d + 0.5f); 
+{
+	return (int)floor(d + 0.5f);
 }
 
 typedef std::map<std::string, std::string> strStrMap;
@@ -429,7 +429,7 @@ inline float radians(float a)
 static reduxfx::World convertWorld(const reduxfx::World& src, reduxfx::PixelFormat dstPixelFormat, int dstBitDepth, bool flipY = false)
 {
 	reduxfx::World dst;
-	
+
 	int dCh = dstPixelFormat == reduxfx::PF_RGB ? 3:4;
 	int dBPP = dCh * (dstBitDepth / 8);
 	dst.data = new char[src.width * src.height * dBPP];
@@ -495,7 +495,7 @@ static reduxfx::World convertWorld(const reduxfx::World& src, reduxfx::PixelForm
 		}
 		srcBuf += srcStride;
 	}
-	
+
 	return dst;
 }
 

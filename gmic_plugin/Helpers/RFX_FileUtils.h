@@ -2,8 +2,8 @@
  #
  #  File        : RFX_File_Utils.h
  #
- #  Description : A self-contained header file with helper functions to make    
- #                reading from and writing to files a bit easier    
+ #  Description : A self-contained header file with helper functions to make
+ #                reading from and writing to files a bit easier
  #
  #  Copyright   : Tobias Fleischer / reduxFX Productions (http://www.reduxfx.com)
  #
@@ -12,17 +12,17 @@
  #
  #                    CeCILL-C
  #                    The CeCILL-C license is close to the GNU LGPL.
- #                    ( http://www.cecill.info/licences/Licence_CeCILL-C_V1-en.html )
+ #                    ( http://cecill.info/licences/Licence_CeCILL-C_V1-en.html )
  #
  #                or  CeCILL v2.0
  #                    The CeCILL license is compatible with the GNU GPL.
- #                    ( http://www.cecill.info/licences/Licence_CeCILL_V2-en.html )
+ #                    ( http://cecill.info/licences/Licence_CeCILL_V2-en.html )
  #
  #  This software is governed either by the CeCILL or the CeCILL-C license
  #  under French law and abiding by the rules of distribution of free software.
  #  You can  use, modify and or redistribute the software under the terms of
  #  the CeCILL or CeCILL-C licenses as circulated by CEA, CNRS and INRIA
- #  at the following URL: "http://www.cecill.info".
+ #  at the following URL: "http://cecill.info".
  #
  #  As a counterpart to the access to the source code and  rights to copy,
  #  modify and redistribute granted by the license, users are provided only
@@ -103,7 +103,7 @@ static int loadBufferFromFile(const string filename, unsigned char** bufferP, un
         *bufferP = new unsigned char[bufferSize];
         infile.read((char*)*bufferP, bufferSize);
 		if (!infile) bufferSize = (unsigned int)infile.gcount();
-        
+
 		infile.close();
 		return 0;
     }
@@ -164,7 +164,7 @@ static int saveBufferToFile(const unsigned char** bufferP, const unsigned int bu
     if (outfile.is_open()) {
         outfile.write((char*)(*bufferP), bufferSize);
 		if (piggybackMode) outfile.write((char*)&bufferSize, sizeof(int));
-        outfile.close();			
+        outfile.close();
 		return 0;
     }
 	return -1;

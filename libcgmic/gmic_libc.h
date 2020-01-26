@@ -14,13 +14,13 @@
  #                ( https://plus.google.com/u/0/b/117441237982283011318/+TobiasFleischer )
  #
  #  License     : CeCILL-B v1.0
- #                ( http://www.cecill.info/licences/Licence_CeCILL-B_V1-en.html )
+ #                ( http://cecill.info/licences/Licence_CeCILL-B_V1-en.html )
  #
  #  This software is governed either by the CeCILL-B license
  #  under French law and abiding by the rules of distribution of free software.
  #  You can  use, modify and or redistribute the software under the terms of
  #  the CeCILL-B licenses as circulated by CEA, CNRS and INRIA
- #  at the following URL: "http://www.cecill.info".
+ #  at the following URL: "http://cecill.info".
  #
  #  As a counterpart to the access to the source code and  rights to copy,
  #  modify and redistribute granted by the license, users are provided only

@@ -10,13 +10,13 @@
  #                ( https://plus.google.com/u/0/b/117441237982283011318/+TobiasFleischer )
  #
  #  License     : CeCILL-B v1.0
- #                ( http://www.cecill.info/licences/Licence_CeCILL-B_V1-en.html )
+ #                ( http://cecill.info/licences/Licence_CeCILL-B_V1-en.html )
  #
  #  This software is governed either by the CeCILL-B license
  #  under French law and abiding by the rules of distribution of free software.
  #  You can  use, modify and or redistribute the software under the terms of
  #  the CeCILL-B licenses as circulated by CEA, CNRS and INRIA
- #  at the following URL: "http://www.cecill.info".
+ #  at the following URL: "http://cecill.info".
  #
  #  As a counterpart to the access to the source code and  rights to copy,
  #  modify and redistribute granted by the license, users are provided only
@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
   // And here is the actual call to the G'MIC library!
   // In this example, it will get the input buffer we created, divide only the red channel by 2
   // and then display the result.
-  gmic_call("v 0 apply_channels \"div 2\",rgba_r polaroid 5,30 rotate 20 drop_shadow , drgba display",
+  gmic_call("v + apply_channels \"div 2\",rgba_r polaroid 5,30 rotate 20 drop_shadow , drgba display",
             &nofImages, &images[0], &options);
 
   // We have to dispose output images we got back from the gmic_call that were

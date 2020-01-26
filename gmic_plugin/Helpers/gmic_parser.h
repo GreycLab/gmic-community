@@ -2,8 +2,8 @@
  #
  #  File        : gmic_parser.h
  #
- #  Description : A self-contained header file with helper functions to     
- #                parse the G'MIC standard library file into a param structure    
+ #  Description : A self-contained header file with helper functions to
+ #                parse the G'MIC standard library file into a param structure
  #
  #  Copyright   : Tobias Fleischer / reduxFX Productions (http://www.reduxfx.com)
  #
@@ -12,17 +12,17 @@
  #
  #                    CeCILL-C
  #                    The CeCILL-C license is close to the GNU LGPL.
- #                    ( http://www.cecill.info/licences/Licence_CeCILL-C_V1-en.html )
+ #                    ( http://cecill.info/licences/Licence_CeCILL-C_V1-en.html )
  #
  #                or  CeCILL v2.0
  #                    The CeCILL license is compatible with the GNU GPL.
- #                    ( http://www.cecill.info/licences/Licence_CeCILL_V2-en.html )
+ #                    ( http://cecill.info/licences/Licence_CeCILL_V2-en.html )
  #
  #  This software is governed either by the CeCILL or the CeCILL-C license
  #  under French law and abiding by the rules of distribution of free software.
  #  You can  use, modify and or redistribute the software under the terms of
  #  the CeCILL or CeCILL-C licenses as circulated by CEA, CNRS and INRIA
- #  at the following URL: "http://www.cecill.info".
+ #  at the following URL: "http://cecill.info".
  #
  #  As a counterpart to the access to the source code and  rights to copy,
  #  modify and redistribute granted by the license, users are provided only
@@ -182,7 +182,7 @@ void processCommand(const string s, EffectData& cd)
 	string r1 = r.substr(0, sPos - 1);
 	int sPos2 = (int)r1.find(dst_prefix);
 	if (sPos2 >= 0) cd.name = strTrim(r1.substr(sPos2 + dst_prefix.size()), " \n");
-	
+
 	string r2 = r.substr(sPos + 1);
 	string r3 = r2;
 	sPos = (int)r2.find(",");
@@ -209,7 +209,7 @@ void processNote(const string s, EffectData& cd)
 {
 	string r = s;
 	// r = replaceHtml(r);
-	strReplace(r, "note(0,", "note(");	
+	strReplace(r, "note(0,", "note(");
 	string n = strLowercase(r);
 	int p1 = (int)n.find("note(");
 	if (p1 >= 0) {
@@ -316,7 +316,7 @@ void processParam(const string s, EffectParameter& cp)
 		cp.text = "";
 		for (int i = 0; i < (int)c.size() - 1; i++) {
 			cp.text += strTrim(c[i]) + "|";
-		}			
+		}
 		cp.text += strTrim(c[(int)c.size() - 1]);
 		strReplace(cp.text, "\"", "");
 		cp.minValue = "0";
@@ -363,7 +363,7 @@ string gmic_parse_single(const string content, EffectData& cd)
 					strReplace(n, "link[", "note(");
 					sPos = (int)n.find("note(");
 					if (sPos >= 0 || inNote) {
-						if (n != "" && 
+						if (n != "" &&
 							(n[n.size() - 1] != ')' && n[n.size() - 1] != ']' && n[n.size() - 1] != '}')
 							) inNote = true;
 						if (sPos >= 0) n = n.substr(sPos + 5);
@@ -429,7 +429,7 @@ string gmic_parse_single(const string content, EffectData& cd)
 			}
 		}
 	}
-	if ((int)content.find(" layers") > 0) 
+	if ((int)content.find(" layers") > 0)
 		cd.multiLayer = true;
 	else
 		cd.multiLayer = false;
@@ -439,11 +439,11 @@ string gmic_parse_single(const string content, EffectData& cd)
 #ifdef OFX_PLUGIN
 	strReplace(cd.name, "&amp;", "&&");
 	strReplace(cd.category, "&amp;", "&&");
-	strReplace(cd.notes, "&amp;", "&&"); 
+	strReplace(cd.notes, "&amp;", "&&");
 #else
 	strReplace(cd.name, "&amp;", "&");
 	strReplace(cd.category, "&amp;", "&");
-	strReplace(cd.notes, "&amp;", "&"); 
+	strReplace(cd.notes, "&amp;", "&");
 #endif
 	return result;
 }
