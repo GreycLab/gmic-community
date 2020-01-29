@@ -1355,6 +1355,108 @@ _karo_moments : skip "${1=0} ${2=1}"
    threshold"}
   u {$moments*$2+$1} rm
 
+_karo_minerrori : skip "${1=0} ${2=1}"
+	m0={is} +cumulate +f.. "x*i(x)" cumulate. m1={iM} +f... "x*x*i(x)" cumulate. a y 
+	minerrori={"
+# 
+# 	public static int Mean(int [] data ) {
+# 		// C. A. Glasbey, "An analysis of histogram-based thresholding algorithms,"
+# 		// CVGIP: Graphical Models and Image Processing, vol. 55, pp. 532-537, 1993.
+# 		//
+# 		// The threshold is the mean of the greyscale data
+# 		int threshold = -1;
+# 		double tot=0, sum=0;
+# 		for (int i=0; i<data.length; i++){
+# 			tot+= data[i];
+# 			sum+=(i*data[i]);
+# 		}
+# 		threshold =(int) Math.floor(sum/tot);
+# 		return threshold;
+# 	}
+# 	public static int MinErrorI(int [] data ) {
+# 		  // Kittler and J. Illingworth, "Minimum error thresholding," Pattern Recognition, vol. 19, pp. 41-47, 1986.
+# 		 // C. A. Glasbey, "An analysis of histogram-based thresholding algorithms," CVGIP: Graphical Models and Image Processing, vol. 55, pp. 532-537, 1993.
+# 		// Ported to ImageJ plugin by G.Landini from Antti Niemisto's Matlab code (GPL)
+# 		// Original Matlab code Copyright (C) 2004 Antti Niemisto
+# 		// See http://www.cs.tut.fi/~ant/histthresh/ for an excellent slide presentation
+# 		// and the original Matlab code.
+# 
+# 		int threshold =  Mean(data); //Initial estimate for the threshold is found with the MEAN algorithm.
+   threshold=int("$m1"/"$m0");
+   Tprev=-2;
+	 ll=0;
+# 		double mu, nu, p, q, sigma2, tau2, w0, w1, w2, sqterm, temp;
+# 		//int counter=1;
+# 		while (threshold!=Tprev){
+   while(threshold!=Tprev&&ll++<1000,           #echo(ll,' ',threshold,' ',Tprev);
+#   while(abs(threshold-Tprev)>1&&ll++<1000,    #echo(ll,' ',threshold,' ',Tprev);
+# 			//Calculate some statistics.
+# 			mu = B(data, threshold)/A(data, threshold);
+    mu=i(threshold,2)/i(threshold,1);
+# 			nu = (B(data, data.length - 1)-B(data, threshold))/(A(data, data.length - 1)-A(data, threshold));
+    nu=(i(w-1,2)-i(threshold,2))/(i(w-1,1)-i(threshold,1));
+# 			p = A(data, threshold)/A(data, data.length - 1);
+    p=i(threshold,1)/i(w-1,1);
+# 			q = (A(data, data.length - 1)-A(data, threshold)) / A(data, data.length - 1);
+    q=(i(w-1,1)-i(threshold,1))/i(w-1,1);
+# 			sigma2 = C(data, threshold)/A(data, threshold)-(mu*mu);
+    sigma2=i(threshold,3)/i(threshold,1)-(mu*mu);
+# 			tau2 = (C(data, data.length - 1)-C(data, threshold)) / (A(data, data.length - 1)-A(data, threshold)) - (nu*nu);
+    tau2=(i(w-1,3)-i(threshold,3))/(i(w-1,1)-i(threshold,1))-(nu*nu);
+# 
+# 			//The terms of the quadratic equation to be solved.
+    w0 = 1.0/sigma2-1.0/tau2;
+    w1 = mu/sigma2-nu/tau2;
+    w2 = (mu*mu)/sigma2 - (nu*nu)/tau2 + log10((sigma2*(q*q))/(tau2*(p*p)));
+# 
+# 			//If the next threshold would be imaginary, return with the current one.
+    sqterm = (w1*w1)-w0*w2;
+# 			if (sqterm < 0) {
+# 				IJ.log("MinError(I): not converging. Try \'Ignore black/white\' options");
+# 				return threshold;
+# 			}
+    if(sqterm<0,echo('MinError(I):not converging.');break());
+# 
+# 			//The updated threshold is the integer part of the solution of the quadratic equation.
+    Tprev = threshold;
+    temp = (w1+sqrt(sqterm))/w0;
+# 
+# 			if ( Double.isNaN(temp)) {
+# 				IJ.log ("MinError(I): NaN, not converging.");
+# 				threshold = Tprev;
+# 			}
+# 			else
+# 				threshold =(int) Math.floor(temp);
+# 			//IJ.log("Iter: "+ counter+++"  t:"+threshold);
+# 		}
+    if(isnan(temp),echo('MinError(I):NaN,not converging.');threshold=Tprev,threshold=floor(temp));
+	 );
+# 		return threshold;
+# 	}
+# 
+# 	protected static double A(int [] y, int j) {
+# 		double x = 0;
+# 		for (int i=0;i<=j;i++)
+# 			x+=y[i];
+# 		return x;
+# 	}
+# 
+# 	protected static double B(int [] y, int j) {
+# 		double x = 0;
+# 		for (int i=0;i<=j;i++)
+# 			x+=i*y[i];
+# 		return x;
+# 	}
+# 
+# 	protected static double C(int [] y, int j) {
+# 		double x = 0;
+# 		for (int i=0;i<=j;i++)
+# 			x+=i*i*y[i];
+# 		return x;
+# 	}
+   threshold"}
+  u {$minerrori*$2+$1} rm
+
 #@cli _kr_histogram : _nb_levels>0[%],_value0[%],_value1[%]
 #@cli : Computes the histogram and returns in status the value of first class and the bin size
 #@cli : _nb_levels
