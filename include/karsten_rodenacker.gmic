@@ -1041,7 +1041,7 @@ karo_zerleg :
 
 #@cli karo_threshold : _method={ triangle | yen | otsu | _otsu | bgt | intermeans | intera | rats | \
 # fixnnn | huang | huang2 | li | moments | minerrori | maxentropy | mean | \
-# renyientropy },_delclass>0,_smooth>0
+# renyientropy | shanbhag},_delclass>0,_smooth>0
 #@cli : Calculate threshold (from ImageJ) in range [0,255], evtl. normalization necessary.
 #@cli : For each method user function _karo_"_method" is called!
 #@cli : If {_delclass > 0} delete cluster {_delclass-1}.
@@ -1792,6 +1792,9 @@ _karo_renyientropy : skip "${1=0} ${2=1}"
   u {$renyientropy*$2+$1} rm
 # 
 # 
+_karo_shanbhag : skip "${1=0} ${2=1}"
+	+/. {is} +cumulate. +*. -1 +. 1.0 a y
+	shanbhag={"
 # 	public static int Shanbhag(int [] data ) {
 # 		// Shanhbag A.G. (1994) "Utilization of Information Measure as a Means of
 # 		//  Image Thresholding" Graphical Models and Image Processing, 56(5): 414-419
@@ -1831,6 +1834,7 @@ _karo_renyientropy : skip "${1=0} ${2=1}"
 # 				break;
 # 			}
 # 		}
+   first_bin=0; for(ih=0,ih<w,ih++,if(!(abs(i(ih,2))<2.220446049250313e-16),first_bin=ih;break()));
 # 
 # 		/* Determine the last non-zero bin */
 # 		last_bin=data.length - 1;
@@ -1840,39 +1844,47 @@ _karo_renyientropy : skip "${1=0} ${2=1}"
 # 				break;
 # 			}
 # 		}
+   last_bin=(w-1); for(ih=w-1,ih>=first_bin,ih--,if(!(abs(i(ih,3))<2.220446049250313e-16),last_bin=ih;break()));
 # 
 # 		// Calculate the total entropy each gray-level
 # 		// and find the threshold that maximizes it 
-# 		threshold =-1;
-# 		min_ent = Double.MAX_VALUE;
+   threshold =-1;
+   min_ent = 4503599627370496.0;
 # 
 # 		for ( it = first_bin; it <= last_bin; it++ ) {
+   for(it=first_bin,it<=last_bin,it++,
 # 			/* Entropy of the background pixels */
-# 			ent_back = 0.0;
-# 			term = 0.5 / P1[it];
+    ent_back = 0.0;
+    term = 0.5 / i(it,2);  #P1[it];
 # 			for ( ih = 1; ih <= it; ih++ )  { //0+1?
 # 				ent_back -= norm_histo[ih] * Math.log ( 1.0 - term * P1[ih - 1] );
 # 			}
-# 			ent_back *= term;
+    for(ih=1,ih<=it,ih++,ent_back-=i(ih,1)*log(1.0-term*i(ih-1,2)));
+    ent_back *= term;
 # 
 # 			/* Entropy of the object pixels */
-# 			ent_obj = 0.0;
-# 			term = 0.5 / P2[it];
+    ent_obj = 0.0;
+    term = 0.5 / i(it,3);  #P2[it];
 # 			for ( ih = it + 1; ih < data.length; ih++ ){
 # 				ent_obj -= norm_histo[ih] * Math.log ( 1.0 - term * P2[ih] );
 # 			}
-# 			ent_obj *= term;
+    for(ih=it+1,ih<w,ih++,ent_obj-=i(ih,1)*log(1.0-term*i(ih,3)));
+    ent_obj *= term;
 # 
 # 			/* Total entropy */
-# 			tot_ent = Math.abs ( ent_back - ent_obj );
+    tot_ent = abs ( ent_back - ent_obj );
 # 
 # 			if ( tot_ent < min_ent ) {
 # 				min_ent = tot_ent;
 # 				threshold = it;
 # 			}
+    if(tot_ent<min_ent,min_ent=tot_ent;threshold=it);
 # 		}
+	 );
 # 		return threshold;
 # 	}
+   threshold"}
+  u {$shanbhag*$2+$1} rm
 
 #@cli _kr_histogram : _nb_levels>0[%],_value0[%],_value1[%]
 #@cli : Computes the histogram and returns in status the value of first class and the bin size
