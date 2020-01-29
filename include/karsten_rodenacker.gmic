@@ -1040,7 +1040,7 @@ karo_zerleg :
   endl done v +
 
 #@cli karo_threshold : _method={ triangle | yen | otsu | _otsu | bgt | intermeans | intera | rats | \
-# fixnnn | huang | huang2 | li | moments | minerrori},_delclass>0,_smooth>0
+# fixnnn | huang | huang2 | li | moments | minerrori | maxentropy },_delclass>0,_smooth>0
 #@cli : Calculate threshold (from ImageJ) in range [0,255], evtl. normalization necessary.
 #@cli : For each method user function _karo_"_method" is called!
 #@cli : If {_delclass > 0} delete cluster {_delclass-1}.
@@ -1457,6 +1457,104 @@ _karo_minerrori : skip "${1=0} ${2=1}"
 # 	}
    threshold"}
   u {$minerrori*$2+$1} rm
+
+_karo_maxentropy : skip "${1=0} ${2=1}"
+	+/. {is} +cumulate. +*. -1 +. 1.0 a y
+	maxentropy={"
+# 	public static int MaxEntropy(int [] data ) {
+# 		// Implements Kapur-Sahoo-Wong (Maximum Entropy) thresholding method
+# 		// Kapur J.N., Sahoo P.K., and Wong A.K.C. (1985) "A New Method for
+# 		// Gray-Level Picture Thresholding Using the Entropy of the Histogram"
+# 		// Graphical Models and Image Processing, 29(3): 273-285
+# 		// M. Emre Celebi
+# 		// 06.15.2007
+# 		// Ported to ImageJ plugin by G.Landini from E Celebi's fourier_0.8 routines
+# 		int threshold=-1;
+# 		int ih, it;
+# 		int first_bin;
+# 		int last_bin;
+# 		double tot_ent;  /* total entropy */
+# 		double max_ent;  /* max entropy */
+# 		double ent_back; /* entropy of the background pixels at a given threshold */
+# 		double ent_obj;  /* entropy of the object pixels at a given threshold */
+# 		double [] norm_histo = new double[data.length]; /* normalized histogram */
+# 		double [] P1 = new double[data.length]; /* cumulative normalized histogram */
+# 		double [] P2 = new double[data.length];
+# 
+# 		int total =0;
+# 		for (ih = 0; ih < data.length; ih++ )
+# 			total+=data[ih];
+# 
+# 		for (ih = 0; ih < data.length; ih++ )
+# 			norm_histo[ih] = (double)data[ih]/total;
+# 
+# 		P1[0]=norm_histo[0];
+# 		P2[0]=1.0-P1[0];
+# 		for (ih = 1; ih < data.length; ih++ ){
+# 			P1[ih]= P1[ih-1] + norm_histo[ih];
+# 			P2[ih]= 1.0 - P1[ih];
+# 		}
+# 
+# 		/* Determine the first non-zero bin */
+# 		first_bin=0;
+# 		for (ih = 0; ih < data.length; ih++ ) {
+# 			if ( !(Math.abs(P1[ih])<2.220446049250313E-16)) {
+# 				first_bin = ih;
+# 				break;
+# 			}
+# 		}
+   first_bin=0; for(ih=0,ih<w,ih++,if(!(abs(i(ih,2))<2.220446049250313E-16),first_bin=ih;break()));
+# 
+# 		/* Determine the last non-zero bin */
+# 		last_bin=data.length - 1;
+# 		for (ih = data.length - 1; ih >= first_bin; ih-- ) {
+# 			if ( !(Math.abs(P2[ih])<2.220446049250313E-16)) {
+# 				last_bin = ih;
+# 				break;
+# 			}
+# 		}
+   last_bin=w-1; for(ih=w-1,ih>=first_bin,ih--,if(!(abs(i(ih,3))<2.220446049250313E-16),last_bin=ih;break()));
+# 
+# 		// Calculate the total entropy each gray-level
+# 		// and find the threshold that maximizes it 
+# 		max_ent = Double.MIN_VALUE;
+   max_ent=-1.E16;
+# 
+# 		for ( it = first_bin; it <= last_bin; it++ ) {
+   for(it=first_bin,it<=last_bin,it++,
+# 			/* Entropy of the background pixels */
+# 			ent_back = 0.0;
+# 			for ( ih = 0; ih <= it; ih++ )  {
+# 				if ( data[ih] !=0 ) {
+# 					ent_back -= ( norm_histo[ih] / P1[it] ) * Math.log ( norm_histo[ih] / P1[it] );
+# 				}
+# 			}
+    ent_back=0.0; for(ih=0,ih<=it,ih++,if(i(ih,0)!=0,ent_back-=(i(ih,1)/i(it,2)) * log(i(ih,1)/i(it,2))));
+# 
+# 			/* Entropy of the object pixels */
+# 			ent_obj = 0.0;
+# 			for ( ih = it + 1; ih < data.length; ih++ ){
+# 				if (data[ih]!=0){
+# 				ent_obj -= ( norm_histo[ih] / P2[it] ) * Math.log ( norm_histo[ih] / P2[it] );
+# 				}
+# 			}
+    ent_obj=0.0; for(ih=it+1,ih<w,ih++,if(i(ih,0)!=0,ent_obj-=(i(ih,1)/i(it,3)) * log(i(ih,1)/i(it,3))));
+# 
+# 			/* Total entropy */
+    tot_ent = ent_back + ent_obj;
+# 
+# 			// IJ.log(""+max_ent+"  "+tot_ent);
+# 			if ( max_ent < tot_ent ) {
+# 				max_ent = tot_ent;
+# 				threshold = it;
+# 			}
+    if(max_ent<tot_ent,max_ent=tot_ent;threshold=it);
+# 		}
+# 		return threshold;
+# 	}
+	 );
+   threshold"}
+  u {$maxentropy*$2+$1} rm
 
 #@cli _kr_histogram : _nb_levels>0[%],_value0[%],_value1[%]
 #@cli : Computes the histogram and returns in status the value of first class and the bin size
