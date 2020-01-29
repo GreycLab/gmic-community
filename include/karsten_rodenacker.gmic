@@ -1040,7 +1040,7 @@ karo_zerleg :
   endl done v +
 
 #@cli karo_threshold : _method={ triangle | yen | otsu | _otsu | bgt | intermeans | intera | rats | \
-# fixnnn | huang | huang2 | li },_delclass>0,_smooth>0
+# fixnnn | huang | huang2 | li | moments },_delclass>0,_smooth>0
 #@cli : Calculate threshold (from ImageJ) in range [0,255], evtl. normalization necessary.
 #@cli : For each method user function _karo_"_method" is called!
 #@cli : If {_delclass > 0} delete cluster {_delclass-1}.
@@ -1302,6 +1302,58 @@ _karo_li : skip "${1=0} ${2=1}"
         abs(new_thresh-old_thresh)>tolerance);
       threshold"}
   u {$li*$2+$1} rm
+
+_karo_moments : skip "${1=0} ${2=1}"
+	/ {is} moments={"
+# 	public static int Moments(int [] data ) {
+# 		//  W. Tsai, "Moment-preserving thresholding: a new approach," Computer Vision,
+# 		// Graphics, and Image Processing, vol. 29, pp. 377-393, 1985.
+# 		// Ported to ImageJ plugin by G.Landini from the the open source project FOURIER 0.8
+# 		// by  M. Emre Celebi , Department of Computer Science,  Louisiana State University in Shreveport
+# 		// Shreveport, LA 71115, USA
+# 		//  http://sourceforge.net/projects/fourier-ipal
+# 		//  http://www.lsus.edu/faculty/~ecelebi/fourier.htm
+#			double total =0;
+   m0=1.0; m1=0.0; m2 =0.0; m3 =0.0; sum =0.0; p0=0.0;
+# 		double cd, c0, c1, z0, z1;	/* auxiliary variables */
+   threshold = -1;
+# 
+# 		double [] histo = new  double [data.length];
+# 
+# 		for (int i=0; i<data.length; i++)
+# 			total+=data[i];
+# 
+# 		for (int i=0; i<data.length; i++)
+# 			histo[i]=(double)(data[i]/total); //normalised histogram
+# 
+# 		/* Calculate the first, second, and third order moments */
+# 		for ( int i = 0; i < data.length; i++ ){
+# 			m1 += i * histo[i];
+# 			m2 += i * i * histo[i];
+# 			m3 += i * i * i * histo[i];
+# 		}
+   for(ih=0, ih<w, ih++, m1+=ih*i(ih); m2+=ih*ih*i(ih); m3+=ih*ih*ih*i(ih));
+# 		/* 
+# 		First 4 moments of the gray-level image should match the first 4 moments
+# 		of the target binary image. This leads to 4 equalities whose solutions 
+# 		are given in the Appendix of Ref. 1 
+# 		*/
+   cd = m0 * m2 - m1 * m1;
+   c0 = ( -m2 * m2 + m1 * m3 ) / cd;
+   c1 = ( m0 * -m3 + m2 * m1 ) / cd;
+   z0 = 0.5 * ( -c1 - sqrt ( c1 * c1 - 4.0 * c0 ) );
+   z1 = 0.5 * ( -c1 + sqrt ( c1 * c1 - 4.0 * c0 ) );
+   p0 = ( z1 - m1 ) / ( z1 - z0 );  # /* Fraction of the object pixels in the target binary image */
+# 
+# 		// The threshold is the gray-level closest  
+# 		// to the p0-tile of the normalized histogram 
+   sum=0;
+   for (ih=0, ih<w, ih++, sum+=i(ih); if (sum>p0, threshold = ih; break()) );
+# 			}
+# 		}
+# 		return threshold;
+   threshold"}
+  u {$moments*$2+$1} rm
 
 #@cli _kr_histogram : _nb_levels>0[%],_value0[%],_value1[%]
 #@cli : Computes the histogram and returns in status the value of first class and the bin size
