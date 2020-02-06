@@ -338,26 +338,30 @@ afre_orien : skip ${1=1}
 #@cli : Blur selected images with a soft box filter.
 #@cli : Default values: 'radius=1', 'gaussian=1' and 'boundary_conditions=1'.
 afre_box : check "${1=1}>=1 && isbool(${2=1}) && isbool(${3=1})"
-  v - if $2 g="soft box" else g="box" fi w={$1*2+1} v +
+  if $2 g="soft box" else g="box" fi w={$1*2+1} v +
   e[] "[afre]^_^) box: Blur image$? with a "${w}"x"${w}" "$g" filter."
   v - repeat $! l[$>]
     . $w,$w f[^0] 1 if $2 gaussian. {100/3}% fi
-    +convolve[1] [2],$3 convolve[0] [2],$3 k[0,3] /
-  endl done v +
+    +rows. 50% columns.. 50% +convolve[1] [2],$3 convolve[4] [3],$3
+    convolve[0] [2],$3 convolve[0] [3],$3 k[0,4] /
+  endl done
 
-#@cli afre_gui0 : radius>=1,_smoothing>=0
-#@cli : Blur selected images with a custom self-guided filter. Use orders of magnitude for smoothing.
+#@cli afre_gui0 : radius>=1,_smoothing>=0,1<=_faster<=4
+#@cli : Blur selected images with a custom self-guided filter.
+#@cli : - Use orders of magnitude for 'smoothing'.
+#@cli : - Use 'faster' to speed up filter at the cost of accuracy.
 #@cli : \ Based on "K He, J Sun, X Tang. Guided image filtering. TPAMI, 35(6):1397-1409, 2013".
-#@cli : Default values: 'radius=1' and 'smoothing=1e-2'.
-afre_gui0 : check "${1=1}>=1 && ${2=1e-2}>=0"
-  e[] "[afre]^_^) gui0: Blur image$? with a custom self-guided filter using radius=$1 and smoothing=$2."
-  v - repeat $! l[$>] nm={b} iM={iM} / $iM
-    . +sqr[^0] afre_box[^0] $1 nm I,mI,mII
+#@cli : Default values: 'radius=1', 'smoothing=1e-2' and 'faster=1'.
+afre_gui0 : check "${1=1}>=1 && ${2=1e-2}>=0 && ${3=1}>=1 &&
+    $3<=4"
+  e[] "[afre]^_^) gui0: Blur image$? with a custom self-guided filter using radius=$1, smoothing=$2 and faster=$3."
+  repeat $! l[$>] nm={b} iM={iM} / $iM
+    +r2dx {100/$3}%,1 +sqr. afre_box[^0] $1 nm I,mI,mII
     +sqr[mI] *. -1 +. [mII] rm[mII] nm. vI
     ++[vI] {$2*ia+1e-6} /[vI] . rm. nm[vI] a
     +*[a] [mI] *. -1 +. [mI] rm[mI] nm. b
-    afre_box[^0] $1 nm[^0] ma,mb *[I] [ma] +[I] [mb] k[I]
-  * $iM nm $nm endl done v +
+    afre_box[^0] $1 nm[^0] ma,mb r[^0] [I],5 *[I] [ma] +[I] [mb] k[I]
+  * $iM nm $nm endl done
 
 #@cli afre_gui1 : [guide],radius>=1,_smoothing>=0
 #@cli : Blur selected images with a custom guided filter. Use orders of magnitude for smoothing.
