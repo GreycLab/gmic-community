@@ -3507,54 +3507,42 @@ r2dx {(1/($12+1))*100}%,$13
 #@cli rep_objvf: eq. to 'rep_objvolumefilt' : (+)
 rep_objvf: rep_objvolumefilt $*
 #@cli rep_objvolumefilt: 0<=_v1<=1,0<=_v2<=1,_mode= { 0=eliminate_interior || 1=eliminate_exterior },_colour1...
+#@cli : (eq. to rep_objvf)
 #@cli : _v1 and _v2 refers to boundary in percent. By default, this command use alpha as reference unless all channel values are specified next to mode.
 #@cli : (eq. to 'rep_objvf').\n
 #@cli : Default value: '_mode=1'
 rep_objvolumefilt:
-skip ${3=1}
+skip ${3=0},${4=}
+if $1!=$2
 repeat $! l[$>]
-if $#>3
-+f [${4--1}]
-+eq
-compose_channels. *
-f. 1-i
-rm..
-a c
-fi
-val_a=$1
-val_b=$2
-minv={min($val_a,$val_b)}
-maxv={max($val_a,$val_b)}
-if ($1<-1||$1>1)&&($2<-1||$2>1) v + error "Invalid numbers for Variable 1 and/or 2." v - fi
-if $1==$2 v + error "Variable 1 and 2 can't be the same" v - fi
-ek={$#<4?$3:!$3}
-vv=0
-repeat s#0
-sh[0] $>
-vv+={iv#-1}
-rm.
-done
-if $vv!=0
-+channels {s-1}
-f. i==0?0:1 .
-f[2] "begin(A = resize([ 0,(s#0-1)],s,s#0-1));I+A" norm[2] round[2] 0.01 label[2] 0 {iM+1},1,1,{0,1}
-f[1] ">i(#3,i(#2,x,y,z,0),0,0,c)+=i;i" n. 0,1 map[2] .
-f. i==im#-1?1:i
-min_pas_zero={im#-1}
-tmm={1-$min_pas_zero}
-new_minv={$minv*$tmm+$min_pas_zero}
-sh[0] {s#0-1}
-rm[1,3]
-f. i#-2<$new_minv||i#-2>$maxv?($ek?0:i):($ek?i:0)
-rm[1,2]
-fi
-if $#>3
-s c,-{s-1}
-+f.. [${4--1}]
-f... i0#-2?i#-1:i
-rm[1,2]
-fi
+    ssize={s}
+    if narg(${4--1})&&s>1
+        if !(narg(${4--1})>=($ssize-1)) error "Invalid argument count!" fi
+        if narg(${4--1})<$ssize +channels {s-1} colormap. 0,1,2 alp={i(#-1,0,0)} rm. fi 
+        100%,100%,100%,1,"begin(
+            const ss="$ssize"-1;
+            ref_color=vectorss(${4--1});
+        );
+        vectorss(I#0)!=ref_color?1:0
+        "
+        if narg(${4--1})<$ssize End={vector$ssize(${4--1},$alp)}
+        else End={vector$ssize(${4--1})}
+        fi
+    else 
+        +channels {s-1} 
+        End={vector$ssize(0)}
+    fi
+    f. i?1 area_fg. 0,1
+    area_1={$1*iM}
+    area_2={$2*iM}
+    minarea={min($area_1,$area_2)}
+    maxarea={max($area_1,$area_2)}
+    if $3 f.. !(i0#-1>$minarea&&i0#-1<$maxarea)?I:[$End] #Exclusive#
+    else  f.. i0#-1>$minarea&&i0#-1<$maxarea?I:[$End]    #Inclusive#
+    fi
+    rm.
 endl done
+fi
 #@cli rep_form_pixel: _form_id<24,_form_quad_lx!=0,_form_quad_ly!=0,_form_ratio[%]!=0,_angle,0<=_reflect_dir<=2,_sublevel,_interpolation<6,_keep_original_size={ 0=resized_result | 1=preserve_original_size },_shape_option_1..._shape_option_n
 #@cli : _form_id refers to the id or name of shape. circle is a valid form id, and any integer number that is 0-24 inclusive is a form id.
 #@cli : _form_quad_lx refers to the size of the tile in pixel form. It cannot be 0 unless you want to use _form_quad_ly variable to define the tile width.
