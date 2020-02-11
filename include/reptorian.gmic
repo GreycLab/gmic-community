@@ -3506,17 +3506,19 @@ $9?polkal_b:polkal_a;
 r2dx {(1/($12+1))*100}%,$13
 #@cli rep_objvf: eq. to 'rep_objvolumefilt' : (+)
 rep_objvf: rep_objvolumefilt $*
-#@cli rep_objvolumefilt: 0<=_v1<=1,0<=_v2<=1,_mode= { 0=eliminate_interior || 1=eliminate_exterior },_colour1...
+#@cli rep_objvolumefilt: 0<=_v1<=100%,0<=_v2<=100%,_mode={ -2=eliminate_exterior_filter_max_out || -1=eliminate_interior_filter_max_out || 0=eliminate_interior || 1=eliminate_exterior },_colour1...
 #@cli : _v1 and _v2 refers to boundary in percent. By default, this command use alpha as reference unless all channel values are specified next to mode.
 #@cli : (eq. to 'rep_objvf').\n
 #@cli : Default value: '_mode=1'
 rep_objvolumefilt:
 skip ${3=0},${4=}
-if $1!=$2
+if $1<0||$2<0||$1>1||$2>1 error ""(""$"1>=0&&"$"1"<=1)"&&"(""$"2>=0&&"$"2"<=1)==F"" fi
+if (max($1,$2)-min($1,$2))==1 error "max"(""$"1,"$"2")"-min"(""$"1,"$"2")"<1==F" fi
+if ($1!=$2)
 repeat $! l[$>]
     ssize={s}
     if narg(${4--1})&&s>1
-        if !(narg(${4--1})>=($ssize-1)) error "Invalid argument count!" fi
+        if (narg(${4--1})<($ssize-1)) error "{narg(${4--1})}>={$ssize-1}==F" fi
         if narg(${4--1})<$ssize +channels {s-1} colormap. 0,1,2 alp={i(#-1,0,0)} rm. fi 
         100%,100%,100%,1,"begin(
             const ss="$ssize"-1;
@@ -3531,15 +3533,30 @@ repeat $! l[$>]
         +channels {s-1} 
         End={vector$ssize(0)}
     fi
+    if !iv#-1 error "Variance>0==F" fi
     f. i?1 area_fg. 0,1
-    area_1={$1*iM}
-    area_2={$2*iM}
+    if $3<0 f. i==iM?0:i fi
+    area_1={$1*iM#-1}
+    area_2={$2*iM#-1}
     minarea={min($area_1,$area_2)}
     maxarea={max($area_1,$area_2)}
-    if $3 f.. !(i0#-1>$minarea&&i0#-1<$maxarea)?I:[$End] #Exclusive#
-    else  f.. i0#-1>$minarea&&i0#-1<$maxarea?I:[$End]    #Inclusive#
+    if $3>=0
+        if $3 f.. !(i0#-1>$minarea&&i0#-1<$maxarea)?I:[$End]
+        else  f.. i0#-1>$minarea&&i0#-1<$maxarea?I:[$End]
+        fi
+    else
+        if $3<-1    f.. if(i0#-1,i0#-1>$minarea&&i0#-1<$maxarea?I:[$End],I)
+        else        f.. if(i0#-1,!(i0#-1>$minarea&&i0#-1<$maxarea)?I:[$End],I)
+        fi    
     fi
     rm.
+    vv=0
+    repeat s
+        sh $>
+        vv+={iv#-1}
+        rm.
+    done
+    if !$vv error "Variance>0==F" fi
 endl done
 fi
 #@cli rep_form_pixel: _form_id<24,_form_quad_lx!=0,_form_quad_ly!=0,_form_ratio[%]!=0,_angle,0<=_reflect_dir<=2,_sublevel,_interpolation<6,_keep_original_size={ 0=resized_result | 1=preserve_original_size },_shape_option_1..._shape_option_n
@@ -5077,8 +5094,8 @@ gui_split_preview "rep_logpindis_gui $*",${-3--1}
 #@gui : Boundary Condition=choice(0,"Periodic","Mirror")
 #@gui : Interpolation=choice(2,"Nearest","Linear","Bicubic")
 #@gui : Base Reference Dimension=int(1024,10,4096)
-#@gui :  sep  = separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui :  sep  = separator(), note=note("<small>Author: Reptorian.      Latest Update: <i>2019/6/4</i>.</small>")
+#@gui : sep=separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(), note=note("<small>Author: Reptorian. Latest Update: <i>2019/6/4</i>.</small>")
 rep_sqrlogpindis_gui:
 rep_sqrlogpindis $1,{(($2/100)-.5)*2},{(($3/100)-.5)*-2},{(($4/100)-.5)*2},{(($5/100)-.5)*-2},${6-18}
 rep_sqrlogpindis_gui_preview:
@@ -5165,44 +5182,84 @@ u "{$1}"\
 #@gui : sep=separator(), note=note("<small>Author: Reptorian.      Latest Update: <i>2019/9/7</i>.</small>")
 gui_rep_polkal: rep_polkal ${1-3},{($4-50)*2}%,{($5-50)*-2}%,${6--1}
 #@gui Object Size Filtering: gui_rep_objvf,gui_rep_objvf_preview(0)
-#@gui : note=note("The purpose of this filter is to filter objects based on their volume. It is based on the principle of the <a href="https://forums.getpaint.net/topic/113962-object-pruner/">Object Pruner plugin</a> for Paint.NET made by <b>MJW</b>."), sep = separator()
-#@gui : Mode of Object Filtering=choice(0,"Alpha-Based","Colour - 3 Channels","Colour - 4 Channels")
-#@gui : sep=separator(), note=note("<b>Object Filtering Options</b>")
+#@gui : Mode of Object Filtering=choice(0,"Auto","Colour","*Colour with Alpha")
+#@gui : note=note("*Applicable if contain alpha, otherwise, use Colour Mode. This is only applicable for GIMP!")
+#@gui : sep=separator(),note=note("<b>Object Filtering Options</b>")
 #@gui : Volume 1 (%)=float(0,0,100)
 #@gui : Volume 2 (%)=float(100,0,100)
-#@gui : Boundary Elimination=choice(0,"Eliminate Inclusive","Eliminate Exclusive")
+#@gui : Preserve=choice(0,"Inclusive","Exclusive")
+#@gui : Preserve=choice(0,"Inclusive by Secondary Max Area","Exclusive by Secondary Max Area")
+#@gui : Use Secondary Maximum Area?=bool(0)
 #@gui : Colour=color(0,0,0)
 #@gui : Colour=color(0,0,0,0)
-#@gui : sep=separator(), note=note("<b>Preview Settings</b>")
+#@gui : sep=separator(),note=note("<b>Preview Settings</b>")
 #@gui : Reveal Erased Objects?=bool(1)
-#@gui : Colour of Erased Object=color(0,0,0)
-#@gui : sep=separator(),note=note("<small>Author: Reptorian. Latest Update: <i>2019/9/8</i>.</small>")
+#@gui : Colour of Erased Object=color(127,127,127)
+#@gui : Render Mode=choice(0,"Main","Removed Alpha Mode","Alpha Details")
+#@gui : List Percentiles?=bool(0)_0
+#@gui : sep=separator(),note=note("<b>-Instruction-</b>\n\nThe purpose of this filter is to filter objects based on their volume. It is based on the principle of the <a href="https://forums.getpaint.net/topic/113962-object-pruner/">Object Pruner plugin</a> for Paint.NET made by <b>MJW</b>.\n\nUse Colour Mode for fully opaque image. <small>Note:Otherwise, use Colour Mode with Alpha or Auto.\n\n<b>Special Note:</b>If you're seeing error, switch the render mode and pick the colors until error no longer show up on Main Render Mode.</small>\n----\n<b>Warning:</b> Untested on GIMP!")
+#@gui : sep=separator(),note=note("<small>Author: Reptorian. Latest Update: <i>2020/2/10</i>.</small>")
 gui_rep_objvf:
-if $1==0 rep_objvf {$2/100},{$3/100},$4
-elif $1==1 rep_objvf {$2/100},{$3/100},$4,${5-7}
-else rep_objvf {$2/100},{$3/100},$4,${8-11}
+contain_alpha=0
+escape=0
+current_layer=0
+do
+    l[$current_layer] if s==2||s>3 contain_alpha=1 escape=1 fi endl
+    current_layer+=1
+while $current_layer<$!&&!$escape
+if ($1==1||!($1==2&&$contain_alpha))&&$1
+    if $6 preserve_choice={($5+1)} preserve_choice*=-1
+    else  preserve_choice=$4
+    fi
+    repeat $! l[$>]
+        if $contain_alpha
+            sh {s-1} if !iv#-1 alp=iM#-1 else alp=0 fi rm.
+            rep_objvf $2%,$3%,$preserve_choice,${7-9},$alp
+        else rep_objvf $2%,$3%,$preserve_choice,${7-9}
+        fi
+    endl done
+elif $1==2&&$contain_alpha
+    if $6 preserve_choice={($5+1)} preserve_choice*=-1
+    else  preserve_choice=$4
+    fi
+    rep_objvf $2%,$3%,$preserve_choice,${10-13}
+else
+    if $contain_alpha rep_objvf $2%,$3%,$4
+    else rep_objvf $2%,$3%,$4,${7-9}
+    fi
 fi
 gui_rep_objvf_preview:
-if $12
-    if $1==0 +rep_objvf {$2/100},{$3/100},$4
-    elif $1==1 +rep_objvf {$2/100},{$3/100},$4,${5-7}
-    else +rep_objvf {$2/100},{$3/100},$4,${8-11} fi
-    +eq compose_channels. * *. 255 negate. rm.. {w#0},{h#0},1,3,[${13-15}]
-    rv[-2,-1] a[-2,-1] c
-    blend normal
+contain_alpha=0
+escape=0
+current_layer=0
+do
+    l[$current_layer] if s==2||s>3 contain_alpha=1 escape=1 fi endl
+    current_layer+=1
+while $current_layer<$!&&!$escape
+if $18==2
+    channels {s-1}
+elif $18==1
+    channels 0,{s-2}
 else
-    if $1==0 rep_objvf {$2/100},{$3/100},$4
-    elif $1==1 rep_objvf {$2/100},{$3/100},$4,${5-7}
-    else rep_objvf {$2/100},{$3/100},$4,${8-11} fi
+    if $14
+    +gui_rep_objvf ${1-13}
+    f begin(ss={s-1};);if(i(x,y,z,ss),i,0);
+    f.. I!=I#-1?[${15-17},255]:I
+    else gui_rep_objvf ${1-13}
+    fi
 fi
 u "{$1}"\
 "{$2}"\
 "{$3}"\
-"{$4}"\
-"{$5,$6,$7}_"{$1==1?2:0}\
-"{$8,$9,$10,$11}_"{$1==2?2:0}\
-"{$12}"\
-"{$13,$14,$15}_"{$12?2:0}
+"{$4}_"{$1?(!$6?2:0):2}\
+"{$5}_"{$1?($6?2:0):0}\
+"{$6}_"{$1?2:0}\
+"{$7,$8,$9}_"{($1==1||!$contain_alpha)?2:0}\
+"{$10,$11,$12,$13}_"{($1==2&&$contain_alpha)?2:0}\
+"{$14}_"{!$18?2:1}\
+"{$15,$16,$17}_"{!$18?($14?2:1):1}\
+"{$18}"\
+"{$19}_"0
 #@gui Tiled Form : gui_rep_form_pixel, gui_rep_form_pixel_preview(0)
 #@gui : note=note("Original idea comes from <a href="https://forums.getpaint.net/topic/26758-trs-tiled-pixels-v12/">TR's Tiled Pixels V1.2</a> plugin by <b>TechnoRobbo</b> for Paint.NET. This version is a extended version utilizing average sampling per area per tile. Dynamic shapes are also supported by this filter.\n\nDynamic Shapes - Fern, Gear, Polygon, Snowflake, Star\n\nShape that are dynamic are labeled with -[D] next to their name.\n\n<small>Note - You may want to sharp your picture due to the average sampling per area per tile algorithm applied by this filter. The reason being is that the contour of the shape would be more discernible after filter is processed.</small>"), sep = separator()
 #@gui : note=note("<b>Color Space Processing</b>")
