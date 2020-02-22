@@ -5186,84 +5186,105 @@ u "{$1}"\
 #@gui : sep=separator(), note=note("<small>Author: Reptorian.      Latest Update: <i>2019/9/7</i>.</small>")
 gui_rep_polkal: rep_polkal ${1-3},{($4-50)*2}%,{($5-50)*-2}%,${6--1}
 #@gui Object Size Filtering: gui_rep_objvf,gui_rep_objvf_preview(0)
-#@gui : Mode of Object Filtering=choice(0,"Auto","Colour","*Colour with Alpha")
-#@gui : note=note("*Applicable if contain alpha, otherwise, use Colour Mode. This is only applicable for GIMP!")
+#@gui : Mode of Object Filtering=choice(0,"Auto","Alpha","Colour")
+#@gui : Threshold for Auto-Mode Switching(%)=float(10,0,100)
 #@gui : sep=separator(),note=note("<b>Object Filtering Options</b>")
 #@gui : Volume 1 (%)=float(1,0,100)
 #@gui : Volume 2 (%)=float(99,0,100)
 #@gui : Preserve=choice(0,"Inclusive","Exclusive")
 #@gui : Preserve=choice(0,"Inclusive by Secondary Max Area","Exclusive by Secondary Max Area")
 #@gui : Use Secondary Maximum Area?=bool(0)
-#@gui : Colour=color(0,0,0)
 #@gui : Colour=color(0,0,0,0)
 #@gui : sep=separator(),note=note("<b>Preview Settings</b>")
 #@gui : Reveal Erased Objects?=bool(1)
 #@gui : Colour of Erased Object=color(127,127,127)
 #@gui : Render Mode=choice(0,"Main","Removed Alpha Mode","Alpha Details")
 #@gui : List Percentiles?=bool(0)_0
-#@gui : sep=separator(),note=note("<b>-Instruction-</b>\n\nThe purpose of this filter is to filter objects based on their volume. It is based on the principle of the <a href="https://forums.getpaint.net/topic/113962-object-pruner/">Object Pruner plugin</a> for Paint.NET made by <b>MJW</b>.\n\nUse Colour Mode for fully opaque image. <small>Note:Otherwise, use Colour Mode with Alpha or Auto.\n\n<b>Special Note:</b>If you're seeing error, switch the render mode and pick the colors until error no longer show up on Main Render Mode.</small>\n----\n<b>Warning:</b> Untested on GIMP!")
-#@gui : sep=separator(),note=note("<small>Author: Reptorian. Latest Update: <i>2020/2/10</i>.</small>")
+#@gui : sep=separator(),note=note("<b>-Instruction-</b>\n\nThe purpose of this filter is to filter objects based on their volume. It is based on the principle of the <a href="https://forums.getpaint.net/topic/113962-object-pruner/">Object Pruner plugin</a> for Paint.NET made by <b>MJW</b>.\n\n<b>Note:</b> Use Colour Mode for fully opaque image.\n<b>Alternative Note:</b> Use Colour Mode with Alpha or Auto.\n\n<b>Special Note:</b> If you're seeing error, switch the render mode and pick the colors until error no longer show up on Main Render Mode.Sometimes changing Mode of Object Filtering can resolve it.\n----\n<b>Warning:</b> Untested on GIMP!")
+#@gui : sep=separator(),note=note("<small>Author: Reptorian. Latest Update: <i>2020/2/21</i>.</small>")
 gui_rep_objvf:
-contain_alpha=0
-escape=0
-current_layer=0
-do
-    l[$current_layer] if s==2||s>3 contain_alpha=1 escape=1 fi endl
-    current_layer+=1
-while $current_layer<$!&&!$escape
-if ($1==1||!($1==2&&$contain_alpha))&&$1
-    if $6 preserve_choice={($5+1)} preserve_choice*=-1
-    else  preserve_choice=$4
-    fi
+if $7 
+    preserve_choice={($6+1)*-1}
+else  
+    preserve_choice=$5
+fi
+if !$1
     repeat $! l[$>]
-        if $contain_alpha
-            sh {s-1} if !iv#-1 alp=iM#-1 else alp=0 fi rm.
-            rep_objvf $2%,$3%,$preserve_choice,${7-9},$alp
-        else rep_objvf $2%,$3%,$preserve_choice,${7-9}
+        colour={vectors(${8-11})}
+        if s==2||s>3
+            ss={s-1}
+            colour={vector$ss(${8-11})}
+            sh {s-1}
+            maxalp={iM#-1}
+            +f. i#-1?1
+            sumnalp={1-(is#-1/wh#-1)}
+            rm.
+            if $sumnalp>$2%
+                rm. 
+                rep_objvf $3%,$4%,$preserve_choice
+            else
+                if !iv#-1
+                    alp=$maxalp
+                else 
+                    alp=0
+                fi
+                rm.
+                rep_objvf $3%,$4%,$preserve_choice,$colour,$alp
+            fi
+        else
+            colour={vectors(${8-11})}
+            rep_objvf $3%,$4%,$preserve_choice,$colour
         fi
     endl done
-elif $1==2&&$contain_alpha
-    if $6 preserve_choice={($5+1)} preserve_choice*=-1
-    else  preserve_choice=$4
-    fi
-    rep_objvf $2%,$3%,$preserve_choice,${10-13}
-else
-    if $contain_alpha rep_objvf $2%,$3%,$4
-    else rep_objvf $2%,$3%,$4,${7-9}
-    fi
+elif $1==1 
+    rep_objvf $3%,$4%,$preserve_choice
+else 
+    colour={vectors(${8-11})}
+    rep_objvf $3%,$4%,$preserve_choice,$colour
 fi
 gui_rep_objvf_preview:
-contain_alpha=0
-escape=0
+show_colour=0
 current_layer=0
-do
-    l[$current_layer] if s==2||s>3 contain_alpha=1 escape=1 fi endl
-    current_layer+=1
-while $current_layer<$!&&!$escape
-if $18==2
+
+if !$1
+    do
+        l[$current_layer]
+            if s==2||s>3
+                {w},{h},100%,1,i(#-1,x,y,z,s-1)?1
+                if !iv#-1 show_colour+=1 fi
+                rm.
+            fi
+        endl
+        current_layer+=1
+    while !$show_colour&&$current_layer<$!
+elif $1==2 show_colour=1
+fi
+
+if $16==2
     channels {s-1}
-elif $18==1
+elif $16==1
     channels 0,{s-2}
 else
-    if $14
-    +gui_rep_objvf ${1-13}
-    f begin(ss={s-1};);if(i(x,y,z,ss),i,0);
-    f.. I!=I#-1?[${15-17},255]:I
-    else gui_rep_objvf ${1-13}
+    if $12
+        +gui_rep_objvf ${1-11}
+        f begin(ss={s-1};);if(i(x,y,z,ss),i,0);
+        f.. I!=I#-1?[${13-15},255]:I
+    else 
+        gui_rep_objvf ${1-11}
     fi
 fi
 u "{$1}"\
-"{$2}"\
+"{$2}"_{!$1?2:0}\
 "{$3}"\
-"{$4}_"{$1?(!$6?2:0):2}\
-"{$5}_"{$1?($6?2:0):0}\
-"{$6}_"{$1?2:0}\
-"{$7,$8,$9}_"{($1==1||!$contain_alpha)?2:0}\
-"{$10,$11,$12,$13}_"{($1==2&&$contain_alpha)?2:0}\
-"{$14}_"{!$18?2:1}\
-"{$15,$16,$17}_"{!$18?($14?2:1):1}\
-"{$18}"\
-"{$19}_"0
+"{$4}"\
+"{$5}"_{!$7?2:0}\
+"{$6}"_{$7?2:0}\
+"{$7}"\
+"{$8,$9,$10,$11}"_{$show_colour?2:0}\
+"{$12}"_{!$16?2:1}\
+"{$13,$14,$15}"_{($12&&!$16)?2:1}\
+"{$16}"\
+"{$17}"_0
 #@gui Tiled Form : gui_rep_form_pixel, gui_rep_form_pixel_preview(0)
 #@gui : note=note("Original idea comes from <a href="https://forums.getpaint.net/topic/26758-trs-tiled-pixels-v12/">TR's Tiled Pixels V1.2</a> plugin by <b>TechnoRobbo</b> for Paint.NET. This version is a extended version utilizing average sampling per area per tile. Dynamic shapes are also supported by this filter.\n\nDynamic Shapes - Fern, Gear, Polygon, Snowflake, Star\n\nShape that are dynamic are labeled with -[D] next to their name.\n\n<small>Note - You may want to sharp your picture due to the average sampling per area per tile algorithm applied by this filter. The reason being is that the contour of the shape would be more discernible after filter is processed.</small>"), sep = separator()
 #@gui : note=note("<b>Color Space Processing</b>")
