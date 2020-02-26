@@ -44,6 +44,33 @@
 #
 #-------------------------------
 
+#@cli rep_pw: eq. to 'rep_point_warp' : (+)
+rep_pw: rep_point_warp $*
+#@cli rep_point_warp: 0%<=_pointwidth(%)<=100%,0%<=_distance(%)<=100%,0%,_radialInfluence<=100%,-1>=_distortion_center_x>=1,-1>=_distortion_center_y>=1,-360>=_distortion_angle>=360,_boundary={ 0=none | 1=neumann | 2=periodic | 3=mirror }
+#@cli : Distorts image around a point. If you're using large radius, radialInfluence is not recommended to be set to 100%.
+#@cli : (eq. to 'rep_pw')\n
+#@cli : Default values: '_pointwidth=10%','_distance=10%','_radialInfluence=0%','_distortion_center_x=0','_distortion_center_y=0','_distortion_angle=0','_boundary=3'
+rep_point_warp:
+skip ${1=10},${2=10},${3=0},${4=0},${5=0},${6=0},${7=3}
+f "begin(
+img_hypotenuse=($2*sqrt(w^2+h^2));
+radius=log2((10^(abs($3)*300))*1000)*e;
+d=log(radius^($1*(.25*min(w,h))));
+hw=w/2;
+hh=h/2;
+angle=($6/180)*pi+pi;
+ox=cos(angle)*img_hypotenuse;
+oy=sin(angle)*img_hypotenuse;
+dx=$4*hw;
+dy=$5*hh;
+);
+xd=x-dx;
+yd=y+dy;
+radinf=radius^(-(((xd-hw)/d)^2+((yd-hh)/d)^2)^2);
+rx=(ox*radinf)+x;
+ry=(oy*radinf)+y;
+i(rx,ry,z,c,2,$7);
+"
 #@cli rep_rand_sqrrecfill: eq. to 'rep_random_square_rectangle_fill' : (+)
 rep_rand_sqrrecfill: rep_random_square_rectangle_fill $*
 #@cli rep_random_square_rectangle_fill: _palette,square_dimension>0,_rectangle_max_length_1>0,_rectangle_max_length_2>0,_erode,_output={ 0=none | 1=line },_reduce_nonrectangles={ 0=do_not_reduce_nonrectagles | 1=reduce_nonrectangles },_remove_black_from_palette={ 0=preserve | 1=remove },_seed,_colourspace,
@@ -5975,6 +6002,27 @@ u "{$1}_"{$2?1:2}\
 "{$11}"\
 "{$12}_"{$2?2:1}\
 "{$13}"
+#@gui Point Warp:gui_rep_pw,gui_rep_pw_preview(0)
+#@gui : Point Width=float(100,0,100)
+#@gui : Distance=float(100,0,100)
+#@gui : Radial Influence=float(0,0,100)
+#@gui : Placement of Distortion=point(50,50,0,1,128,128,128,255)
+#@gui : Distortion Angle=float(0,-180,180)
+#@gui : Boundary Condition=choice(3,"None","Neumann","Periodic","Mirror")
+#@gui : sep=separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep=separator(),_=note("<small>This is a modified code of a conversion of Illab2014's Paint.NET plugin named <a href="https://forums.getpaint.net/topic/32180-point-warp-engorged-smudge-aug-20-2015/">Point Warp</a>. The difference between this and Illab2014's filter is that this one takes into account of image size and contains boundary conditions.</small>")
+#@gui : sep=separator(),_=note("<small>Author: <i>Reptorian</i> Latest update: <i>2020/2/26</i>.</small>")
+gui_rep_pw:
+rep_pw $1%,$2%,$3%,{($4/100-.5)*2},{($5/100-.5)*-2},$6,$7
+gui_rep_pw_preview:
+gui_split_preview "gui_rep_pw ${1-7}",${-3--1}
+#@gui Prime Surface:gui_rep_prime_surface
+#@gui : _=note("<b>Warning!:</b> This filter is super computationally intensive!It is recommended that you use a small image dimension to use this filter!\n\n<b>For starters:</b> Start with a dimension of 256x256. If it takes too long, decrease the area of your image dimension. If it finish quickly, then increase the area of your dimension."),sep=separator()
+#@gui : Negate Direction?=bool(0)
+#@gui : Mirror?=bool(0)
+#@gui : sep=separator(),_=note("<small>Author: <i>Reptorian</i> Latest update: <i>2020/2/26</i>.</small>")
+gui_rep_prime_surface:
+rep_prime_surface {w},{h},$1,$2 k. n 0,255
 ######################
 
 # Local Variables:
