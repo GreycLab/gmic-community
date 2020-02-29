@@ -2226,34 +2226,43 @@ descriptive_feature :
       if {$>==0} sres=$res else sres=$sres\,$res fi
   endl done u $sres v +
 
-#@cli example_descriptive_feature : [region],_all(0),_background(0)
+#@cli example_descriptive_feature : [region],_all(false),_background(false),_verbose_draw(true),_verbose_text(false)
 #@cli : Example for feature extraction from a selected grey image and a [region] mask or label image \
 # using 'extract_region' and 'descriptive_feature'. More than 9 regions are truncated if _all == false. \
-# Background region (label == 0) is only calculated if _background == true.
+# Background region (label == 0) is only calculated if _background == true. \
+# Graphical display of feature with _verbose_draw ==true and \
+# textual display only with _verbose_text == true.
 #@cli : 'osteo_' and 'follic_' in the examples are transmission image examples from \
 # microscopic cells with region masks
 #@cli : $ osteo_ example_descriptive_feature.. .
 #@cli : $ follic_ karo_extinction.. , label_fg. 0 example_descriptive_feature.. .
 example_descriptive_feature : 
-  check ${"is_image_arg $1"}" && isbool(${2=0}) && isbool(${3=0})"
+  check ${"is_image_arg $1"}" && isbool(${2=0}) && isbool(${3=0}) && isbool(${4=1}) && isbool(${5=0})"
   pass$1 nm. Region
   im={im}
 	if {$3==0&&$im==0} im+=1 fi
   num={iM-$im+1}
   fe="Area","Mean","SD","Curtosis","Excess","Min","Max","Median"
   m "_MC : $""=_M"
-	if {$num>9} warn[0--3] "More than 9 regions! Not processed!" num={$2?$num:9} fi
+	st_ff=""
+	nmax={$2?$num:9}
+	if {$num>9&&$2==0} warn[0--3] "More than 9 regions! Not processed!" fi
   repeat $num,ii
     +extract_region[0] [1],0,{$im+$ii} 
 		if {h==0} rm. warn[0--3] "Empty region "{$im+$ii}"! Not processed!" continue fi
-    descriptive_feature. rm. _MC ${}
-    128,128,1,3 e[] "Features label: "{$im+$ii} text. "Features label: "{$im+$ii},0,0,12,1,255,255,0
+    descriptive_feature. rm. temp_ff=${} _MC ${} #u [{$im+$ii},$temp_ff] $temp_ff=${}
+    if $4 128,128,1,3 text. "Features label: "{$im+$ii},0,0,12,1,255,255,0 fi
+		if $5 e[] "Features label: "{$im+$ii} fi
     repeat 8 
       ff=${arg\ {$>+1},$fe}\ =\ {_${_M{$>+1}}}
-      e[] $ff text. $ff,0,{($>+2)*12},12,1,255,255,0
+      if $5 e[] $ff fi
+			if $4 text. $ff,0,{($>+2)*12},12,1,255,255,0 fi
     done
+#		st_ff={[$st_ff,$temp_ff]}
+		nmax-=1 if !$nmax break fi
   done rm[Region] uncommand _MC
-  if {$num>3} append_tiles[1--1] 3 fi
+  if $4 if {$num>3} append_tiles[1--1] 3 fi fi
+#	u $st_ff
 
 #@cli karo_morpho : action, _kernel(0), _size(5), _ckernel("1,0,1; 0,1,0; 1,0,1")
 #@cli : Mathematical morphology filter
