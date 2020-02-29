@@ -44,11 +44,11 @@
 #
 #-------------------------------
 
-#@cli rep_donut_dist: eq. to 'rep_donut_distortion' : (+)
-rep_donut_dist: rep_donut_distortion $*
-#@cli rep_donut_distortion: 0<=_torus_circu_min_dimension_percent_1(%)<=100,0<=_torus_circu_min_dimension_percent_2(%)<=100,_distort_ang,_mode_1={ 0=softmode | 1=midmode | 2=hardmode | 3=hardmode_alt | 4=distroymode | 5=invdistroymode | 6=quadextrudemode | 7=hexextrudemode },_mode_2={ 0=softmode | 1=midmode | 2=hardmode | 3=hardmode_alt | 4=distroymode | 5=invdistroymode | 6=quadextrudemode | 7=hexextrudemode },0<=_mode_percent_comb(%)<=100,_offx(%),_offy(%),_off_dup={ 0=no_duplicate_dist | 1=duplicate_dist },_bgremove={ 0=keep_background | 1=remove_background },_cent_isolat_torus_mode={ 0=do_not_center | 1=center },_interpolation={ 0=nearest | 1=linear },_boundary={ 0=none | 1=neumann | 2=periodic | 3=mirror }
+#@cli rep_rbtt: eq. to 'rep_rotate_by_torus_top' : (+)
+rep_rbtt: rep_rotate_by_torus_top $*
+#@cli rep_rotate_by_torus_top: 0<=_torus_circu_min_dimension_percent_1(%)<=100,0<=_torus_circu_min_dimension_percent_2(%)<=100,_distort_ang,_mode_1={ 0=softmode | 1=midmode | 2=hardmode | 3=hardmode_alt | 4=distroymode | 5=invdistroymode | 6=quadextrudemode | 7=hexextrudemode },_mode_2={ 0=softmode | 1=midmode | 2=hardmode | 3=hardmode_alt | 4=distroymode | 5=invdistroymode | 6=quadextrudemode | 7=hexextrudemode },0<=_mode_percent_comb(%)<=100,_offx(%),_offy(%),_off_dup={ 0=no_duplicate_dist | 1=duplicate_dist },_bgremove={ 0=keep_background | 1=remove_background },_cent_isolat_torus_mode={ 0=do_not_center | 1=center },_interpolation={ 0=nearest | 1=linear },_boundary={ 0=none | 1=neumann | 2=periodic | 3=mirror }
 #@cli : Inspired by the Donut Distortion plugin made by MadJik for Paint.NET, this version of donut distortion adds new features such as more modes, mode blending, isolated torus mode.
-#@cli : (eq. to 'rep_donut_dist')\n
+#@cli : (eq. to 'rep_rbtt')\n
 #@cli : _torus_circu_min_dimension_percent_1 refers to the primary circumference of circle relative to the minimum image dimension.
 #@cli : _torus_circu_min_dimension_percent_2 refers to the secondary circumference of circle relative to the minimum image dimension.
 #@cli : _distort_ang refers to the maximum angle of distortion.
@@ -63,7 +63,7 @@ rep_donut_dist: rep_donut_distortion $*
 #@cli : _interpolation defines the smoothness of the image.
 #@cli : _boundary defines how out-of-range values are wrapped as.
 #@cli : Default values: '_torus_circu_min_dimension_percent_1=1','_torus_circu_min_dimension_percent_2=.5','_distort_ang=45','_mode_1=0','_mode_2=','_mode_percent_comb=50%','_offx=0%','_offy=0%','_off_dup=1','_bgremove=0','_cent_isolat_torus_mode=0','_interpolation=1','_boundary=2'
-rep_donut_distortion:
+rep_rotate_by_torus_top:
 skip ${1=1},${2=.5},${3=45},${4=0},${5=},${6=50%},${7=0},${8=0},${9=1},${10=0},${11=0}${12=1},${13=2}
 
 different_dimension=0
@@ -77,14 +77,14 @@ do
 while !$different_dimension&&($img_id<$!)
 
 if !$different_dimension 
-    rep_donut_distortion_source ${1-13}
+    rep_rotate_by_torus_top_source ${1-13}
 else 
     repeat $! l[$>] 
-        rep_donut_distortion_source ${1-13}
+        rep_rotate_by_torus_top_source ${1-13}
     endl done
 fi
 
-rep_donut_distortion_source:
+rep_rotate_by_torus_top_source:
 skip ${1=1},${2=0},${3=45},${4=0},${5=},${6=.5},${7=0},${8=0},${9=1},${10=1},${11=0}${12=1},${13=2}
 
 if {$1==$2} error ""$"1!="$"2=F" fi
@@ -104,18 +104,15 @@ begin(
     torus_val_2=$2;
     new_min=min(torus_val_1,torus_val_2);
     new_max=max(torus_val_1,torus_val_2);
-    old_max=max(1,0);
-    old_min=min(1,0);
-    mincirc=new_max<1&&new_min==0?new_min:new_max;
-    nm(v)=((old_max-old_min)/(new_max-new_min))*(v-mincirc)+mincirc;
-    oldcut(v)=v>old_max?old_max:(v<old_min?old_min:v);
-    bndcut(v)=v>old_max||v<old_min?0:1;
+    nm(v)=(v-new_min)*(1/(new_max-new_min));
+    limcut(v)=v>1?1:(v<0?0:v);
+    bndcut(v)=v>1||v<0?0:1;
 );
 xx=(x/ww-.5)*2*sx;
 yy=(y/hh-.5)*2*sy;
 gradient=nm(sqrt(xx^2+yy^2));
 bndl=bndcut(gradient);
-[oldcut(gradient),bndl,bndl];
+[limcut(gradient),bndl,bndl];
 "
 
 r2dx. 50%,3
@@ -6248,11 +6245,11 @@ rep_prime_surface {w},{h},$1,$2 k. n 0,255
 #@gui : sep=separator(), note=note("<small>Author: Reptorian. Latest Update: <i>2020/2/26</i>.</small>")
 fx_rep_pxpush: rep_pxpush {($1/100-.5)*2},{($2/100-.5)*2}
 fx_pxpush_preview: gui_split_preview "fx_rep_pxpush $*",${-3--1}
-#@gui Donut Distortion: fx_rep_donut_dist, fx_rep_donut_dist_preview(0)
+#@gui Rotate by Torus Map: fx_rep_rbtt, fx_rep_rbtt_preview(0)
 #@gui : _=note("<b>Main</b>")
 #@gui : Circumference A (%)=float(100,0,100)
 #@gui : Circumference B (%)=float(50,0,100)
-#@gui : sep=separator()_=note("<b>Distortion Setting</b>")
+#@gui : sep=separator()_=note("<b>Distortion</b>")
 #@gui : Distortion Angle=float(-180,-720,720)
 #@gui : Distortion Mode=choice(3,"Soft","Medium","Hard","Alternative Hard","Distroy","Inverse-Distroy","Quad Extrude","Hexagonal Extrude")
 #@gui : Distortion Mode A=choice(3,"Soft","Medium","Hard","Alternative Hard","Distroy","Inverse-Distroy","Quad Extrude","Hexagonal Extrude")
@@ -6270,13 +6267,13 @@ fx_pxpush_preview: gui_split_preview "fx_rep_pxpush $*",${-3--1}
 #@gui : sep=separator(),_=note("<b>Preview</b>"), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui : sep=separator(),_=note("<b>Information</b>\n"),_=note("This filter is inspired by <a href="https://forums.getpaint.net/topic/23400-donut-distortion-effect-plugin/">Donut Distortion Paint.NET plugin</a> by <a href="https://forums.getpaint.net/profile/45895-madjik/">MadJik</a>.\n\n This G'MIC version includes additional modes,wraparound mode, and special mode which isolates the distortion.")
 #@gui : sep=separator(), note=note("<small>Author: Reptorian. Latest Update: <i>2020/2/29</i>.</small>")
-fx_rep_donut_dist:
+fx_rep_rbtt:
 coordx={($9/100-.5)*2}
 coordy={($10/100-.5)*-2}
-if $8 rep_donut_dist {$1/100},{$2/100},$3,$5,$6,{$7/100},{($9/100-.5)*2},{($10/100-.5)*-2},$11,$12,$13,$14,$15
-else  rep_donut_dist {$1/100},{$2/100},$3,$4,,,{($9/100-.5)*2},{($10/100-.5)*-2},$11,$12,$13,$14,$15
+if $8 rep_rbtt {$1/100},{$2/100},$3,$5,$6,{$7/100},{($9/100-.5)*2},{($10/100-.5)*-2},$11,$12,$13,$14,$15
+else  rep_rbtt {$1/100},{$2/100},$3,$4,,,{($9/100-.5)*2},{($10/100-.5)*-2},$11,$12,$13,$14,$15
 fi
-fx_rep_donut_dist_preview: gui_split_preview "fx_rep_donut_dist ${1-15}",${-3--1}
+fx_rep_rbtt_preview: gui_split_preview "fx_rep_rbtt ${1-15}",${-3--1}
 u "{$1}"\
 "{$2}"\
 "{$3}"\
