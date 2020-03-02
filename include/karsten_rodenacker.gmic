@@ -576,7 +576,7 @@ pink_delaunay : skip ${1=0} v -
   file_rm $nn.del
   v +
 
-#@cli :: KaRo's Tests
+#@cli :: KaRo's Test custom functions
 
 #@cli osteo : [noarg]
 #@cli : Load osteoblast cell image (transmitted light)
@@ -798,6 +798,8 @@ hgKGdCDNwAAAZYIFpg=="
     nm follic,follic_
   endl v +
 
+#@cli :: KaRo's Test custom input functions
+
 #@cli gwyddionread : _filename
 #@cli : Read gwyddion ASCII file and produce image
 #@cli : Data beginning after "Start of Data:" are imported
@@ -896,6 +898,8 @@ wykoread : skip "${1=Wyko_Example.ASC}"
       rotate -90,0
     else rm fi
   endl v +
+
+#@cli :: KaRo's Test cli custom functions
 
 #@cli pseudo_c : Pseudo coloring of greyscale image
 pseudo_c : v - if {s!=1} to_gray. fi {iM},1,1,3,u(255) round. map.. . rm.  v +
@@ -2199,6 +2203,36 @@ yiq_y,yiq_iq,\
 ryb,ryb_r,ryb_y,ryb_b}
     u $mode
   else u "$1" fi else u "$1" fi
+
+#@cli karo_feat_eval_n : [maskimage],_high_connectivity,_oneo
+#@cli : Compute features from selected transmission (grey) image and multi-component maskimage.
+#@cli : if _oneo is true, mask is considered as one-component maskimage
+#@cli : Features: centroid (x,y), area, mean extincton, sd extinction.
+#@cli : follic_ loads an example image and mask
+#@cli : $ follic_ karo_feat_eval_n.. . run "repeat {h#-2} =. 2,{i(#-2,0,$>)},{i(#-2,1,$>)} done" \
+# +ge. 2 delaunay3d. n.. 0,255 j3d.. .,0,0,0,0.5,1 rm.
+karo_feat_eval_n : check ${-is_image_arg\ $1} check "${2=1}>=0" skip ${3=0}
+  e[^-1] "Compute features from transmission image$? and multi-component mask image "$1"."
+  v -  repeat $! pass$1 0 l[$>,-1] 
+    if {!$3} +label_fg. 0,$2 else +neq. 0 fi
+    mode=${"-_karo_mode... ,"} if {$mode<=160} mode={iM#-3} fi
+    +karo_extinction... $mode 
+    l[-1,-2] o={iM#0} 6,$o 
+      repeat {iM#0} 
+        +eq[0] {$>+1} nn={is} 
+        +barycenter. cc0={@0} cc1={@1} rm.
+        +*[1,-1] su={is/$nn}
+        +. $su -sqr. *. [-2] su2={sqrt(is/($nn-1))}
+        rm[-1--2] 
+        =. $cc0,0,$>
+        =. $cc1,1,$>
+        =. $nn,2,$>
+        =. $su,3,$>
+        =. $su2,4,$>
+        =. $mode,5,$>
+      done
+    endl k. 
+  endl done v +
 
 #@cli descriptive_feature :
 #@cli : Estimation of features number(sum,m0),mean(m1),SD(m2),skewness(m3),kurtosis(m4),min,max,median
