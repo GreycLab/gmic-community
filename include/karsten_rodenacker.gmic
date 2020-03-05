@@ -799,6 +799,24 @@ hgKGdCDNwAAAZYIFpg=="
   endl v +
 
 #@cli :: KaRo's Test custom input functions
+ 
+#@cli karo_read_bd : name,_verbosity(=0),_append_type(=z) {z|c|x|y},_no_delete(=0) 
+#@cli : Read biodata with external bfconvert from OME 
+#@cli : bftools directory has to be in the PATH
+#@cli : http://www.openmicroscopy.org/site/support/bio-formats5/users/comlinetools/conversion.html
+karo_read_bd : skip "${2=0} ${3=z} ${4=0}" ina=$1 
+ e[^-1] "Read biodata with OME bftool bfconvert (name=\""$ina"\", verbosity=$2, append_type=$3, no_delete=$4)."
+  ona=${-path_tmp}${-file_slash}gmic_bd_$_pid.tif 
+  if {$2<2} postf=" >/dev/null 2>&1" else postf="" endif
+  cmd="bfconvert merge overwrite -no-upgrade "${ina}" "${ona}
+  if {${is_windows}==0} cmd=${cmd}${postf} else echo_stdout $(cmd) endif
+  if isfile(['/${ina}']) 
+    if {$2!=0} echo_stdout $cmd v + endif x $cmd if {$2!=0} v - endif
+    if isfile(['/${ona}']) l[]
+      i ${ona} if {$!>0} if {'"$3"'=='z'} a z elif {'"$3"'=='c'} a c elif {'"$3"'=='x'} a x elif {'"$3"'=='y'} a y endif endif
+      if {$4==0} file_rm $ona else e "File "$ona" not deleted!" endif endl 
+      else e "File "$ona" not found!" endif
+  else e "File "$ina" not found!" endif v +
 
 #@cli gwyddionread : _filename
 #@cli : Read gwyddion ASCII file and produce image
@@ -818,7 +836,6 @@ hgKGdCDNwAAAZYIFpg=="
 #@cli : |# Start of Data:
 gwyddionread : skip "${1=gwyddion_Example.asc}"
   e[^-1] "Read gwyddion ASCII text data: "$1
-  v -
   l[]
     i raw:"$1",uchar nm={b}
     # Retrieve header information.
@@ -852,7 +869,6 @@ gwyddionread : skip "${1=gwyddion_Example.asc}"
     else rm fi
     u [$len_x,$len_y,$offs_x,$offs_y,$bit2nm]
   endl
-  v +
 
 #@cli wykoread : _filename
 #@cli : Read Wyko/Bruker/Vision ASCII file and produce image(s)
@@ -870,7 +886,7 @@ gwyddionread : skip "${1=gwyddion_Example.asc}"
 #@cli : |RAW_DATA	3	1228800
 wykoread : skip "${1=Wyko_Example.ASC}"
   e[^-1] "Read Vision surface profilometry OPD text data: "$1
-  v - l[]
+  l[]
     i raw:"$1",uchar nm={b}
     # Retrieve header information.
     s +,10
@@ -897,7 +913,7 @@ wykoread : skip "${1=Wyko_Example.ASC}"
       file_rm $file_tmp
       rotate -90,0
     else rm fi
-  endl v +
+  endl
 
 #@cli :: KaRo's Test cli custom functions
 
@@ -1061,10 +1077,10 @@ connectivity and "${-arg\ 1+!$3,sorted,unsorted}" by size"
 #@cli : Number of remaining objects in status
 karo_segmentarea :
   check "$1>0"
-  v - repeat $! l[$>]
+  repeat $! l[$>]
     neq. 0 label_fg. 0,0 +histogram. {iM+1},0,{iM} =. 0,0 ge. $1
     map.. . u {is} rm.
-  endl done v +
+  endl done
 
 #@cli karo_zerleg : Partition of binary image zero areas
 #@cli : using pink watershed (https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/wshedtopo_8c.html)
@@ -2257,6 +2273,25 @@ karo_feat_eval_n : check ${-is_image_arg\ $1} check "${2=1}>=0" skip ${3=0}
       done
     endl k. 
   endl done v +
+
+#@cli _karo_mode : _smooth(=5), low(=-1), hig(=-1), _binsize(=1), _nodel(=0)
+#@cli : Estimate mode (most frequent value) of image histogram from selected image \
+# after evtl. histogram smoothing between _low and _hig \
+# with _low==-1 min and hig=-1 max from the image.
+#@cli : If _binsize<0 it represents neg. number of cluster (classes)
+#@cli : If _nodel==true the histogram is kept
+_karo_mode : 
+  check ${1=5}>=0 skip "${2=-1} ${3=-1} ${4=1} ${5=0}"
+	if {$2==-1} low={im} else low=$2 fi
+	if {$3==-1} hig={iM} else hig=$3 fi
+  if {$4<0} clust={abs($4)} binsize={($hig-$low)/$clust}
+	else clust={round(($hig-$low+$4)/$4)} binsize=$4 fi
+  if {$1>0} e[^-1] "Extract mode of image$? after smoothing $1 between "{_$low}" and "{_$hig}" binsize "$binsize" cluster "$clust
+	else e[^-1] "Extract mode of image$? between "{_$low}" and "{_$hig}" binsize "$binsize" cluster "$clust fi
+  +histogram. $clust,$low,$hig 
+  if {$1>0} smooth. $1 fi 
+  u {xM*$binsize+$low} 
+	if {!$5} rm. fi
 
 #@cli descriptive_feature :
 #@cli : Estimation of features number(sum,m0),mean(m1),SD(m2),skewness(m3),kurtosis(m4),min,max,median
