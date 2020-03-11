@@ -95,9 +95,12 @@ karos_error :
 _wrbytepnk :
   output_pink3d ${1}.pnk
 
-#@cli _xpink : pink_cmd,p1, ... ,pn
-#@cli : Packs the list of parameters to a string with spaces,
-#@cli : generates the pink input image in tmp and executes the pink command and reads the result image
+#@cli _xpink : pink_cmd, p1, ... , pn
+#@cli : Packs the list of parameters to a string with spaces, \
+# generates the pink input image in tmp, executes the pink command \
+# and reads the result image. 
+#@cli : To see the parameters and to control the existence of the program, \
+# type in a system shell 'pink_cmd', e.g. $ asf !
 #@cli : If $GMIC_PINK_VERBOSE is true, the command and sysout is printed
 #@cli : If $GMIC_PINK_NO_RM is true, the temporary files are not removed
 #@cli : Outfiles with P == 80 as first char are considerd as images, everything else is considered as list
@@ -177,10 +180,10 @@ output_pink3d : skip ${2=P5}
 #@cli : Test file type
 #@cli : returns the first character from the first non comment line in status
 #@cli : P == 80 ! everything else is considered as list
-input_pinktest : v -
+input_pinktest : 
   i[0] raw:"$1",uchar s[0] -,10 i=0
   do u {$i,@0} while {${}==35&&i++<$!}
-	rm v +
+	rm
 
 _pink_setorigin : skip "${2=0} ${3=0} ${4=0}" v -
   i[0] raw:"$1",uchar s[0] +,10
@@ -197,9 +200,9 @@ _pink_setorigin : skip "${2=0} ${3=0} ${4=0}" v -
 #@cli : _mode != 0 the vertice, hull, edge lists and the adjacency matrix
 input_pinklist :
   skip ${2=0}
-  e[^-1] "Read pinklist $1" v -
+  e[^-1] "Read pinklist $1"
   i[0] raw:"$1",uchar s[0] -,10
-  if {{0,@0}=={'G'}}  v + e "Delaunay graph list file" v -
+  if {{0,@0}=={'G'}}  e "Delaunay graph list file" 
     rows[0] 2,100% n={{0,t}} rm[0]
     3,$n,1,1 nm. vertices
     1,$n,1,1 nm. vhull
@@ -233,7 +236,7 @@ input_pinklist :
       done
     fi
     u $ver,$edg,$nhull
-  elif  {{0,@0}=={'e'}} v + e "1d list file" v -
+  elif  {{0,@0}=={'e'}} e "1d list file" 
     s[0] -,32 n={{1,t}} rm[0,1]
     1,$n,1,1 nm. vertices
     if {$!-1<$n} s[0] -,32 fi
@@ -243,7 +246,7 @@ input_pinklist :
     k[vertices]
     ver={vertices,h}
     u $ver
-  elif  {{0,@0}=={'s'}} v + e "1d vertice list file" v -
+  elif  {{0,@0}=={'s'}} e "1d vertice list file"
     rows[0] 2,100% n={{0,t}} rm[0]
     1,$n,1,1 nm. vertices
     1,$n,1,1 nm. vhull
@@ -255,7 +258,7 @@ input_pinklist :
     k[vertices,vhull] a x
     ver={vertices,h}
     u $ver
-  elif  {{0,@0}=={'b'}} v + e "2d list file" v -
+  elif  {{0,@0}=={'b'}} e "2d list file"
     rows[0] 2,100% n={{0,t}} rm[0]
     2,$n,1,1 nm. vertices
     repeat {$!-1} l[{$>},vertices]
@@ -265,7 +268,7 @@ input_pinklist :
     k[vertices]
     ver={vertices,h}
     u $ver
-  elif  {{0,@0}=={'n'}} v + e "2d vertice list file" v -
+  elif  {{0,@0}=={'n'}} e "2d vertice list file"
     rows[0] 2,100% n={{0,t}} rm[0]
     2,$n,1,1 nm. vertices
     1,$n,1,1 nm. vhull
@@ -277,7 +280,7 @@ input_pinklist :
     k[vertices,vhull] a x
     ver={vertices,h}
     u $ver
-  elif  {{0,@0}=={'B'}} v + e "3d list file" v -
+  elif  {{0,@0}=={'B'}} e "3d list file"
     rows[0] 2,100% n={{0,t}} rm[0]
     3,$n,1,1 nm. vertices
     repeat {$!-1} l[{$>},vertices]
@@ -287,7 +290,7 @@ input_pinklist :
     k[vertices]
     ver={vertices,h}
     u $ver
-  elif  {{0,@0}=={'N'}} v + e "3d vertice list file" v -
+  elif  {{0,@0}=={'N'}} e "3d vertice list file"
     rows[0] 2,100% n={{0,t}} rm[0]
     3,$n,1,1 nm. vertices
     1,$n,1,1 nm. vhull
@@ -300,73 +303,78 @@ input_pinklist :
     ver={vertices,h}
     u $ver
   else error "Not implemented!" fi
-  v +
 
-#@cli pinkxipo : [b1],..[bn],name,pn+2, .. ,pm
-#@cli : Pink wrapper pinkxipo[a] [b1,..bn,]name(pn+1)[,pn+2, .. ,pm] (requires the PINK library to be installed).
-#@cli : Executables with 1, 2-n input image files (xi), pos. parameters (p), output file (o)
-#@cli : (https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/)
-#@cli : prepares input, calls external "name inputa [inputb1 ... inputbn] [pn+2 ... pm] output" and reads output (/tmp)
-#@cli : Add. images are located before the pink executable name. If images are replaced by a parameter,
-#@cli : e.g. null, than it has to be located after the executable name!
-#@cli : $ sp 1 ir. 0,50% +pinkxipo. distc,3 +negate.. +pinkxipo... dist,3 pinkxipo[1] [0],bisector \
-# pinkxipo[3] [2],bisector k[0,1,3] a c
-#@cli : $ sp 2 +pinkxipo. dilatballnum,5 +-
-#@cli : $ sp 1 ir. 0,50% +pinkxipo. dilatballnum,10 +pinkxipo.. .,distgeo,4
-#@cli : $ sp 1 +pinkxipo. seuilauto,128,max,3
-pinkxipo :
-  e[^0] "Pink cmd "$* v -
-  $=var
-  p=1
-  na={n}
-  for {$#>=$p" && "${-is_image_arg\ ${var$p}}} pass${var$p} p+=1 done pl=$p-1
-  exec=${var$p} p+=1
-  if {$#==$p} pp=${var$p}
-  elif {$#>$p} repeat {$#-$p+1} if {$>==0} pp=${var$p} else pp=$pp" "${var$p} fi p+=1 done
-  else pp="" fi
-  filename=${-file_rand}
-  if {if(isnum($GMIC_PINK_VERBOSE),0$GMIC_PINK_VERBOSE,0)>0} verb=" 2>&1" else verb=" >/dev/null 2>&1" fi
-  if {if(isnum($GMIC_PINK_NO_RM),0$GMIC_PINK_NO_RM,0)>0} no_rm=1 else no_rm=0 fi
-  echo_stdout $verb
-  if {!${-is_windows}}
-    prefix=pink.
-    x "which "$prefix$exec$verb
-    if {${}!=0} prefix="" x "which "$exec$verb
-      if {${}!=0} error "executable (pink.)"$exec" not found in PATH, status = "${}"!! Returning!!\n" return fi
-    fi
-  else prefix="" fi
-  ni=$!
-  repeat $!
-    if {iM#$>>255} output_pink3d[$>] ${filename}$>.pnk,P8 else output_pink3d[$>] ${filename}$>.pnk fi
-    if {$>==0} il=${filename}$>.pnk else il=$il","${filename}$>.pnk fi done
-  ilk=${-karo_li2st\ $il}
-  cmd=$prefix$exec\ $ilk\ $pp\ ${filename}"_o.pnk"$verb
-  e $cmd
-  x $cmd
-  status=${}
-  if {!$no_rm} repeat $ni file_rm ${-arg\ {$>+1},$il} done fi
-  if {$status!=0" && "['$exec']!='seuilauto'} v + error $exec" Status is "$status"." return
-  elif isfile(['{/${filename}_o.pnk}']) i ${filename}_o.pnk file_rm ${filename}_o.pnk k. nm $na~
-  else error "exec Error!!" fi
-  v +
+# ##@cli pinkxipo : [b1],..[bn],name,pn+2, .. ,pm
+# ##@cli : Pink wrapper pinkxipo[a] [b1,..bn,]name(pn+1)[,pn+2, .. ,pm] (requires the PINK library to be installed).
+# ##@cli : Executables with 1, 2-n input image files (xi), pos. parameters (p), output file (o)
+# ##@cli : (https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/)
+# ##@cli : prepares input, calls external "name inputa [inputb1 ... inputbn] [pn+2 ... pm] output" and reads output (/tmp)
+# ##@cli : Add. images are located before the pink executable name. If images are replaced by a parameter,
+# ##@cli : e.g. null, than it has to be located after the executable name!
+# ##@cli : $ sp 1 ir. 0,50% +pinkxipo. distc,3 +negate.. +pinkxipo... dist,3 pinkxipo[1] [0],bisector \
+# ## pinkxipo[3] [2],bisector k[0,1,3] a c
+# ##@cli : $ sp 2 +pinkxipo. dilatballnum,5 +-
+# ##@cli : $ sp 1 ir. 0,50% +pinkxipo. dilatballnum,10 +pinkxipo.. .,distgeo,4
+# ##@cli : $ sp 1 +pinkxipo. seuilauto,128,max,3
+# #pinkxipo :
+# #  e[^0] "Pink cmd "$* v -
+# #  $=var
+# #  p=1
+# #  na={n}
+# #  for {$#>=$p" && "${-is_image_arg\ ${var$p}}} pass${var$p} p+=1 done pl=$p-1
+# #  exec=${var$p} p+=1
+# #  if {$#==$p} pp=${var$p}
+# #  elif {$#>$p} repeat {$#-$p+1} if {$>==0} pp=${var$p} else pp=$pp" "${var$p} fi p+=1 done
+# #  else pp="" fi
+# #  filename=${-file_rand}
+# #  if {if(isnum($GMIC_PINK_VERBOSE),0$GMIC_PINK_VERBOSE,0)>0} verb=" 2>&1" else verb=" >/dev/null 2>&1" fi
+# #  if {if(isnum($GMIC_PINK_NO_RM),0$GMIC_PINK_NO_RM,0)>0} no_rm=1 else no_rm=0 fi
+# #  echo_stdout $verb
+# #  if {!${-is_windows}}
+# #    prefix=pink.
+# #    x "which "$prefix$exec$verb
+# #    if {${}!=0} prefix="" x "which "$exec$verb
+# #      if {${}!=0} error "executable (pink.)"$exec" not found in PATH, status = "${}"!! Returning!!\n" return fi
+# #    fi
+# #  else prefix="" fi
+# #  ni=$!
+# #  repeat $!
+# #    if {iM#$>>255} output_pink3d[$>] ${filename}$>.pnk,P8 else output_pink3d[$>] ${filename}$>.pnk fi
+# #    if {$>==0} il=${filename}$>.pnk else il=$il","${filename}$>.pnk fi done
+# #  ilk=${-karo_li2st\ $il}
+# #  cmd=$prefix$exec\ $ilk\ $pp\ ${filename}"_o.pnk"$verb
+# #  e $cmd
+# #  x $cmd
+# #  status=${}
+# #  if {!$no_rm} repeat $ni file_rm ${-arg\ {$>+1},$il} done fi
+# #  if {$status!=0" && "['$exec']!='seuilauto'} v + error $exec" Status is "$status"." return
+# #  elif isfile(['{/${filename}_o.pnk}']) i ${filename}_o.pnk file_rm ${filename}_o.pnk k. nm $na~
+# #  else error "exec Error!!" fi
+# #  v +
+
+#@cli pink : eq. to 'pink_new'. :
+pink : pink_new $*
 
 #@cli pink_new : pink_cmd,p1,...,pn
-#@cli : Pink wrapper (requires the PINK library to be installed).
-#@cli : (https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/)
+#@cli : Pink wrapper (requires the PINK library to be installed), see 
+#@cli :   <A href="https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/">Pink</A>
+#@cli : Shortcut 'pink'
 #@cli : Prepares input, calls external "pink_cmd input p1...pn output" and reads output (/tmp) \
 # and replaces positional image parameters bei temp. files. \
 # Only Pink routines with input file(s) and ONE output file can be called. \
 # Images with spectral channels (s>1) are splitted, processed one by one and merged.\n
 #@cli : ATTENTION positional image parameter are never spitted and merged \
-# similar to input and output images. Positional image parameter should already have the \
-# necessary format!\n
+# similar to selected (input) and output images. Positional image parameter should already have the \
+# needed format for the selected pink binary!\n
 #@cli : pink_new prepares selected images and image parameter as pnk files in 'auto' mode and \
 # creates a command string. \
-# Files are written as pnk files to temporary space, outfile is \
-# a pnk file name pointing to temporary space.
-#@cli : "pink_cmd infile p1 ... (px)imagefile ... pn outfile"
-#@cli : GMIC_PINK_NO_RM true: created files are not removed
-#@cli : GMIC_PINK_VERBOSE true: created cmd string and pink messages are printed
+# Images (splitted if spectrum s > 1) are processed one by one and \
+# are written as pnk files to temporary space, outfile is \
+# a pnk file name pointing to temporary space too. The executed call looks like \
+# "pink_cmd infile p1 ... (px)imagefile ... pn outfile".\n
+#@cli : OS variable:
+#@cli : GMIC_PINK_NO_RM == true: created files in temporary space are not removed
+#@cli : GMIC_PINK_VERBOSE == true: created cmd string and pink messages are printed
 #@cli : $ image.jpg +pink_new. asfr,5 pink_new.. asf,5
 #@cli : $ image.jpg +blur 2 pink_new maxima,4
 #@cli : $ sp ? to_gray ir. 0,50% +pink_new. distc,3 +negate.. +pink_new... dist,3 pink_new[1] \
@@ -374,7 +382,7 @@ pinkxipo :
 #@cli : $ sp 2 +pink_new. dilatballnum,5 +-
 #@cli : $ sp boats ir. 0,50% +pink_new. dilatballnum,10 +pink_new.. distgeo,.,4
 #@cli : $ sp barbara +pink_new. seuilauto,128,max,3
-pink_new : v -
+pink_new : 
   $=pp
   if {$#>1}
     np=""
@@ -387,23 +395,23 @@ pink_new : v -
 			else np=${np}\ ${pp{$>+2}} fi
     done
   else np=" " fi
-  v + e[^-1] "Call pink_new package on image$? with cmd: \"$1 [img]"$np" [img]\"." v -
+  v + e[0] "Call pink_new package on image$? with cmd: \"$1 [img]"$np" [img]\"." v -
   _xpinks[0] $1,$np
   if {if(isnum($GMIC_PINK_NO_RM),0$GMIC_PINK_NO_RM,0)>0} no_rm=1 else no_rm=0 fi
 	if {$no_rm==0} repeat {$#-1} strlen ${filename$>} if {${}>0} file_rm ${filename$>}.pnk fi done fi
-  v +
 
-#@cli pink : pink_cmd,p1,...,pn
-#@cli : obsolet, use pink_new !!
-#@cli : Pink wrapper (requires the PINK library to be installed).
-#@cli : (https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/)
-#@cli : prepares input, calls external "pink_cmd input p1...pn output" and reads output (/tmp)
-#@cli : $ image.jpg +pink asfr,5 pink[0] asf,5
-#@cli : $ image.jpg +blur 2 pink maxima,4
-pink : v -
-  if {$#>1} ({"'${2--1}'"}) replace. {','},{"' '"} p={t} rm. else p=" " fi
-  v + e[^-1] "Call pink package on image$? with cmd: \"$1 [img] "$p" [img]\"." v -
-  repeat $! l[$>] _xpinks $1,$p endl done v +
+
+# # #@cli pink : pink_cmd,p1,...,pn
+# # #@cli : Abbreviaton of pink_new (obsolet, use pink_new !!)
+# # #@cli : Pink wrapper (requires the PINK library to be installed).
+# # #@cli : (https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/)
+# # #@cli : prepares input, calls external "pink_cmd input p1...pn output" and reads output (/tmp)
+# # #@cli : $ image.jpg +pink asfr,5 pink[0] asf,5
+# # #@cli : $ image.jpg +blur 2 pink maxima,4
+# # #  v -
+# # #  if {$#>1} ({"'${2--1}'"}) replace. {','},{"' '"} p={t} rm. else p=" " fi
+# # #  v + e[^-1] "Call pink package on image$? with cmd: \"$1 [img] "$p" [img]\"." v -
+# # #  repeat $! l[$>] _xpinks $1,$p endl done v +
 
 #@cli pink_grayskel : _connectivity={ 4 }, _lambda=0
 #@cli : (https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/grayskel_8c.html)
