@@ -122,22 +122,23 @@ _xpink :
     fi
     if {if(isnum($GMIC_PINK_VERBOSE),0$GMIC_PINK_VERBOSE,0)>0}
 		  echo_stdout ${prefix}${1}${suffix}" "${filename}".pnk $2 "${filename}"_o.pnk"$verb fi
-    o ${filename}.pnk -x ${prefix}${1}${suffix}" "${filename}".pnk $2 "${filename}"_o.pnk"$verb
+    o ${filename}.pnk x ${prefix}${1}${suffix}" "${filename}".pnk ${2} "${filename}"_o.pnk"$verb
+    _status=${}
   else
     if {if(isnum($GMIC_PINK_VERBOSE),0$GMIC_PINK_VERBOSE,0)>0}
 		  echo_stdout $1" "${x_filename}".pnk $2 "${x_filename}"_o.pnk" fi
-    o ${filename}.pnk -x $1" "${x_filename}".pnk $2 "${x_filename}"_o.pnk"
+    o ${filename}.pnk x ${1}" "${x_filename}".pnk ${2} "${x_filename}"_o.pnk"
+    _status=${}
   fi
-  status=${}
   if {!$no_rm} file_rm ${x_filename}.pnk fi
-  if {$status!=0" && "['"$1"']!='seuilauto'} v + error "Exec status is "${status}"." v -
+  if {$_status!=0" && "['"$1"']!='seuilauto'} error "Exec status is "$_status"." 
   elif isfile(['{/${filename}_o.pnk}'])
     input_pinktest ${filename}_o.pnk
     if {${}==80} i ${filename}_o.pnk
     else input_pinklist ${filename}_o.pnk fi
     k. nm. $na
     if {!$no_rm} file_rm ${x_filename}_o.pnk fi
-  else error "Exec error!!"
+  else error "Exec error "$_status"!!"
   fi 
 
 #@cli _xpinks : pink_cmd,parameter_string(with spaces)
@@ -149,6 +150,14 @@ _xpinks : v -
 
 _xframe :
   line 0%,0%,100%,0% line 0%,100%,100%,100% line 0%,0%,0%,100% line 100%,0%,100%,100%
+
+#@cli karo_frame : _width(1), _border(0)
+#@cli : _width thickness of border
+#@cli : _border==false border is deleted, inner region copied
+#@cli : _border==true border is copied, inner region deleted
+karo_frame :
+  if ${2=0} e[^2] "Copy border Delete inner." f bb=${1=1};if(x<bb||y<bb||x>(w-bb-1)||y>(h-bb-1),i,0);
+	else  e[^2] "Delete border Copy inner." f bb=${1=1};if(x<bb||y<bb||x>(w-bb-1)||y>(h-bb-1),0,i); fi
 
 #@cli output_pink3d : filename,_type
 #@cli : Save selected images as _type-coded (P5,P8,P9) PNK files (PINK extension for 3d volumetric images).
@@ -304,54 +313,6 @@ input_pinklist :
     u $ver
   else error "Not implemented!" fi
 
-# ##@cli pinkxipo : [b1],..[bn],name,pn+2, .. ,pm
-# ##@cli : Pink wrapper pinkxipo[a] [b1,..bn,]name(pn+1)[,pn+2, .. ,pm] (requires the PINK library to be installed).
-# ##@cli : Executables with 1, 2-n input image files (xi), pos. parameters (p), output file (o)
-# ##@cli : (https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/)
-# ##@cli : prepares input, calls external "name inputa [inputb1 ... inputbn] [pn+2 ... pm] output" and reads output (/tmp)
-# ##@cli : Add. images are located before the pink executable name. If images are replaced by a parameter,
-# ##@cli : e.g. null, than it has to be located after the executable name!
-# ##@cli : $ sp 1 ir. 0,50% +pinkxipo. distc,3 +negate.. +pinkxipo... dist,3 pinkxipo[1] [0],bisector \
-# ## pinkxipo[3] [2],bisector k[0,1,3] a c
-# ##@cli : $ sp 2 +pinkxipo. dilatballnum,5 +-
-# ##@cli : $ sp 1 ir. 0,50% +pinkxipo. dilatballnum,10 +pinkxipo.. .,distgeo,4
-# ##@cli : $ sp 1 +pinkxipo. seuilauto,128,max,3
-# #pinkxipo :
-# #  e[^0] "Pink cmd "$* v -
-# #  $=var
-# #  p=1
-# #  na={n}
-# #  for {$#>=$p" && "${-is_image_arg\ ${var$p}}} pass${var$p} p+=1 done pl=$p-1
-# #  exec=${var$p} p+=1
-# #  if {$#==$p} pp=${var$p}
-# #  elif {$#>$p} repeat {$#-$p+1} if {$>==0} pp=${var$p} else pp=$pp" "${var$p} fi p+=1 done
-# #  else pp="" fi
-# #  filename=${-file_rand}
-# #  if {if(isnum($GMIC_PINK_VERBOSE),0$GMIC_PINK_VERBOSE,0)>0} verb=" 2>&1" else verb=" >/dev/null 2>&1" fi
-# #  if {if(isnum($GMIC_PINK_NO_RM),0$GMIC_PINK_NO_RM,0)>0} no_rm=1 else no_rm=0 fi
-# #  echo_stdout $verb
-# #  if {!${-is_windows}}
-# #    prefix=pink.
-# #    x "which "$prefix$exec$verb
-# #    if {${}!=0} prefix="" x "which "$exec$verb
-# #      if {${}!=0} error "executable (pink.)"$exec" not found in PATH, status = "${}"!! Returning!!\n" return fi
-# #    fi
-# #  else prefix="" fi
-# #  ni=$!
-# #  repeat $!
-# #    if {iM#$>>255} output_pink3d[$>] ${filename}$>.pnk,P8 else output_pink3d[$>] ${filename}$>.pnk fi
-# #    if {$>==0} il=${filename}$>.pnk else il=$il","${filename}$>.pnk fi done
-# #  ilk=${-karo_li2st\ $il}
-# #  cmd=$prefix$exec\ $ilk\ $pp\ ${filename}"_o.pnk"$verb
-# #  e $cmd
-# #  x $cmd
-# #  status=${}
-# #  if {!$no_rm} repeat $ni file_rm ${-arg\ {$>+1},$il} done fi
-# #  if {$status!=0" && "['$exec']!='seuilauto'} v + error $exec" Status is "$status"." return
-# #  elif isfile(['{/${filename}_o.pnk}']) i ${filename}_o.pnk file_rm ${filename}_o.pnk k. nm $na~
-# #  else error "exec Error!!" fi
-# #  v +
-
 #@cli pink : eq. to 'pink_new'. :
 pink : pink_new $*
 
@@ -395,7 +356,7 @@ pink_new :
 			else np=${np}\ ${pp{$>+2}} fi
     done
   else np=" " fi
-  v + e[0] "Call pink_new package on image$? with cmd: \"$1 [img]"$np" [img]\"." v -
+  v + e[^1] "Call pink_new package on image$? with cmd: \"$1 [img]"$np" [img]\"." v -
   _xpinks[0] $1,$np
   if {if(isnum($GMIC_PINK_NO_RM),0$GMIC_PINK_NO_RM,0)>0} no_rm=1 else no_rm=0 fi
 	if {$no_rm==0} repeat {$#-1} strlen ${filename$>} if {${}>0} file_rm ${filename$>}.pnk fi done fi
@@ -419,7 +380,7 @@ pink_new :
 #@cli : Default values: 'connectivity=4' and 'lambda=0'.
 #@cli : $ image.jpg +pink_grayskel , +pink_grayskel[0] ,10 +pink_grayskel[0] ,100 append_tiles 2
 pink_grayskel : skip ${1=4},${2=0}
-  check "${1=4}==4" v - repeat $! l[$>] pink grayskel,null,$1,$2 endl done v +
+  check "${1=4}==4" repeat $! l[$>] pink grayskel,null,$1,$2 endl done
 
 #@cli pink_heightmaxima : _connectivity={ 4 | 8 | 6 | 26 },_height=1
 #@cli : (https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/heightmaxima_8c.html)
@@ -2577,12 +2538,12 @@ fx_karo_pink_bin_preview :
 #@cli : Pink executables in search PATH or C:\\Pink\\bin\\ for Windows
 #@cli : Author : <i>KaRo</i>.           Latest update : <i>2012/11/18</i>
 #@cli : note = link("https://perso.esiee.fr/~coupriem/Pink/doc/html/files.html")
-fx_karo_pink_bianca : v 2
+fx_karo_pink_bianca : 
   skip "${1=5}","${2=60}","${3=5}","${4=1}","${5=0}","${6=0}"
   if $5 negate fi
   if {!${-is_windows}} exe="label" else exe="C:\Pink\bin\label" fi
   s c if $6 k.. else k. fi
-  +pink asf,$1 +- k[-1,-3] threshold. ${2}%
+  +pink asf,$1 +- k[-1,-3] threshold. $2%
   +pink_wshed.. ,1,$3
   pink. $exe,4,max threshold. 1
   erode_oct.. {$4*2+1} dilate_oct.. {$4*2+1}
