@@ -351,12 +351,12 @@ afre_orien : check isbool(${1=1})
   e[] "[afre]^_^) orien: Compute orientation of image$? using luminance (D50 "$Y")."
   repeat $! +afre_y50[$>] $1 replace. 0,1 /[$>,-1] done
 
-#@cli afre_conv : [K1],_[K2],_transpose_K2={ 0 | 1 }
+#@cli afre_conv : [k1],_[k2],_transpose_k2={ 0 | 1 }
 #@cli : Convolve selected images with 1-2 kernels.
-#@cli : Default value: 'transpose_K2=1'.
-afre_conv : check ${is_image_arg\ $1}" && "isbool(${3=1}) skip ${2=0}
+#@cli : Default value: 'transpose_k2=0'.
+afre_conv : check ${is_image_arg\ $1}" && "isbool(${3=0}) skip ${2=0}
   repeat $! pass$1 0
-    if ${is_image_arg\ $2} pass$2 0 if $3 transpose. KT=" a transposed" fi e[] "[afre]^_^) conv: Convolve image$? using ["${"-pass$1 -1"}"] and"$KT" ["${"-pass$2 -1"}"]."
+    if ${is_image_arg\ $2} pass$2 0 if $3 transpose. kT=" a transposed" fi e[] "[afre]^_^) conv: Convolve image$? using ["${"-pass$1 -1"}"] and"$kT" ["${"-pass$2 -1"}"]."
       l[$>,-2--1] +f[0] 1 mv. 1 +convolve[1] [2] convolve[4] [3]
       convolve[0] [2] convolve[0] [3] k[0,4] / endl
     elif $2&&!${is_image_arg\ $2} error[] "\n[afre]>_<) conv: Parameter must be an image."
@@ -419,11 +419,28 @@ afre_gui1 : check ${is_image_arg\ $1}" && ${2=1}>=1 && ${3=1e-2}>=0 && ${4=1}>=1
   endl done rm.
   repeat $! *[$>] ${iM$>} done
 
+#@cli afre_gui2 : [k1],[k2],_smoothing>=0,1<=_faster<=4,_transpose_k2={ 0 | 1 }
+#@cli : Convolve selected images with a custom self-guided filter using 2 kernels.
+#@cli : - Use orders of magnitude for 'smoothing'.
+#@cli : - Use 'faster' to speed up command at the cost of accuracy.
+#@cli : ~ Based on "K He, J Sun, X Tang. Guided image filtering. TPAMI, 35(6):1397-1409, 2013".
+#@cli : Default values: 'smoothing=1e-2', 'faster=1' and 'transpose_k2=0'.
+afre_gui2 : check ${is_image_arg\ $1}" && "${is_image_arg\ $2}" && ${3=1e-2}>=0 && ${4=1}>=1 && "isbool(${5=0})" &&
+    $4<=4"
+  e[] "[afre]^_^) gui2: Convolve image$? with a custom self-guided filter using 2 kernels, smoothing=$3, faster=$4 and transpose=$5."
+  repeat $! pass$1 0 pass$2 0 l[$>,-2--1] nm={0,b} iM={0,iM} /[0] $iM
+    +r2dx[0] {100/$4}%,1 +sqr. afre_conv[^0-2] [1],[2],$5 nm I,k1,k2,mI,mII
+    +sqr[mI] *. -1 +. [mII] rm[mII] nm. vI
+    ++[vI] {$3*ia+1e-6} /[vI] . rm. nm[vI] a
+    +*[a] [mI] *. -1 +. [mI] rm[mI] nm. b
+    afre_conv[^0-2] [k1],[k2],$5 nm[^0-2] ma,mb r[^0-2] [I],5 *[I] [ma] +[I] [mb] k[I]
+  * $iM nm $nm endl done
+
 
 # List of Commands and Filters #
 #------------------------------#
 # GUI CLI : afre_vigrect afre_vigcirc afre_softlight afre_sharpenfft afre_contrastfft afre_edge afre_cleantext afre_gleam afre_halfhalf
-# CLI only: afre_gnorm afre_hnorm afre_y50 afre_reorder afre_log2 afre_orien afre_conv afre_box afre_gui0 afre_gui1
+# CLI only: afre_gnorm afre_hnorm afre_y50 afre_reorder afre_log2 afre_orien afre_conv afre_box afre_gui0 afre_gui1 afre_gui2
 # GUI only: fx_darken_sky fx_gamify fx_hnorm
 
 
