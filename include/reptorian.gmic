@@ -44,6 +44,642 @@
 #
 #-------------------------------
 
+#@cli rep_rpgtiler_noniso: { filename | [tile] },min_tile>=3,increment>=0,_tileset_iw_width>=1,_tileset_ih_width>=1,_preserve_bgout={ 0=eliminate_bg | 1=preserve_bg },_drgba_r>=0,_drgba_g>=0,_drgba_b>=0,_gridcol>=0,_trackpadcol>=0 
+#@cli : Launch the interactive non-isometric RPG Tiling toolkit.
+#@cli : More info: The interactive RPG Tiling toolkit is a early version. More features will be added such as symmetry mode and row/column shifting.\n
+#@cli : Note: This is meant to enable artists to make artwork based on non-isometric RPG games or even world. It is not meant to be a tool to aid into making RPG games. If you want that, then you need to look into other solutions. Of course, there might be the off-chance that this tool is suitable for you.\n 
+#@cli : '{ filename | [tile] }' can be either location of the tile in text form, or as a image argument. If using image argument, you must do rep_rpgtiler[target] [tile] to make it work.
+#@cli : 'min_tile' defines the size of tiles.
+#@cli : 'increment' defines the maximum possible selection length by number of tiles added by 1. 0 means maximum possible selection length by tile within axis is exactly 1.
+#@cli : '_tileset_iw_width' defines the width of tileset visible within interactive window.
+#@cli : '_tileset_ih_width' defines the width of tileset visible within interactive window.
+#@cli : '_preserve_bgout' can be used to keep or erase image after painting tiles.
+#@cli : '_dbrga_r' is the color of transparent background. If a value is assigned to this, then transparent areas are replaced with colored background instead of a checkerboard.
+#@cli : '_dbrga_g' is the color of transparent background. If a value is assigned to this, then transparent areas are replaced with colored background instead of a checkerboard.
+#@cli : '_dbrga_b' is the color of transparent background. If a value is assigned to this, then transparent areas are replaced with colored background instead of a checkerboard.
+#@cli : '_gridcol' defines the color of grid within interactive window. Only grayscale value.
+#@cli : '_trackpadcol' defines the color of tracker pad within interactive window. Only grayscale value.\n
+#@cli : Default values: '_tileset_iw_width=16','_tileset_ih_width=16','_preserve_bgout=0','_drgba_r=','_drgba_g=','_drgba_b=','_gridcol=0','_trackpadcol=0'
+rep_rpgtiler_noniso:
+skip ${4=16},${5=16},${6=0},${7=},${8=},${9=},${10=0},${11=255}
+include_image=${"is_image_arg $1"}
+
+min_tile={abs($2)}
+if $min_tile<3 error "$"2>=3==F"" fi
+max_increment={abs($3)}
+
+tile_width=$min_tile
+tile_height=$min_tile
+
+gridcol={abs($10)}
+trackpadcol={abs($11)}
+
+if narg($7)||narg($8)||narg($9)
+    if narg($7) __r_col={min(abs($7),255)} else __r_col=0 fi
+    if narg($8) __g_col={min(abs($8),255)} else __g_col=0 fi
+    if narg($9) __b_col={min(abs($9),255)} else __b_col=0 fi
+
+    m "xalp : drgba $__r_col,$__g_col,$__b_col"
+else
+    m "xalp : drgba"
+fi
+
+m "xalpa: xalp to_a"
+
+if $!==1
+    gw={w#0}
+    gh={h#0}
+    nw={ceil($gw/$min_tile)*$min_tile}
+    nh={ceil($gh/$min_tile)*$min_tile}
+    r $nw,$nh,100%,100%,0,0,.5,.5 to_a 
+    +store[0] ogb
+    xalpa
+    cs={s#-1}
+    +store[0] bg
+    +store[0] cbg
+    +f (((x%$min_tile)==0||(y%$min_tile)==0)||(x==(w-1)||y==(h-1)))?255-i:i
+    rm.
+    f 0
+    +store[0] current_image
+    +store[0] undo_image
+    e[] "\nEntering non-isometric RPG Tiling Tool!"
+else
+    error "$!==1=F"
+fi
+
+e[] "\n Instruction on how to work with interactive windows.\n
+ \ ---------------------------------------------------------\n\n
+ \ - On any window - \n
+ \   * Q: Remove/Restore Background\n
+ \   * G: Activate Canvas Grid Mode ON/OFF\n
+ \   * X: Activate Copy Mode On/OFF\n
+ \   * C: Switch between Place/Eraser Mode\n
+ \   * Z: Undo Tile Placement\n
+ \   * W: Restore ALL windows\n\n
+ \ - On Canvas window - \n
+ \   * F: Activate/Deactivate Background Tile Layering Mode\n
+ \   * A: Enable/Disable Tracker\n\n
+ \ - On Tileset window - \n
+ \   * CTRL+ARROWKEY: Resize Tile Selection Box\n
+ \   * ARROWKEY: Scroll through tileset\n\n
+ \ - On Tile window - \n
+ \   * CTRL+ARROWKEY: Mirror alongside axis\n
+ \   * ARROWKEY: Rotate Tile\n
+ \   * MOUSE BUTTON: Switch between Place/Eraser Mode\n\n
+ \ ---------------------------------------------------------\n"\n
+
+if $include_image
+    pass$1 0
+else
+    i $1
+fi
+
+l.
+    xr={ceil(w#-1/(abs($4)*$min_tile))}
+    yr={ceil(h#-1/(abs($5)*$min_tile))}
+    split_tiles. {-abs($4)*$min_tile},{-abs($5)*$min_tile}
+    mw=${-max_w}
+    mh=${-max_h}
+    ti={$!}
+endl
+
+$min_tile,$min_tile,1,4,0
+fti={$!}
+
+$bg
++xalp.
+w[-1] {w#0},{h#0},0,"Canvas"
+rm[-2,-1]
+
++xalp[1] w1[-1] {w#1},{h#1},0,"Tileset" rm.
+w2[-1] 196,196,0,"Tile"
+
+fti={$!}
+
+icx=0
+icy=0
+ci=0
+lr=0
+tb=0
+tbc=0
+ni=1
+erasemode=0
+rotval=0
+background_mode=0
+gridmode=0
+optinsert=1
+start=0
+copymode=0
+trackermode=1
+canvas_background=1
+current_canvas_background=1
+current_erase_mode=0
+selection=0
+undo=0
+sx=0
+sy=0
+cx=-1
+cy=-1
+
+activate_edit=0
+do
+
+    if {*,Z}" || "{*1,Z}" || "{*2,Z}
+        undo+=1
+        undo={$undo%2}
+        wait 500
+    fi
+    
+    if $undo
+        $undo_image f[0] i#-1 +store[0] current_image $bg rv[-2,-1] blend[-2,-1] alpha xalpa. 
+        if $gridmode f. !(((x%$min_tile)==0||(y%$min_tile)==0)||(x==(w-1)||y==(h-1)))?i:$gridcol fi
+        w[-1] rm.
+        undo=0
+        wait 500
+    fi
+    
+    if {*,W}" || "{*1,W}" || "{*2,W} w[] w1[] w2[] fi
+    
+    if $erasemode
+        +f. 0 w2[-1] rm.
+        optinsert=1
+    fi
+    
+    if $current_erase_mode!=$erasemode
+        if $current_erase_mode==1&&$erasemode==0
+            $tile f.. i#-1 rm.
+            +xalpa.
+            w2[-1] rm.        
+        fi
+        current_erase_mode=$erasemode
+    fi
+    
+    if $current_canvas_background!=$canvas_background
+        if $canvas_background
+            $cbg store. bg
+            current_canvas_background=$canvas_background
+        else
+            $bg f. 0 xalpa. store. bg
+            current_canvas_background=$canvas_background           
+        fi
+    fi
+    
+    if {*,Q}" || "{*1,Q}" || "{*2,Q}
+        canvas_background+=1
+        canvas_background={$canvas_background%2}
+        wait 500
+    fi
+    
+    x,y,b,ww,wh={*,x,y,b,w,h}
+    x1,y1,b1,ww1,wh1={*1,x,y,b,w,h}
+    x2,y2,b2,ww2,wh2={*2,x,y,b,w,h}
+    
+    if {*,G}" || "{*1,G}" || "{*2,G}
+        gridmode+=1
+        gridmode={$gridmode%2}
+    fi
+    
+    if {*,C}" || "{*1,C}" || "{*2,C}
+        erasemode=0
+        copymode+=1
+        copymode={$copymode%2}
+    fi
+    
+    if {*,F}
+        background_mode+=1
+        background_mode={$background_mode%2}
+    fi
+    
+    if {*,A}
+        trackermode+=1
+        trackermode={$trackermode%2}
+    fi
+    
+    if $start
+        if $copymode
+            if $trackermode
+                $bg [0] blend[-2,-1] alpha
+                psx={floor($x/$min_tile)*$min_tile}
+                psy={floor($y/$min_tile)*$min_tile}
+                $tile_width,$tile_height,1,{$cs-1},(x<=2||x>=(w-3))||(y<=2||y>=(h-3))?$trackpadcol:0
+                sh. 0 f. (x<=2||x>=(w-3))||(y<=2||y>=(h-3))?255:0
+                j[-3] [-2],$psx,$psy,0,0,1,[-1],255
+                rm[-2--1]
+                xalp.
+                w[-1] {w#0},{h#0},0,"Canvas - (Copy Mode)"
+                rm.
+            else w[] {w#0},{h#0},0,"Canvas - (Copy Mode)"
+            fi
+        else
+            if $background_mode
+                if !$erasemode
+                    if !$gridmode
+                        $bg [0] blend[-2,-1] alpha
+                        if $trackermode" && "$x>=0" && "$y>=0" && "$x<=(w#0-1)" && "$y<=(h#0-1)
+                            psx={floor($x/$min_tile)*$min_tile}
+                            psy={floor($y/$min_tile)*$min_tile}
+                            $tile_width,$tile_height,1,{$cs-1},(x<=2||x>=(w-3))||(y<=2||y>=(h-3))?$trackpadcol:0
+                            sh. 0 f. (x<=2||x>=(w-3))||(y<=2||y>=(h-3))?255:0
+                            j[-3] [-2],$psx,$psy,0,0,1,[-1],255
+                            rm[-2--1]
+                        fi
+                        xalp.
+                        w[-1] {w#0},{h#0},0,"Canvas - Place Tileset (Background Mode)"
+                        rm.
+                    else
+                        $bg [0] blend[-2,-1] alpha f. !(((x%$min_tile)==0||(y%$min_tile)==0)||(x==(w-1)||y==(h-1)))?i:$gridcol
+                        if $trackermode" && "$x>=0" && "$y>=0" && "$x<=(w#0-1)" && "$y<=(h#0-1)
+                            psx={floor($x/$min_tile)*$min_tile}
+                            psy={floor($y/$min_tile)*$min_tile}
+                            $tile_width,$tile_height,1,{$cs-1},(x<=2||x>=(w-3))||(y<=2||y>=(h-3))?$trackpadcol:0
+                            sh. 0 f. (x<=2||x>=(w-3))||(y<=2||y>=(h-3))?255:0
+                            j[-3] [-2],$psx,$psy,0,0,1,[-1],255
+                            rm[-2--1]
+                        fi
+                        xalp. f. !(((x%$min_tile)==0||(y%$min_tile)==0)||(x==(w-1)||y==(h-1)))?i:$gridcol
+                        w[-1] {w#0},{h#0},0,"Canvas - Place Tileset (Background Mode) (Gridmode ON)"
+                        rm.
+                    fi
+                else
+                    if !$gridmode
+                        $bg [0] blend[-2,-1] alpha
+                        if $trackermode" && "$x>=0" && "$y>=0" && "$x<=(w#0-1)" && "$y<=(h#0-1)
+                            psx={floor($x/$min_tile)*$min_tile}
+                            psy={floor($y/$min_tile)*$min_tile}
+                            $tile_width,$tile_height,1,{$cs-1},(x<=2||x>=(w-3))||(y<=2||y>=(h-3))?$trackpadcol:0
+                            sh. 0 f. (x<=2||x>=(w-3))||(y<=2||y>=(h-3))?255:0
+                            j[-3] [-2],$psx,$psy,0,0,1,[-1],255
+                            rm[-2--1]
+                        fi
+                        xalp.
+                        w[-1] {w#0},{h#0},0,"Canvas - Eraser Mode"
+                        rm.
+                    else
+                        $bg [0] blend[-2,-1] alpha f. !(((x%$min_tile)==0||(y%$min_tile)==0)||(x==(w-1)||y==(h-1)))?i:$gridcol
+                        if $trackermode" && "$x>=0" && "$y>=0" && "$x<=(w#0-1)" && "$y<=(h#0-1)
+                            psx={floor($x/$min_tile)*$min_tile}
+                            psy={floor($y/$min_tile)*$min_tile}
+                            $tile_width,$tile_height,1,{$cs-1},(x<=2||x>=(w-3))||(y<=2||y>=(h-3))?$trackpadcol:0
+                            sh. 0 f. (x<=2||x>=(w-3))||(y<=2||y>=(h-3))?255:0
+                            j[-3] [-2],$psx,$psy,0,0,1,[-1],255
+                            rm[-2--1]
+                        fi
+                        xalp. f. !(((x%$min_tile)==0||(y%$min_tile)==0)||(x==(w-1)||y==(h-1)))?i:$gridcol
+                        w[-1] {w#0},{h#0},0,"Canvas - Eraser Mode (Gridmode ON)"
+                        rm.
+                    fi
+                fi
+            else
+                if !$erasemode
+                    if !$gridmode
+                        $bg [0] blend[-2,-1] alpha
+                        if $trackermode" && "$x>=0" && "$y>=0" && "$x<=(w#0-1)" && "$y<=(h#0-1)
+                            psx={floor($x/$min_tile)*$min_tile}
+                            psy={floor($y/$min_tile)*$min_tile}
+                            $tile_width,$tile_height,1,{$cs-1},(x<=2||x>=(w-3))||(y<=2||y>=(h-3))?$trackpadcol:0
+                            sh. 0 f. (x<=2||x>=(w-3))||(y<=2||y>=(h-3))?255:0
+                            j[-3] [-2],$psx,$psy,0,0,1,[-1],255
+                            rm[-2--1]
+                        fi
+                        xalp.
+                        w[-1] {w#0},{h#0},0,"Canvas - Place Tileset"
+                        rm.
+                    else
+                        $bg [0] blend[-2,-1] alpha f. !(((x%$min_tile)==0||(y%$min_tile)==0)||(x==(w-1)||y==(h-1)))?i:$gridcol
+                        if $trackermode" && "$x>=0" && "$y>=0" && "$x<=(w#0-1)" && "$y<=(h#0-1)
+                            psx={floor($x/$min_tile)*$min_tile}
+                            psy={floor($y/$min_tile)*$min_tile}
+                            $tile_width,$tile_height,1,{$cs-1},(x<=2||x>=(w-3))||(y<=2||y>=(h-3))?$trackpadcol:0
+                            sh. 0 f. (x<=2||x>=(w-3))||(y<=2||y>=(h-3))?255:0
+                            j[-3] [-2],$psx,$psy,0,0,1,[-1],255
+                            rm[-2--1]
+                        fi
+                        xalp. f. !(((x%$min_tile)==0||(y%$min_tile)==0)||(x==(w-1)||y==(h-1)))?i:$gridcol
+                        w[-1] {w#0},{h#0},0,"Canvas - Place Tileset (Gridmode ON)"
+                        rm.
+                    fi
+                else
+                    if !$gridmode
+                        $bg [0] blend[-2,-1] alpha
+                        if $trackermode" && "$x>=0" && "$y>=0" && "$x<=(w#0-1)" && "$y<=(h#0-1)
+                            psx={floor($x/$min_tile)*$min_tile}
+                            psy={floor($y/$min_tile)*$min_tile}
+                            $tile_width,$tile_height,1,{$cs-1},(x<=2||x>=(w-3))||(y<=2||y>=(h-3))?$trackpadcol:0
+                            sh. 0 f. (x<=2||x>=(w-3))||(y<=2||y>=(h-3))?255:0
+                            j[-3] [-2],$psx,$psy,0,0,1,[-1],255
+                            rm[-2--1]
+                        fi
+                        xalp.
+                        w[-1] {w#0},{h#0},0,"Canvas - Eraser Mode"
+                        rm.
+                    else
+                        $bg [0] blend[-2,-1] alpha f. !(((x%$min_tile)==0||(y%$min_tile)==0)||(x==(w-1)||y==(h-1)))?i:$gridcol
+                        if $trackermode" && "$x>=0" && "$y>=0" && "$x<=(w#0-1)" && "$y<=(h#0-1)
+                            psx={floor($x/$min_tile)*$min_tile}
+                            psy={floor($y/$min_tile)*$min_tile}
+                            $tile_width,$tile_height,1,{$cs-1},(x<=2||x>=(w-3))||(y<=2||y>=(h-3))?$trackpadcol:0
+                            sh. 0 f. (x<=2||x>=(w-3))||(y<=2||y>=(h-3))?255:0
+                            j[-3] [-2],$psx,$psy,0,0,1,[-1],255
+                            rm[-2--1]
+                        fi
+                        xalp. f. !(((x%$min_tile)==0||(y%$min_tile)==0)||(x==(w-1)||y==(h-1)))?i:$gridcol
+                        w[-1] {w#0},{h#0},0,"Canvas - Eraser Mode (Gridmode ON)"
+                        rm.
+                    fi
+                fi
+            fi
+        fi
+    else
+        if $gridmode
+            $bg xalp. f. !(((x%$min_tile)==0||(y%$min_tile)==0)||(x==(w-1)||y==(h-1)))?i:$gridcol
+            f. !(((x%$min_tile)==0||(y%$min_tile)==0)||(x==(w-1)||y==(h-1)))?i:$gridcol
+            w[-1] {w#0},{h#0},0,"Canvas - (Gridmode ON)"
+            rm.
+        else
+            $bg xalp.
+            w[-1] {w#0},{h#0},0,"Canvas"
+            rm.
+        fi
+        
+    fi
+    
+    if   {{{*1,CTRLLEFT}" || "{*1,CTRLRIGHT}}" && "{*1,ARROWLEFT}}" &&"$selection      
+        icx-=1
+        icx={max($icx,0)}
+        tile_width={$min_tile+($icx*$min_tile)}
+        
+        f. 0
+        r. $tile_width,$tile_height
+        f. i(#$ni,$sx+x,$sy+y)
+        +xalp.
+        w2[-1] {($icx+1)*196},{($icy+1)*196},0,"Tile"
+        rm.
+        +f. (x<=2||x>=(w-3))||(y<=2||y>=(h-3))?255-i:i
+        +j[$ni] [-1],$sx,$sy
+        xalp.
+        w1[-1]
+        rm[-2,-1]
+    elif {{{*1,CTRLLEFT}" || "{*1,CTRLRIGHT}}" && "{*1,ARROWRIGHT}}" &&"$selection   
+        icx+=1
+        icx={min($icx,$max_increment)}
+        tile_width={$min_tile+($icx*$min_tile)}
+
+        f. 0
+        r. $tile_width,$tile_height
+        f. i(#$ni,$sx+x,$sy+y)
+        +xalp.
+        w2[-1] {($icx+1)*196},{($icy+1)*196},0,"Tile"
+        rm.
+        +f. (x<=2||x>=(w-3))||(y<=2||y>=(h-3))?255-i:i
+        +j[$ni] [-1],$sx,$sy
+        xalp.
+        w1[-1]
+        rm[-2,-1]
+    elif {{{*1,CTRLLEFT}" || "{*1,CTRLRIGHT}}" && "{*1,ARROWDOWN}}" &&"$selection
+        icy+=1
+        icy={min($icy,$max_increment)}
+        tile_height={$min_tile+($icy*$min_tile)}
+
+        f. 0
+        r. $tile_width,$tile_height
+        f. i(#$ni,$sx+x,$sy+y)
+        +xalp.
+        w2[-1] {($icx+1)*196},{($icy+1)*196},0,"Tile"
+        rm.
+        +f. (x<=2||x>=(w-3))||(y<=2||y>=(h-3))?255-i:i
+        +j[$ni] [-1],$sx,$sy
+        xalp.
+        w1[-1]
+        rm[-2,-1]
+    elif {{{*1,CTRLLEFT}" || "{*1,CTRLRIGHT}}" && "{*1,ARROWUP}}" &&"$selection
+        icy-=1
+        icy={max($icy,0)}
+        tile_height={$min_tile+($icy*$min_tile)}
+        
+        f. 0
+        r. $tile_width,$tile_height
+        f. i(#$ni,$sx+x,$sy+y)
+        +xalp.
+        w2[-1] {($icx+1)*196},{($icy+1)*196},0,"Tile"
+        rm.
+        +f. (x<=2||x>=(w-3))||(y<=2||y>=(h-3))?255-i:i
+        +j[$ni] [-1],$sx,$sy
+        xalp.
+        w1[-1]
+        rm[-2,-1]
+    elif {*1,ARROWRIGHT}
+        selection=0
+        lr+=1
+        lr={$lr%$xr}
+        ci={($lr+$tb)%$ti}
+        ni={$ci+1}
+        +xalp[$ni]
+        w1[-1] {w#$ni},{h#$ni}
+        rm.
+        wait 625
+    elif {*1,ARROWLEFT}
+        selection=0
+        lr-=1
+        lr={$lr%$xr}
+        ci={($lr+$tb)%$ti}
+        ni={$ci+1}
+        +xalp[$ni]
+        w1[-1] {w#$ni},{h#$ni}
+        rm.
+        wait 625
+    elif {*1,ARROWDOWN}
+        selection=0
+        tbc+=1
+        tbc={$tbc%$yr}
+        tb={$tbc*$xr}
+        ci={($lr+$tb)%$ti}
+        ni={$ci+1}
+        +xalp[$ni]
+        w1[-1] {w#$ni},{h#$ni}
+        rm.
+        wait 625
+    elif {*1,ARROWUP}
+        selection=0
+        tbc-=1
+        tbc={$tbc%$yr}
+        tb={$tbc*$xr}
+        ci={($lr+$tb)%$ti}
+        ni={$ci+1}
+        +xalp[$ni]
+        w1[-1] {w#$ni},{h#$ni}
+        rm.
+        wait 625
+    fi
+    
+    if   {{*2,CTRLLEFT}" || "{*2,CTRLRIGHT}}" && "{{*2,ARROWLEFT}" || "{*2,ARROWRIGHT}}
+        mirror[-1] x
+        +xalp.
+        w2[-1]  {($icx+1)*196},{($icy+1)*196},0,"Tile"
+        rm.
+        optinsert=1
+        wait 100
+    elif {{*2,CTRLLEFT}" || "{*2,CTRLRIGHT}}" && "{{*2,ARROWUP}" || "{*2,ARROWDOWN}}
+        mirror[-1] y
+        +xalp.
+        w2[-1]  {($icx+1)*196},{($icy+1)*196},0,"Tile"
+        rm.
+        optinsert=1
+        wait 100
+    elif {*2,ARROWLEFT}
+        temp_tile_width=$tile_width
+        temp_tile_height=$tile_height
+        temp_icx=$icx
+        temp_icy=$icy
+        icx=$temp_icy
+        icy=$temp_icx
+        rotate[-1] -90
+        +xalp.
+        w2[-1]  {($icx+1)*196},{($icy+1)*196},0,"Tile"
+        rm.
+        optinsert=1
+        tile_width=$temp_tile_height
+        tile_height=$temp_tile_width
+        wait 100
+    elif {*2,ARROWRIGHT}
+        temp_tile_width=$tile_width
+        temp_tile_height=$tile_height
+        temp_icx=$icx
+        temp_icy=$icy
+        icx=$temp_icy
+        icy=$temp_icx
+        rotate[-1] 90
+        +xalp.
+        w2[-1]  {($icx+1)*196},{($icy+1)*196},0,"Tile"
+        rm.
+        optinsert=1
+        tile_width=$temp_tile_height
+        tile_height=$temp_tile_width
+        wait 100
+    fi
+    
+    if $b" && "$x>=0" && "$y>=0" && "!{*,Z}" && "!{*,Q}
+        psx={floor($x/$min_tile)*$min_tile}
+        psy={floor($y/$min_tile)*$min_tile}
+        if !$erasemode&&!$copymode
+            if $psx!=$cx||$psy!=$cy||$optinsert
+                +store[0] undo_image
+                $tile_width,$tile_height,1,{s#0},i(#0,x+$psx,y+$psy)
+                [-2]
+                if $background_mode rv[-2,-1] fi
+                blend[-2,-1] alpha
+                j[0] [-1],$psx,$psy
+                rm.
+                +store[0] current_image
+                $bg
+                $current_image
+                blend[-2,-1] alpha
+                xalp.
+                if !$gridmode w[-1]
+                else
+                    f. !(((x%$min_tile)==0||(y%$min_tile)==0)||(x==(w-1)||y==(h-1)))?i:$gridcol
+                    w[-1]
+                fi
+                rm.
+                optinsert=0
+            fi
+        elif !$copymode
+            +store[0] undo_image
+            $tile_width,$tile_height,1,{s#0}
+            j[0] [-1],$psx,$psy
+            rm.
+            +store[0] current_image
+            $bg
+            $current_image
+            blend[-2,-1] alpha
+            xalp.
+            if !$gridmode w[-1]
+            else
+                f. !(((x%$min_tile)==0||(y%$min_tile)==0)||(x==(w-1)||y==(h-1)))?i:$gridcol
+                w[-1]
+            fi
+            rm.
+        else
+            f[-1] i(#0,$psx+x,$psy+y)
+            +store. tile
+            +xalp.
+            w2[-1]
+            rm.
+            copymode=0
+            erasemode=0
+        fi
+        cx=$psx
+        cy=$psy
+    fi
+    
+    if $b1" && "$x1>=0" && "$y1>=0
+        copymode=0
+        if !$selection selection=1 fi
+        erasemode=0
+        
+        sx={floor($x1/$min_tile)*$min_tile}
+        sy={floor($y1/$min_tile)*$min_tile}
+        f. i(#$ni,$sx+x,$sy+y,z,c)
+        +store. tile
+        +xalp.
+        w2[-1] 
+        rm.
+        
+        +f[-1] (x<=2||x>=(w-3))||(y<=2||y>=(h-3))?255-i:i
+        +j[$ni] [-1],$sx,$sy
+        xalp.
+        w1[-1]
+        rm[-2,-1]
+        if $gridmode
+            if $background_mode w[] {w#0},{h#0},0,"Canvas - Place Tileset (Background Mode) (Gridmode ON)"
+            else  w[] {w#0},{h#0},0,"Canvas - Place Tileset (Gridmode ON)"
+            fi
+        else
+            if $background_mode w[] {w#0},{h#0},0,"Canvas - Place Tileset"
+            else w[] {w#0},{h#0},0,"Canvas - Place Tileset"
+            fi
+        fi
+        optinsert=1
+        start=1
+    fi
+    
+    if {*,D}" || "{*1,D}" || "{*2,D}
+        erasemode+=1
+        erasemode={$erasemode%2}
+        if $erasemode
+            +store. tile
+            f. 0
+            w2[-1]
+        fi
+        wait 400
+    fi
+    
+    if {$b2" && "$x2>=0" && "$y2>=0}
+        erasemode+=1
+        erasemode={$erasemode%2}
+        copymode=0
+        if !$erasemode
+            +store. tile
+            f. 0
+            w2[-1]
+            +xalp[$ni]
+            w1[-1]
+            rm.
+            if $gridmode
+                w[] {w#0},{h#0},0,"Canvas - Eraser Mode (Gridmode ON)"
+            else
+                w[] {w#0},{h#0},0,"Canvas - Eraser Mode"
+            fi
+            optinsert=1
+        fi
+    fi
+    
+    wait
+while {*}" && "!{*,ESC}
+uncommand xalp,xalpa
+w1[] 0
+w2[] 0
+k[0]
+if $6 $obg rv blend alpha fi
 #@cli rep_trsa: eq. to 'rep_technorobbo_strange_attractor' : (+)
 rep_trsa: rep_technorobbo_strange_attractor $*
 #@cli rep_technorobbo_strange_attractor: _algorithm,_density,_scalefactor,_attractor_var_1,_attractor_var_2,_attractor_var_3,_attractor_var_4,_attractor_var_5,_attractor_var_6,_attractor_var_7,_attractor_var_8,_attractor_var_9
@@ -388,7 +1024,7 @@ begin(
         graymode(a,b,c)=a*c1f+b*c2f+c*c3f;
     ,        
         if($4==0,graymode(a,b,c)=a*0.22248840+b*0.71690369+c*0.06060791;,
-        if($4==1,graymode(a,b,c)=a*0.2989+b*0.5870+c*0.1140;,
+        if($4==1,graymode(a,b,c)=a*0.2990+b*0.5870+c*0.1140;,
         if($4==2,graymode(a,b,c)=(max(a,b,c)+min(a,b,c))/2;,
         if($4==3,graymode(a,b,c)=min(a,b,c);,
         if($4==4,graymode(a,b,c)=max(a,b,c);,
@@ -6981,6 +7617,83 @@ u "{$1}"\
 "{$15}"\
 "{$16}"\
 "{$17}"
+#@gui Non-Isometric RPG Tiler (Interactive): fx_rep_rpgtiler_noniso,fx_rep_rpgtiler_noniso_preview
+#@gui :_=note("Launch the interactive non-isometric RPG Tiling toolkit.\n\n<u>Please Read Instruction Below!</u>"),_=separator()
+#@gui :_=note("<b>Interactive Window</b>")
+#@gui :1.Tileset=file()
+#@gui :2.Tile Size=int(32,3,128)
+#@gui :3.Max Selection Increment=int(2,0,8)
+#@gui :4.Interactive Tileset Width=int(16,2,64)
+#@gui :5.Interactive Tileset Height=int(16,2,64)
+#@gui :6.Apply Image Background on Final Image?=bool(0)
+#@gui :7.Alpha to RGB Background Mode=choice(0,"Checkerboard","Colored")
+#@gui :8.9.10.Background Colour=color(0,0,0)
+#@gui :11.Grid Color=float(0,0,255)
+#@gui :12.Trackpad Color=float(255,0,255)
+#@gui :_=separator(),_=note("<b>Preprocessing</b>")
+#@gui :13.Reverse Layers?=bool(0)
+#@gui :_=note("<small>This option is usable for programs that supports editing on two or more layer at once with G'MIC-QT!</small>")
+#@gui :_=separator(),_=note("<b>Preview</b>")
+#@gui :14.Hide Background?=bool(0)
+#@gui :15.Preview Grid and Tracker?=bool(1)
+#@gui :16.Hide Tileset?=bool(0),_=separator()
+#@gui :_=note("\n- <u><b>Instruction</b></u> -\n\n"),_=separator()
+#@gui :_=note("<b>Section 1 - Preview Window</b>"),_=separator()
+#@gui :_=note("Before processing to the interactive window - Test the following conditions:\n\n<b>1. </b>Tileset is correct\n<b>2. </b>Grid fits and is very visible\n<b>3. </b>Tracker is very visible\n\nIf the preview looks good, then proceed to the interactive tool by clicking OK.\n\n<b>Warning</b>Apply will only waste your time!")
+#@gui :_=separator(),_=note("<b>Section 2 - Interactive Windows</b>"),_=separator()
+#@gui :_=note("<b>On All Windows</b>\n\n- Q : Remove/Restore\n- G : Activate Canvas Grid Mode On/Off\n- C : Activate Copy Mode On/Off\n- D : Switch Between Place/Eraser Mode\n- Z : Undo Tile Placement\n- W : Restore All Windows\n\n<b>On Canvas Window</b>\n\n-    F : Activate/Deactivate Background Tile Layering Mode\n- A : Enable/Disable Tracker\n\n<b>On Tileset Window</b>\n\n- CTRL+ARROWKEY : Resize Tile Selection\n- ARROWKEY : Scroll Through Tileset\n\n<b>On Tile Window</b>\n\n- CTRL+ARROWKEY : Resize Tile Selection\n- ARROWKEY : Scroll Through Tileset\n- MOUSE BUTTON : Switch Between Place/Eraser Mode")
+#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2020/4/2</i>.</small>")
+fx_rep_rpgtiler_noniso:
+fileloc="$1"
+if $13 rv fi blend alpha
+i $fileloc
+if $7 rep_rpgtiler_noniso[0] [-1],${2-6},${8-12}
+else  rep_rpgtiler_noniso[0] [-1],${2-6},${11-12}
+fi
+rm.
+fx_rep_rpgtiler_noniso_preview:
+fileloc="$1"
+
+ww={w}
+hh={h}
+
+if $13 rv fi 
+if $14 f 0 fi
+blend alpha
+
+
+if !$16
+    store. bg
+    i $fileloc
+    r. $ww,$hh,100%,100%,0
+    if !$14 $bg rv
+    blend alpha
+    fi
+fi
+
+if $7
+    drgba ${8-10}
+else
+    drgba
+fi
+
+if $15
+    f "
+    begin(
+        psx=floor((w/2)/$2)*$2;
+        psy=floor((h/2)/$2)*$2;
+        border=2;
+        border_left=psx+border;
+        border_right=psx+$2-border;
+        border_up=psy+border;
+        border_down=psy+$2-border;
+        boundx=psx+$2;
+        boundy=psy+$2;
+    );
+    tracker=(x>psx&&x<boundx)&&(y>psy&&y<boundy)?((x<=border_left||x>=border_right)||(y<=border_up||y>=border_down)?$12:i):i;
+    grid=!(((x%$2)==0||(y%$2)==0)||(x==(w-1)||y==(h-1)))?tracker:$11;
+    "
+fi
 ######################
 
 # Local Variables:
