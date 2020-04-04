@@ -377,39 +377,32 @@ afre_orien : check isbool(${1=1})
   e[] "[afre]^_^) orien: Compute orientation of image$? using luminance (D50 "$Y")."
   repeat $! +afre_y50[$>] $1 replace. 0,1 /[$>,-1] done
 
-#@cli afre_conv : [k1],_[k2],_transpose_k2={ 0 | 1 }
-#@cli : Convolve selected images with 1-2 kernels.
-#@cli : Default value: 'transpose_k2=0'.
-afre_conv : check ${is_image_arg\ $1}" && "isbool(${3=0}) skip ${2=0}
+#@cli afre_conv : [kernel]
+#@cli : Convolve selected images with a custom kernel.
+afre_conv : check ${is_image_arg\ $1}
   repeat $! pass$1 0
-    if ${is_image_arg\ $2} pass$2 0 if $3 transpose. kT=" a transposed" fi e[] "[afre]^_^) conv: Convolve image$? using ["${"-pass$1 -1"}"] and"$kT" ["${"-pass$2 -1"}"]."
-      l[$>,-2--1] +f[0] 1 mv. 1 +convolve[1] [2] convolve[4] [3]
-      convolve[0] [2] convolve[0] [3] k[0,4] / endl
-    elif $2&&!${is_image_arg\ $2} error[] "\n[afre]>_<) conv: Parameter must be an image."
-    else e[] "[afre]^_^) conv: Convolve image$? using ["${"-pass$1 -1"}"]."
-      l[$>,-1] +f[0] 1 mv. 1
-      +rows. 50% columns.. 50% +convolve[1] [2],$3 convolve[4] [3],$3
-      convolve[0] [2],$3 convolve[0] [3],$3 k[0,4] / endl
-    fi done
+    e[] "[afre]^_^) conv: Convolve image$? using ["${"-pass$1 -1"}"]."
+    l[$>,-1] +f[0] 1 mv. 1
+    +rows. 50% columns.. 50% +convolve[1] [2] convolve[4] [3]
+    convolve[0] [2] convolve[0] [3] k[0,4] / endl
+  done
 
-#@cli afre_box : radius>=1,_gaussian={ 0 | 1 },_boundary_conditions={ 0=dirichlet | 1=neumann }
+#@cli afre_box : radius>=1,_gaussian={ 0 | 1 }
 #@cli : Blur selected images with a soft box filter.
-#@cli : Default values: 'radius=1', 'gaussian=1' and 'boundary_conditions=1'.
-afre_box : check "${1=1}>=1 && isbool(${2=1}) && isbool(${3=1})"
+#@cli : Default values: 'radius=1' and 'gaussian=1'.
+afre_box : check "${1=1}>=1 && isbool(${2=1})"
   if $2 g="soft box" else g="box" fi w={$1*2+1}
   e[] "[afre]^_^) box: Blur image$? with a "${w}"x"${w}" "$g" filter."
   repeat $! l[$>]
-    . $w,$w f[^0] 1 if $2 gaussian. {100/3}% fi
-    +rows. 50% columns.. 50% +convolve[1] [2],$3 convolve[4] [3],$3
-    convolve[0] [2],$3 convolve[0] [3],$3 k[0,4] /
+    $w,$w f. 1 if $2 gaussian. {100/3}% fi afre_conv.. . rm.
   endl done
 
 #@cli afre_gui0 : radius>=1,_smoothing>=0,1<=_faster<=4
 #@cli : Blur selected images with a custom self-guided filter.
+#@cli : Default values: 'radius=1', 'smoothing=1e-2' and 'faster=1'.\n
 #@cli : - Use orders of magnitude for 'smoothing'.
 #@cli : - Use 'faster' to speed up command at the cost of accuracy.
-#@cli : ~ Based on "K He, J Sun, X Tang. Guided image filtering. TPAMI, 35(6):1397-1409, 2013".
-#@cli : Default values: 'radius=1', 'smoothing=1e-2' and 'faster=1'.
+#@cli : * Based on "K He, J Sun, X Tang. Guided image filtering. TPAMI, 35(6):1397-1409, 2013".
 afre_gui0 : check "${1=1}>=1 && ${2=1e-2}>=0 && ${3=1}>=1 &&
     $3<=4"
   e[] "[afre]^_^) gui0: Blur image$? with a custom self-guided filter using radius=$1, smoothing=$2 and faster=$3."
@@ -423,10 +416,10 @@ afre_gui0 : check "${1=1}>=1 && ${2=1e-2}>=0 && ${3=1}>=1 &&
 
 #@cli afre_gui1 : [guide],radius>=1,_smoothing>=0,1<=_faster<=4
 #@cli : Blur selected images with a custom guided filter.
+#@cli : Default values: 'radius=1', 'smoothing=1e-2' and 'faster=1'.\n
 #@cli : - Use orders of magnitude for 'smoothing'.
 #@cli : - Use 'faster' to speed up command at the cost of accuracy.
-#@cli : ~ Based on "K He, J Sun, X Tang. Guided image filtering. TPAMI, 35(6):1397-1409, 2013".
-#@cli : Default values: 'radius=1', 'smoothing=1e-2' and 'faster=1'.
+#@cli : * Based on "K He, J Sun, X Tang. Guided image filtering. TPAMI, 35(6):1397-1409, 2013".
 afre_gui1 : check ${is_image_arg\ $1}" && ${2=1}>=1 && ${3=1e-2}>=0 && ${4=1}>=1 &&
     $4<=4"
   e[] "[afre]^_^) gui1: Blur image$? with a custom guided filter using guide=["${"-pass$1 -1"}"], radius=$2, smoothing=$3 and faster=$4."
@@ -445,21 +438,21 @@ afre_gui1 : check ${is_image_arg\ $1}" && ${2=1}>=1 && ${3=1e-2}>=0 && ${4=1}>=1
   endl done rm.
   repeat $! *[$>] ${iM$>} done
 
-#@cli afre_gui2 : [k1],[k2],_smoothing>=0,1<=_faster<=4,_transpose_k2={ 0 | 1 }
-#@cli : Convolve selected images with a custom self-guided filter using 2 kernels.
+#@cli afre_gui2 : [kernel],_smoothing>=0,1<=_faster<=4
+#@cli : Convolve selected images with a custom self-guided filter.
+#@cli : Default values: 'smoothing=1e-2' and 'faster=1'.\n
 #@cli : - Use orders of magnitude for 'smoothing'.
 #@cli : - Use 'faster' to speed up command at the cost of accuracy.
-#@cli : ~ Based on "K He, J Sun, X Tang. Guided image filtering. TPAMI, 35(6):1397-1409, 2013".
-#@cli : Default values: 'smoothing=1e-2', 'faster=1' and 'transpose_k2=0'.
-afre_gui2 : check ${is_image_arg\ $1}" && "${is_image_arg\ $2}" && ${3=1e-2}>=0 && ${4=1}>=1 && "isbool(${5=0})" &&
-    $4<=4"
-  e[] "[afre]^_^) gui2: Convolve image$? with a custom self-guided filter using 2 kernels, smoothing=$3, faster=$4 and transpose=$5."
-  repeat $! pass$1 0 pass$2 0 l[$>,-2--1] nm={0,b} iM={0,iM} /[0] $iM
-    +r2dx[0] {100/$4}%,1 +sqr. afre_conv[^0-2] [1],[2],$5 nm I,k1,k2,mI,mII
+#@cli : * Based on "K He, J Sun, X Tang. Guided image filtering. TPAMI, 35(6):1397-1409, 2013".
+afre_gui2 : check ${is_image_arg\ $1}"&& ${2=1e-2}>=0 && ${3=1}>=1 &&
+    $3<=4"
+  e[] "[afre]^_^) gui2: Convolve image$? with a custom self-guided filter using smoothing=$2 and faster=$3."
+  repeat $! pass$1 0 l[$>,-1] nm={0,b} iM={0,iM} /[0] $iM
+    +r2dx[0] {100/$3}%,1 +sqr. afre_conv[^0-1] [1],[2] nm I,k,mI,mII
     +sqr[mI] *. -1 +. [mII] rm[mII] nm. vI
-    ++[vI] {$3*ia+1e-6} /[vI] . rm. nm[vI] a
+    ++[vI] {$2*ia+1e-6} /[vI] . rm. nm[vI] a
     +*[a] [mI] *. -1 +. [mI] rm[mI] nm. b
-    afre_conv[^0-2] [k1],[k2],$5 nm[^0-2] ma,mb r[^0-2] [I],5 *[I] [ma] +[I] [mb] k[I]
+    afre_conv[^0-1] [k1],[k2] nm[^0-1] ma,mb r[^0-1] [I],5 *[I] [ma] +[I] [mb] k[I]
   * $iM nm $nm endl done
 
 
