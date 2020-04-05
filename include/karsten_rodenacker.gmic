@@ -219,20 +219,35 @@ output_pink3d : skip ${2=P5}
 #@cli input_pinktest : file_name
 #@cli : Test file type
 #@cli : returns the first character from the first non comment line in status
-#@cli : P == 80 ! everything else is considered as list
+#@cli : ${} == 'P' == 80 ! everything else is considered as list or non-pnk-file
 input_pinktest : 
   i[0] raw:"$1",uchar s[0] -,10 i=0
-  do u {$i,@0} while {${}==35&&i++<$!}
+  do u {$i,@0} i={$i+1} while {${}==35&&$i<$!}
 	rm
 
-_pink_setorigin : skip "${2=0} ${3=0} ${4=0}" v -
-  i[0] raw:"$1",uchar s[0] +,10
-	i. "$1"
-	ln="\n#origin "{round(w*($2+1)/2)}" "{round(h*($3+1)/2)}
-	if {d>1} ln=${ln}" "{round(d*($4+1)/2)} fi
-	({'$ln'}) l. s x a y endl mv. 1 rm. y x a x
-	o. raw:"$1",uchar v +
+# # _pink_setorigin : skip "${2=0} ${3=0} ${4=0}" v -
+# #   i[0] raw:"$1",uchar s[0] +,10
+# # 	i. "$1"
+# # 	ln="\n#origin "{round(w*($2+1)/2)}" "{round(h*($3+1)/2)}
+# # 	if {d>1} ln=${ln}" "{round(d*($4+1)/2)} fi
+# # 	({'$ln'}) l. s x a y endl mv. 1 rm. y x a x
+# # 	o. raw:"$1",uchar v +
 
+#@cli pink_setorigin : pink_file, _origx(0), _orig_y(0), orig_z(0)
+#@cli : Call of pink routine setorigin to make an image file as structuring element usable
+pink_setorigin : skip "${2=0} ${3=0} ${4=0}" 
+  input_pinktest $1 if ${}!=80 error "Not a pnk file: "$1 fi
+  if ${is_windows} x "setorigin $1 $2 $3 $4"
+	else 
+	  x 0,"which setorigin" 
+		if ${}==0 x "setorigin $1 $2 $3 $4"
+	  else 
+		  x 0,"which pink.setorigin"
+		  if ${}==0 x "pink.setorigin $1 $2 $3 $4"
+ 		  else error "setorigin not found!" fi
+	  fi
+	fi
+ 
 #@cli input_pinklist : file_name, _mode
 #@cli : Read a pink list file
 #@cli : spec. type G from pink.delaunay) at file_name and prepare
