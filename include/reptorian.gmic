@@ -4846,16 +4846,19 @@ rep_sptbwgp: rep_shift_pixel_to_boundary_with_group_pixels $*
 #@cli : Default values: '_position=-1','_axis=1','_influence_factor=1','_threshold=0','_channel_mode='
 rep_shift_pixel_to_boundary_with_group_pixels:
 skip ${1=-1},${2=1},${3=.5},${4=0},${5=}
-
 any_channels=0
 tcr=3
 influence_factor={min(abs($3),1)}
 position={(($1+1)/2)}
-
+if $4>0 m "sptbwgp_filter_nonzero : f i>=$4"
+else    m "sptbwgp_filter_nonzero : f i?1"
+fi
+if $2 m "sptbwgp_create_strip : {w},1,1,1,sum(crop(#-1,x,0,0,0,1,h#-1,1,1))"
+else  m "sptbwgp_create_strip : {h},1,1,1,sum(crop(#-1,0,y,0,0,w#-1,1,1,1))"
+fi
 if   $position<0 position=0
 elif $position>1 position=1
 fi
-
 if narg($5)
     if $5>=0
         tcr+=1
@@ -4863,51 +4866,25 @@ if narg($5)
         any_channels=1
     fi
 fi
-
 if $influence_factor
     repeat $! l[$>]
         if (s==2||s>$tcr)||$any_channels
-        
-            if $2
-                length={w}
-            else
-                length={h}
+            if $2 length={w} else length={h} fi
+            tic
+            +channels {s-1}
+            sptbwgp_filter_nonzero.
+            sptbwgp_create_strip
+            alpinfo={crop(i#-1)}
+            rm[-2,-1]
+            if $2 100%,100%,100%,100%,begin(alpi=[$alpinfo];);if(alpi[x]==h,I#0);
+            else  100%,100%,100%,100%,begin(alpi=[$alpinfo];);if(alpi[y]==w,I#0);
             fi
-            
-            sh. {s-1}
-            f. i<$4?0:i
-            rm.
-
-            u {"
-                const alpchan=s-1;
-                const vs="$length";
-                v=vectorvs(0);
-                if($2
-                    ,for(xx=0,xx<w,xx++,
-                        for(yy=0,yy<h,yy++,
-                            if(i(xx,yy,z,alpchan),v[xx]++);
-                        );
-                    );
-                    ,for(yy=0,yy<h,yy++,
-                        for(xx=0,xx<w,xx++,
-                            if(i(xx,yy,z,alpchan),v[yy]++);
-                        );
-                    );
-                );(v)
-            "}
-
-            alpinfo={[${}]}
-
-            100%,100%,100%,100%,begin(alpi=[$alpinfo];);$2?(alpi[x]==h?i#0):(alpi[y]==w?i#0)
-            
-            sh.. {s-1}
-
             eval ${-math_lib}"            
-                influence_factor="$influence_factor";
-                invert_factor=1-influence_factor;
-                position="$position";
+                const influence_factor="$influence_factor";
+                const invert_factor=1-influence_factor;
+                const position="$position";
+                const alp=s-1;
                 alpi=["$alpinfo"];
-                
                 if($2,
                     for(xx=0,xx<w,xx++,
                         nyy=h-1;
@@ -4917,7 +4894,7 @@ if $influence_factor
                             nyy-=tyy*position;
                             for(yy=h-1,yy>-1,yy--,
                                 if(N,
-                                    if(i(#2,xx,yy),
+                                    if(i(#0,xx,yy,z,alp),
                                         N--;
                                         tnyy=influence_factor*nyy+invert_factor*yy;
                                         if(position==1,I(#1,xx,ceil(tnyy))=I(#0,xx,yy);
@@ -4939,7 +4916,7 @@ if $influence_factor
                             nxx+=txx*position;
                             for(xx=0,xx<w,xx++,
                                 if(N,
-                                    if(i(#2,xx,yy),
+                                    if(i(#0,xx,yy,z,alp),
                                         N--;
                                         tnxx=influence_factor*nxx+invert_factor*xx;
                                         if(position==1,I(#1,floor(tnxx),yy)=I(#0,xx,yy);
@@ -4954,10 +4931,12 @@ if $influence_factor
                     );
                 );
             "
-            rm[0,2]
+            rm..
+            toc
         fi
     endl done
 fi
+uncommand sptbwgp_filter_nonzero,sptbwgp_create_strip
 #@cli rep_sinowaterdist: (eq. to rep_sinusoidal_water_distortion)
 rep_sinowaterdist: rep_sinusoidal_water_distortion $*
 #@cli rep_sinusoidal_distortion: _xbalance>0,_ybalance>0,_scale>=0,_interpolation,_boundary_condition
