@@ -4868,37 +4868,60 @@ if $influence_factor
     repeat $! l[$>]
         if (s==2||s>$tcr)||$any_channels
         
-            ss={s-1}
-            sh $ss f. "i>$4?i:0" rm.
-            {w},{h},1,1,i(#-1,x,y,0,$ss)?1
-            
-            if $2 
-                {w},1,1,1,sum(crop(#-1,x,0,0,0,1,h#-1,1,1)) 
-                {w#-2},{h#-2},1,{$ss+1},if(i(#-1,x,0,0,0)==h#0,i(#0))
-            else  
-                1,{h},1,1,sum(crop(#-1,0,y,0,0,w#-1,1,1,1)) 
-                {w#-2},{h#-2},1,{$ss+1},if(i(#-1,0,y,0,0)==w#0,i(#0))
+            if $2
+                length={w}
+            else
+                length={h}
             fi
+            
+            sh. {s-1}
+            f. i<$4?0:i
+            rm.
+
+            u {"
+                const alpchan=s-1;
+                const vs="$length";
+                v=vectorvs(0);
+                if($2
+                    ,for(xx=0,xx<w,xx++,
+                        for(yy=0,yy<h,yy++,
+                            if(i(xx,yy,z,alpchan),v[xx]++);
+                        );
+                    );
+                    ,for(yy=0,yy<h,yy++,
+                        for(xx=0,xx<w,xx++,
+                            if(i(xx,yy,z,alpchan),v[yy]++);
+                        );
+                    );
+                );(v)
+            "}
+
+            alpinfo={[${}]}
+
+            100%,100%,100%,100%,begin(alpi=[$alpinfo];);$2?(alpi[x]==h?i#0):(alpi[y]==w?i#0)
+            
+            sh.. {s-1}
 
             eval ${-math_lib}"            
                 influence_factor="$influence_factor";
                 invert_factor=1-influence_factor;
                 position="$position";
+                alpi=["$alpinfo"];
                 
                 if($2,
-                    for(xx=0,xx<w#-1,xx++,
-                        nyy=h#-1-1;
-                        if(i(#-2,xx,0)&&i(#-2,xx,0)<h#-1,
-                            N=i(#-2,xx,0);
-                            tyy=h#-1-N;
+                    for(xx=0,xx<w,xx++,
+                        nyy=h-1;
+                        if(alpi[xx]&&alpi[xx]<h,
+                            N=alpi[xx];
+                            tyy=h-N;
                             nyy-=tyy*position;
-                            for(yy=h#-1-1,yy>-1,yy--,
+                            for(yy=h-1,yy>-1,yy--,
                                 if(N,
-                                    if(i(#-3,xx,yy),
+                                    if(i(#2,xx,yy),
                                         N--;
                                         tnyy=influence_factor*nyy+invert_factor*yy;
-                                        if(position==1,I(#-1,xx,ceil(tnyy))=I(#-4,xx,yy);
-                                                      ,I(#-1,xx,floor(tnyy))=I(#-4,xx,yy);
+                                        if(position==1,I(#1,xx,ceil(tnyy))=I(#0,xx,yy);
+                                                      ,I(#1,xx,floor(tnyy))=I(#0,xx,yy);
                                         );
                                         nyy--;
                                     );
@@ -4908,19 +4931,19 @@ if $influence_factor
                         );
                     );
                 ,
-                    for(yy=0,yy<h#-1,yy++,
+                    for(yy=0,yy<h,yy++,
                         nxx=0;
-                        if(i(#-2,0,yy)&&i(#-2,0,yy)<w#-1,
-                            N=i(#-2,0,yy);
-                            txx=w#-1-N;
+                        if(alpi[yy]&&alpi[yy]<w,
+                            N=alpi[yy];
+                            txx=w-N;
                             nxx+=txx*position;
-                            for(xx=0,xx<w#-1,xx++,
+                            for(xx=0,xx<w,xx++,
                                 if(N,
-                                    if(i(#-3,xx,yy),
+                                    if(i(#2,xx,yy),
                                         N--;
                                         tnxx=influence_factor*nxx+invert_factor*xx;
-                                        if(position==1,I(#-1,floor(tnxx),yy)=I(#-4,xx,yy);
-                                                      ,I(#-1,ceil(tnxx),yy)=I(#-4,xx,yy);
+                                        if(position==1,I(#1,floor(tnxx),yy)=I(#0,xx,yy);
+                                                      ,I(#1,ceil(tnxx),yy)=I(#0,xx,yy);
                                         );
                                         nxx++;
                                     );
@@ -4931,7 +4954,7 @@ if $influence_factor
                     );
                 );
             "
-            k.
+            rm[0,2]
         fi
     endl done
 fi
