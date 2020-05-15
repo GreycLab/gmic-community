@@ -44,6 +44,46 @@
 #
 #-------------------------------
 
+#@cli rep_lpasc_ordith: 'eq to. rep_loupasc_ordered_dithered' : (+)
+rep_lpasc_ordith: rep_loupasc_ordered_dithered $*
+#@cli rep_loupasc_ordered_dithered : _dither_method={ 0=checkerboard | 1=dispersed | 2=arcade | 3=ordered | 4=lines | 5=custom | 6=random }, _palette={ 0=Binary | 1= EGA | 2= Web-safe | 3=12-bit }
+#@cli: Color reduction with dithering using algorithm provided by Pascal Ollive.
+rep_loupasc_ordered_dithered:
+f "begin(
+    color_count=[2,4,6,16];
+    custom_matrix=[34,14,3,22,6,27,21,8,26,13,30,1,29,18,33,5,20,12,9,0,19,28,10,32,16,31,7,17,2,25,4,24,15,35,23,11];
+    line_matrix=[8,9,6,7,1,0,3,2,4,5,9,8,2,3,0,1,4,5,7,6,1,0,3,2,4,5,8,9,6,7,0,1,4,5,7,6,9,8,2,3,4,5,8,9,6,7,1,0,3,2,7,6,9,8,2,3,0,1,4,5,6,7,1,0,3,2,4,5,8,9,2,3,0,1,4,5,7,6,9,8,3,2,4,5,8,9,6,7,1,0,4,5,7,6,9,8,2,3,0,1];
+    mat_rev(n)=(
+        v = (n & 0x55555555) << 1 | (n >> 1) & 0x55555555;
+        v = (v & 0x33333333) << 2 | (v >> 2) & 0x33333333;
+        v = (v & 0x0f0f0f0f) << 4 | (v >> 4) & 0x0f0f0f0f;
+        v = (v << 24) | ((v & 0xff00) << 8) | ((v >> 8) & 0xff00) | (v >> 24);
+    v;
+    );
+    orddith(ipx,cc,coefcount,ditherpattern)=int((((cc-1)*coefcount+1)*ipx+255*ditherpattern-1)/(255*coefcount));
+    randdit(ipx,cc,nx,ny)=(
+        sd=(mat_rev(ny)>>23)<<22|mat_rev(nx)>>10;
+        ditp=(48271*sd)%2147483647;
+        int(((cc - 1) * ipx + (ditp / 8421506)) / 255);
+    );
+    if($1==0,appdit(ipx,cc,nx,ny)=orddith(ipx,cc,2,xor(nx,ny)&0x1);,
+    if($1==1,appdit(ipx,cc,nx,ny)=orddith(ipx,cc,4,((xor(nx,ny)&0x1)<<1)|(ny&0x1)),
+    if($1==2,appdit(ipx,cc,nx,ny)=orddith(ipx,cc,8,2+(ny&0x3));,
+    if($1==3,appdit(ipx,cc,nx,ny)=orddith(ipx,cc,5,line_matrix[20*(ny%5)+2*(nx%5)]>>1);,
+    if($1==4,appdit(ipx,cc,nx,ny)=orddith(ipx,cc,10,line_matrix[10*(ny%10)+(nx%10)]);,
+    if($1==5,appdit(ipx,cc,nx,ny)=orddith(ipx,cc,36,custom_matrix[6*(ny%6)+(nx%6)]);,
+             appdit(ipx,cc,nx,ny)=randdit(ipx,cc,nx,ny);
+    );
+    );
+    );
+    );
+    );
+    );
+    cc=color_count[$2];
+    cs=255/(cc-1);
+);
+appdit(i,cc,x,y)*cs;
+"
 #@cli rep_sptbwgp_recpoltrans: eq. to 'rep_shift_pixel_to_boundary_with_group_pixels_with_rectangular_polar_transformation' : (+)
 rep_sptbwgp_recpoltrans: rep_shift_pixel_to_boundary_with_group_pixels_with_rectangular_polar_transformation $*
 #@cli rep_shift_pixel_to_boundary_with_group_pixels_with_rectangular_polar_transformation: -1<=_fxy_position<=1,0<=_influence_factor<=1, _threshold>=0,-1>=_ptxy_xpos<=1,-1>=_ptxy_ypos<=1,'_channel_mode='
@@ -8360,6 +8400,24 @@ py={(($5-50)*-2)/100}
 rep_sptbwgp_recpoltrans $position,$influence,$threshold,$px,$py
 gui_rep_sptbwgp_recpoltrans_preview:
 gui_split_preview "gui_rep_sptbwgp_recpoltrans ${1-5}",${-3--1}
+#@gui Ordered Dithering: fx_rep_loupasc_ordered_dithered,fx_rep_loupasc_ordered_dithered_preview
+#@gui :Dithering Method=choice(4,"Checkerboard","Dispersed","Arcade","Ordered","Lines","Matrix","Random")
+#@gui :Color Count=choice(3,"2","4","6","16")
+#@gui :Use Luminosity?=bool(0)
+#@gui :_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse")
+#@gui :Preview Split=point(50,50,0,0,200,200,200,0,10)_0
+#@gui :_=separator(),_=note("<small>Dithering algorithm developed by Pascal Ollive. - <a href="https://forums.getpaint.net/topic/116414-new-developer-new-plugin-ordered-dither/?tab=comments#comment-571305">Source Code Link</a></small>")
+#@gui :_=separator(), note=note("<small>Author: Reptorian. Latest Update: <i>2020/5/15</i>.</small>")
+fx_rep_loupasc_ordered_dithered: 
+repeat $! l[$>]
+    if $3
+        to_graya sh. 0 rep_loupasc_ordered_dithered. $1,$2 rm.
+    else
+        sh. 0,2 rep_loupasc_ordered_dithered. $1,$2 rm.
+    fi
+endl done
+fx_rep_loupasc_ordered_dithered_preview:
+gui_split_preview "fx_rep_loupasc_ordered_dithered ${1-3}",${-3--1}
 ######################
 
 # Local Variables:
