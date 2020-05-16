@@ -161,8 +161,8 @@ elif $include_tile_img pass$6 0 rep_tiler_nonisometric[0] ${1-5},[-1],${7--1} rm
 else rep_tiler_nonisometric $*
 fi
 #@cli rep_tiler_nonisometric: { filename | [tileset] },__min_tile>=3,increment>=0,_tileset_iw_width>=1,_tileset_ih_width>=1,{ _filename | [placed_tiles] },_preserve_bgout={ 0=eliminate_bg | 1=preserve_bg },_drgba_r>=0,_drgba_g>=0,_drgba_b>=0,_gridcol>=0,_trackpadcol>=0 
-#@cli : Launch the interactive non-isometric RPG Tiling toolkit. Mandatory variables are the first 3 ones!
-#@cli : More info: The interactive RPG Tiling toolkit is a near final version. Final version will have tiledata import and export. Perhaps with a master developer editor to make overworld art.\n
+#@cli : Launch the interactive non-isometric tiling toolkit. Mandatory variables are the first 3 ones!
+#@cli : More info: The interactive non-isometriciling toolkit is a near final version. Final version will have tiledata import and export. Perhaps with a master developer editor to make overworld art.\n
 #@cli : (eq. to 'rep_tiler_n').\n
 #@cli : Note: This is meant to enable artists to make artwork based on non-isometric RPG games or even world. It is not meant to be a tool to aid into making RPG games. If you want that, then you need to look into other solutions. Of course, there might be the off-chance that this tool is suitable for you.\n 
 #@cli : '{ filename | [tileset] }' can be either location of the tileset in text form, or as a image argument. If using image argument, you must do rep_tiler_nonisometric[target] [tile] to make it work.
@@ -177,7 +177,8 @@ fi
 #@cli : '_dbrga_b' is the color of transparent background. If a value is assigned to this, then transparent areas are replaced with colored background instead of a checkerboard.
 #@cli : '_gridcol' defines the color of grid within interactive window. Only grayscale value.
 #@cli : '_trackpadcol' defines the color of tracker pad within interactive window. Only grayscale value.\n
-#@cli : Default values: '_tileset_iw_width=16','_tileset_ih_width=16','_filename=""','_preserve_bgout=0','_drgba_r=','_drgba_g=','_drgba_b=','_gridcol=0','_trackpadcol=0'
+#@cli : Default values: '_tileset_iw_width=16','_tileset_ih_width=16','_filename=""','_preserve_bgout=0','_drgba_r=','_drgba_g=','_drgba_b=','_gridcol=0','_trackpadcol=0'\n
+#@cli : Author: Reptorian
 #@cli : $ 640,480,1,4 rep_tileset_n generic_platform rep_tiler_n[0] [-1],32,3,16,16,,0,,,,0,0
 #@cli : $ 640,480,1,4 rep_tiler_n tile.png,16,1
 rep_tiler_nonisometric:
@@ -246,7 +247,6 @@ if $!==1
     fi
     +store[0] current_image
     +store[0] undo_image
-    e[] "\nEntering non-isometric RPG Tiling Tool!"
 else
     error "$!==1=F"
 fi
@@ -294,6 +294,7 @@ e[] "\n Instruction on how to work with interactive windows.\n
  \     * J: Symmetry Line to Center\n
  \     * ARROWKEY: Move Symmetry Line\n\n
  \ - On Tileset window - \n
+ \   * G: Activate Tileset Grid Mode On/Off\n 
  \   * CTRL+ARROWKEY: Resize Tile Selection Box\n
  \   * ARROWKEY: Scroll through tileset\n\n
  \ - On Tile window - \n
@@ -404,6 +405,7 @@ mode=0
     canvas_tracker=1
 
     tileset_gridmode=0
+    temp_tileset_gridmode=0
 
     select_from_tileset=0
 
@@ -794,6 +796,8 @@ do
             optinsert=1
         fi
         
+        if {*1,G} tileset_gridmode+=1 tileset_gridmode={$tileset_gridmode%2} wait 200 temp_tileset_gridmode=1 fi
+        
         x,y,b,ww,wh={*,x,y,b,w,h}
         x1,y1,b1,ww1,wh1={*1,x,y,b,w,h}
         x2,y2,b2,ww2,wh2={*2,x,y,b,w,h}
@@ -927,6 +931,7 @@ do
             
             if $resize_tile_from_tileset
                     r. $tile_width,$tile_height,100%,100%,0
+                    tsx={min($tsx,$tsw-($icx*$__min_tile))} tsy={min($tsy,$tsh-($icy*$__min_tile))}
                     pass2tile. [$ni],$tsx,$tsy
                     +out2display. , w2[-1] {$d2rw+($d2rw*$icx)},{$d2rw+($d2rw*$icy)} rm.
                     if $tileset_gridmode
@@ -968,6 +973,8 @@ do
                     +out2display. , w2[-1] {$d2rw+($d2rw*$icx)},{$d2rw+($d2rw*$icy)} rm. 
                     cutcopymode=0
                     optinsert=1
+                    temp_tileset_gridmode=1
+                    select_from_tileset=0
                 else
                     +store[0] undo_image
                     cutcopymode=0
@@ -1007,6 +1014,25 @@ do
             w1[-1] rm.
             
             wait 50
+        fi
+        
+        if $temp_tileset_gridmode
+            if $select_from_tileset
+                if $tileset_gridmode
+                    +out2display[$ni] 0,$tsx,$tsy,$tile_width,$tile_height,$trackpadcol,$gridcol
+                else
+                    +out2display[$ni] 0,$tsx,$tsy,$tile_width,$tile_height,$trackpadcol
+                fi
+                w1[-1] rm.
+            else
+                if $tileset_gridmode
+                    +out2display[$ni] 0,0,0,1,1,,$gridcol
+                else
+                    +out2display[$ni] 0,0,0,1,1
+                fi
+                w1[-1] rm.
+            fi
+            temp_tileset_gridmode=0
         fi
         
         if !$start
@@ -8279,7 +8305,7 @@ u "{$1}"\
 #@gui :_=note("<b>Section 1 - Preview Window</b>"),_=separator()
 #@gui :_=note("Before processing to the interactive window - Test the following conditions:\n\n<b>1. </b>Tileset is correct\n<b>2. </b>Grid fits and is very visible\n<b>3. </b>Tracker is very visible\n\nIf the preview looks good, then proceed to the interactive tool by clicking OK.\n\n<b>Warning: </b>Apply will only waste your time!")
 #@gui :_=separator(),_=note("<b>Section 2 - Interactive Windows</b>"),_=separator()
-#@gui :_=note("Press Escape on Canvas Window to exit!\n\n<u>Main Editing Mode</u>\n\n<b>On Any Windows</b>\n\n- D: Switch between Place/Eraser Mode\n- R: Activate Replace Mode\n- W: Restore All Windows\n- SPACEBAR: Switch Editing Mode\n\n<b>On Canvas Window</b>\n\n- C: Copy Mode On/Off\n- X: Cut Mode On/Off\n- Z: Undo Canvas Change\n- F: Activate/Deactivate Background Tile Layering Mode\n- G: Grid Mode On/Off\n- Q: Remove/Restore Background\n- A: Tracker On/Off\n- S: Symmetry Mode On/Off\n\n=== On Canvas[Symmetry Mode] ===\n--- B: Switch Axis in Symmetry Mode\n--- M: Switch Axis in Periodic/Mirror Mode\n--- J: Symmetry Line to Center\n--- ARROWKEY: Move Symmetry Line\n\n<b>On Tileset Window</b>\n\n- CTRL+ARROWKEY : Resize Tile Selection\n- ARROWKEY : Scroll Through Tileset\n\n<b>On Tile Window</b>\n\n- CTRL+ARROWKEY : Resize Tile Selection\n- ARROWKEY : Scroll Through Tileset\n- MOUSE BUTTON : Switch Between Place/Eraser Mode\n\n<u>Row/Column Editing Mode</u>\n\n<b>On Any Windows</b>\n\n- W: Restore All Windows\n- SPACEBAR: Switch Editing Mode\n\n<b>On Canvas Window</b>\n\n- Z: Undo Canvas Change\n- T: Enable Row/Column Shifting Mode\n- E: Place Mode On/Off\n- G: Grid Mode On/Off\n- Q: Remove/Restore Background\n- A: Tracker On/Off\n- S: Symmetrical Selection Mode\n\n=== On Canvas[Selection] ===\n--- C: Keep Selected Row/Column\n--- X: Delete Selected Row/Column\n--- D: Select/Deselect\n--- R: Clear Selection\n--- V: Selection Box On/Off\n--- Mouse Button: Select/Deselect\n--- ARROWKEY: Switch between Row/Column Selection\n\n=== On Canvas[Symmetry Mode-Symmetry] ===\n--- J: Symmetry Line to Center\n\n=== On Canvas[Row/Column Shifting Mode] ===\n--- Mouse Button[1st Click]: Activate Shifting\n--- Mouse Button[2nd Click]: Finalize Shifting\n--- ARROWKEY: Switch between Row/Column Selection\n\n=== On Canvas[Place Mode] ===\n--- B: Switch between Replacement/Placement Mode\n--- F: Place Row/Column as Foreground/Background\n--- Mouse Button: Place Row/Column\n\n<b>On Tile Window</b>\n\n- ARROWKEY: Flip Row/Column")
+#@gui :_=note("Press Escape on Canvas Window to exit!\n\n<u>Main Editing Mode</u>\n\n<b>On Any Windows</b>\n\n- D: Switch between Place/Eraser Mode\n- R: Activate Replace Mode\n- W: Restore All Windows\n- SPACEBAR: Switch Editing Mode\n\n<b>On Canvas Window</b>\n\n- C: Copy Mode On/Off\n- X: Cut Mode On/Off\n- Z: Undo Canvas Change\n- F: Activate/Deactivate Background Tile Layering Mode\n- G: Grid Mode On/Off\n- Q: Remove/Restore Background\n- A: Tracker On/Off\n- S: Symmetry Mode On/Off\n\n=== On Canvas[Symmetry Mode] ===\n--- B: Switch Axis in Symmetry Mode\n--- M: Switch Axis in Periodic/Mirror Mode\n--- J: Symmetry Line to Center\n--- ARROWKEY: Move Symmetry Line\n\n<b>On Tileset Window</b>\n\n- G: Grid Mode On/Off\nCTRL+ARROWKEY : Resize Tile Selection\n- ARROWKEY : Scroll Through Tileset\n\n<b>On Tile Window</b>\n\n- CTRL+ARROWKEY : Resize Tile Selection\n- ARROWKEY : Scroll Through Tileset\n- MOUSE BUTTON : Switch Between Place/Eraser Mode\n\n<u>Row/Column Editing Mode</u>\n\n<b>On Any Windows</b>\n\n- W: Restore All Windows\n- SPACEBAR: Switch Editing Mode\n\n<b>On Canvas Window</b>\n\n- Z: Undo Canvas Change\n- T: Enable Row/Column Shifting Mode\n- E: Place Mode On/Off\n- G: Grid Mode On/Off\n- Q: Remove/Restore Background\n- A: Tracker On/Off\n- S: Symmetrical Selection Mode\n\n=== On Canvas[Selection] ===\n--- C: Keep Selected Row/Column\n--- X: Delete Selected Row/Column\n--- D: Select/Deselect\n--- R: Clear Selection\n--- V: Selection Box On/Off\n--- Mouse Button: Select/Deselect\n--- ARROWKEY: Switch between Row/Column Selection\n\n=== On Canvas[Symmetry Mode-Symmetry] ===\n--- J: Symmetry Line to Center\n\n=== On Canvas[Row/Column Shifting Mode] ===\n--- Mouse Button[1st Click]: Activate Shifting\n--- Mouse Button[2nd Click]: Finalize Shifting\n--- ARROWKEY: Switch between Row/Column Selection\n\n=== On Canvas[Place Mode] ===\n--- B: Switch between Replacement/Placement Mode\n--- F: Place Row/Column as Foreground/Background\n--- Mouse Button: Place Row/Column\n\n<b>On Tile Window</b>\n\n- ARROWKEY: Flip Row/Column")
 #@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2020/4/28</i>.</small>")
 fx_rep_rpgtiler_noniso:
 skip ${3=""}
