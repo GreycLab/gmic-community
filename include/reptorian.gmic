@@ -47,35 +47,40 @@
 #@cli rep_kodl: eq. to 'rep_keep_original_dimension_and_or_layer' : (+)
 rep_kodl:
 _gmic_s="$?" v + _rep_keep_original_dimension_and_or_layer $"*"
-#@cli rep_keep_original_dimension_and_or_layer: "command",_mode={ 0=mode_0 | 1=mode_1 | 2=mode_2},_interpolation, _boundary_conditions, _ax, _ay, _az
+#@cli rep_keep_original_dimension_and_or_layer: "command",_mode={ 0=old_dim | 1=old_dim_and_layer | 2=new_dim_and_layer},_interpolation, _boundary_conditions, _ax, _ay, _az
 #@cli : Apply command to image(s), then have the option to preserve dimensions and/or resized layer.
 #@cli : (eq. to 'rep_kodl').\n
-#@cli : Default values: _preserve_resized_layer=0,_interpolation=0,_boundary_conditions=3,_ax=0.5,_ay=0.5,_az=0
+#@cli : Default values: _preserve_resized_layer=0,_interpolation=0,_boundary_conditions=3,_ax=0.5,_ay=0.5,_az=0\n
+#@cli : Author: Reptorian.
+
 rep_keep_original_dimension_and_or_layer:
 _gmic_s="$?" v + _$0 $"*"
 _rep_keep_original_dimension_and_or_layer:
 skip ${2=0},${3=0},${4=3},${5=.5},${6=.5},${7=0}
-image_count={$!*3}
-imgs={$!}
-eval "
-const lc="$image_count";
-dimension_list=vectorlc(0);
-for(imgc=0,imgc<"$imgs",imgc++,
-    dimension_list[3*imgc+0]=w#imgc;
-    dimension_list[3*imgc+1]=h#imgc;
-    dimension_list[3*imgc+2]=d#imgc;
-);
-(dimension_list)"
-dimensions_info=[${}]
+if $2==0||$2==1
+    image_count={$!*3}
+    imgs={$!}
+    eval "
+    const lc="$image_count";
+    dimension_list=vectorlc(0);
+    for(imgc=0,imgc<"$imgs",imgc++,
+        dimension_list[3*imgc+0]=w#imgc;
+        dimension_list[3*imgc+1]=h#imgc;
+        dimension_list[3*imgc+2]=d#imgc;
+    );
+    (dimension_list)"
+    dimensions_info=[${}]
+fi
 m "apply_filter:$1" 
 if abs($2)>=0&&abs($2)<=2
     repeat $! l[$<]
         if abs($2)>=1
             +apply_filter
-            r.. {w#-1},{h#-1},{d#-1},100%,${3-7}
+            r[0] {w#-1},{h#-1},{d#-1},100%,${3-7}
         fi
-        if abs($2)==2||!$2
-            r[0] {($dimensions_info)[$<*3+0]},{($dimensions_info)[$<*3+1]},{($dimensions_info)[$<*3+2]},100%,${3-7}
+        if abs($2)==1||!$2
+            if !$2 apply_filter fi
+            r {($dimensions_info)[$<*3+0]},{($dimensions_info)[$<*3+1]},{($dimensions_info)[$<*3+2]},100%,${3-7}
         fi
     endl done
 fi
@@ -5791,8 +5796,8 @@ r {w%2==0?w+1:w},{h%2==0?h+1:h},1,1,0
 f "begin(altern=0;const ang=pi*($13/180);const sd=max(w,h)/min(w,h);
     if($1>41,ff=$1-38;,ff=abs($1)-1;);
     if($1<-1,
-        vxf(a,b)=(vec=[${14--1}];vec[altern*2]);
-        vyf(a,b)=(vec=[${14--1}];vec[altern*2+1]);,
+        vxf(a,b)=([${14--1}])[altern*2];
+        vyf(a,b)=([${14--1}])[altern*2+1];,
     if($1==-1,
         vxf(a,b)=$14;
         vyf(a,b)=$15;,
