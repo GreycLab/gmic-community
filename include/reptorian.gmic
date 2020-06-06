@@ -52,7 +52,6 @@ _gmic_s="$?" v + _rep_keep_original_dimension_and_or_layer $"*"
 #@cli : (eq. to 'rep_kodl').\n
 #@cli : Default values: _preserve_resized_layer=0,_interpolation=0,_boundary_conditions=3,_ax=0.5,_ay=0.5,_az=0\n
 #@cli : Author: Reptorian.
-
 rep_keep_original_dimension_and_or_layer:
 _gmic_s="$?" v + _$0 $"*"
 _rep_keep_original_dimension_and_or_layer:
@@ -5035,15 +5034,6 @@ any_channels=0
 tcr=3
 influence_factor={min(abs($3),1)}
 position={(($1+1)/2)}
-if $4>0 m "sptbwgp_remove_alpha_threshold : f i>=$4?i"
-else    m "sptbwgp_remove_alpha_threshold : f i?i"
-fi
-if $4>0 m "sptbwgp_filter_nonzero : 100%,100%,100%,1,i(#0,x,y,z,s#-1-1)>=$4?1"
-else    m "sptbwgp_filter_nonzero : 100%,100%,100%,1,i(#0,x,y,z,s#-1-1)?1"
-fi
-if $2 m "sptbwgp_create_strip : {w},1,1,1,sum(crop(#-1,x,0,0,0,1,h#-1,1,1))"
-else  m "sptbwgp_create_strip : {h},1,1,1,sum(crop(#-1,0,x,0,0,w#-1,1,1,1))"
-fi
 if   $position<0 position=0
 elif $position>1 position=1
 fi
@@ -5058,9 +5048,16 @@ if $influence_factor
     repeat $! l[$>]
         if (s==2||s>$tcr)||$any_channels
             tic
-            sh {s-1} sptbwgp_remove_alpha_threshold. rm.
-            sptbwgp_filter_nonzero.
-            sptbwgp_create_strip
+            sh {s-1}
+            if $2
+                if $4 {w},1,1,1,val=[crop(#-1,x,0,0,0,1,h#-1,1,1)];sum(val>=$4)
+                else  {w},1,1,1,val=[crop(#-1,x,0,0,0,1,h#-1,1,1)];sum(val>0)
+                fi
+            else
+                if $4 {h},1,1,1,val=[crop(#-1,0,x,0,0,w#-1,1,1,1)];sum(val>=$4)
+                else  {h},1,1,1,val=[crop(#-1,0,x,0,0,w#-1,1,1,1)];sum(val>0)
+                fi
+            fi
             alpinfo={crop(i#-1)}
             rm[-2,-1]
             if $2 100%,100%,100%,100%,begin(alpi=[$alpinfo];);if(alpi[x]==h,I#0);
@@ -5072,6 +5069,9 @@ if $influence_factor
                 const position="$position";
                 const alp=s-1;
                 alpi=["$alpinfo"];
+                if($4,alpc(a)=(a>=$4?1);
+                     ,alpc(a)=a;
+                );
                 if($2
                 ,
                     if(position==1
@@ -5093,7 +5093,7 @@ if $influence_factor
                             nyy-=tyy*position;
                             for(yy=h-1,yy>-1,yy--,
                                 if(N,
-                                    if(i(#0,xx,yy,z,alp),
+                                    if(alpc(i(#0,xx,yy,z,alp)),
                                         N--;
                                         tnyy=influence_factor*nyy+invert_factor*yy;
                                         I(#1,xx,func(tnyy))=I(#0,xx,yy);
@@ -5113,7 +5113,7 @@ if $influence_factor
                             nxx+=txx*position;
                             for(xx=0,xx<w,xx++,
                                 if(N,
-                                    if(i(#0,xx,yy,z,alp),
+                                    if(alpc(i(#0,xx,yy,z,alp)),
                                         N--;
                                         tnxx=influence_factor*nxx+invert_factor*xx;
                                         I(#1,func(tnxx),yy)=I(#0,xx,yy);
@@ -5131,7 +5131,6 @@ if $influence_factor
         fi
     endl done
 fi
-uncommand sptbwgp_filter_nonzero,sptbwgp_create_strip,sptbwgp_remove_alpha_threshold
 #@cli rep_sinowaterdist: (eq. to rep_sinusoidal_water_distortion)
 rep_sinowaterdist: rep_sinusoidal_water_distortion $*
 #@cli rep_sinusoidal_distortion: _xbalance>0,_ybalance>0,_scale>=0,_interpolation,_boundary_condition
@@ -5632,7 +5631,6 @@ fi
 #@cli : $ sp tiger rep_form_pixel star,35,35,,,,,,8
 #@cli : $ sp lena rep_form_pixel cupid,35,35,,24,1
 rep_form_pixel:
-skip ${9=0}
 sid="$1"
 isnum_sid={isnum($sid)}
 isint_sid={isint($sid)}
@@ -5641,12 +5639,6 @@ if $isnis if $sid>=0 sid=${"-arg "1+$sid"","australia,barbedwire,circle,crosshai
 isnum_sid={isnum($sid)}
 isint_sid={isint($sid)}
 isnis={$isnum_sid&&$isint_sid}
-if $#>=9
-    if $9
-    {$!},1,1,2,[w#x,h#x]
-    store. original_dimension
-    fi
-fi
 +store[0] __shape_reference
 if $isnis
     r[0] {ceil(w/abs($2))*abs($2)},{ceil(h/abs($3))*abs($3)},100%,100%,0,0,.5,.5
@@ -5661,17 +5653,8 @@ if $isnis
 else
     apply_parallel "_rep_form_pixel $*"
 fi
-if $#>=9
-    if $9
-    $original_dimension
-    repeat $!-1
-    r[$>] {i(#-1,$>,0,0,0)},{i(#-1,$>,0,0,1)},100%,100%,0,0,.5,.5
-    done
-    rm.
-    fi
-fi
 _rep_form_pixel:
-skip ${4=},${5=},${6=},${7=},${8=},${9=}
+skip ${4=},${5=},${6=},${7=},${8=}
 if narg($4) form_ratio={abs($4)} else form_ratio=1 fi
 if narg($5) ang=$5 else ang=0 fi
 if narg($6) mi={abs($6)} else mi=0 fi
@@ -5695,7 +5678,7 @@ isint_sid={isint($sid)}
 isnis={$isnum_sid&&$isint_sid}
 l[0]
     if !$isnis
-        if $#>9 shape_$sid {max($tw,$th)*$sub},${10--1}
+        if $#>8 shape_$sid {max($tw,$th)*$sub},${9--1}
         else shape_$sid {max($tw,$th)*$sub}
         fi
         rv
