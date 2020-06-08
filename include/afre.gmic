@@ -84,11 +84,11 @@ fx_darken_sky_preview :
 afre_edge : check "${2=1}>=1 && ${3=1}>=0.5 && ${4=1}>=0.5 && ${5=1}>=0.5 &&
     $2<=10 && $3<=4 && $4<=4 && $5<=4"
   e[] "[afre]^_^) edge: Compute edge of image$? using method=$1, thinning=$2, recovery=$3, brightness=$4 and details=$5."
-  v - repeat $! l[$>] if $1 m "method : afre_sdpatch 1" else m "method : afre_gnorm" fi
+  repeat $! l[$>] if $1 m "method : afre_sdpatch 1" else m "method : afre_gnorm" fi
     method im,ic,iM={[im,ic,iM]} ^ {1/$5} n $im,$iM
     repeat $2 +afre_box 1 method. r={[im,iM]} ^. $3 n. $r - done
     c $ic,$iM ^ {1/$4} n 0,$iM
-  endl done v +
+  endl done um method
 
 afre_edge_preview :
   afre_edge $*
@@ -109,9 +109,9 @@ afre_edge_preview :
 afre_cleantext : check "${1=8}>=0 && ${2=1}>=0.2 && ${3=80}>=0 && ${4=95}>=0 &&
     $1<=10 && $2<=1 && $3<=100 && $4<=100"
   e[] "[afre]^_^) cleantext: Clean scanned text using clean=$1, range=$2, black=$3 and white=$4."
-  v - c={(11-$1)*2+1} +dilate $c erode. $c - n 0,255
+  c={(11-$1)*2+1} +dilate $c erode. $c - n 0,255
   retinex , norm n 0,1 f 1-gauss(i,$2)
-  if $3!=$4 c $3%,$4% else c $3%,{$4+.5}% fi n 0,255 round v +
+  if $3!=$4 c $3%,$4% else c $3%,{$4+.5}% fi n 0,255 round
 
 afre_cleantext_preview :
   afre_cleantext $*
@@ -136,11 +136,11 @@ afre_cleantext_preview :
 afre_vigrect : check "${1=50}>=1 && ${2=75}>=-500 && ${3=10}>=1 && ${4=50}>=0 && ${5=50}>=0 &&
     $1<=100 && $2<=500 && $3<=50 && $4<=100 && $5<=100"
   e[] "[afre]^_^) vigrect: Add rectangular vignette of image$? using size=$1, strength=$2, blur=$3, position_x=$4 and position_y=$5."
-  v - repeat $! l[$>] iM={iM} min={min(w,h)} s={$min/100*(50.5-$1/2)}
+  repeat $! l[$>] iM={iM} min={min(w,h)} s={$min/100*(50.5-$1/2)}
     tx={$min/100*($4-50)} ty={$min/100*($5-50)}
     +f x<$s+$tx||x>w-$s+$tx||y<$s+$ty||y>h-$s+$ty
     distance. 0 b. {$min/100*$3} -. {im} *. {$2/100} -
-  c 0,$iM endl done v +
+  c 0,$iM endl done
 
 afre_vigrect_preview :
   afre_vigrect $*
@@ -159,10 +159,10 @@ afre_vigrect_preview :
 afre_vigcirc : check "${1=90}>=50 && ${2=75}>=-500 && ${3=50}>=0 && ${4=50}>=0 &&
     $1<=150 && $2<=500 && $3<=100 && $4<=100"
   e[] "[afre]^_^) vigcirc: Add circular vignette of image$? using size=$1, strength=$2, position_x=$3 and position_y=$4."
-  v - repeat $! l[$>] iM={iM} min={min(w,h)}
+  repeat $! l[$>] iM={iM} min={min(w,h)}
     +f 1 circle. $3%,$4%,{($min/2-2)/100*$1}
     distance. 0 b. 1 -. {im} *. {$2/100} -
-  c 0,$iM endl done v +
+  c 0,$iM endl done
 
 afre_vigcirc_preview :
   afre_vigcirc $*
@@ -221,9 +221,9 @@ afre_sharpenfft_preview :
 afre_contrastfft : check "${1=75}>=1 && ${2=50}>=0 && ${3=1}>=1 &&
     $1<=100 && $2<=150 && $3<=10"
   e[] "[afre]^_^) contrastfft: Enhance contrast for image$? with Fourier transform using strength=$1, amount=$2 and iterations=$3."
-  v - repeat $! l[$>] repeat $3
+  repeat $! l[$>] repeat $3
     +fftpolar ^.. {($1-.5)/100} ifftpolar[^0] afre_softlight $2
-  done endl done v +
+  done endl done
 
 afre_contrastfft_preview :
   afre_contrastfft $*
@@ -395,10 +395,12 @@ afre_cleanphoto : check "${1=3}>=2 && ${2=10}>=1 && ${3=1}>=-50 && ${4=1}>=1 &&
   m "cphoto :
     +erode_threshold $1 dilate_threshold. $1 afre_gui1. .. c 0,100%
     +afre_edge.. 1,1,4,4 c. 0,$2% n. 0,1 blend_fade[0,1] . k[0]"
-  if $3<0 afre_section {-$3} elif $3<2 cphoto
-  else s yx,$3 l[{[${4--1}]-1}] repeat $! l[$>] +cphoto
-    +gaussian.. {[w,h]*.5} c. 0,50% n. 0,1 blend_fade[0,1] . k[0]
-  endl done endl append_tiles $3 fi
+  repeat $! l[$>]
+    if $3<0 afre_section {-$3} elif $3<2 cphoto
+    else s yx,$3 l[{[${4--1}]-1}] repeat $! l[$>] +cphoto
+      +gaussian.. {[w,h]*.5} c. 0,50% n. 0,1 blend_fade[0,1] . k[0]
+    endl done endl append_tiles $3 fi
+  endl done um cphoto
 
 #@cli afre_compare : crop={ 1=once | 2=twice },_layout={ x | y | z | tile },_normalize={ 0 | 1 }
 #@cli : Crop then compare selected images interactively.
