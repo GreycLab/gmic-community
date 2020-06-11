@@ -2741,20 +2741,20 @@ rep_2dchannelsranges: _rep_2dchannelsranges
 _rep_2dchannelsranges:
 if $!>1 error "Cannot be used on more than 1 images!" fi
 repeat s
-if $>==0
-sh $>
-minv={im#-1}
-maxv={iM#-1}
-cv=[$minv,$maxv]
-rm.
-else
-sh $>
-minv={im#-1}
-maxv={iM#-1}
-tcv=[$minv,$maxv]
-cv=[$cv,$tcv]
-rm.
-fi
+    if $>==0
+        sh $>
+        minv={im#-1}
+        maxv={iM#-1}
+        cv=[$minv,$maxv]
+        rm.
+    else
+        sh $>
+        minv={im#-1}
+        maxv={iM#-1}
+        tcv=[$minv,$maxv]
+        cv=[$cv,$tcv]
+        rm.
+    fi
 done
 u {"chv="$cv";(chv)"}
 #@cli rep_ol: eq. to 'rep_orientation_list'. : (+)
@@ -5615,7 +5615,7 @@ repeat $! l[$>]
     if !$vv error "Final Variance>0==F" fi
 endl done
 fi
-#@cli rep_form_pixel: _form_id<24,_form_quad_lx!=0,_form_quad_ly!=0,_form_ratio[%]!=0,_angle,0<=_reflect_dir<=2,_sublevel,_interpolation<6,_keep_original_size={ 0=resized_result | 1=preserve_original_size },_shape_option_1..._shape_option_n
+#@cli rep_form_pixel: form_id={ 0=australia | 1=barbedwire | 2=circle | 3=crosshair | 4=cupid | 5=diamond | 6=dragon | 7=dragonfly | 8=fern | 9=flip | 10=gear | 11=gumleaf | 12=heart | 13=information | 14=kookaburra | 15=mail | 16=mapleleaf | 17=paint_splat | 18=paw | 19=phone | 20=polygon | 21=rooster | 22=shopping_cart | 23=snowflake | 24=star },form_quad_lx!=0,form_quad_ly!=0,_form_ratio[%]!=0,_angle, 0<=_reflect_dir<=2,sublevel,_interpolation={ 0=nearest | 1=average | 2=grid | 3=linear | 4=bicubic | 5=lanczos},_tile_boundary={ 0=periodic | 1=mirror },_image_boundary={ 0=neumann | 1=periodic | 2=mirror},_kdol={ 0=default | 1=old_dim | 2=new_layer | 3=new_layer_old_dim },shape_option_1..._shape_option_n
 #@cli : _form_id refers to the id or name of shape. circle is a valid form id, and any integer number that is 0-24 inclusive is a form id.
 #@cli : _form_quad_lx refers to the size of the tile in pixel form. It cannot be 0 unless you want to use _form_quad_ly variable to define the tile width.
 #@cli : _form_quad_ly refers to the size of the tile in pixel form. It cannot be 0 unless you want to use _form_quad_lx variable to define it tile height.
@@ -5623,114 +5623,151 @@ fi
 #@cli : _angle refers to the rotation of shapes per tile
 #@cli : _reflect_dir refers to the mirroring of each shape. 1,2 means the mirroring is applied.
 #@cli : _sublevel refers to the initial size of the shape to be scaled down to fit tiles.
-#@cli : _interpolation refers to the interpolation of the scaling of shapes to fit each tile.
-#@cli : _keep_original_size places the image at center if it a value greater than 0. Otherwise, the filter will proceed keeping all the tiles at the same size.
-#@cli : If _form_id is a negative number, then it will use the layer number 0 as form reference. Forms that supports dynamic options are fern,gear,polygon,snowflake,star. Dynamic options corresponds to _shape_option_n.\n
+#@cli : _interpolation refers to the interpolation of the scaling of shapes to fit each tile. See 'gmic h resize' _interpolation.
+#@cli : _tile_boundary refers to how the tiles are repeated within the canvas
+#@cli : _image_boundary refers to how the pixels are treated when out-of-range of original canvas before generating tiles
+#@cli : _kdol can be used to resize the generated result to original dimension and/or to create new layer on top of existing image.
+#@cli : _shape_option are used to define the behavior of shapes when available.\n
 #@cli : Note: _shape_option_1 can be empty. n refers to corresponding shape option.\n
 #@cli : Default value: '_form_ratio=1','_ang=0','_reflect_dir=0','_sublevel=.5','_interpolation=2'
-#@cli : $ sp tiger rep_form_pixel star,35,35,,,,,,8
-#@cli : $ sp lena rep_form_pixel cupid,35,35,,24,1
+#@cli : $ sp tiger rep_form_pixel star,32,32,1,45,0,1,5,1,2,1,6
 rep_form_pixel:
-sid="$1"
-isnum_sid={isnum($sid)}
-isint_sid={isint($sid)}
-isnis={$isnum_sid&&$isint_sid}
-if $isnis if $sid>=0 sid=${"-arg "1+$sid"","australia,barbedwire,circle,crosshair,cupid,diamond,dragonfly,fern,flip,gear,gumleaf,heart,information,kookaburra,mail,mapleleaf,paint_splat,paw,phone,polygon,rooster,shopping_cart,snowflake,star"} fi fi
-isnum_sid={isnum($sid)}
-isint_sid={isint($sid)}
-isnis={$isnum_sid&&$isint_sid}
-+store[0] __shape_reference
-if $isnis
-    r[0] {ceil(w/abs($2))*abs($2)},{ceil(h/abs($3))*abs($3)},100%,100%,0,0,.5,.5
-    r[^0] {ceil(w/abs($2))*abs($2)},{ceil(h/abs($3))*abs($3)},100%,100%,0,1,.5,.5
-else
-    r {ceil(w/abs($2))*abs($2)},{ceil(h/abs($3))*abs($3)},100%,100%,0,1,.5,.5
-fi
-if $isnis
-    if $!>1 apply_parallel[^0] "$__shape_reference rv _rep_form_pixel $*"
-    else apply_parallel "$__shape_reference rv _rep_form_pixel $*"
-    fi
-else
-    apply_parallel "_rep_form_pixel $*"
-fi
-_rep_form_pixel:
-skip ${4=},${5=},${6=},${7=},${8=}
-if narg($4) form_ratio={abs($4)} else form_ratio=1 fi
-if narg($5) ang=$5 else ang=0 fi
-if narg($6) mi={abs($6)} else mi=0 fi
-if narg($7) sub={abs($7)} else sub=.5 fi
-if narg($8) interpolation={abs($8)} else interpolation=5 fi
-sid="$1"
-isnum_sid={isnum($sid)}
-isint_sid={isint($sid)}
-isnis={$isnum_sid&&$isint_sid}
-tw=abs($2)
-th=abs($3)
-if !{$tw||$th} v + error "Invalid Dimension!" v - fi
-tw={!$tw?$th:$tw}
-th={!$th?$tw:$th}
+skip ${4=},${5=},${6=},${7=},${8=},${9=},${10=},${11=}
+
+if narg($4)  form_ratio={abs($4)}         else form_ratio=1 fi
+if narg($5)  ang=$5                       else ang=0 fi
+if narg($6)  mirror={abs($6)%3}           else mirror=0 fi
+if narg($7)  sub={abs($7)}                else sub=.5 fi
+if narg($8)  interpolation={abs($8)}      else interpolation=5 fi
+if narg($9)  tile_boundary={abs($9)}      else tile_boundary=0 fi
+if narg($10) __image_boundary={abs($10)}  else __image_boundary=2 fi
+if narg($11) var_kodl={abs($11)%4}        else var_kodl=0  fi
+
+__tw=abs($2)
+__th=abs($3)
+if $__tw&&$__tw<4 __$tw=4 fi
+if $__th&&$__th<4 __$th=4 fi
+if !($__tw||$__th) error "\$__tw||\$__th==F"  fi
+__tw={!$__tw?$__th:$__tw}
+__th={!$__th?$__tw:$__th}
 sub+=1
 interpolation+=1
-if $form_ratio==0||$form_ratio>1 v + error "Invalid Form Ratio Number!" v - fi
-if $isnis if $sid>=0 sid=${"-arg "1+$sid"","australia,barbedwire,circle,crosshair,cupid,diamond,dragonfly,fern,flip,gear,gumleaf,heart,information,kookaburra,mail,mapleleaf,paint_splat,paw,phone,polygon,rooster,shopping_cart,snowflake,star"} fi fi
-isnum_sid={isnum($sid)}
-isint_sid={isint($sid)}
-isnis={$isnum_sid&&$isint_sid}
-l[0]
-    if !$isnis
-        if $#>8 shape_$sid {max($tw,$th)*$sub},${9--1}
-        else shape_$sid {max($tw,$th)*$sub}
-        fi
-        rv
-    fi
-endl
-if abs($ang)%360!=0 rotate[0] $ang,1 fi
-if $mi==1 mirror[0] x elif $mi==2 mirror[0] y fi
-n[0] 0,1
-if $isnis
-    if s#0<=4&&s#0>1 l[0] s c,{if(s==4,-3,if(s==2,-1,-s))} if $!==2 to_gray.. *[-2,-1] else to_gray fi endl
-    elif s#0==5 l[0] s c,-4 cmyk2rgb.. to_gray.. *[-2,-1] endl fi
+tile_boundary+=2
+__image_boundary+=1
+
+mw=${-max_w}
+mh=${-max_h}
+nw={ceil($mw/$__tw)*$__tw}
+nh={ceil($mh/$__th)*$__th}
+
+if  $var_kodl==3  m "rep_form_pixel_generate_process: ow={w#0} oh={h#0} rep_form_pixel_process_tiles_alternative $""1,$""2,$__tw,$__th,$__image_boundary r[^-1] {$ow},{$oh},100%,100%,0,0,.5,.5"
+elif $var_kodl==2 m "rep_form_pixel_generate_process: rep_form_pixel_process_tiles_alternative $""1,$""2,$__tw,$__th,$__image_boundary"
+elif $var_kodl==1 m "rep_form_pixel_generate_process: ow={w#0} oh={h#0} rep_form_pixel_process_tiles $""1,$""2,$__tw,$__th,$__image_boundary r[0] {$ow},{$oh},100%,100%,0,0,.5,.5"
+else              m "rep_form_pixel_generate_process: rep_form_pixel_process_tiles $""1,$""2,$__tw,$__th,$__image_boundary"
 fi
-autocrop[0] 0
-shape_image_ratio={w#0/h#0}
-target_image_ratio={$tw/$th}
-resize_width={$target_image_ratio>$shape_image_ratio?w#0*($th/h#0):$tw}
-resize_height={$target_image_ratio>$shape_image_ratio?$th:h#0*($tw/w#0)}
-r[0] {$resize_width*$form_ratio},{$resize_height*$form_ratio},1,1,{$interpolation},0,.5,.5
-r[0] {$tw},{$th},1,1,0,0,.5,.5
-cut[0] 0,1 n[0] 0,1
-ti_l={$!-1}
-repeat $!-1 l[0,{$>+1}]
-    s. x,{w#1/w#0}
-    ti_w={$!-1}
-    s[^0] y,{h#1/h#0}
-    ti_h={($!-1)/$ti_w}
-    repeat $!-1 l[0,{$>+1}]
-        .
-        repeat s#-1
-        sh. $>
-        if iv#-1!=0
-            sh... $>
-            f. i*i0#0
-            f.. i*(1-i0#0)
-            f.. is/((1-ia#0)*w*h)
-            f. is/(ia#0*w*h)
-            f.. i#-1*i0#0+i*(1-i0#0)
-            rm[^0-2]
+
+imgs={$!}
+
+if ${is_image_arg\ $1}
+    pass$1 0
+    if s<=4&&s>1
+        if s==3
+            to_gray.
         else
-            rm.
+            s. c,{if(s==4,-3,if(s==2,-1,-s))}
+            to_gray..
+            *[-2,-1]
         fi
-        done
-        rm..
-    endl done
-    l[^0]
-        repeat $ti_w
-            a[{$<*$ti_h}-{($<+1)*$ti_h-1}] y
-        done
-        a x
+    elif s==5
+        s. c,-4 cmyk2rgb.. to_gray.. *[-2,-1]
+    fi
+else
+    sid="$1"
+    if isnum($1) if isint($1)
+        sid=${"-arg "1+$sid"","australia,barbedwire,circle,crosshair,cupid,diamond,dragon,dragonfly,fern,flip,gear,gumleaf,heart,information,kookaburra,mail,mapleleaf,paint_splat,paw,phone,polygon,rooster,shopping_cart,snowflake,star"}
+    fi fi
+    if $#>11 shape_$sid {max($__tw,$__th)*$sub},${12--1}
+    else shape_$sid {max($__tw,$__th)*$sub}
+    fi
+    r. {ceil(w/$__tw)*$__tw},{ceil(h/$__th)*$__th},100%,100%,0,0,.5,.5
+fi
+
+if abs($ang)%360!=0 rotate. $ang,1 fi
+if   $mirror==1 mirror. x 
+elif $mirror==2 mirror. y
+fi
+
+n. 0,1 autocrop. 0
+autocrop. 0
+shape_image_ratio={w#-1/h#-1}
+target_image_ratio={$__tw/$__th}
+resize_width={$target_image_ratio>$shape_image_ratio?w#-1*($__th/h#-1):$__tw}
+resize_height={$target_image_ratio>$shape_image_ratio?$__th:h#-1*($__tw/w#-1)}
+r. {$resize_width*$form_ratio},{$resize_height*$form_ratio},1,1,{$interpolation},0,.5,.5
+r. $__tw,$__th,1,1,0,0,.5,.5
+cut. 0,1 n. 0,1
+r. $nw,$nh,100%,100%,0,$tile_boundary
+
+repeat $imgs
+    rw={ceil(w#$</$__tw)*$__tw}
+    rh={ceil(h#$</$__th)*$__th}
+    l[$<,-1] 
+        rep_form_pixel_generate_process $rw,$rh
     endl
-endl done
-rm[0]
+done
+
+rm.
+
+if $var_kodl>1&&$imgs>1 repeat $imgs-1 mv[-1] {1+($>*2)} done fi
+
+uncommand rep_form_pixel_generate_process
+rep_form_pixel_process_tiles:
+r[0] $1,$2,100%,100%,0,$5,.5,.5 
+avgc={avg(crop(#1,0,0,abs($3),abs($4)))}
+{w#0},{h#0},1,{s#0},i0#1*i#0 
+{w#0},{h#0},1,{s#0},(1-i0#1)*i#0
+repeat s#0
+    ci={$>}
+    repeat 2 sh.. $ci done
+    sh[0] $ci
+    
+    f. ">begin(const ww=abs($3);const hh=abs($4);const wwhh=ww*hh;const length=floor(w/ww);avg_a=vectorlength(0);avg_b=vectorlength(0);const avg_c="$avgc";const w_avg=wwhh*avg_c;const iw_avg=wwhh-w_avg;);
+    if(!x&&!(y%hh),
+        for(v=0,v<length,v++,
+            avg_a[v]=sum(crop(#-2,v*ww,y,ww,hh))/iw_avg;
+            avg_b[v]=sum(crop(#-3,v*ww,y,ww,hh))/w_avg;
+        );
+    );
+    lerp(avg_a[floor(x/ww)],avg_b[floor(x/ww)],i#1);
+    "
+    rm[-3--1]
+done
+rm[-2,-1]
+
+rep_form_pixel_process_tiles_alternative:
+r[0] $1,$2,100%,100%,0,$5,.5,.5 
+avgc={avg(crop(#1,0,0,abs($3),abs($4)))}
+{w#0},{h#0},1,{s#0},i0#1*i#0 
+{w#0},{h#0},1,{s#0},(1-i0#1)*i#0
+{w#0},{h#0},1,{s#0}
+repeat s#0
+    ci={$>}
+    repeat 2 sh... $ci done
+    sh[4] $ci
+    
+    f. ">begin(const ww=abs($3);const hh=abs($4);const wwhh=ww*hh;const length=floor(w/ww);avg_a=vectorlength(0);avg_b=vectorlength(0);const avg_c="$avgc";const w_avg=wwhh*avg_c;const iw_avg=wwhh-w_avg;);
+    if(!x&&!(y%hh),
+        for(v=0,v<length,v++,
+            avg_a[v]=sum(crop(#-2,v*ww,y,ww,hh))/iw_avg;
+            avg_b[v]=sum(crop(#-3,v*ww,y,ww,hh))/w_avg;
+        );
+    );
+    lerp(avg_a[floor(x/ww)],avg_b[floor(x/ww)],i#1);
+    "
+    rm[-3--1]
+done
+k[0,1,-1]
+rv[-2,-1]
 #@cli rep_tfrac: eq. to 'rep_thorn_fractal' : (+)
 rep_tfrac: rep_thorn_fractal $*
 #@cli rep_thorn_fractal: style= { <-1=Custom Alternating Formula | -1= Custom Formula | 0= Normal | 1= Normal Inverted | 2= Tanh Stroke 1 | 3= Tanh Stroke 2 | 4= Asymphological Vibrato | 5= Asymphological Basic | 6= Asymphological Basic 2 | 7= Asymphochaos | 8= Petallian | 9= Semi-Thorny Petallian | 10= Thorny Petal 1| 11= Thorny Petal 2 | 12= Inflation | 13= Inflation 2 | 14= Earthing | 15= Acrylic Earthing | 16= Unearthing Origami | 17= Cubic Unearthing | 18= Webbing Cubic Unearthing | 19= Chaotic Hooks | 20= Echo Wide | 21= Echo Squircle | 22= Echo Hall | 23= Echo Hall 2 | 24= Liquid Parabolic | 25= Chaos-Vibrato | 26= Chaos Deep-Vibrato | 27= Chaos Spacetime | 28= Parabolic | 29= Parabolic Chaos | 30= Cubic-Diamond Chaos | 31= C-Line | 32= Contour Chaos | 33= Spiderweb-Diamond | 34= Acrylica | 35= Refractive Space | 36= Smooth-Artistry | 37= Ferrofluid | 38= Triangular Interweaving | 39= Fabric Chaos | 40= Reverse Tangent Division | 41= Chaotic Tangent | 42= Alternating Chaos 1 | 43= Alternating Chaos 2 | 44= Alternating Chaos 3 | 45= Alternating Chaos 4 },_escape>0,_iteration>0,_subsampling_level>=1,_cx,_cy,_r_xy>0,_r_x>0,_r_y>0,_r_pi= { 0=r_xy multiplied by 1 | 1=r_xy multiplied by pi },_o_x,_o_y,_function_angle,_custom_x,_custom_y
@@ -7350,95 +7387,188 @@ u "{$1}"\
 "{$13,$14,$15}"_{($12&&!$16)?2:1}\
 "{$16}"\
 "{$17}"_0
-#@gui Tiled Form : gui_rep_form_pixel, gui_rep_form_pixel_preview(0)
-#@gui : note=note("Original idea comes from <a href="https://forums.getpaint.net/topic/26758-trs-tiled-pixels-v12/">TR's Tiled Pixels V1.2</a> plugin by <b>TechnoRobbo</b> for Paint.NET. This version is a extended version utilizing average sampling per area per tile. Dynamic shapes are also supported by this filter.\n\nDynamic Shapes - Fern, Gear, Polygon, Snowflake, Star\n\nShape that are dynamic are labeled with -[D] next to their name.\n\n<small>Note - You may want to sharp your picture due to the average sampling per area per tile algorithm applied by this filter. The reason being is that the contour of the shape would be more discernible after filter is processed.</small>"), sep=separator()
-#@gui : note=note("<b>Color Space Processing</b>")
-#@gui : Colour Space=choice(0,"RGB","RYB","CMYK","HCY","HSI","HSL","HSV","LAB","LCH")
-#@gui : sep=separator(), note=note("<b>Shape Option</b>")
-#@gui : Tiled Shape=choice(1,"By Layer","Australia","Barbedwire","Circle","Crosshair","Cupid","Diamond","Dragonfly","Fern-[D]","Flip","Gear-[D]","Gumleaf","Heart","Information","Kookaburra","Mail","Mapleleaf","Paint Splat","Paw","Phone","Polygon-[D]","Rooster","Shopping Cart","Snowflake-[D]","Star-[D]")
-#@gui : Reverse Layer =bool(0)
-#@gui : note=note("<small>For the first option, you must use at least 2 layer to use layer as shape reference, else it'll use the only image itself as shape reference. Reverse Layer option might have to be used to generate the proper result when using first option.</small>")
-#@gui : sep=separator(), note=note("<b>Tile Options</b>")
-#@gui : Shape Width (px)=int(30,4,100)
-#@gui : Shape Height (px)=int(30,4,100)
-#@gui : Shape Ratio (%)=float(100,5,100)
-#@gui : Shape Rotation=float(0,-180,180)
-#@gui : Shape Mirror Axis=choice(0,"None","X","Y")
-#@gui : Subpixel Level=float(.5,0,2)
-#@gui : Interpolation=choice(5,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
-#@gui : sep=separator(), note=note("<b>Dynamic Options</b>")
-#@gui : Fern Type=choice("Asplenium Adiantum-Nigrum","Thelypteridaceae")
-#@gui : Fern Density (%)=float(100,0,300)
-#@gui : Gear Teeth Count=int(8,3,32)
-#@gui : Gear Height (%)=float(25,0.1,100)
-#@gui : Gear Offset Teeth (%)=float(0,0,100)
-#@gui : Gear Inner Ratio (%)=float(50,0.1,100)
-#@gui : Polygon Vertices=int(5,3,100)
-#@gui : Snowflake Recursion=int(5,1,6)
-#@gui : Star Branches=int(3,5,100)
-#@gui : Star Thickness (%)=float(38,.1,100)
-#@gui : note=note("<small>Options are only visible for dynamic shapes!</small>")
-#@gui : sep=separator() note=note("<b>Preservation of Image Size</b>")
-#@gui : Preserve Image Size=bool(0)
-#@gui : note=note("<small>It is recommended to use this for blending mode and/or if you're using Paint.NET")
-#@gui : sep=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui : sep=separator(),note=note("<small>Author: Reptorian. Latest Update: <i>2019/5/18</i>.</small>")
+#@gui Tiled Form : gui_rep_form_pixel, gui_rep_form_pixel_preview
+#@gui :_=note("<small><b>Note</b> - It is recommended to boost local contrast before applying!</small>"),_=separator()
+#@gui :_=note("<b>Color Space Processing</b>")
+#@gui :Colour Space=choice(0,"RGB","RYB","CMYK","HCY","HSI","HSL","HSV","LAB","LCH")
+#@gui :_=separator(),_=note("<b>Tile Shape</b>")
+#@gui :Tiled Shape=choice(1,"By Layer","Australia","Barbedwire","Circle","Crosshair","Cupid","Diamond","Dragon Curve-[D]","Dragonfly","Fern-[D]","Flip","Gear-[D]","Gumleaf","Heart","Information","Kookaburra","Mail","Mapleleaf","Paint Splat","Paw","Phone","Polygon-[D]","Rooster","Shopping Cart","Snowflake-[D]","Star-[D]")
+#@gui :Reverse Layer =bool(0)
+#@gui :_=note("<small>For the first option, you must use at least 2 layer to use layer as shape reference, else it'll use the only image itself as shape reference. Reverse Layer option might have to be used to generate the proper result when using first option.</small>")
+#@gui :_=separator(),_=note("<b>Tiles</b>")
+#@gui :Shape Width (px)=int(30,0,100)
+#@gui :Shape Height (px)=int(30,0,100)
+#@gui :Shape Ratio (%)=float(100,5,100)
+#@gui :Shape Rotation=float(0,-180,180)
+#@gui :Shape Mirror Axis=choice(0,"None","X","Y")
+#@gui :Subpixel Level=float(.5,0,2)
+#@gui :Interpolation=choice(5,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
+#@gui :Tile Boundary=choice(0,"Periodic","Mirror")
+#@gui :Preprocess Boundary=choice(2,"Neumann","Periodic","Mirror")
+#@gui :Output=choice(0,"New Dimension","Old Dimension","New Dimension - New Layer","Old Dimension - New Layer")
+#@gui :_=note("<small>For Krita User: Creating new layer requires manual reordering!</small>")
+#@gui :_=separator(),_=note("<b>Dynamic Shape</b>")
+#@gui :Dragon Curve Recursion=int(10,0,30)
+#@gui :Dragon Curve Rotation=float(0,-180,180)
+#@gui :Fern Type=choice("Asplenium Adiantum-Nigrum","Thelypteridaceae")
+#@gui :Fern Density (%)=float(100,0,300)
+#@gui :Gear Teeth Count=int(8,3,32)
+#@gui :Gear Height (%)=float(25,0.1,100)
+#@gui :Gear Offset Teeth (%)=float(0,0,100)
+#@gui :Gear Inner Ratio (%)=float(50,0.1,100)
+#@gui :Polygon Vertices=int(5,3,100)
+#@gui :Snowflake Recursion=int(5,1,6)
+#@gui :Star Branches=int(3,5,100)
+#@gui :Star Thickness (%)=float(38,.1,100)
+#@gui :_=note("<small>Dynamic Shapes Options are only visible for dynamic shapes!</small>")
+#@gui :_=separator(),_=note("<b>Paint.NET Workaround</b>")
+#@gui :Export Mode=choice("New Dimension","New Dimension - New Layer")
+#@gui :Folder=folder()
+#@gui :Filename=text("tiledform.png")
+#@gui :Export Images=button()
+#@gui :_=note("<small>This section is only for Paint.NET users! If you don't use this this software, then you don't need use this section!</small>")
+#@gui :_=separator(),_=note("Original idea comes from <a href="https://forums.getpaint.net/topic/26758-trs-tiled-pixels-v12/">TR's Tiled Pixels V1.2</a> plugin by <b>TechnoRobbo</b> for Paint.NET. This version is a extended version utilizing weighted average sampling per area per tile, boundary option, anti-aliasing, dynamic shape, color space,and transformation. Dynamic shapes are also supported by this filter.")
+#@gui :_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2020/6/08</i>.</small>")
 gui_rep_form_pixel:
-if $3&&!$2 rv fi
-if $1!=2&&$1!=0
-repeat {!$2&&$!>1?$!-1:$!} l[{!$2&&$!>1?$>+1:$>}]
-sh 0,2
-if $1==1 rgb2ryb.
-elif $1==3 rgb2hcy.
-elif $1==4 rgb2hsi.
-elif $1==5 rgb2hsl.
-elif $1==6 rgb2hsv.
-elif $1==7 rgb2lab.
-elif $1==8 rgb2lch.
-fi
-rm.
-endl done
-elif $1==2
-repeat {!$2&&$!>1?$!-1:$!} l[{!$2&&$!>1?$>+1:$>}]
-if s==3 rgb2cmyk
-elif s==4 s c,-3 rgb2cmyk.. a c
-fi
-endl done
-fi
-if $2==8 rep_form_pixel {$2-1},${4-5},{$6%},${7-10},$21,$12%,0,{100%},$11
-elif $2==10 rep_form_pixel {$2-1},${4-5},{$6%},$21,${7-10},${13-16}
-elif $2==20 rep_form_pixel {$2-1},${4-5},{$6%},$21,${7-10},{$17}
-elif $2==23 rep_form_pixel {$2-1},${4-5},{$6%},$21,${7-10},{$18}
-elif $2==24 rep_form_pixel {$2-1},${4-5},{$6%},$21,${7-10},{$19},{$20%}
-else rep_form_pixel {$2-1},${4-5},{$6%},${7-10},$21
-fi
-if $1!=2&&$1!=0
-repeat {!$2&&$!>1?$!-1:$!} l[{!$2&&$!>1?$>+1:$>}]
-sh 0,2
-if $1==1 ryb2rgb.
-elif $1==3 hcy2rgb.
-elif $1==4 hsi2rgb.
-elif $1==5 hsl2rgb.
-elif $1==6 hsv2rgb.
-elif $1==7 lab2rgb.
-elif $1==8 lch2rgb.
-fi
-rm.
-endl done
-elif $1==2
-repeat {!$2&&$!>1?$!-1:$!} l[{!$2&&$!>1?$>+1:$>}]
-if s==4 cmyk2rgb
-elif s==5 s c,-4 cmyk2rgb.. a c
-fi
-endl done
-fi
+dynamic_shape=1
 if $3 rv fi
+if $2
+    if $2==7  
+        form_id=dragon 
+        form_var=${14-15}
+    elif $2==9  
+        form_id=fern
+        form_var=$17%,0,1,$16
+    elif $2==11 
+        form_id=gear
+        form_var=${18-21}
+    elif $2==21 
+        form_id=polygon
+        form_var=$22
+    elif $2==24 
+        form_id=snowflake
+        form_var=$23
+    elif $2==25 
+        form_id=star
+        form_var=$24,{$25/100}
+    else 
+        form_id={$2-1} 
+        form_var=""
+    fi
+fi
+if !('$_host'=='paintdotnet')
+    ti={$!}
+    if $1
+        repeat !$2?($!-1):$! l[{$>+!$2}]
+            if $1!=2
+                sh 0,2
+                if $1==1 rgb2ryb.
+                elif $1==3 rgb2hcy.
+                elif $1==4 rgb2hsi.
+                elif $1==5 rgb2hsl.
+                elif $1==6 rgb2hsv.
+                elif $1==7 rgb2lab.
+                elif $1==8 rgb2lch.
+                fi
+                rm.
+            else
+                s c,-3 rgb2cmyk.. a c
+            fi
+        endl done
+    fi
+    if !$2 rep_form_pixel[^0] [0],${4-5},$6%,${7-13}
+    else   rep_form_pixel $form_id,${4-5},$6%,${7-13},$form_var
+    fi
+    if $1
+        repeat !$2?($!-1):$! l[{$>+!$2}]
+            if $1!=2
+                sh 0,2
+                if $1==1 ryb2rgb.
+                elif $1==3 hcy2rgb.
+                elif $1==4 hsi2rgb.
+                elif $1==5 hsl2rgb.
+                elif $1==6 hsv2rgb.
+                elif $1==7 lab2rgb.
+                elif $1==8 lch2rgb.
+                fi
+                rm.
+            else
+                s c,-4 cmyk2rgb.. a c
+            fi
+        endl done
+    fi
+    if $13<2||$3 rv fi
+else
+    filename="$27/$28"
+    if $1
+        l[0]
+            if $1!=2
+                sh 0,2
+                if $1==1 rgb2ryb.
+                elif $1==3 rgb2hcy.
+                elif $1==4 rgb2hsi.
+                elif $1==5 rgb2hsl.
+                elif $1==6 rgb2hsv.
+                elif $1==7 rgb2lab.
+                elif $1==8 rgb2lch.
+                fi
+                rm.
+            else
+                s c,-3 rgb2cmyk.. a c
+            fi
+        endl
+    fi
+    
+    if !$2
+        if !$29 rep_form_pixel[0] [1],${4-5},$6%,${7-12},1 k[0]
+        else    rep_form_pixel[0] [1],${4-5},$6%,${7-12},{$26*2} rm.
+        fi
+    else
+        k[0]
+        if !$29
+                rep_form_pixel $form_id,${4-5},$6%,${7-12},1,$form_var
+        else
+                rep_form_pixel $form_id,${4-5},$6%,${7-12},{$26*2},$form_var
+        fi
+    fi
+    
+    if $1
+        repeat $! l[$>]
+            if $1!=2
+                sh 0,2
+                if $1==1 ryb2rgb.
+                elif $1==3 hcy2rgb.
+                elif $1==4 hsi2rgb.
+                elif $1==5 hsl2rgb.
+                elif $1==6 hsv2rgb.
+                elif $1==7 lab2rgb.
+                elif $1==8 lch2rgb.
+                fi
+                rm.
+            else
+                s c,-4 cmyk2rgb.. a c
+            fi
+        endl done
+    fi
+    if $29 o $filename fi    
+fi
 gui_rep_form_pixel_preview:
-if $2 gui_split_preview "gui_rep_form_pixel $*",${-3--1}
-else gui_rep_form_pixel $* fi
+pdn=0 if '$_host'=='paintdotnet' pdn=1 fi
+if !$pdn
+    if $3 rv fi
+    if !$2 store[0] __ref rv fi
+    gui_split_preview "if !$2 $__ref rv fi gui_rep_form_pixel $1,$2,0,${4-12},{$13%2},${14-28},0",${-3--1}
+else
+    if $29 gui_rep_form_pixel ${1-12},1,${14-29}
+    else
+        if !$2 store[1] __ref fi
+        gui_split_preview "if !$2 $__ref fi gui_rep_form_pixel ${1-12},1,${14-28},0 k[0]",${-3--1}
+    fi
+fi
 u "{$1}"\
 "{$2}"\
-"{$3}_"{!$2?2:0}\
+"{$3}"\
 "{$4}"\
 "{$5}"\
 "{$6}"\
@@ -7446,19 +7576,27 @@ u "{$1}"\
 "{$8}"\
 "{$9}"\
 "{$10}"\
-"{$11}_"{$2==8?2:0}\
-"{$12}_"{$2==8?2:0}\
-"{$13}_"{$2==10?2:0}\
-"{$14}_"{$2==10?2:0}\
-"{$15}_"{$2==10?2:0}\
-"{$16}_"{$2==10?2:0}\
-"{$17}_"{$2==20?2:0}\
-"{$18}_"{$2==23?2:0}\
-"{$19}_"{$2==24?2:0}\
-"{$20}_"{$2==24?2:0}\
-"{$21}"\
-"{$22}"\
-"{$23}"
+"{$11}"\
+"{$12}"\
+"{$13}_"{!$pdn?2}\
+"{$14}_"{$2==7?2}\
+"{$15}_"{$2==7?2}\
+"{$16}_"{$2==9?2}\
+"{$17}_"{$2==9?2}\
+"{$18}_"{$2==11?2}\
+"{$19}_"{$2==11?2}\
+"{$20}_"{$2==11?2}\
+"{$21}_"{$2==11?2}\
+"{$22}_"{$2==21?2}\
+"{$23}_"{$2==24?2}\
+"{$24}_"{$2==25?2}\
+"{$25}_"{$2==25?2}\
+"{$26}_"{$pdn?2}\
+"{$27}_"{$pdn?2}\
+"{$28}_"{$pdn?2}\
+"{0}_"{$pdn?2}\
+"{$30}"\
+"{$31,$32}"
 #@gui Color Existence Distribution [RGB-8]: rep_color_existence_distribution_rgb8,rep_color_existence_distribution_rgb8
 #@gui : note=note("This filter is used to find colors that does or does not exist within a image.\n\n For <b>Paint.NET users</b>, please refer to this tutorial named <a href="https://forums.getpaint.net/topic/115124-finding-millions-of-colors-that-does-or-does-not-exist-gmic-qt-tutorial/?tab=comments#comment-562927">Finding millions of colors that does or does not exist - G'MIC QT Tutorial</a>")
 #@gui : sep separator()
