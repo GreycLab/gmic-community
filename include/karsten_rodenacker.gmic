@@ -2491,6 +2491,76 @@ rv[-1,-3] -[-1,-3] rv - / 2"
   uncommand my_erode,my_dilate,my_action
   v +
 
+#@cli karo_shape_moments
+#@cli : selected image considered as binary or skalar pattern \
+# with pixle values==0 outside the pattern or region and either \
+# ==1 (for binary) or !=0 for skalar pattern. \
+# Calculation of shape moments and other features returned in status. \
+# With mean==1 input was binary otherwise skalar! \
+# Moments m00=sum, m10,m01 centroid, orientation=theta, mean, h1-h7 Hu's moment invariants, with length. 
+#@cli : Result in status:
+#@cli : sum centroid x,y theta execenticity mean Hu moments 1-7 main axis lengths
+#@cli : m00 m10 m01 theta excent mean h1 h2 h3 h4 h5 h6 h7 width length
+#@cli : Result in _karo_shape_moments
+#@cli : [[$m00,$m01,$my02,$my03],[$m10,$my11,$my12,0],[$my20,$my21,0,0],[$my30,0,0,0]],
+#@cli :  [[$eta00,$eta01,$eta02,$eta03],[$eta10,$eta11,$eta12,0],[$eta20,$eta21,0,0],[$eta30,0,0,0]],
+#@cli :  [$h1,$h2,$h3,$h4,$h5,$h6,$h7,0],
+#@cli :  [$theta,$lambda1,$lambda2,$excent,0,0,0,0]
+#@cli : $ osteo_ k. +karo_shape_moments _sm=${} to_rgb n 0,255 circle ${arg\ 2,$_sm},${arg\ 3,$_sm},1%,1,255,0,0
+#@cli : $ osteo_ * +karo_shape_moments _sm=${} to_rgb n 0,255 circle ${arg\ 2,$_sm},${arg\ 3,$_sm},1%,1,255,0,0
+karo_shape_moments : +l[-1]
+		+extract[0] "i!=0",1 extract[0] "i!=0",2 
+		s[1] c rm[3] +*[1,2] [0]
+# Moments
+		m00,m10,m01={[is#0,is#3/is#0,is#4/is#0]} rm[3,4]
+		+[1] {-$m10}  # 1 c10
+		+[2] {-$m01}  # 2 c01 
+		+sqr[1,2]     # 3 4 c20 c02
+		+*[3,4] [1]   # 5 6 c30 c12
+		+*[3,4] [2]   # 7 8 c21 c03
+		+*[1,2]       # 9 c11
+		*[1-9] [0] 
+# Centered moments
+		my11,my20,my02,my21,my12,my30,my03={[is#9,is#3,is#4,is#7,is#6,is#5,is#8]}
+# scaled centered moments
+		eta00,eta10,eta11,eta01,eta20,eta21,eta02,eta12,eta30,eta03={\
+		[$m00/h#1,0,$my11/$m00^2,0,\
+		 $my20/$m00^2,$my21/$m00^2.5,$my02/$m00^2,$my12/$m00^2.5,\
+		 $my30/$m00^2.5,$my03/$m00^2.5]}
+# Hu's moment invariants
+		h1,h2,h3,h4,h5,h6,h7={\
+		[$eta20+$eta02,sqr($eta20-$eta02)+4*sqr($eta11),sqr($eta30-3*$eta12)+sqr(3*$eta21-$eta03),\
+		 sqr($eta30+$eta12)+sqr($eta21+$eta03),\
+		 ($eta30-3*$eta12)*($eta30+$eta12)*(sqr($eta30+$eta12)-3*sqr($eta21+$eta03))+\
+				(3*$eta21-$eta03)*($eta21+$eta03)*(3*sqr($eta30+$eta12)-sqr($eta21+$eta03)),\
+		 ($eta20-$eta02)*(sqr($eta30+$eta12)-sqr($eta21+$eta03))+\
+				4*$eta11*($eta30+$eta12)*($eta21+$eta03),\
+		 (3*$eta21-$eta03)*($eta30+$eta12)*(sqr($eta30+$eta12)-3*sqr($eta21+$eta03))-\
+				($eta30-3*$eta12)*($eta21+$eta03)*(3*sqr($eta30+$eta12)-sqr($eta21+$eta03)^2)]}
+# Orientation, Eigenvalues,eccentricity	
+		theta,lambda1,lambda2={\
+		[0.5*atan(2*$my11/($my20-$my02)),\
+		 0.5*($my20+$my02)/$m00+0.5*sqrt(4*($my11/$m00)^2+($my20/$m00-$my02/$m00)^2),\
+		 0.5*($my20+$my02)/$m00-0.5*sqrt(4*($my11/$m00)^2+($my20/$m00-$my02/$m00)^2)]}
+		 excent={sqrt(1-$lambda2/$lambda1)}
+
+		_karo_shape_moments={\
+		[[[$m00,$m10,$my20,$my30],[$m01,$my11,$my21,0],[$my02,$my12,0,0],[$my03,0,0,0]],\
+		 [[$eta00,$eta10,$eta20,$eta30],[$eta01,$eta11,$eta21,0],[$eta02,$eta12,0,0],[$eta03,0,0,0]],\
+		 [$h1,$h2,$h3,$h4,$h5,$h6,$h7,0],\
+		 [$theta,$lambda1,$lambda2,$excent,0,0,0,0]]}
+		
+		rm
+	endl
+	l.
+		rotate. {-$theta/pi*180},1,0,$m10,$m01 
+		extract. "i!=0",1 s c 
+		min10,max10,min01,max01={[im#-3,iM#-3,im#-2,iM#-2]} 
+		wid,len={[min($max10-$min10,$max01-$min01),max($max10-$min10,$max01-$min01)]}
+		rm
+	endl
+	u $m00,$m10,$m01,$theta,$excent,$eta00,$h1,$h2,$h3,$h4,$h5,$h6,$h7,$wid,$len
+
 #@cli fx_karo_mm_diff : _size,_size2,_operation,_shape,_channel,_scale
 #@cli : Compute difference of math. morph. operation with two sizes on selected images.
 #@cli : _size = int(5,1,25)
