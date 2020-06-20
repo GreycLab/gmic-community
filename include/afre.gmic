@@ -349,24 +349,31 @@ afre_section : check "${1=20}>=1 && $1<=50"
     grid {100/$1}%,{100/$1}%,-1,-1,.2,$iM
   endl done
 
-#@cli afre_cleanphoto : 2<=size<=10,1<=_recovery<=100,-50<=_xy_sections<=50,_mask1>=1,_mask2>=1,...
+#@cli afre_cleanphoto : 1<=size<=10,1<=_xy_sections<=50,_maskN>=1,...
 #@cli : Clean dust and scratches from photos.
-#@cli : Default values: 'size=3', 'recovery=10', 'xy_sections=1' and 'mask1=1'.\n
-#@cli : 'xy_sections' has special properties.
-#@cli : - 'xy_sections>0': process masked regions specified by 'mask1','mask2',...
-#@cli : - 'xy_sections<0': assign and display numbered regions.
-afre_cleanphoto : check "${1=3}>=2 && ${2=10}>=1 && ${3=1}>=-50 &&
-    $1<=10 && $2<=100 && $3<=50" skip ${4=1}
-  m "cphoto : p=$1,,,{iM}
-    +erode_threshold $p dilate_threshold. $p afre_gui1. .. c. 0,100%
-    +afre_edge.. 1,1,4,4 afre_box. 1 c. 0,$2% n. 0,1 blend_fade[0,1] . k[0]"
-  if $3<0 v + afre_section {-$3} elif $3<2 cphoto
-  else e[] "[afre]^_^) cleanphoto: Clean dust and scratches from image$? using size=$1, recovery=$2, xy_sections=$3 and masks=${4--1}."
-    repeat $! l[$>]
-      s yx,$3 l[{cut([${4--1}]-1,0,sqr($3)-1)}] repeat $! l[$>] +cphoto
-        +gaussian.. {[w,h]*.5} c. 0,50% n. 0,1 blend_fade[0,1] . k[0]
-      endl done endl append_tiles $3
-    endl done um cphoto fi
+#@cli : Default values: 'size=3', 'xy_sections=1' and 'mask1=1'.\n
+#@cli : - 'maskN' is a comma separated list of regions mapped by 'afre_section'.
+#@cli : \t Use the 'afre_section' command to visualize.
+afre_cleanphoto : check "${1=3}>=1 && ${2=1}>=1 &&
+    $1<=10 && $2<=50" skip ${3=1}
+  m "ip : s={$1*2+1} +l +erode_oct $s dilate_oct. $s - c 0,100% ^ 2
+    c 5%,10% dilate_oct 3 n 0,1 endl +inpaint_pde.. . rm..
+    +gaussian.. {[w,h]*.5} c. 0,50% n. 0,1 blend_fade[0,1] . k[0]"
+  e[] "[afre]^_^) cleanphoto: Clean dust and scratches from image$? using size=$1, xy_sections=$2 and maskN=${3--1}."
+  repeat $! l[$>] iM={iM} w,h={[w,h]/$2} 100%,100%,1,1 l. (${3--1})
+    repeat w v={i($>)} i={$v%$2?$v%$2:$2} j={($v+$2-$i)/$2}
+      r={[$w*$i-$w,$h*$j-$h,$w*$i-1,$h*$j-1]} rectangle[0] $r,1,$iM
+    done rm. label_fg 0
+    repeat iM +==[0] {$>+1} coord=${"
+      w={w} h={h} val={i(w-1,h-1)} +=. {1+$val},100%,100%,100%
+      autocrop. =. $val,100%,100%,100% x0={$w-w} y0={$h-h} rm.
+      +autocrop. x1={$x0+w-1} y1={$y0+h-1} rm. u $x0,$y0,$x1,$y1
+    "} rm. ($coord) done
+    rm[0] a y endl
+    repeat h x0,y0,x1,y1={@{[0,1,2,3]+4*$>}} +z.. $x0,$y0,$x1,$y1
+      ip. j[0] .,$x0,$y0 rm.
+    done rm.
+  endl done um ip
 
 #@cli afre_compare : crop={ 1=once | 2=twice },_layout={ x | y | z | tile },_normalize={ 0 | 1 }
 #@cli : Crop then compare selected images interactively.
