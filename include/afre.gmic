@@ -349,14 +349,34 @@ afre_section : check "${1=20}>=1 && $1<=50"
     grid {100/$1}%,{100/$1}%,-1,-1,.2,$iM
   endl done
 
-#@cli afre_cleanphoto : 1<=radius<=10,1<=_xy_sections<=50,_maskN>=1,...
+#@cli afre_cleanphoto : 2<=size<=10,1<=_recovery<=100,-50<=_xy_sections<=50,_maskN>=1,...
+#@cli : Clean dust and scratches from photos.
+#@cli : Default values: 'size=3', 'recovery=10', 'xy_sections=1' and 'maskN=1'.\n
+#@cli : - 'xy_sections' sections image into MxM labeled regions.
+#@cli : \ \ \ For global processing, set 'xy_sections' to 1.
+#@cli : \ \ \ To visualize these regions with labels, use a negative number.
+#@cli : - 'maskN' is a comma separated list of regions to be processed.
+afre_cleanphoto : check "${1=3}>=2 && ${2=10}>=1 && ${3=1}>=-50 &&
+    $1<=10 && $2<=100 && $3<=50" skip ${4=1}
+  m "cphoto : p=$1,,,{iM}
+    +erode_threshold $p dilate_threshold. $p afre_gui1. .. c. 0,100%
+    +afre_edge.. 1,1,4,4 afre_box. 1 c. 0,$2% n. 0,1 blend_fade[0,1] . k[0]"
+  if $3<0 v + afre_section {-$3} elif $3<2 cphoto
+  else e[] "[afre]^_^) cleanphoto: Clean dust and scratches from image$? using size=$1, recovery=$2, xy_sections=$3 and masks=${4--1}."
+    repeat $! l[$>]
+      s yx,$3 l[{cut([${4--1}]-1,0,sqr($3)-1)}] repeat $! l[$>] +cphoto
+        +gaussian.. {[w,h]*.5} c. 0,50% n. 0,1 blend_fade[0,1] . k[0]
+      endl done endl append_tiles $3
+    endl done um cphoto fi
+
+#@cli afre_cleanphoto2 : 1<=radius<=10,1<=_xy_sections<=50,_maskN>=1,...
 #@cli : Clean dust and scratches from photos.
 #@cli : Default values: 'radius=3', 'xy_sections=1' and 'mask1=1'.\n
 #@cli : - 'xy_sections' sections image into MxM labeled regions.
 #@cli : \ \ For global processing, set 'xy_sections' to 1.
 #@cli : - 'maskN' is a comma separated list of regions to be processed.
 #@cli : \ \ Use 'afre_section' to determine region labels.
-afre_cleanphoto : check "${1=3}>=1 && ${2=1}>=1 &&
+afre_cleanphoto2 : check "${1=3}>=1 && ${2=1}>=1 &&
     $1<=10 && $2<=50" skip ${3=1}
   m "ip : s={$1*2+1} +l +erode_oct $s dilate_oct. $s - c 0,100% ^ 2
     c 5%,10% dilate_oct 3 n 0,1 endl +inpaint_pde.. . rm..
@@ -546,7 +566,7 @@ afre_gui1c : check ${is_image_arg\ $1}" && "${is_image_arg\ $2}" && ${3=1e-2}>=0
 # List of Commands and Filters
 #-----------------------------
 # GUI CLI : afre_edge afre_cleantext afre_vigrect afre_vigcirc afre_softlight afre_sharpenfft afre_contrastfft afre_gleam afre_halfhalf
-# CLI only: afre_gnorm afre_hnorm afre_sdpatch afre_reorder afre_section afre_cleanphoto afre_compare afre_log2 afre_y50 afre_orien afre_conv afre_box afre_gui0 afre_gui1 afre_gui0c afre_gui1c
+# CLI only: afre_gnorm afre_hnorm afre_sdpatch afre_reorder afre_section afre_cleanphoto afre_cleanphoto2 afre_compare afre_log2 afre_y50 afre_orien afre_conv afre_box afre_gui0 afre_gui1 afre_gui0c afre_gui1c
 # GUI only: fx_darken_sky fx_gamify fx_hnorm
 
 
