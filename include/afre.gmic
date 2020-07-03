@@ -376,16 +376,29 @@ afre_section : check "${1=20}>=1 && $1<=50"
 #@cli : - 'maskN' is a comma separated list of regions to be processed.
 afre_cleanphoto : check "${1=3}>=2 && ${2=10}>=1 && ${3=1}>=-50 &&
     $1<=10 && $2<=100 && $3<=50" skip ${4=1}
-  m "cphoto : p=$1,,,{iM}
+  m=min(w,h) err=int($m/25) if $err<$3 error[] "\n[afre]>_<) cleanphoto: Section image$? into no more than "{max(sqr($err),1)}" ("{max($err,1)}"x"{max($err,1)}") regions." fi
+  m "ip : p=$1,,,{iM}
     +erode_threshold $p dilate_threshold. $p afre_gui1. .. c. 0,100%
-    +afre_edge.. 1,1,4,4 afre_box. 1 c. 0,$2% n. 0,1 blend_fade[0,1] . k[0]"
-  if $3<0 v + afre_section {-$3} elif $3<2 cphoto
-  else e[] "[afre]^_^) cleanphoto: Clean dust and scratches from image$? using size=$1, recovery=$2, xy_sections=$3 and masks=${4--1}."
-    repeat $! l[$>]
-      s yx,$3 l[{cut([${4--1}]-1,0,sqr($3)-1)}] repeat $! l[$>] +cphoto
-        +gaussian.. {[w,h]*.3} c. 0,50% n. 0,1 blend_fade[0,1] . k[0]
-      endl done endl append_tiles $3
-    endl done um cphoto fi
+    +afre_edge.. 1,1,4,4 afre_box. 1 c. 0,$2% n. 0,1 +blend_fade[0,1] . k[0,-1]
+    +gaussian. {[w,h]*.3} c. 0,50% n. 0,1 blend_fade[0,1] . k[0]"
+  e[] "[afre]^_^) cleanphoto: Clean dust and scratches from image$? using size=$1, recovery=$2, xy_sections=$3 and masks=${4--1}."
+  repeat $! l[$>] if $3>1
+    iM={iM} w0,h0={[w,h]} w,h={[w,h]/$3} 100%,100%,1,3 l. (${4--1})
+      c. 1,{sqr($3)} round. sort. discard. unroll. x
+      repeat w v={i($>)} i={$v%$3?$v%$3:$3} j={($v+$3-$i)/$3}
+        r={[$w*$i-$w,$h*$j-$h,$w*$i-1,$h*$j-1]} rectangle[0] $r,1,$iM
+      done rm. label_fg 0 r {[$w0,$h0]+2},1,3,0,0,.5,.5
+      repeat iM +==[0] {$>+1} coord=${"
+        w={w} h={h} val={i(w-1,h-1)} +=. {1+$val},100%,100%,100%
+        autocrop. =. $val,100%,100%,100% x0={$w-w} y0={$h-h} rm.
+        +autocrop. x1={$x0+w-1} y1={$y0+h-1} rm. u $x0,$y0,$x1,$y1
+      "} rm. ($coord) done
+    a[^0] y endl r[0] {[$w0,$h0]+2},1,3,0,0,.5,.5
+    repeat h x0,y0,x1,y1={@{[0,1,2,3]+4*$>}} +z[0,1] $x0,$y0,$x1,$y1
+      +ip.. f. i#4?i#5:i#3 j[0] .,$x0,$y0 rm[-3--1]
+    done k[0] r {[$w0,$h0]},1,3,0,0,.5,.5
+  else ip
+  fi endl done um ip
 
 #@cli afre_cleanphoto2 : 1<=radius<=10,1<=_xy_sections<=50,_maskN>=1,...
 #@cli : Clean dust and scratches from photos.
