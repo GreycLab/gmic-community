@@ -279,7 +279,7 @@ afre_gleam : check "${1=3}>=2 && ${2=50}>=10 && $1<=100 && $2<=90"
 afre_gleam_preview :
   afre_gleam $*
 
-#@gui Half & half : afre_halfhalf, afre_halfhalf_preview(0)+ : *
+#@gui Half & half : afre_halfhalf, afre_halfhalf_preview(0)+
 #@gui : note = note("<strong>Stitch left and right halves of 2 images, respectively.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2020-Feb21.</strong>\n\n
 #@gui : * Remember to set <strong>Input layers</strong>.\n
 #@gui : * <strong>Match size</strong> doesn't work in Krita.\n\n")
@@ -297,6 +297,24 @@ afre_halfhalf : check isbool(${1=0})
 
 afre_halfhalf_preview :
   afre_halfhalf $*
+
+#@gui Portrait Montage : afre_portraitmontage, afre_portraitmontage_preview(0)+
+#@gui : note = note("<strong>Generate portrait montage.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2020Jun28.</strong>\n\n
+#@gui : - Set <strong>Input layers</strong> to <strong>All</strong>.\n
+#@gui : - Portraits should be centred and have the same dimensions.\n\n")
+#@gui : Spacing = int(5,0,10)
+#@gui : Colour = color(230,255,230)
+#@cli afre_portraitmontage : 0<=spacing<=10,0<=_colour={[R,G,B]}<=255
+#@cli : Generate portrait montage.
+#@cli : Default values: 'spacing=5' and 'colour=230,255,230'.\n
+#@cli : Portraits should be centred and have the same dimensions.
+afre_portraitmontage : check "${1=5}>=0 && ${2=230}>=0 && ${3=255}>=0 && ${4=230}>=0 && $1<=10"
+  repeat $! l[$>] +f. 1 +circle. 50%,50%,{min(w,h)*.49} n[0,1] 0,255
+  -[1] 1 blend_fade[0,1] . k[0] frame {[$1,$1]*min(w,h)*.01},-1 endl done
+  append_tiles 0 replace_color 0,0,-1,-1,-1,$2,$3,$4
+
+afre_portraitmontage_preview :
+  afre_portraitmontage $*
 
 
 #@cli Core Commands
@@ -339,34 +357,80 @@ afre_reorder :
 #@cli : Section selected images into numbered regions.
 #@cli : Default value: 'xy_sections=20'.
 afre_section : check "${1=20}>=1 && $1<=50"
+  m=min(w,h) err=int($m/25) if $err<$1 error[] "\n[afre]>_<) section: Section image$? into no more than "{max(sqr($err),1)}" ("{max($err,1)}"x"{max($err,1)}") regions." fi
   e[] "[afre]^_^) section: Section image$? into "{sqr($1)}" ($1x$1) numbered regions."
   repeat $! l[$>]
     im,iM={[im,iM]} s yx,$1 repeat $!
-      text[$>] {$>+1},.5~,.5~,60%,.9,$im
-      text[$>] {$>+1},.5~,.5~,61%,.9,$iM
+      t[$>] {$>+1},.5~,.5~,{$m*.55},.9,$im t[$>] {$>+1},.5~,.5~,{$m*.56},.9,$iM
     done append_tiles $1
     grid {100/$1}%,{100/$1}%,,,.2,$im
     grid {100/$1}%,{100/$1}%,-1,-1,.2,$iM
   endl done
 
-#@cli afre_cleanphoto : 2<=size<=10,1<=_recovery<=100,-50<=_xy_sections<=50,_mask1>=1,_mask2>=1,...
+#@cli afre_cleanphoto : 2<=size<=10,1<=_recovery<=100,-50<=_xy_sections<=50,_maskN>=1,...
 #@cli : Clean dust and scratches from photos.
-#@cli : Default values: 'size=3', 'recovery=10', 'xy_sections=1' and 'mask1=1'.\n
-#@cli : 'xy_sections' has special properties.
-#@cli : - 'xy_sections>0': process masked regions specified by 'mask1','mask2',...
-#@cli : - 'xy_sections<0': assign and display numbered regions.
+#@cli : Default values: 'size=3', 'recovery=10', 'xy_sections=1' and 'maskN=1'.\n
+#@cli : - 'xy_sections' sections image into MxM labeled regions.
+#@cli : \ \ \ For global processing, set 'xy_sections' to 1.
+#@cli : \ \ \ To visualize these regions with labels, use a negative number.
+#@cli : - 'maskN' is a comma separated list of regions to be processed.
 afre_cleanphoto : check "${1=3}>=2 && ${2=10}>=1 && ${3=1}>=-50 &&
     $1<=10 && $2<=100 && $3<=50" skip ${4=1}
-  m "cphoto : p=$1,,,{iM}
+  m=min(w,h) err=int($m/25) if $err<$3 error[] "\n[afre]>_<) cleanphoto: Section image$? into no more than "{max(sqr($err),1)}" ("{max($err,1)}"x"{max($err,1)}") regions." fi
+  m "ip : p=$1,,,{iM}
     +erode_threshold $p dilate_threshold. $p afre_gui1. .. c. 0,100%
-    +afre_edge.. 1,1,4,4 afre_box. 1 c. 0,$2% n. 0,1 blend_fade[0,1] . k[0]"
-  if $3<0 v + afre_section {-$3} elif $3<2 cphoto
-  else e[] "[afre]^_^) cleanphoto: Clean dust and scratches from image$? using size=$1, recovery=$2, xy_sections=$3 and masks=${4--1}."
-    repeat $! l[$>]
-      s yx,$3 l[{cut([${4--1}]-1,0,sqr($3)-1)}] repeat $! l[$>] +cphoto
-        +gaussian.. {[w,h]*.5} c. 0,50% n. 0,1 blend_fade[0,1] . k[0]
-      endl done endl append_tiles $3
-    endl done um cphoto fi
+    +afre_edge.. 1,1,4,4 afre_box. 1 c. 0,$2% n. 0,1 +blend_fade[0,1] . k[0,-1]
+    +gaussian. {[w,h]*.3} c. 0,50% n. 0,1 blend_fade[0,1] . k[0]"
+  e[] "[afre]^_^) cleanphoto: Clean dust and scratches from image$? using size=$1, recovery=$2, xy_sections=$3 and masks=${4--1}."
+  repeat $! l[$>] if $3>1
+    iM={iM} w0,h0={[w,h]} w,h={[w,h]/$3} 100%,100%,1,3 l. (${4--1})
+      c. 1,{sqr($3)} round. sort. discard. unroll. x
+      repeat w v={i($>)} i={$v%$3?$v%$3:$3} j={($v+$3-$i)/$3}
+        r={[$w*$i-$w,$h*$j-$h,$w*$i-1,$h*$j-1]} rectangle[0] $r,1,$iM
+      done rm. label_fg 0 r {[$w0,$h0]+2},1,3,0,0,.5,.5
+      repeat iM +==[0] {$>+1} coord=${"
+        w={w} h={h} val={i(w-1,h-1)} +=. {1+$val},100%,100%,100%
+        autocrop. =. $val,100%,100%,100% x0={$w-w} y0={$h-h} rm.
+        +autocrop. x1={$x0+w-1} y1={$y0+h-1} rm. u $x0,$y0,$x1,$y1
+      "} rm. ($coord) done
+    a[^0] y endl r[0] {[$w0,$h0]+2},1,3,0,0,.5,.5
+    repeat h x0,y0,x1,y1={@{[0,1,2,3]+4*$>}} +z[0,1] $x0,$y0,$x1,$y1
+      +ip.. f. i#4?i#5:i#3 j[0] .,$x0,$y0 rm[-3--1]
+    done k[0] r {[$w0,$h0]},1,3,0,0,.5,.5
+  else ip
+  fi endl done um ip
+
+#@cli afre_cleanphoto1 : 1<=radius<=10,1<=_xy_sections<=50,_maskN>=1,...
+#@cli : Clean dust and scratches from photos.
+#@cli : Default values: 'radius=3', 'xy_sections=1' and 'maskN=1'.\n
+#@cli : - 'xy_sections' sections image into MxM labeled regions.
+#@cli : \ \ For global processing, set 'xy_sections' to 1.
+#@cli : - 'maskN' is a comma separated list of regions to be processed.
+#@cli : \ \ Use 'afre_section' to determine region labels.
+afre_cleanphoto1 : check "${1=3}>=1 && ${2=1}>=1 &&
+    $1<=10 && $2<=50" skip ${3=1}
+  m=min(w,h) err=int($m/25) if $err<$2 error[] "\n[afre]>_<) cleanphoto: Section image$? into no more than "{max(sqr($err),1)}" ("{max($err,1)}"x"{max($err,1)}") regions." fi
+  m "ip : s={$1*2+1} +l +erode_oct $s dilate_oct. $s - c 0,100% ^ 2
+    c 5%,10% dilate_oct 3 n 0,1 endl +inpaint_pde.. . rm..
+    +gaussian. {[w,h]*.3} c. 0,50% n. 0,1 blend_fade[0,1] . k[0]"
+  e[] "[afre]^_^) cleanphoto: Clean dust and scratches from image$? using radius=$1, xy_sections=$2 and maskN=${3--1}."
+  repeat $! l[$>] if $2>1
+    iM={iM} w0,h0={[w,h]} w,h={[w,h]/$2} 100%,100%,1,3 l. (${3--1})
+      c. 1,{sqr($2)} round. sort. discard. unroll. x
+      repeat w v={i($>)} i={$v%$2?$v%$2:$2} j={($v+$2-$i)/$2}
+        r={[$w*$i-$w,$h*$j-$h,$w*$i-1,$h*$j-1]} rectangle[0] $r,1,$iM
+      done rm. label_fg 0 r {[$w0,$h0]+2},1,3,0,0,.5,.5
+      repeat iM +==[0] {$>+1} coord=${"
+        w={w} h={h} val={i(w-1,h-1)} +=. {1+$val},100%,100%,100%
+        autocrop. =. $val,100%,100%,100% x0={$w-w} y0={$h-h} rm.
+        +autocrop. x1={$x0+w-1} y1={$y0+h-1} rm. u $x0,$y0,$x1,$y1
+      "} rm. ($coord) done
+    a[^0] y endl r[0] {[$w0,$h0]+2},1,3,0,0,.5,.5
+    repeat h x0,y0,x1,y1={@{[0,1,2,3]+4*$>}} +z[0,1] $x0,$y0,$x1,$y1
+      +ip.. f. i#4?i#5:i#3 j[0] .,$x0,$y0 rm[-3--1]
+    done k[0] r {[$w0,$h0]},1,3,0,0,.5,.5
+  else ip
+  fi endl done um ip
 
 #@cli afre_compare : crop={ 1=once | 2=twice },_layout={ x | y | z | tile },_normalize={ 0 | 1 }
 #@cli : Crop then compare selected images interactively.
@@ -536,8 +600,8 @@ afre_gui1c : check ${is_image_arg\ $1}" && "${is_image_arg\ $2}" && ${3=1e-2}>=0
 
 # List of Commands and Filters
 #-----------------------------
-# GUI CLI : afre_edge afre_cleantext afre_vigrect afre_vigcirc afre_softlight afre_sharpenfft afre_contrastfft afre_gleam afre_halfhalf
-# CLI only: afre_gnorm afre_hnorm afre_sdpatch afre_reorder afre_section afre_cleanphoto afre_compare afre_log2 afre_y50 afre_orien afre_conv afre_box afre_gui0 afre_gui1 afre_gui0c afre_gui1c
+# GUI CLI : afre_edge afre_cleantext afre_vigrect afre_vigcirc afre_softlight afre_sharpenfft afre_contrastfft afre_gleam afre_halfhalf afre_portraitmontage
+# CLI only: afre_gnorm afre_hnorm afre_sdpatch afre_reorder afre_section afre_cleanphoto afre_cleanphoto1 afre_compare afre_log2 afre_y50 afre_orien afre_conv afre_box afre_gui0 afre_gui1 afre_gui0c afre_gui1c
 # GUI only: fx_darken_sky fx_gamify fx_hnorm
 
 
