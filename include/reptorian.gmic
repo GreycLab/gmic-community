@@ -44,6 +44,36 @@
 #
 #-------------------------------
 
+#@cli rep_edgefade: radius>0,_exponential_factor>0 : radius>0,_exponential_factor>0,_nl_amplitude>0,0<_n_smooth<=1,0<_a_smooth<=1
+#@cli : Fade edges on alpha. Only applicable for images with 2 channels or 4+ channels. The last channel is the alpha channel.\n
+#@cli : Note: Execute 'gmic h normalize_local' for more information on '_nl_amplitude','_n_smooth', and '_a_smooth'. nl is short for normalize_local.\n
+#@cli : Default values: '_exponential_factor=0','_nl_amplitude=0','_n_smooth=4%','_a_smooth=5%'
+rep_edgefade:
+skip ${2=1},${3=0},${4=4%},${5=2%}
+repeat $! l[$>]
+    if s==2||s>=4
+        sh. {s-1} Mval={iM#-1} n. 0,1 rm.
+        +channels {s-1}
+        r2dx. 200%,3
+        l.
+            if $3 
+                +normalize_local. $3,{$1*200%},$4,$5,1,0,1 
+                n. 0,1 
+            fi
+            +f. i?1
+            +erode_circ[{$3?1:0}] {$1*4} f. i>.5?1
+            +f[{$3?1:0}] i#0!=0?(i#-2!=i#-1?1):0
+            inpaint_pde.. [-1]
+            f.. i^$2
+            replace_nan.. 0
+            f[0] i*i#-2
+            k[0]
+            r2dx 50%,3
+        endl
+        sh[0] {s#0-1}
+        *. .. *. $Mval rm[-2,-1]
+    fi
+endl done
 #@cli rep_kodl: eq. to 'rep_keep_original_dimension_and_or_layer' : (+)
 rep_kodl:
 _gmic_s="$?" v + _rep_keep_original_dimension_and_or_layer $"*"
@@ -8697,6 +8727,31 @@ repeat $! l[$>]
 endl done
 fx_rep_loupasc_ordered_dither_preview:
 gui_split_preview "fx_rep_loupasc_ordered_dither ${1-3}",${-3--1}
+#@gui Edge Fade: fx_rep_edgefade,fx_rep_edgefade_preview(0)
+#@gui :_=note("<b>Main</b>")
+#@gui :Half-Hypothenuse (%)=float(10,.1,100)
+#@gui :Exponential Factor=float(2,0,3)
+#@gui :_=separator(),_=note("<b>Local Normalization</b>")
+#@gui :Amplitude=float(0,0,15)
+#@gui :Neighborhood Smoothness (%)=float(4,.1,100)
+#@gui :Average Smoothness (%)=float(2,.1,100)
+#@gui :_=separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui :_=separator(), _=note("<small>Author: Reptorian. Latest Update: <i>2020/7/13</i>.</small>")
+fx_rep_edgefade:
+hypo={sqrt(sqr(w)+sqr(h)}
+hypo/=2
+hypo*=$1%
+hypo={round($hypo)}
+rep_edgefade $hypo,${2-3},$4%,$5%
+fx_rep_edgefade_preview:
+gui_split_preview "rep_edgefade ${1-5}",${-3--1}
+u "{$1}"\
+"{$2}"\
+"{$3}"\
+"{$4}_"{$3?2:1}\
+"{$5}_"{$3?2:1}\
+"{$6}"\
+"{$7,$8}"
 ######################
 
 # Local Variables:
