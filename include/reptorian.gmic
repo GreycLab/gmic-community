@@ -44,6 +44,34 @@
 #
 #-------------------------------
 
+#@cli rep_jr_bps : eq. to 'rep_jr_bitplane_shuffler' : (+)
+rep_jr_bps: rep_jr_bitplane_shuffler $*
+#@cli rep_jr_bitplane_shuffler: _bitdepth,_binary_swap={ 0=reverse | 1=forward },_seed
+#@cli : Apply bit plane swapping per pixels.
+#@cli : (eq. to 'rep_jr_bps')\n
+#@cli : Note: You can apply negative number to _binary_swap to use reverse effect.\n
+#@cli : Default values: '_bitdepth=8','_binary_swap=1','_seed=?'
+rep_jr_bitplane_shuffler:
+skip ${1=8},${2=1},${3=u(0,1000000)}
+repeat $! l[$>]
+    repeat s
+        sh. $>
+        f. "begin(
+            const bits=$1;
+            const mb=2^bits;
+            srand(mb*$3);
+            shuf=index=vectorbits(0);
+            for(n=0,n<bits,n++,shuf[n]=index[n]=n);
+            for(n=0,n<bits,n++,m=int(u(0,mb))%bits;swap(shuf[m],shuf[n]);srand(m+n+1));
+            ($2>0)?(swap(shuf,index));
+        );
+        val=0;
+        for(n=0,n<bits,n++,(int(i/(2^index[n]))%2)?(val+=(2^shuf[n])));
+        val
+        "
+        rm.
+    done
+endl done
 #@cli rep_edgefade: radius>0,_exponential_factor>0 : radius>0,_exponential_factor>0,_nl_amplitude>0,0<_n_smooth<=1,0<_a_smooth<=1
 #@cli : Fade edges on alpha. Only applicable for images with 2 channels or 4+ channels. The last channel is the alpha channel.\n
 #@cli : Note: Execute 'gmic h normalize_local' for more information on '_nl_amplitude','_n_smooth', and '_a_smooth'. nl is short for normalize_local.\n
@@ -8764,6 +8792,15 @@ u "{$1}_"{!$3?2}\
 "{$7}_"{$5?2:1}\
 "{$8}"\
 "{$9,$10}"
+#@gui Bit Plane Shuffler: fx_rep_jr_bps,fx_rep_jr_bps_preview(0)
+#@gui :Depth=choice(0,"8-Bit","16-Bit")
+#@gui :Direction=choice(0,"Forward","Backward")
+#@gui :Seed=int(5000,0,10000)
+#@gui :_=separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui :_=separator(), _=note("<small>Author: Reptorian.,Joan Rake Latest Update: <i>2020/7/18</i>.</small>")
+fx_rep_jr_bps:rep_jr_bitplane_shuffler {($1*8)+8},${2-3}
+fx_rep_jr_bps_preview:
+gui_split_preview "fx_rep_jr_bps ${1-3}",${-3--1}
 ######################
 
 # Local Variables:
