@@ -957,110 +957,106 @@ fx_split_luminance:
 
 # Sub, Contrast bias factor, returns absolute laplacian
 Sub_Contrast_Bias:
-/. 255
-to_gray.
-laplacian.
-abs.
-# End Of Sub
+  /. 255
+  to_gray.
+  laplacian.
+  abs.
 
 # Sub, Saturation bias factor, returns standard deviatin of picel values
 Sub_Saturation_Bias:
-# 1: Calculate average values
-/. 255
-+s[0] c
-blend[-1,-2,-3] average # Destroyes images 1,2,3, leaves 0 and 1
-# 2: Calculate difference values
-s[0] c #  images ,0, R1,G2,B3; 0 contains average
-# Probable error on removing next image.
-# Commented out on 30.11.2014
-# rm[0]
-+-[0] [1] # images ,0, R1,G2,B3,DR4
-rm[1] # images ,0,,G2,B3,DR4
-+-[0] [1] # images 0,,G1,B2,DR3,DG4
-rm[1] # images ,0,,,B1,DR2,DG3
-+-[0] [1] # images 0,,,B1,DR2,DG3,DB4
-rm[1] # images ,0,,,,DR1,DG2,DB3
-rm[0] # images ,,,,,DR1,DG2,DB3
-# Raise to power
-^[0] 2 # DR1²
-^[1] 2 # DR2²
-^[2] 2 # DR3³
-# sum
-+[1] [2] # DR1²,DR3²+DR2²,DR3²
-rm[2]
-+[0] [1] # DR1²+(DR3²+DR2²),DR3²+DR2²
-rm[1] # DR1²+(DR3²+DR2²)
-# Population has three datapoints, divide by 3
-/[0] 3
-# Standard deviation
-sqrt[0]
-# End Of Sub
+  # 1: Calculate average values
+  /. 255
+  +s[0] c
+  blend[-1,-2,-3] average # Destroyes images 1,2,3, leaves 0 and 1
+  # 2: Calculate difference values
+  s[0] c #  images ,0, R1,G2,B3; 0 contains average
+  # Probable error on removing next image.
+  # Commented out on 30.11.2014
+  # rm[0]
+  +-[0] [1] # images ,0, R1,G2,B3,DR4
+  rm[1] # images ,0,,G2,B3,DR4
+  +-[0] [1] # images 0,,G1,B2,DR3,DG4
+  rm[1] # images ,0,,,B1,DR2,DG3
+  +-[0] [1] # images 0,,,B1,DR2,DG3,DB4
+  rm[1] # images ,0,,,,DR1,DG2,DB3
+  rm[0] # images ,,,,,DR1,DG2,DB3
+  # Raise to power
+  ^[0] 2 # DR1²
+  ^[1] 2 # DR2²
+  ^[2] 2 # DR3³
+  # sum
+  +[1] [2] # DR1²,DR3²+DR2²,DR3²
+  rm[2]
+  +[0] [1] # DR1²+(DR3²+DR2²),DR3²+DR2²
+  rm[1] # DR1²+(DR3²+DR2²)
+  # Population has three datapoints, divide by 3
+  /[0] 3
+  # Standard deviation
+  sqrt[0]
 
 # Sub, Exposure bias factor
 # Wchannel=exp(-(V-0.5)²/(2*sigma*sigma))
 # V-0.5
 Sub_Exposure_Bias :
-/[0] 255
--[0] 0.5
-^[0] 2
-/[0] {2*$1*$1}
-*[0] -1
-exp[0]
-s[0] c # 1,2,3
-*[0] [2]
-rm[2]
-*[0] [1]
-rm[1]
-# End Of Sub
+  /[0] 255
+  -[0] 0.5
+  ^[0] 2
+  /[0] {2*$1*$1}
+  *[0] -1
+  exp[0]
+  s[0] c # 1,2,3
+  *[0] [2]
+  rm[2]
+  *[0] [1]
+  rm[1]
 
 # Sub, Pyramid bluring
 Sub_BlurPyramid :
-# Calculate size
-size={0,min(w,h)}
-levels={round(log($size)/log(5))}
-Deviation=1
+  # Calculate size
+  size={0,min(w,h)}
+  levels={round(log($size)/log(5))}
+  Deviation=1
 
-# Scale down and blur
-b[0] $Deviation,1,1 # Blur image 100
-repeat {$levels-1}
-	+resize. 50%,50%,5,1 # Scale subsequently down, create {$levels-1} images
-	b. $Deviation,1,1 # Blur scaled image
-done
+  # Scale down and blur
+  b[0] $Deviation,1,1 # Blur image 100
+  repeat $levels-1
+    +resize. 50%,50%,5,1 # Scale subsequently down, create {$levels-1} images
+    b. $Deviation,1,1 # Blur scaled image
+  done
 
-# Scale up and blend
-blndalpha=0.5
-repeat {$levels-1}
-	index={-($<+1)} # Image index to blend, start at next step of pyramid and progress to smaller iteratins
-	resize[$index] [0],5,1
-	blend[0,$index] alpha,$blndalpha,0
-	blndalpha={$blndalpha/2} # Reduce opacity of blending by factor of 2 on each iteration
-done
+  # Scale up and blend
+  blndalpha=0.5
+  repeat $levels-1
+    index={-($<+1)} # Image index to blend, start at next step of pyramid and progress to smaller iteratins
+    resize[$index] [0],5,1
+    blend[0,$index] alpha,$blndalpha,0
+    blndalpha={$blndalpha/2} # Reduce opacity of blending by factor of 2 on each iteration
+  done
 
 # Main, Combined weight
 fx_ExposureWeightMap :
-wc=$1
-ws=$2
-sigma=$3
-we=$4
-BlurMap=$5
-to_rgb[0]
-+Sub_Contrast_Bias[0] # CB, 0,1
-+Sub_Saturation_Bias[0] # SB, 0,1,2
-+Sub_Exposure_Bias[0] $sigma # EB, 0,1,2,3
-rm[0] # 0,1,2
-# Weight W=CB^wc+SB^ws+EB^we
-^[0] $wc
-^[1] $ws
-^[2] $we
-+[0] [1]
-+[0] [2]
-k[0]
-n[0] 0,255
-# Blur mask
-if {$BlurMap==1}
-		sub_BlurPyramid[0]
-fi
-# End Of Main
+  wc=$1
+  ws=$2
+  sigma=$3
+  we=$4
+  BlurMap=$5
+  to_rgb[0]
+  +Sub_Contrast_Bias[0] # CB, 0,1
+  +Sub_Saturation_Bias[0] # SB, 0,1,2
+  +Sub_Exposure_Bias[0] $sigma # EB, 0,1,2,3
+  rm[0] # 0,1,2
+  # Weight W=CB^wc+SB^ws+EB^we
+  ^[0] $wc
+  ^[1] $ws
+  ^[2] $we
+  +[0] [1]
+  +[0] [2]
+  k[0]
+  n[0] 0,255
+  # Blur mask
+  if $BlurMap==1
+    sub_BlurPyramid[0]
+  fi
 
 fx_ExposureWeightMapPreview :
   gui_split_preview "fx_ExposureWeightMap ${1--2}",$-1
