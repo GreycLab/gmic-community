@@ -1605,44 +1605,42 @@ fx_WarpTest :
 #@gui : Colored? = bool(0)
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse")
 #@gui : sep = separator(), note = note("<small>Author : <i>Arto Huotari</i>.      Latest update : <i>2013/09/28</i>.</small>")
-
 fx_dodgesketch:
-# remove alpha channel
-to_rgb[0]
-Power=$1
-SpatialVariance=$2
-ValueVariance=$3
-Iterations=$4
-Colored=$5
+  # Remove alpha channel
+  to_rgb[0]
+  Power=$1
+  SpatialVariance=$2
+  ValueVariance=$3
+  Iterations=$4
+  Colored=$5
 
-# Remove color, add as new incase org can be later used for "colored"
-+fx_mix_hsv[0] 1,0,0,0,-1,0,1,0,0,0,2,0
-# Smooth with bilateral filter
-+fx_smooth_bilateral. $SpatialVariance,$ValueVariance,$Iterations,0,0
-# Invert colors of smoothed image
-negate.
-# Compose inverted image with 0.5 opacity to BW
-blend[-1,-2] alpha,0.5,0
-# Take duplicate of previous
-.
-# Make BW lines
-+blend[-1,-2] dodge,1,0
-# Clear mem
-k[0,-1]
+  # Remove color, add as new incase org can be later used for "colored"
+  +fx_mix_hsv[0] 1,0,0,0,-1,0,1,0,0,0,2,0
+  # Smooth with bilateral filter
+  +fx_smooth_bilateral. $SpatialVariance,$ValueVariance,$Iterations,0,0
+  # Invert colors of smoothed image
+  negate.
+  # Compose inverted image with 0.5 opacity to BW
+  blend[-1,-2] alpha,0.5,0
+  # Take duplicate of previous
+  .
+  # Make BW lines
+  +blend[-1,-2] dodge,1,0
+  # Clear mem
+  k[0,-1]
 
-# Use repeat loop to multiply the sketch
-repeat $Power
-	.
-	blend[-1,-2] multiply
-done
+  # Use repeat loop to multiply the sketch
+  repeat $Power
+    .
+    blend[-1,-2] multiply
+  done
 
-if {$Colored==1}
-	+blend[-1,-2] hardlight # image -1 i.e. image 3
-	rm..
-	fx_transfer_colors[-1,-2] 0,0
-fi
-
-k.
+  if $Colored==1
+    +blend[-1,-2] hardlight # image -1 i.e. image 3
+    rm..
+    fx_transfer_colors[-1,-2] 0,0
+  fi
+  k.
 
 fx_dodgesketchpreview :
   gui_split_preview "fx_dodgesketch ${1--2}",$-1
@@ -1663,61 +1661,60 @@ fx_dodgesketchpreview :
 #@gui : note = note("Optional viewing of vector field")
 #@gui : Show Quiver = bool(0)
 #@gui : sep = separator(), note = note("<small>Author : <i>Arto Huotari</i>.      Latest update : <i>2012/02/25</i>.</small>")
-
 fx_MappedSmooth :
-# Variables
-MapType=$1
-fi={$2*3.1415/180}
-ZeroOffset=$3
-Amplitude=$4
-LMult=$5
-ShowQuiver=$6
+  # Variables
+  MapType=$1
+  fi={$2*3.1415/180}
+  ZeroOffset=$3
+  Amplitude=$4
+  LMult=$5
+  ShowQuiver=$6
 
-if {$MapType==0}
-	+fx_local_orientation 0.5,0,100,0,4,0
-fi
+  if $MapType==0
+    +fx_local_orientation 0.5,0,100,0,4,0
+  fi
 
-# Angles for rotation
-cosfi={cos($fi)}
-sinfi={sin($fi)}
+  # Angles for rotation
+  cosfi={cos($fi)}
+  sinfi={sin($fi)}
 
-to_rgb[-2,-1]
-# set origin 128,128 to 0,0
--. {128+$ZeroOffset}
+  to_rgb[-2,-1]
+  # Set origin 128,128 to 0,0
+  -. {128+$ZeroOffset}
 
-s. c # there were 2 images in the stack, now there are 4, 0,1,2,3, -1 was used in split
-# Force blue channel to 0
-*[3] 0
-# Channel -3 = X values = image [1]
-# Channel -2 = Y values = image [2]
-# Channel -1 is zero = image [3]
-# Rotation for X coord is x'=Xcosfi-Ysinfi
-# Calculate first Xcosfi and Ycosfi to new image
-+*[1] $cosfi # xcosfi this is now image 4
-+*[2] $sinfi # ysinfi this is now image 5
-# Calculate new X coord
--[4] [5]
-rm[5]
-# Calculate new Y coord y'=Xsinfi+Ycosfi
-+*[1] $sinfi # xsinfi this is now image 5
-+*[2] $cosfi # yxosfi this is now image 6
-+[5] [6]
-rm[6]
-rm[1,2] # Image 3 becomes 1, 4x' becomes 2 and 5y' becomes 3
-rm[1] 	# Image 1z deleted, 2x' becomes 1 and 3y' becomes 2
-100%,100%,100%,1,0
-a[1,2,3] c
-# Divide with 128 to "normalize" between -1 1 (not true for non zero offsets)
-/. {128/$LMult}
-channels. 0,1
-if {$ShowQuiver==0}
-	vector2tensor.
-	smooth.. .,$Amplitude
-fi
-if {$ShowQuiver==1}
-	quiver.. .,10,{$Amplitude/20},1,0.8,255
-fi
-rm.
+  s. c # There were 2 images in the stack, now there are 4, 0,1,2,3, -1 was used in split
+  # Force blue channel to 0
+  *[3] 0
+  # Channel -3 = X values = image [1]
+  # Channel -2 = Y values = image [2]
+  # Channel -1 is zero = image [3]
+  # Rotation for X coord is x'=Xcosfi-Ysinfi
+  # Calculate first Xcosfi and Ycosfi to new image
+  +*[1] $cosfi # xcosfi this is now image 4
+  +*[2] $sinfi # ysinfi this is now image 5
+  # Calculate new X coord
+  -[4] [5]
+  rm[5]
+  # Calculate new Y coord y'=Xsinfi+Ycosfi
+  +*[1] $sinfi # xsinfi this is now image 5
+  +*[2] $cosfi # yxosfi this is now image 6
+  +[5] [6]
+  rm[6]
+  rm[1,2] # Image 3 becomes 1, 4x' becomes 2 and 5y' becomes 3
+  rm[1] 	# Image 1z deleted, 2x' becomes 1 and 3y' becomes 2
+  100%,100%,100%,1,0
+  a[1,2,3] c
+  # Divide with 128 to "normalize" between -1 1 (not true for non zero offsets)
+  /. {128/$LMult}
+  channels. 0,1
+  if $ShowQuiver==0
+    vector2tensor.
+    smooth.. .,$Amplitude
+  fi
+  if $ShowQuiver==1
+    quiver.. .,10,{$Amplitude/20},1,0.8,255
+  fi
+  rm.
 
 #****************************************
 # Gimp Rotation Demo
@@ -1727,35 +1724,35 @@ rm.
 #@gui : Angle Shift = float(0,-180,180)
 #@gui : sep = separator(), note = note("<small>Author : <i>Arto Huotari</i> with help from <i>David Tschumperl&#233;</i>.     Latest update : <i>2012/02/25</i>.</small>")
 fx_DemoVecRot :
-angle=$1
-# Force to RGB (remove possible alpha channel)
-to_rgb[0]
-# Take a copy of the input to work on
-[0]
-# Force the copy to RGB just in case. This is not actually needed and just takes time.
-to_rgb.
-# Split image along channels
-s. c
-# Subtract 128 from red and green channels
--.. 128
--... 128
-# Append channels back to one image
-a[-3,-2,-1] c
-# Drop third channel from the field
-# other vise matrix multiplication at rotation and quiver will not work
-channels. 0,1
-# Divide by 128 to scale length
-/. 128
-# Rotation code from David
-	# 200,200,1,2 200x200x1 px only two channels
-	rotation3d 0,0,1,$angle # It seems this creates a new image "a rotation matrix"
-	z. 0,0,1,1 # This crops the rotation matrix, I do not know why
-	mix_channels.. ({@0-1};{@2-3}) # Channel mixer is used here with the rotation matrix
-	rm. # remove rotation matrix
-# End rotation code
-# Quiver takes only two channels in. It will give an error othervise
-quiver.. .,10,10,1,0.8,255
-k..
+  angle=$1
+  # Force to RGB (remove possible alpha channel)
+  to_rgb[0]
+  # Take a copy of the input to work on
+  [0]
+  # Force the copy to RGB just in case. This is not actually needed and just takes time.
+  to_rgb.
+  # Split image along channels
+  s. c
+  # Subtract 128 from red and green channels
+  -.. 128
+  -... 128
+  # Append channels back to one image
+  a[-3,-2,-1] c
+  # Drop third channel from the field
+  # other vise matrix multiplication at rotation and quiver will not work
+  channels. 0,1
+  # Divide by 128 to scale length
+  /. 128
+  # Rotation code from David
+  # 200,200,1,2 200x200x1 px only two channels
+  rotation3d 0,0,1,$angle # It seems this creates a new image "a rotation matrix"
+  z. 0,0,1,1 # This crops the rotation matrix, I do not know why
+  mix_channels.. ({@0-1};{@2-3}) # Channel mixer is used here with the rotation matrix
+  rm. # remove rotation matrix
+  # End rotation code
+  # Quiver takes only two channels in. It will give an error othervise
+  quiver.. .,10,10,1,0.8,255
+  k..
 
 
 #****************************************
@@ -1768,15 +1765,12 @@ k..
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse")
 #@gui : sep = separator(), note = note("<small>Author : <i>Arto Huotari</i>.      Latest update : <i>2011/12/06</i>.</small>")
 ##@gui : note = link("Filter Explained here","http://gmic.sourceforge.net/reference.shtml")
-
 fx_StructureTensors:
   structuretensors abs ^ $1
   n 0,255
 
 fx_StructureTensorsPreview :
   gui_split_preview "fx_StructureTensors ${1--2}",$-1
-
-#************END OF FILTER*************
 
 
 #****************************************
@@ -1796,44 +1790,43 @@ fx_StructureTensorsPreview :
 #@gui : Paper Whiteness = int(245,0,255)
 #@gui : Squiggle Gamma = int(45,1,128)
 #@gui : Squiggle Multiplier = float(0.5,0,1)
-
 fx_OldSquiggly :
-+fx_spread[0] $1,$1,0,0  # Spread noise (image1)
-fx_segment_watershed[1] $2,$3,0,0   # Segmentation (image1)
-+fx_gradient_norm[1] $4,$5,0,100,0,0 # Gradient norm (image2)
+  +fx_spread[0] $1,$1,0,0  # Spread noise (image1)
+  fx_segment_watershed[1] $2,$3,0,0   # Segmentation (image1)
+  +fx_gradient_norm[1] $4,$5,0,100,0,0 # Gradient norm (image2)
 
-# Create colorized squiggle
-+blend[2,1] multiply # image 3
-# Increase chroma threes have been modified from 1 and
-fx_mix_ycbcr[3] 1,0,0,$6,0,0,$6,0,0,0,2,0 # image 3
+  # Create colorized squiggle
+  +blend[2,1] multiply # image 3
+  # Increase chroma threes have been modified from 1 and
+  fx_mix_ycbcr[3] 1,0,0,$6,0,0,$6,0,0,0,2,0 # image 3
 
-# Tonemap original
-fx_map_tones[0] $7,$8,0.1,30,0,0 # image 0
-# fx_apply_curve[0] 0,30,128,-1,128,-1,128,-1,128,-1,128,255,1,3,0,0,0
-# Compose Squigglies to original
-blend[0,3] darken # it seems image 3 is destroyed in this op.
+  # Tonemap original
+  fx_map_tones[0] $7,$8,0.1,30,0,0 # image 0
+  # fx_apply_curve[0] 0,30,128,-1,128,-1,128,-1,128,-1,128,255,1,3,0,0,0
+  # Compose Squigglies to original
+  blend[0,3] darken # it seems image 3 is destroyed in this op.
 
-rm[1,2] # remove extra images to save memory 3->0
+  rm[1,2] # remove extra images to save memory 3->0
 
-# Create paper
-# +fx_plasma 0.5,10 # Image 1
-+fx_plasma 0.5,10,8,0 # Image 1
-fx_blackandwhite[1] 0.299,0,0.587,0,0.114,0,1,1,0,0,0,0,0,0,2,0,0,0,16,4,0,0,0
-# adjust paper lightness, 7 and 215 need to be parameters
-fx_apply_curve[1] $9,-1,128,-1,128,-1,128,-1,128,-1,128,$10,1,3,0,0,0
+  # Create paper
+  # +fx_plasma 0.5,10 # Image 1
+  +fx_plasma 0.5,10,8,0 # Image 1
+  fx_blackandwhite[1] 0.299,0,0.587,0,0.114,0,1,1,0,0,0,0,0,0,2,0,0,0,16,4,0,0,0
+  # adjust paper lightness, 7 and 215 need to be parameters
+  fx_apply_curve[1] $9,-1,128,-1,128,-1,128,-1,128,-1,128,$10,1,3,0,0,0
 
-# Adjust squiggly
-fx_apply_curve[0] 0,$11,128,-1,128,-1,128,-1,128,-1,128,255,1,3,0,0,0
+  # Adjust squiggly
+  fx_apply_curve[0] 0,$11,128,-1,128,-1,128,-1,128,-1,128,255,1,3,0,0,0
 
-# Combine paper and squiggly
-*[0] {0.5*(1+$12)}
-*[1] {0.5*(1-$12)}
+  # Combine paper and squiggly
+  *[0] {0.5*(1+$12)}
+  *[1] {0.5*(1-$12)}
 
-++[0] [1] # image 2
+  ++[0] [1] # image 2
 
-+blend[0,2] softlight # image 3
-rm[0,1,2]
-#************END OF FILTER*************
+  +blend[0,2] softlight # image 3
+  rm[0,1,2]
+
 
 #***********************************
 # AbstractFlood
@@ -1865,149 +1858,146 @@ rm[0,1,2]
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse")
 #@gui : sep = separator(), note = note("<small>Author : <i>Arto Huotari</i>.      Latest update : <i>2013/09/28</i>.</small>")
 #@gui : note = link("Filter Explained here","http://www.flickr.com/photos/naggobot/6243715666")
-
 fx_AbstractFlood :
 
-# Parameters from input
-Prep=$1
-SpatialVariance=$2
-ValueVariance=$3
-Iterations=$4
-ActivateFlood=$5
-Repeats=$6
-Tolerance=$7
-FloodBaseStep=$8
-CanvasR=$9
-CanvasG=$10
-CanvasB=$11
-Opacity=$12
-ActivateCubism=$13
-CubismIterations=$14
-Blocsize=$15
-Angle=$16
-CubismOpacity=$17
-Smoothness=$18
-StepThreshold={$19+0.1} # Threshold for opacity, has pixel been flooded or not
+  # Parameters from input
+  Prep=$1
+  SpatialVariance=$2
+  ValueVariance=$3
+  Iterations=$4
+  ActivateFlood=$5
+  Repeats=$6
+  Tolerance=$7
+  FloodBaseStep=$8
+  CanvasR=$9
+  CanvasG=$10
+  CanvasB=$11
+  Opacity=$12
+  ActivateCubism=$13
+  CubismIterations=$14
+  Blocsize=$15
+  Angle=$16
+  CubismOpacity=$17
+  Smoothness=$18
+  StepThreshold={$19+0.1} # Threshold for opacity, has pixel been flooded or not
 
-Step=$FloodBaseStep
-Delta=1 # Base step addition i.e. how much the bug step is increased if the pixel was not good place to make flood
-# Save delta org for later use
-DeltaOrg=$Delta
+  Step=$FloodBaseStep
+  Delta=1 # Base step addition i.e. how much the bug step is increased if the pixel was not good place to make flood
+  # Save delta org for later use
+  DeltaOrg=$Delta
 
-# add alpha channel to original just in case
-to_rgba[0]
+  # Add alpha channel to original just in case
+  to_rgba[0]
 
-# Preprocess with bilateral filtering
-if {$Prep==1}
-fx_smooth_bilateral[0] $SpatialVariance,$ValueVariance,$Iterations,0,0 # image 0
-fi
-# Make bg for composing. Bg is transparent so that alpha can be used to
-# determine if operation should be done.
-({$CanvasR}^{$CanvasG}^{$CanvasB}^0) # image 1
+  # Preprocess with bilateral filtering
+  if $Prep==1
+    fx_smooth_bilateral[0] $SpatialVariance,$ValueVariance,$Iterations,0,0 # image 0
+  fi
+  # Make bg for composing. Bg is transparent so that alpha can be used to
+  # determine if operation should be done.
+  ({$CanvasR}^{$CanvasG}^{$CanvasB}^0) # image 1
 
-to_rgba[1] # force to RGBA just in case
-r[1] [0] # resize to image size
+  to_rgba[1] # force to RGBA just in case
+  r[1] [0] # resize to image size
 
-# Start pattern from centre and proceed
-# with random walk. start/centre point is
-X={(w)/2}
-Y={(h)/2}
-# Grab image h and w for later use
-ImageH={(h)}
-ImageW={(w)}
+  # Start pattern from centre and proceed
+  # with random walk. start/centre point is
+  X={(w)/2}
+  Y={(h)/2}
+  # Grab image h and w for later use
+  ImageH={(h)}
+  ImageW={(w)}
 
-# Set DoLoop decision parameters for later use
-DoLoop=0
-IsGood=0
+  # Set DoLoop decision parameters for later use
+  DoLoop=0
+  IsGood=0
 
-# Go to loop if ActivateFlood = 1
-if {$ActivateFlood==1}
+  # Go to loop if ActivateFlood = 1
+  if $ActivateFlood==1
 
-	# A comment here is needed
-	repeat $Repeats
+    # A comment here is needed
+    repeat $Repeats
 
-		# The actual flood is done by this
-		# ellipse {100*$X/w}%,{100*$Y/h}%,{1},{1},{0},1,255,0,255
-		flood[0] {100*$X/w}%,{100*$Y/h}%,0,$Tolerance,0,1,{0,i($X,$Y,0,0)},{0,i($X,$Y,0,1)},{0,i($X,$Y,0,2)},{0,i($X,$Y,0,3)} # Img0
+      # The actual flood is done by this
+      # ellipse {100*$X/w}%,{100*$Y/h}%,{1},{1},{0},1,255,0,255
+      flood[0] {100*$X/w}%,{100*$Y/h}%,0,$Tolerance,0,1,{0,i($X,$Y,0,0)},{0,i($X,$Y,0,1)},{0,i($X,$Y,0,2)},{0,i($X,$Y,0,3)} # Img0
 
-		# Select the color that was flooded + others pixels of same color
-		+fx_select_color[0] 0,1,0,{0,i($X,$Y,0,0)},{0,i($X,$Y,0,1)},{0,i($X,$Y,0,2)},{0,i($X,$Y,0,3)},0,0 # image2
+      # Select the color that was flooded + others pixels of same color
+      +fx_select_color[0] 0,1,0,{0,i($X,$Y,0,0)},{0,i($X,$Y,0,1)},{0,i($X,$Y,0,2)},{0,i($X,$Y,0,3)},0,0 # image2
 
-		if {$ActivateCubism==1}
-			# Treat color with Cubism
-			cubism[2] $CubismIterations,$Blocsize,$Angle,$CubismOpacity,$Smoothness
-		fi
+      if $ActivateCubism==1
+	# Treat color with Cubism
+	cubism[2] $CubismIterations,$Blocsize,$Angle,$CubismOpacity,$Smoothness
+      fi
 
-		# Compose with alpha blending mode
-		blend[1,2] alpha
+       # Compose with alpha blending mode
+       blend[1,2] alpha
 
-		# Calculate new coordinate in do while loop until
-		# new coordinate has opacity lower than threshold
-		# and new coordinate is whitin image boundary
+       # Calculate new coordinate in do while loop until
+       # new coordinate has opacity lower than threshold
+       # and new coordinate is whitin image boundary
 
-		do
-			# Random step length is minimum step + delta which is dependent on how many attempts have been made
-			Rstep={$Step+$Delta}
-			# Random direction to go to
-			theta={u(360)}
-			# Add to previous coordinate to get new coord
+      do
+        # Random step length is minimum step + delta which is dependent on how many attempts have been made
+        Rstep={$Step+$Delta}
+	# Random direction to go to
+	theta={u(360)}
+	# Add to previous coordinate to get new coord
 
-			Xnew={int($X+$Rstep*cos($theta))}
-			Ynew={int($Y+$Rstep*sin($theta))}
+	Xnew={int($X+$Rstep*cos($theta))}
+	Ynew={int($Y+$Rstep*sin($theta))}
 
-			# Check if new coordinate is good ie whitin image
-			if {{$Xnew>0}" && "{$Xnew<$ImageW}" && "{$Ynew>0}" && "{$Ynew<$ImageH}}
-				# If coord was good set as new 'bug' location
-				X=$Xnew
-				Y=$Ynew
-				# Check the alpha of new coord. If above threshold increase delta
-				if {1,i($X,$Y,0,3)>$StepThreshold}
-					# Increase delta if no suitable pixel could be found on previous step
-					# Delta is smaller of the previous
-					# Base step size + do while loop number # or#  one tenth of maximum image dimension
-					Delta={min({$Delta+$Delta*2},{max($ImageW,$ImageH)/5})}
-				fi
+	# Check if new coordinate is good ie whitin image
+	if $Xnew>0" && "$Xnew<$ImageW" && "$Ynew>0" && "$Ynew<$ImageH
+	  # If coord was good set as new 'bug' location
+	  X=$Xnew
+	  Y=$Ynew
+	  # Check the alpha of new coord. If above threshold increase delta
+	  if {1,i($X,$Y,0,3)>$StepThreshold}
+	    # Increase delta if no suitable pixel could be found on previous step
+	    # Delta is smaller of the previous
+	    # Base step size + do while loop number # or#  one tenth of maximum image dimension
+	    Delta={min({$Delta+$Delta*2},{max($ImageW,$ImageH)/5})}
+	  fi
 
-				# Check the alpha of new coord,
-				# if below threshold exit do-while and flood
-				if {1,i($X,$Y,0,3)<$StepThreshold}
-					IsGood=10
-				fi
-					# make sure that loop will be eventuall exited, run a max of 100 do-while loops
-				if {$DoLoop>100}
-					IsGood=10
-				fi
-			fi
-			# Increase do loop counter
-			DoLoop=$DoLoop+1
-		# Continue until IsGood has been set to 10
-		while {$IsGood<1}
+	  # Check the alpha of new coord,
+	  # if below threshold exit do-while and flood
+	  if {1,i($X,$Y,0,3)<$StepThreshold}
+	    IsGood=10
+	  fi
+	  # Make sure that loop will be eventuall exited, run a max of 100 do-while loops
+	  if $DoLoop>100
+	    IsGood=10
+	  fi
+	fi
+	# Increase do loop counter
+        DoLoop=$DoLoop+1
+	# Continue until IsGood has been set to 10
+      while $IsGood<1
 
-		# Set trigger to bad i.e 0
-		IsGood=0
-		DoLoop=0
-		Delta=$DeltaOrg
-	done
+      # Set trigger to bad i.e 0
+      IsGood=0
+      DoLoop=0
+      Delta=$DeltaOrg
+    done
+  fi
 
-fi
+  # Create specified color BG and Compose
+  ({$CanvasR}^{$CanvasG}^{$CanvasB}^{$Opacity}) # image 2
+  r[2] [0]
+  rv[1,2]
+  blend[1,2] alpha
 
-# Create specified color BG and Compose
-({$CanvasR}^{$CanvasG}^{$CanvasB}^{$Opacity}) # image 2
-r[2] [0]
-rv[1,2]
-blend[1,2] alpha
-
-# Keep only result
-if {$ActivateFlood==1}
-	k[1]
-elif  {$ActivateFlood==0}
-	k[0]
-fi
+  # Keep only result
+  if $ActivateFlood==1
+    k[1]
+  elif $ActivateFlood==0
+    k[0]
+  fi
 
 fx_AbstractFlood_Preview :
   gui_split_preview "fx_AbstractFlood ${1--2}",$-1
 
-#**********EndOfFilter*************
 
 # Local Variables:
 # mode: sh
