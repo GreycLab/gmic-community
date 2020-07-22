@@ -677,7 +677,7 @@ fx_yag_soften_preview :
 
 #@gui Naggobot
 #******************************************
-#Import 16 bit image
+# Import 16 bit image
 #******************************************
 #@gui Import 16bits Image : fx_import_image_16, fx_import_image_16
 #@gui : note = note("Filter can be used to import and adjust 16 bit images to Gimp. Plugin may have limited set of import formats available depending on compilation. At minimum only .png should work reliably.")
@@ -704,86 +704,84 @@ fx_yag_soften_preview :
 #@gui : Cut Dark Values = float(0,0,100)
 #@gui : sep = separator(), note = note("<small>Author: <i>Arto Huotari;</i>.      Latest update: <i>2014/04/02</i>.</small>")
 fx_import_image_16 :
-# Variables
-ProcessTo=$2
-Gamma=$3
-Brightness=$4
-Contrast=$5
-Equalize=$6
-AB=$7
-A=$8
-B=$9
-CutHigh=$10
-CutLow=$11
-# Remove import image
-rm i
-# Import image from disk
-"$1"
-# Make sure that the input is rgb
-to_rgb
-# Scale down to preview size
-if {$ProcessTo!=3}
-	resize2dx 520,1
-fi
-apply_gamma $Gamma
-# Check if image has pixelvalues over 255
-# Correct only for gamma if not
-if {0,iM>256}
-	if $Equalize
-		+equalize 65535
-		blend alpha,{$Equalize/2}
-	fi
-	# Scale values to 0 to 1 range
-	div 65535
-	# Separate luminance from colour
-	rgb2lab
-	s c
-	if $Brightness
-		+... $Brightness
-	fi
-	if {$Contrast!=1}
-		*... $Contrast
-	fi
-	# Adjust saturation by multiplying both A and B channels
-	if $AB
-		*.. $AB
-		*. $AB
-	fi
-	# Adjust colour balance by multiplying A or B channel.
-	if $A
-		*.. {1+$A}
-	fi
-	if $B
-		*. {1+$B}
-	fi
-	a c
-	lab2rgb
-	# RGB cut and normalize
-	if {$CutHigh!=100" || "$CutLow!=0}
-		Range=1
-		# Calculate cut high
-		HighValue={$CutHigh/100*$Range}
-		# Calculate low value from remaining
-		LowValue={$CutLow/100*$HighValue}
-		cut $LowValue,$HighValue
-		n 0,1
-	fi
-	# Scale to 255 for Gimp
-	* 255
-	# Cut 0,255 for Gimp
-	cut 0,255
-	if {$ProcessTo==1}
-			+display_histogram {0,w},{0,h},255,0,254,0
-			blend lighten,0.7
-	fi
-	if {$ProcessTo==2}
-			+display_histogram {0,w},{0,h},255,0,254,0,log(1+i)-1
-			blend lighten,0.7
-	fi
-fi
-#******************************************
-#END OF FILTER
-#******************************************
+  # Variables
+  ProcessTo=$2
+  Gamma=$3
+  Brightness=$4
+  Contrast=$5
+  Equalize=$6
+  AB=$7
+  A=$8
+  B=$9
+  CutHigh=$10
+  CutLow=$11
+  # Remove import image
+  rm i
+  # Import image from disk
+  "$1"
+  # Make sure that the input is rgb
+  to_rgb
+  # Scale down to preview size
+  if $ProcessTo!=3
+    resize2dx 520,1
+  fi
+  apply_gamma $Gamma
+  # Check if image has pixelvalues over 255
+  # Correct only for gamma if not
+  if {0,iM>256}
+    if $Equalize
+      +equalize 65535
+      blend alpha,{$Equalize/2}
+    fi
+    # Scale values to 0 to 1 range
+    / 65535
+    # Separate luminance from colour
+    rgb2lab
+    s c
+    if $Brightness
+      +... $Brightness
+    fi
+    if {$Contrast!=1}
+      *... $Contrast
+    fi
+    # Adjust saturation by multiplying both A and B channels
+    if $AB
+      *.. $AB
+      *. $AB
+    fi
+    # Adjust colour balance by multiplying A or B channel.
+    if $A
+      *.. {1+$A}
+    fi
+    if $B
+      *. {1+$B}
+    fi
+    a c
+    lab2rgb
+    # RGB cut and normalize
+    if $CutHigh!=100" || "$CutLow!=0
+      Range=1
+      # Calculate cut high
+      HighValue={$CutHigh/100*$Range}
+      # Calculate low value from remaining
+      LowValue={$CutLow/100*$HighValue}
+      c $LowValue,$HighValue
+      n 0,1
+    fi
+    # Scale to 255 for Gimp
+    * 255
+    # Cut 0,255 for Gimp
+    c 0,255
+    if $ProcessTo==1
+      +display_histogram {0,w},{0,h},255,0,254,0
+      blend lighten,0.7
+    fi
+    if $ProcessTo==2
+      +display_histogram {0,w},{0,h},255,0,254,0,log(1+i)-1
+      blend lighten,0.7
+    fi
+  fi
+
 
 #******************************************
 #Luminance to alpha
@@ -814,8 +812,8 @@ intersect_images:
 # Remove booleans
 rm[-1,-2]
 # Cut to 0-1 range - remove areas selected by booleans
-cut[0] 0,255
-cut[1] 0,255
+c[0] 0,255
+c[1] 0,255
 # Combine images - this image now contains
 # midtone area pixels but grey values = image pixel values
 +[0] [1]
@@ -836,7 +834,7 @@ repeat {$Levels-1}
 	# Subtract i*D from L
 	+-[1] .
 	rm..
-	cut. 0,255
+	c. 0,255
 done
 
 # Create Darker levels
@@ -847,7 +845,7 @@ repeat {$Levels-1}
 	# Subtract i*L from D
 	+-[2] .
 	rm..
-	cut. 0,255
+	c. 0,255
 done
 ####################
 
@@ -877,16 +875,16 @@ reduce_overlap :
 Levels=$1
 repeat {$Levels-1}
 	-[{2+$>}] [{3+$>}]
-	cut[{2+$>}] 0,255
+	c[{2+$>}] 0,255
 done
 repeat {$Levels-1}
 	-[{-$Levels+$>}] [{-$Levels+$>+1}]
-	cut[{-$Levels+$>}] 0,255
+	c[{-$Levels+$>}] 0,255
 done
 # subtract brights and lights from midtones
 -[1] [{-$Levels-1}]
 -[1] .
-cut[1] 0,255
+c[1] 0,255
 #####################
 
 fx_split_luminance:
@@ -926,7 +924,7 @@ repeat {$!-1}
 	# Ma and ma are already 0 and even though 1 is added the output is still
 	# 0 for transparent areas of the mask.
 	+[{$>+1}] 1
-	cut[$>] 0,255
+	c[$>] 0,255
 done
 
 # Combine with original
@@ -973,7 +971,7 @@ fi
 
 # Sub, Contrast bias factor, returns absolute laplacian
 Sub_Contrast_Bias:
-div. 255
+/. 255
 to_gray.
 laplacian.
 abs.
@@ -982,7 +980,7 @@ abs.
 # Sub, Saturation bias factor, returns standard deviatin of picel values
 Sub_Saturation_Bias:
 # 1: Calculate average values
-div. 255
+/. 255
 +s[0] c
 blend[-1,-2,-3] average # Destroyes images 1,2,3, leaves 0 and 1
 # 2: Calculate difference values
@@ -1007,7 +1005,7 @@ rm[2]
 +[0] [1] # DR1²+(DR3²+DR2²),DR3²+DR2²
 rm[1] # DR1²+(DR3²+DR2²)
 # Population has three datapoints, divide by 3
-div[0] 3
+/[0] 3
 # Standard deviation
 sqrt[0]
 # End Of Sub
@@ -1016,10 +1014,10 @@ sqrt[0]
 # Wchannel=exp(-(V-0.5)²/(2*sigma*sigma))
 # V-0.5
 Sub_Exposure_Bias :
-div[0] 255
+/[0] 255
 -[0] 0.5
 ^[0] 2
-div[0] {2*$1*$1}
+/[0] {2*$1*$1}
 *[0] -1
 exp[0]
 s[0] c # 1,2,3
