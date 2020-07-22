@@ -47,6 +47,7 @@ fx_dreamsmooth :
   Smoothness=$6
   Threads=$7
   Overlap=$8
+
   # Handle multiple layers
   repeat $! l[$>]
 
@@ -90,8 +91,6 @@ fx_dreamsmooth :
 fx_dreamsmooth_preview :
   gui_split_preview "fx_dreamsmooth ${1--2}",$-1
 
-#************END OF FILTER*************
-
 
 #****************************************
 # Morphology painting
@@ -113,7 +112,7 @@ fx_dreamsmooth_preview :
 #@gui : sep = separator()
 #@gui : note = note("Smoothing strength")
 #@gui : Spread Amount = int(8,0,20)
-#@gui : Blurr Strength = int(3,0,10)
+#@gui : Blur Strength = int(3,0,10)
 #@gui : sep = separator()
 #@gui : note = note("Segmentation settings")
 #@gui : Edge Threshold = float(4,0,15)
@@ -142,23 +141,23 @@ fx_MorphoPaint :
   +fx_morpho[0] $1,$2,0,2,0,$3,0 # Morpho as nro 1
   +fx_apply_curve[1] $4,50,$5,200,$6,-1,128,-1,128,-1,128,255,1,3,0,0,0 # Curved morpho as nro 2
   fx_spread[1] $7,$7,0,0 # Spread Morpho nro 1
-  fx_gaussian_b[2] $8,0,0,1,0,0,0 # Blurr Morpho+Spread nro 1
-  fx_segment_watershed[1] $9,$10,0,0 # Segment Morpho+Spread+Blurr nro 1
+  fx_gaussian_b[2] $8,0,0,1,0,0,0 # Blur Morpho+Spread nro 1
+  fx_segment_watershed[1] $9,$10,0,0 # Segment Morpho+Spread+Blur nro 1
   +fx_painting[0] $11,$12,1.5,$13,1,0 # Paint from original nro 0
-  remove[0] # Remove original from stack
-  rv[0,2] # reverse images to logical order (Important if output to Gimp)
+  rm[0] # Remove original from stack
+  rv[0,2] # Reverse images to logical order (Important if output to Gimp)
   rv[1,2]
   if $14
-    if $19==0 MorphoStrength={0} elif $19==1 MorphoStrength={$20} endif	# Set layer value to zero if enabled
-    mul[2] {$MorphoStrength/3} # Morphology
-    if $15==0 StrokeStrength={0} elif $15==1 StrokeStrength={$16} endif	# Set layer value to zero if enabled
-    mul[0] {$StrokeStrength/3} # Paint stroke
-    if $17==0 SegmentStrength={0} elif $17==1 SegmentStrength={$18} endif # Set layer value to zero if enabled
-    mul[1] {$SegmentStrength/3} # Segments
-    add[1] [2] # Combine images
-    add[1] [0]
-    if $21 normalize[1] 0,255 endif # Conditional normalize to get the image to correct range
-    remove[0,2] # remove extra images
+    if $19==0 MorphoStrength={0} elif $19==1 MorphoStrength={$20} fi  # Set layer value to zero if enabled
+    *[2] {$MorphoStrength/3} # Morphology
+    if $15==0 StrokeStrength={0} elif $15==1 StrokeStrength={$16} fi  # Set layer value to zero if enabled
+    *[0] {$StrokeStrength/3} # Paint stroke
+    if $17==0 SegmentStrength={0} elif $17==1 SegmentStrength={$18} fi # Set layer value to zero if enabled
+    *[1] {$SegmentStrength/3} # Segments
+    +[1] [2] # Combine images
+    +[1] [0]
+    if $21 normalize[1] 0,255 fi # Conditional normalize to get the image to correct range
+    rm[0,2] # Remove extra images
   fi
 
 fx_MorphoPaint_preview :
@@ -196,40 +195,39 @@ fx_MorphoPaint_preview :
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse")
 #@gui : sep = separator(), note = note("<small>Author : <i>Arto Huotari</i>.      Latest update : <i>2013/09/28</i>.</small>")
 #@gui : note = link("Filter Explained here","http://www.flickr.com/photos/naggobot/6152040642/")
-
 fx_SimpleNoiseCanvas :
 # Filter has some unnecessary reversing of layers due to change from compose to blend
-CanvasScale={$1}
-NoiseAmplitude=$2
-NoiseType=$3
-ThreadHorizLen=$4
-ThreadVertLen=$5
-OverAllBlurr=$6
-HighCut=$7
-LowCut=$8
-CanvasMergeChoice=$9
-InvertCanvasColors=$10
-InvertImageColors=$11
-ReverseChoice=$12
-MergeChoice=$13
-PreserveCanvas=$14
-# (Remember that color is set directly with param 15-17)
+  CanvasScale={$1}
+  NoiseAmplitude=$2
+  NoiseType=$3
+  ThreadHorizLen=$4
+  ThreadVertLen=$5
+  OverAllBlur=$6
+  HighCut=$7
+  LowCut=$8
+  CanvasMergeChoice=$9
+  InvertCanvasColors=$10
+  InvertImageColors=$11
+  ReverseChoice=$12
+  MergeChoice=$13
+  PreserveCanvas=$14
+  # (Remember that color is set directly with param 15-17)
 
-# Remove alpha channel from image
-to_rgb[0]
+  # Remove alpha channel from image
+  to_rgb[0]
 
-# Invert scale factor for scaling
-CanvasScale={1.2-$CanvasScale}
+  # Invert scale factor for scaling
+  CanvasScale={1.2-$CanvasScale}
 
-# Make white base image with specified color and resize it to inputimage size
-(255^255^255)
-r. [0]
+  # Make white base image with specified color and resize it to inputimage size
+  (255^255^255)
+  r. [0]
 
-# Resize to scale factor
-r[1] {100*$CanvasScale}%,{100*$CanvasScale}%
+  # Resize to scale factor
+  r[1] {100*$CanvasScale}%,{100*$CanvasScale}%
 
-# add noise
-if {$NoiseType!=2} NoiseAmplitude={($NoiseAmplitude*10)} endif
+  # Add noise
+  if $NoiseType!=2 NoiseAmplitude={$NoiseAmplitude*10} fi
 fx_noise[1] $NoiseAmplitude,$NoiseType,0,1,0
 # make noise BW
 fx_ditheredbw[1] 1,1,0,0,0,0 # [G'MIC] B&W dithering
@@ -255,11 +253,11 @@ elif {$CanvasMergeChoice==3} blend_edges[2,3] 0.9
 fi
 
 
-# OverAllBlurr
-fx_gaussian_blur[2] $OverAllBlurr,0,0,1,0,0,0 # image 3
+# OverAllBlur
+fx_gaussian_blur[2] $OverAllBlur,0,0,1,0,0,0 # image 3
 
 # Remove noise image
-remove[1]
+rm[1]
 
 # scale canvas back to image size
 r[1] [0]
@@ -273,13 +271,13 @@ blend[1,2] multiply
 fx_apply_curve {$LowCut},-1,128,-1,128,-1,128,-1,128,-1,128,{$HighCut},1,3,0,0,0
 
 # reverse if requested
-if {$ReverseChoice==1} rv[0,1] endif
+if {$ReverseChoice==1} rv[0,1] fi
 
 # Invert canvas colors if requested
-if {$InvertCanvasColors==1} negate[1] endif
+if {$InvertCanvasColors==1} negate[1] fi
 
 # Invert Image colors if requested
-if {$InvertImageColors==1} negate[0] endif
+if {$InvertImageColors==1} negate[0] fi
 
 # Combine to original
 
@@ -306,18 +304,18 @@ elif {$MergeChoice==19} +blend[1,0] xor
 elif {$MergeChoice==20} +blend_edges[1,0] 0.8
 fi
 # Reverse original and canvas if it was done previously
-if {$ReverseChoice==1} rv[0,1] endif
+if {$ReverseChoice==1} rv[0,1] fi
 # Remove canvas if not asked to preserve
-if {$PreserveCanvas==0} remove[1]  endif
+if {$PreserveCanvas==0} rm[1]  fi
 # PreserveCanvas=1
-if {$PreserveCanvas==1" && "$MergeChoice!=21} rv[1,2]  endif
+if {$PreserveCanvas==1" && "$MergeChoice!=21} rv[1,2]  fi
 
 # remove original if merging is done
-if {$MergeChoice!=21} remove[0] endif
+if {$MergeChoice!=21} rm[0] fi
 
 # Switch items for correct preview
 
-if {$MergeChoice!=21" && "$PreserveCanvas==1} rv[0,1] endif
+if {$MergeChoice!=21" && "$PreserveCanvas==1} rv[0,1] fi
 
 fx_SimpleNoiseCanvasPreview :
   gui_split_preview "fx_SimpleNoiseCanvas ${1--2}",$-1
@@ -383,17 +381,17 @@ GMaxThreshold=100
 RiShape=3
 RiAngle=135
 # Code
-if {$ActivatePink==1} deform[0] $RDeform endif
+if {$ActivatePink==1} deform[0] $RDeform fi
 +fx_rodilius[0] $RAmplitude,$RThickness,$RSharpness,$ROrientations,$ROffset,0,$RColormode,$RChannels,0 # img1
 +fx_gradient_norm[0] $GSmoothness,$GLinearity,$GMinThreshold,$GMaxThreshold,$GNegativeColors,0 # img2
 fx_smooth_bilateral[0] 15,10,3,3,0
-if {$ActivateLizards==1} water[0,2] $WAmplitude,$WSmoothness endif
-if {$ActivateShakes==1} ripple[0,2] $RiAmplitude,$RiSize,$RiShape,$RiAngle,0 endif
-if {$ReverseEffect==1} rv[0,2] endif
+if {$ActivateLizards==1} water[0,2] $WAmplitude,$WSmoothness fi
+if {$ActivateShakes==1} ripple[0,2] $RiAmplitude,$RiSize,$RiShape,$RiAngle,0 fi
+if {$ReverseEffect==1} rv[0,2] fi
 +blend[0,2] divide,1,0 # img3
 rv[1,3]
 blend[1,3] value,1,0 # img1
-if {$BgTextured==1} fx_ellipsionism[0] 20,2,10,0.5,1,1,0 endif
+if {$BgTextured==1} fx_ellipsionism[0] 20,2,10,0.5,1,1,0 fi
 blend[0,1] alpha,$MasterOpacity,0
 k[0]
 fx_pastell_preview :
@@ -465,15 +463,15 @@ cAbstraction={2+($pAbstraction-1)*(10-2)/(10-1)}
 CubeSize={4+($pAbstraction-1)*(10-4)/(10-1)}
 
 +fx_ellipsionism[0] $ePrimaryRadius,$eSecondaryRadius,$eSmoothness,$eOpacity,1,$eDensity,0 # 1 # -3
-if {$SoftenAll==1" && "$Soften>0} b. $Soften,0 endif
+if {$SoftenAll==1" && "$Soften>0} b. $Soften,0 fi
 +fx_painting[0] $pAbstraction,$pDetailsScale,$pColor,$pSmoothness,1,0 # 2 # -2
-if {$KuwaIt==1} fx_kuwahara. 2,$pAbstraction,0,0 endif
-if {$Soften>0} b. $Soften,0 endif
+if {$KuwaIt==1} fx_kuwahara. 2,$pAbstraction,0,0 fi
+if {$Soften>0} b. $Soften,0 fi
 +fx_color_abstraction[0] $cAbstraction,45,0.35,0 # 3 # -1
 # If negative then invert colors of -1
-if {$NCA==1} negate. endif
-if {$CubeIt==1} cubism. 600,$CubeSize,40,0.7,0 endif
-if {$Soften>0} b. $Soften,0 endif
+if {$NCA==1} negate. fi
+if {$CubeIt==1} cubism. 600,$CubeSize,40,0.7,0 fi
+if {$Soften>0} b. $Soften,0 fi
 if {$DoNotCompose==0}
 	# Compose Original and Ellipsionism with value
 	blend[0,1] value,$ValueOpacity,$ReverseOrder0 # 0 # -3
@@ -500,7 +498,7 @@ if {$DoNotCompose==0}
 	fi
 	k[0]
 fi
-if {$DoNotCompose==1} remove[0] endif
+if {$DoNotCompose==1} rm[0] fi
 
 fx_ColorAbstractionPaint_Preview :
   gui_split_preview "fx_ColorAbstractionPaint ${1--2}",$-1
@@ -576,9 +574,9 @@ if {$InvertLuminance==1}
 	# Convert to LAB
 	rgb2lab.
 	# Split channels
-	split. c
+	s. c
 	negate...
-	append[-3--1] c
+	a[-3--1] c
 	lab2rgb.
 fi
 
@@ -656,7 +654,7 @@ Darken=$1
 Soften=$2
 # Make sharpener layer
 +fx_laplacian[0] 0,0,100,0,0,0 # image 1
-# Blurr laplacian
+# Blur laplacian
 if {$Soften>0}
 fx_gaussian_blur[1] {$Soften/10},0,0,1,0,0,0
 fi
@@ -674,7 +672,7 @@ blend[0,2] hardlight # image0 is modified, image 2 is removed
 if {$Soften!=100}
 	blend[0,1] grainextract # Image 0 image 1 is removed
 elif {$Soften==100}
-	remove[1]
+	rm[1]
 fi
 fx_yag_soften_preview :
   gui_split_preview "fx_yag_soften ${1--2}",$-1
@@ -750,26 +748,26 @@ if {0,iM>256}
 	div 65535
 	# Separate luminance from colour
 	rgb2lab
-	split c
+	s c
 	if $Brightness
-		add... $Brightness
+		+... $Brightness
 	fi
 	if {$Contrast!=1}
-		mul... $Contrast
+		*... $Contrast
 	fi
 	# Adjust saturation by multiplying both A and B channels
 	if $AB
-		mul.. $AB
-		mul. $AB
+		*.. $AB
+		*. $AB
 	fi
 	# Adjust colour balance by multiplying A or B channel.
 	if $A
-		mul.. {1+$A}
+		*.. {1+$A}
 	fi
 	if $B
-		mul. {1+$B}
+		*. {1+$B}
 	fi
-	append c
+	a c
 	lab2rgb
 	# RGB cut and normalize
 	if {$CutHigh!=100" || "$CutLow!=0}
@@ -782,7 +780,7 @@ if {0,iM>256}
 		normalize 0,1
 	fi
 	# Scale to 255 for Gimp
-	mul 255
+	* 255
 	# Cut 0,255 for Gimp
 	cut 0,255
 	if {$ProcessTo==1}
@@ -817,22 +815,22 @@ intersect_images:
 # Create masks to extract
 # Extract areas in L that are darker than those in D (white shows light areas)
 +lt[0] [1]
-mul. 255
+*. 255
 # Extract areas in D that are darker than those in L (white shows dark areas)
 +lt[1] [0]
-mul. 255
+*. 255
 # Subtract booleans from L and D -> areas with selected pixels will go to 0 or below
-sub[0] .
-sub[1] ..
+-[0] .
+-[1] ..
 # Remove booleans
-remove[-1,-2]
+rm[-1,-2]
 # Cut to 0-1 range - remove areas selected by booleans
 cut[0] 0,255
 cut[1] 0,255
 # Combine images - this image now contains
 # midtone area pixels but grey values = image pixel values
-add[0] [1]
-remove[1]
++[0] [1]
+rm[1]
 # Normalize to create mask i.e. pixel with value of 127.5
 # will be shown with opacity of 255 when mask is used
 ####################
@@ -845,10 +843,10 @@ Levels=$1
 # there fore Li=L-i*D
 repeat {$Levels-1}
 	# Multiply D level with loop index+1
-	+mul[2] {$>+1}
+	+*[2] {$>+1}
 	# Subtract i*D from L
-	+sub[1] .
-	remove..
+	+-[1] .
+	rm..
 	cut. 0,255
 done
 
@@ -856,10 +854,10 @@ done
 # Ligter levels are created by subtracting L repeatedly from D
 repeat {$Levels-1}
 	# Multiply L with loop index + 1
-	+mul[1] {$>+1}
+	+*[1] {$>+1}
 	# Subtract i*L from D
-	+sub[2] .
-	remove..
+	+-[2] .
+	rm..
 	cut. 0,255
 done
 ####################
@@ -889,16 +887,16 @@ fi
 reduce_overlap :
 Levels=$1
 repeat {$Levels-1}
-	sub[{2+$>}] [{3+$>}]
+	-[{2+$>}] [{3+$>}]
 	cut[{2+$>}] 0,255
 done
 repeat {$Levels-1}
-	sub[{-$Levels+$>}] [{-$Levels+$>+1}]
+	-[{-$Levels+$>}] [{-$Levels+$>+1}]
 	cut[{-$Levels+$>}] 0,255
 done
 # subtract brights and lights from midtones
-sub[1] [{-$Levels-1}]
-sub[1] .
+-[1] [{-$Levels-1}]
+-[1] .
 cut[1] 0,255
 #####################
 
@@ -911,7 +909,7 @@ KeepText=$5
 to_rgb
 # L
 +rgb2lab
-split. c
+s. c
 rm[-1,-2]
 normalize. 0,255
 # D
@@ -938,25 +936,25 @@ repeat {$!-1}
 	# no idea why this is necessary, it yields correct results
 	# Ma and ma are already 0 and even though 1 is added the output is still
 	# 0 for transparent areas of the mask.
-	add[{$>+1}] 1
+	+[{$>+1}] 1
 	cut[$>] 0,255
 done
 
 # Combine with original
 if $AlphaOutput
 repeat {$!-1}
-	+append[0,1] c
-	remove[1]
+	+a[0,1] c
+	rm[1]
 done
 fi
 
 if {{$ReduceOverlap==1}" && "{$Levels>1}}
 	# D and L are now equal, remove first
-	remove[2]
+	rm[2]
 fi
 
 # Remove original
-remove[0]
+rm[0]
 
 if $KeepCustom
 	$KeepText
@@ -996,28 +994,28 @@ abs.
 Sub_Saturation_Bias:
 # 1: Calculate average values
 div. 255
-+split[0] c
++s[0] c
 blend[-1,-2,-3] average # Destroyes images 1,2,3, leaves 0 and 1
 # 2: Calculate difference values
-split[0] c #  images ,0, R1,G2,B3; 0 contains average
+s[0] c #  images ,0, R1,G2,B3; 0 contains average
 # Probable error on removing next image.
 # Commented out on 30.11.2014
 # rm[0]
-+sub[0] [1] # images ,0, R1,G2,B3,DR4
++-[0] [1] # images ,0, R1,G2,B3,DR4
 rm[1] # images ,0,,G2,B3,DR4
-+sub[0] [1] # images 0,,G1,B2,DR3,DG4
++-[0] [1] # images 0,,G1,B2,DR3,DG4
 rm[1] # images ,0,,,B1,DR2,DG3
-+sub[0] [1] # images 0,,,B1,DR2,DG3,DB4
++-[0] [1] # images 0,,,B1,DR2,DG3,DB4
 rm[1] # images ,0,,,,DR1,DG2,DB3
 rm[0] # images ,,,,,DR1,DG2,DB3
 # Raise to power
-pow[0] 2 # DR1²
-pow[1] 2 # DR2²
-pow[2] 2 # DR3³
+^[0] 2 # DR1²
+^[1] 2 # DR2²
+^[2] 2 # DR3³
 # sum
-add[1] [2] # DR1²,DR3²+DR2²,DR3²
++[1] [2] # DR1²,DR3²+DR2²,DR3²
 rm[2]
-add[0] [1] # DR1²+(DR3²+DR2²),DR3²+DR2²
++[0] [1] # DR1²+(DR3²+DR2²),DR3²+DR2²
 rm[1] # DR1²+(DR3²+DR2²)
 # Population has three datapoints, divide by 3
 div[0] 3
@@ -1030,19 +1028,19 @@ sqrt[0]
 # V-0.5
 Sub_Exposure_Bias :
 div[0] 255
-sub[0] 0.5
-pow[0] 2
+-[0] 0.5
+^[0] 2
 div[0] {2*$1*$1}
-mul[0] -1
+*[0] -1
 exp[0]
-split[0] c # 1,2,3
-mul[0] [2]
+s[0] c # 1,2,3
+*[0] [2]
 rm[2]
-mul[0] [1]
+*[0] [1]
 rm[1]
 # End Of Sub
 
-# Sub, Pyramid blurring
+# Sub, Pyramid bluring
 Sub_BlurPyramid :
 # Calculate size
 size={0,min(w,h)}
@@ -1078,11 +1076,11 @@ to_rgb[0]
 +Sub_Exposure_Bias[0] $sigma # EB, 0,1,2,3
 rm[0] # 0,1,2
 # Weight W=CB^wc+SB^ws+EB^we
-pow[0] $wc
-pow[1] $ws
-pow[2] $we
-add[0] [1]
-add[0] [2]
+^[0] $wc
+^[1] $ws
+^[2] $we
++[0] [1]
++[0] [2]
 k[0]
 normalize[0] 0,255
 # Blur mask
@@ -1171,7 +1169,7 @@ r. ..
 # Add noise
 fx_noise. $Density,0,3,0,0
 
-# Blurr and deform bg according to choice
+# Blur and deform bg according to choice
 if {$Style==0}
 	fx_blur_linear. $BlurLength,0,135,500,1,3,0,0
 fi
@@ -1196,7 +1194,7 @@ mix_channels.. ({@0-2};{@3-5};{@6-8}) # Channel mixer is used here with the rota
 rm. # remove rotation matrix
 # Scale matrix, this was changed to static and
 # parameter used for diffusion tensor anisotropy
-mul. {$SmScale/max(abs(iM),abs(im))}
+*. {$SmScale/max(abs(iM),abs(im))}
 noise. {$SmAccuracy*max(abs(iM),abs(im))}
 rv[-1,-2]
 smooth. ..,$Amplitude
@@ -1254,7 +1252,7 @@ fi
 resize. [0]
 # Luminance analysis
 +rgb2lab[0]
-split. c
+s. c
 rm[-1,-2]
 b. 10%
 normalize. 0,255
@@ -1277,8 +1275,8 @@ resize. $image_width,$image_height,1,3,5,1
 
 fx_CompositionAnalysis :
 method=$1
-if {$method==0} sub_thumbnailabstraction endif
-if {$method==1} sub_colors_and_lines endif
+if {$method==0} sub_thumbnailabstraction fi
+if {$method==1} sub_colors_and_lines fi
 
 
 
@@ -1302,7 +1300,7 @@ if {$method==1} sub_colors_and_lines endif
 
 fx_blockism:
 XSize={int($1/100*w)}
-if {$XSize==0} XSize=1 endif
+if {$XSize==0} XSize=1 fi
 Ratio=$2
 Variance={int($3*$XSize)}
 Randomness=-1,1
@@ -1320,7 +1318,7 @@ to_rgb[0]
 # Split image to LAB channels if not quick
 if {$LAB}
 	rgb2lab[0]
-	split[0] c
+	s[0] c
 fi
 # Render blocks
 repeat $!
@@ -1368,11 +1366,11 @@ repeat $!
 		# Draw a rectangle with the gray of the block center value  of the L, A or B channel
 		rectangle.. $x0,$y0,$x1,$y1,$Opacity,{i($X,$Y,0,0)},{i($X,$Y,0,1)},{i($X,$Y,0,2)},{i($X,$Y,0,3)}
 	done
-	remove.
+	rm.
 	mv. 0
 done
 if {$LAB}
-	append[-3,-2,-1] c
+	a[-3,-2,-1] c
 	lab2rgb.
 fi
 fx_blockism_preview :
@@ -1404,12 +1402,12 @@ ShowMask=$5
 +fx_smooth_bilateral. 4,8,6,4,0 # 0,1
 fx_smooth_haar. 0.6,5,2,3,1,24 # 0,1
 +rgb2lab. # 0,1,2
-split. c # 0,1,2,3,4
+s. c # 0,1,2,3,4
 rm[-1,-2] # 0,1,2(luminance info of smoothed image only)
 fx_apply_curve. 0,$X1,$Y1,$X2,$Y2,-1,128,-1,128,-1,128,255,1,0,0,21,0
 if {$ShowMask==0}
 	negate. # Negative of Luminance
-	append[-2,-1] c # append luminance info to smoothed image
+	a[-2,-1] c # append luminance info to smoothed image
 	to_rgba. # 0,1,force RGBA for 1
 	blend[0,-1] alpha # Blend with original
 	k[0]
@@ -1449,13 +1447,13 @@ Color=$6
 Smooth=$7
 Sharp=$8
 to_rgb[0]
-if {$Channel} Channel=3 elif Channel=0 endif
+if {$Channel} Channel=3 elif Channel=0 fi
      # Pre segmentation
-     if $PreProcess fx_segment_watershed $EdgeThresh,$WaterSmooth,0,0 endif
+     if $PreProcess fx_segment_watershed $EdgeThresh,$WaterSmooth,0,0 fi
      # Degradation with additive noise
-     if {$DegrLarge!=0} fx_spread $DegrLarge,$DegrLarge,0,0 endif
+     if {$DegrLarge!=0} fx_spread $DegrLarge,$DegrLarge,0,0 fi
      # fx_noise 47.0046,2,3,0,0
-   if {$DegrSmall!=0} fx_noise $DegrSmall,2,$Channel,0,0 endif
+   if {$DegrSmall!=0} fx_noise $DegrSmall,2,$Channel,0,0 fi
      fx_painting $Abstr,$Details,$Color,$Smooth,$Sharp,0
 fx_noisepainting_preview :
   gui_split_preview "fx_noisepainting ${1--2}",$-1
@@ -1514,21 +1512,21 @@ P17=$18
 P18=$19
 P19=$20
 P20=$21
-if {$Choice==1} P1={18/255} P3={41/255} P5={41/255} endif
-if {$Choice==2} P1={25/255} P3={39/255} P5={36/255} endif
-if {$Choice==3} P1={21/255} P3={40/255} P5={39/255} endif
-if {$Choice==4} P1={20/255} P3={41/255} P5={39/255} endif
-if {$Choice==5} P1={21/255} P3={42/255} P5={37/255} endif
-if {$Choice==6} P1={22/255} P3={42/255} P5={36/255} endif
-if {$Choice==7} P1={31/255} P3={36/255} P5={33/255} endif
-if {$Choice==8} P1={28/255} P3={41/255} P5={31/255} endif
-if {$Choice==9} P1={23/255} P3={37/255} P5={40/255} endif
-if {$Choice==10} P1={33/255} P3={36/255} P5={31/255} endif
-if {$Choice==11} P1={36/255} P3={31/255} P5={33/255} endif
-if {$Choice==12} P1={21/255} P3={42/255} P5={37/255} endif
-if {$Choice==13} P1={24/255} P3={37/255} P5={39/255} endif
-if {$Choice==14} P1={37/255} P3={36/255} P5={37/255} endif
-if {$Choice==15} P1={25/255} P3={35/255} P5={40/255} endif
+if {$Choice==1} P1={18/255} P3={41/255} P5={41/255} fi
+if {$Choice==2} P1={25/255} P3={39/255} P5={36/255} fi
+if {$Choice==3} P1={21/255} P3={40/255} P5={39/255} fi
+if {$Choice==4} P1={20/255} P3={41/255} P5={39/255} fi
+if {$Choice==5} P1={21/255} P3={42/255} P5={37/255} fi
+if {$Choice==6} P1={22/255} P3={42/255} P5={36/255} fi
+if {$Choice==7} P1={31/255} P3={36/255} P5={33/255} fi
+if {$Choice==8} P1={28/255} P3={41/255} P5={31/255} fi
+if {$Choice==9} P1={23/255} P3={37/255} P5={40/255} fi
+if {$Choice==10} P1={33/255} P3={36/255} P5={31/255} fi
+if {$Choice==11} P1={36/255} P3={31/255} P5={33/255} fi
+if {$Choice==12} P1={21/255} P3={42/255} P5={37/255} fi
+if {$Choice==13} P1={24/255} P3={37/255} P5={39/255} fi
+if {$Choice==14} P1={37/255} P3={36/255} P5={37/255} fi
+if {$Choice==15} P1={25/255} P3={35/255} P5={40/255} fi
 
 
    repeat $!
@@ -1555,7 +1553,7 @@ if {$Choice==15} P1={25/255} P3={35/255} P5={40/255} endif
       i.. 100%,100%,1,1,$P11
       i... 100%,100%,1,1,$P10
       a[-3--1] c hsv2rgb.
-    endif
+    fi
 
     rv a c endl mv. 0 done                          # Re-compose opacity and loop to next image.
   normalize_local $P18,$P19,$P20,2%,1,0,255
@@ -1599,28 +1597,28 @@ sinfi={sin($fi)}
 to_rgb[-2,-1]
 # set origin 128,128 to 0,0
 -. {128+$ZeroOffset}
-split. c # there were 2 images in the stack, now there are 4, 0,1,2,3, -1 was used in split
+s. c # there were 2 images in the stack, now there are 4, 0,1,2,3, -1 was used in split
 # Force blue channel to 0
-mul[3] 0
+*[3] 0
 # Channel -3 = X values = image [1]
 # Channel -2 = Y values = image [2]
 # Channel -1 is zero = image [3]
 # Rotation for X coord is x'=Xcosfi-Ysinfi
 # Calculate first Xcosfi and Ycosfi to new image
-+mul[1] $cosfi # xcosfi this is now image 4
-+mul[2] $sinfi # ysinfi this is now image 5
++*[1] $cosfi # xcosfi this is now image 4
++*[2] $sinfi # ysinfi this is now image 5
 # Calculate new X coord
-sub[4] [5]
+-[4] [5]
 rm[5]
 # Calculate new Y coord x'=Xsinfi+Ycosfi
-+mul[1] $sinfi # xsinfi this is now image 5
-+mul[2] $cosfi # yxosfi this is now image 6
-add[5] [6]
++*[1] $sinfi # xsinfi this is now image 5
++*[2] $cosfi # yxosfi this is now image 6
++[5] [6]
 rm[6]
 rm[1,2] # Image 3 becomes 1, 4x' becomes 2 and 5y' becomes 3
 rm[1] 	# Image 1z deleted, 2x' becomes 1 and 3y' becomes 2
 100%,100%,100%,1,0
-append[1,2,3] c
+a[1,2,3] c
 # Divide with 128 to "normalize" between -1 1 (not true for non zero offsets)
 /. {128/$LMult}
 channels. 0,1
@@ -1684,7 +1682,7 @@ done
 
 if {$Colored==1}
 	+blend[-1,-2] hardlight # image -1 i.e. image 3
-	remove..
+	rm..
 	fx_transfer_colors[-1,-2] 0,0
 fi
 
@@ -1731,28 +1729,28 @@ to_rgb[-2,-1]
 # set origin 128,128 to 0,0
 -. {128+$ZeroOffset}
 
-split. c # there were 2 images in the stack, now there are 4, 0,1,2,3, -1 was used in split
+s. c # there were 2 images in the stack, now there are 4, 0,1,2,3, -1 was used in split
 # Force blue channel to 0
-mul[3] 0
+*[3] 0
 # Channel -3 = X values = image [1]
 # Channel -2 = Y values = image [2]
 # Channel -1 is zero = image [3]
 # Rotation for X coord is x'=Xcosfi-Ysinfi
 # Calculate first Xcosfi and Ycosfi to new image
-+mul[1] $cosfi # xcosfi this is now image 4
-+mul[2] $sinfi # ysinfi this is now image 5
++*[1] $cosfi # xcosfi this is now image 4
++*[2] $sinfi # ysinfi this is now image 5
 # Calculate new X coord
-sub[4] [5]
+-[4] [5]
 rm[5]
 # Calculate new Y coord y'=Xsinfi+Ycosfi
-+mul[1] $sinfi # xsinfi this is now image 5
-+mul[2] $cosfi # yxosfi this is now image 6
-add[5] [6]
++*[1] $sinfi # xsinfi this is now image 5
++*[2] $cosfi # yxosfi this is now image 6
++[5] [6]
 rm[6]
 rm[1,2] # Image 3 becomes 1, 4x' becomes 2 and 5y' becomes 3
 rm[1] 	# Image 1z deleted, 2x' becomes 1 and 3y' becomes 2
 100%,100%,100%,1,0
-append[1,2,3] c
+a[1,2,3] c
 # Divide with 128 to "normalize" between -1 1 (not true for non zero offsets)
 /. {128/$LMult}
 channels. 0,1
@@ -1781,12 +1779,12 @@ to_rgb[0]
 # Force the copy to RGB just in case. This is not actually needed and just takes time.
 to_rgb.
 # Split image along channels
-split. c
+s. c
 # Subtract 128 from red and green channels
 -.. 128
 -... 128
 # Append channels back to one image
-append[-3,-2,-1] c
+a[-3,-2,-1] c
 # Drop third channel from the field
 # other vise matrix multiplication at rotation and quiver will not work
 channels. 0,1
@@ -1816,7 +1814,7 @@ k..
 ##@gui : note = link("Filter Explained here","http://gmic.sourceforge.net/reference.shtml")
 
 fx_StructureTensors:
-structuretensors abs pow $1
+structuretensors abs ^ $1
 normalize 0,255
 
 fx_StructureTensorsPreview :
@@ -1859,7 +1857,7 @@ fx_map_tones[0] $7,$8,0.1,30,0,0 # image 0
 # Compose Squigglies to original
 blend[0,3] darken # it seems image 3 is destroyed in this op.
 
-remove[1,2] # remove extra images to save memory 3->0
+rm[1,2] # remove extra images to save memory 3->0
 
 # Create paper
 # +fx_plasma 0.5,10 # Image 1
@@ -1872,13 +1870,13 @@ fx_apply_curve[1] $9,-1,128,-1,128,-1,128,-1,128,-1,128,$10,1,3,0,0,0
 fx_apply_curve[0] 0,$11,128,-1,128,-1,128,-1,128,-1,128,255,1,3,0,0,0
 
 # Combine paper and squiggly
-mul[0] {0.5*(1+$12)}
-mul[1] {0.5*(1-$12)}
+*[0] {0.5*(1+$12)}
+*[1] {0.5*(1-$12)}
 
-+add[0] [1] # image 2
+++[0] [1] # image 2
 
 +blend[0,2] softlight # image 3
-remove[0,1,2]
+rm[0,1,2]
 #************END OF FILTER*************
 
 #***********************************
