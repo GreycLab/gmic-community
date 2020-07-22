@@ -1061,9 +1061,6 @@ fx_ExposureWeightMap :
 fx_ExposureWeightMapPreview :
   gui_split_preview "fx_ExposureWeightMap ${1--2}",$-1
 
-#******************************************
-#END OF FILTER
-#******************************************
 
 ############################
 # Smooth sketch
@@ -1093,93 +1090,88 @@ fx_ExposureWeightMapPreview :
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse")
 #@gui : sep = separator(), note = note("<small>Author : <i>Arto Huotari</i>.      Latest update : <i>2014/08/31</i>.</small>")
 #@gui : note = link("Filter Explained here","http://www.flickr.com/groups/gmic/discuss/72157628307225747")
-
 fx_SmoothSketch :
-UsmRadius=5
-CreateSketch=$1
-UsmAmount=$1
-Sharpness=$2 # Sharpness for diffusion tensor
-Anisotropy=$3
-SmScale=$4
-SmAccuracy={$5}
-Amplitude=$6 # Smoothing ampliture
-fi=$7 # Rotation angle for tensor field
-Density=$8 # Noise density
-BlurLength=$9 # blur length
-Style=$10 # Bg Style selection
-BgOpacity=$11 # Bg blend opacity
-PostGamma=$12 # Gamma correction
-OptimizedResult=$13
+  UsmRadius=5
+  CreateSketch=$1
+  UsmAmount=$1
+  Sharpness=$2 # Sharpness for diffusion tensor
+  Anisotropy=$3
+  SmScale=$4
+  SmAccuracy={$5}
+  Amplitude=$6 # Smoothing ampliture
+  fi=$7 # Rotation angle for tensor field
+  Density=$8 # Noise density
+  BlurLength=$9 # blur length
+  Style=$10 # Bg Style selection
+  BgOpacity=$11 # Bg blend opacity
+  PostGamma=$12 # Gamma correction
+  OptimizedResult=$13
 
-if $OptimizedResult
-	OriginalWidth={0,w}
-	# Resize to 1024 width (all in case a bottom layer is included
-	resize2dx 1024
-	fx_smooth_selective. 5,0.5,5,1,0,0,24,0
-fi
+  if $OptimizedResult
+    OriginalWidth={0,w}
+    # Resize to 1024 width (all in case a bottom layer is included
+    resize2dx 1024
+    fx_smooth_selective. 5,0.5,5,1,0,0,24,0
+  fi
 
-if {$CreateSketch==1}
-	# Unsharp to enhance edges and detail
-	# unsharp. $UsmRadius,$UsmAmount
-	fx_unsharp. 0,$UsmRadius,30,$UsmAmount,0,1,1,1,0,0,0
-	# Gradient norm for lines
-	+gradient_norm.
-	# Invert for white bg
-	negate.
-	# Normalize for max range
-	n. 0,255
-fi
+  if $CreateSketch==1
+    # Unsharp to enhance edges and detail
+    # unsharp. $UsmRadius,$UsmAmount
+    fx_unsharp. 0,$UsmRadius,30,$UsmAmount,0,1,1,1,0,0,0
+    # Gradient norm for lines
+    +gradient_norm.
+    # Invert for white bg
+    negate.
+    # Normalize for max range
+    n. 0,255
+  fi
 
-# Noise gb for smudging
-# New white image
-(255;255;255)
-# Resize to image size
-r. ..
-# Add noise
-fx_noise. $Density,0,3,0,0
+  # Noise gb for smudging
+  # New white image
+  (255;255;255)
+  # Resize to image size
+  r. ..
+  # Add noise
+  fx_noise. $Density,0,3,0,0
 
-# Blur and deform bg according to choice
-if {$Style==0}
-	fx_blur_linear. $BlurLength,0,135,500,1,3,0,0
-fi
-if {$Style==1}
-	fx_blur_angular. $BlurLength,1.2,1.2,0,0,0
-fi
-if {$Style==2}
-	fx_blur_linear. $BlurLength,0,135,500,1,3,0,0
-	deform. {$Density/5}
-fi
-if {$Style==3}
-	fx_blur_angular. $BlurLength,1.2,1.2,0,0,0
-	deform. {$Density/5}
-fi
+  # Blur and deform bg according to choice
+  if $Style==0
+    fx_blur_linear. $BlurLength,0,135,500,1,3,0,0
+  fi
+  if $Style==1
+    fx_blur_angular. $BlurLength,1.2,1.2,0,0,0
+  fi
+  if $Style==2
+    fx_blur_linear. $BlurLength,0,135,500,1,3,0,0
+    deform. {$Density/5}
+  fi
+  if $Style==3
+    fx_blur_angular. $BlurLength,1.2,1.2,0,0,0
+    deform. {$Density/5}
+  fi
 
-# Blend bg and edge
-blend[-1,-2] multiply,$BgOpacity,0
-n. 0,255
-+diffusiontensors[0] $Sharpness,$Anisotropy,0.6,1.1,0 # Create diffusion tensor field from original.
-rotation3d 0,0,1,{$fi} # It seems this creates a new image "a rotation matrix" Subtract 45 because this gives sharp image at 0 degrees.
-mix_channels.. ({@0-2};{@3-5};{@6-8}) # Channel mixer is used here with the rotation matrix
-rm. # remove rotation matrix
-# Scale matrix, this was changed to static and
-# parameter used for diffusion tensor anisotropy
-*. {$SmScale/max(abs(iM),abs(im))}
-noise. {$SmAccuracy*max(abs(iM),abs(im))}
-rv[-1,-2]
-smooth. ..,$Amplitude
-k.
-apply_gamma. $PostGamma
+  # Blend bg and edge
+  blend[-1,-2] multiply,$BgOpacity,0
+  n. 0,255
+  +diffusiontensors[0] $Sharpness,$Anisotropy,0.6,1.1,0 # Create diffusion tensor field from original.
+  rotation3d 0,0,1,{$fi} # It seems this creates a new image "a rotation matrix" Subtract 45 because this gives sharp image at 0 degrees.
+  mix_channels.. ({@0-2};{@3-5};{@6-8}) # Channel mixer is used here with the rotation matrix
+  rm. # remove rotation matrix
+  # Scale matrix, this was changed to static and
+  # parameter used for diffusion tensor anisotropy
+  *. {$SmScale/max(abs(iM),abs(im))}
+  noise. {$SmAccuracy*max(abs(iM),abs(im))}
+  rv[-1,-2]
+  smooth. ..,$Amplitude
+  k.
+  apply_gamma. $PostGamma
 
-if $OptimizedResult
-	resize2dx $OriginalWidth
-fi
+  if $OptimizedResult
+    resize2dx $OriginalWidth
+  fi
 
 fx_SmoothSketch_preview :
   gui_split_preview "fx_SmoothSketch ${1--2}",$-1
-
-#******************************************
-#END OF FILTER
-#******************************************
 
 
 #****************************************
