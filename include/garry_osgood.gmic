@@ -191,102 +191,101 @@ _multigrad : skip ${1=50},${2=10},${3=5}
 #@cli : Output images are unnormalized and range from negative to positive
 #@cli : values, Normalize data accordingly for use with bitmap editors.
 tiletex : check "${1=8}>0 && isnum(${2=-1.0}) && ${3=0}>=0 && ${3}<3"
-verbose -
-if $2>=0
-   addenda2="Common default angle: $2."
-else
-   addenda2="Explicit angles from provided images."
-fi
-addenda3="Real and imaginary"
-if $3!=0
-   if $3==1
-      addenda3="Real"
-   else
-      addenda3="Imaginary"
-   fi
-fi
-e[^-1] "Rendering tilable texture on $? at window size $1 "$addenda2". "$addenda3" output to be provided."
-rsz={$1}
-impla={2*pi*$2/255.0}
-all={$3}
-iszed=1
-ccc={0,s}
-badccc="Selected images have different number of channels. Have you accidently included alpha channels in some (but not all) images?"
-repeat $!
-  if {$>,round(ia)!=0" || "round(iM-im)!=0}
-    iszed=0
-    break
+  if $2>=0
+    addenda2="Common default angle: $2."
+  else
+    addenda2="Explicit angles from provided images."
   fi
-done
-if $iszed # Case 0: All images black. Generate random values
-   repeat $!
+  addenda3="Real and imaginary"
+  if $3!=0
+    if $3==1
+      addenda3="Real"
+    else
+      addenda3="Imaginary"
+    fi
+  fi
+  e[^-1] "Rendering tilable texture on $? at window size $1 "$addenda2". "$addenda3" output to be provided."
+  rsz={$1}
+  impla={2*pi*$2/255.0}
+  all={$3}
+  iszed=1
+  ccc={0,s}
+  badccc="Selected images have different number of channels. Have you accidently included alpha channels in some (but not all) images?"
+  repeat $!
+    if {$>,round(ia)!=0" || "round(iM-im)!=0}
+      iszed=0
+      break
+    fi
+  done
+  if $iszed # Case 0: All images black. Generate random values
+    repeat $!
       l[$<]
-         if {$<,$ccc!=s}
-            error $badccc
-         fi
-         input .
-         a[-2,-1] c
-         input {2*$rsz+1},{2*$rsz+1},1,{s},(2*u-1)*{wh}
-         image.. .,{({-2,w}-w)/2},{({-2,h}-h)/2},0,0,1
-         remove.
+        if {$<,$ccc!=s}
+          error $badccc
+        fi
+        input .
+        a[-2,-1] c
+        input {2*$rsz+1},{2*$rsz+1},1,{s},(2*u-1)*{wh}
+        image.. .,{({-2,w}-w)/2},{({-2,h}-h)/2},0,0,1
+        rm.
       endl
-   done
-else # Case 1: Coefficients in polar format have been set in at least one selected image.
-   if $impla<0 # Case 1.1: $impla not set (still negative guardian value). Images must be <radius>, <angle> image pairs.
+    done
+  else # Case 1: Coefficients in polar format have been set in at least one selected image.
+    if $impla<0 # Case 1.1: $impla not set (still negative guardian value). Images must be <radius>, <angle> image pairs.
       if $!%2!=0
-         error "Selected images contain data, but selection count is odd. Cannot determine angles for some coefficients. Consider setting an implied angle or providing an even number of images."
+        error "Selected images contain data, but selection count is odd. Cannot determine angles for some coefficients. Consider setting an implied angle or providing an even number of images."
       fi
-      repeat {$!/2}
-         l[{2*$<},{2*$<+1}]
-            if $ccc!={$<,s}" || "$ccc!={{$<+1},s}
-               error $badccc
-            fi
-            s[-2,-1] c
-            repeat {$!/2}
-                l[{$>},{$!/2+$>}]
-                   /[0,1] 255
-                   *[1] {2*pi}
-                   polar2complex[0,1]
-                endl
-            done
-            a[0--1] c
-         endl
+      repeat $!/2
+        l[{2*$<},{2*$<+1}]
+          if $ccc!={$<,s}" || "$ccc!={{$<+1},s}
+            error $badccc
+          fi
+          s[-2,-1] c
+          repeat $!/2
+            l[{$>},{$!/2+$>}]
+              /[0,1] 255
+              *[1] {2*pi}
+              polar2complex[0,1]
+            endl
+          done
+          a[0--1] c
+        endl
       done
-   else # Case 1.2: Odd numbered selection permitted when $impla is not negative. Furnishes constant angle field.
+    else # Case 1.2: Odd numbered selection permitted when $impla is not negative. Furnishes constant angle field.
       repeat $!
-         l[$<]
-            if $ccc!={$<,s}
-               error $badccc
-            fi
-            input [0]
-            s[-2,-1] c
-            repeat {$!/2}
-               l[{$>},{$!/2+$>}]
-                  /[0,1] 255
-                  *[0] {cos($impla)}
-                  *[1] {sin($impla)}
-               endl
-            done
-            a[0--1] c
-         endl
+        l[$<]
+          if $ccc!={$<,s}
+            error $badccc
+          fi
+          input [0]
+          s[-2,-1] c
+          repeat $!/2
+            l[{$>},{$!/2+$>}]
+              /[0,1] 255
+              *[0] {cos($impla)}
+              *[1] {sin($impla)}
+            endl
+          done
+          a[0--1] c
+        endl
       done
-   fi
-fi
-repeat $!
-   l[$<]
+    fi
+  fi
+  repeat $!
+    l[$<]
       shift. {-round(w/2)},{-round(h/2)},0,0,2
       s. c,2
       ifft[-2,-1]
       if $all!=0
-         if $all==1
-            remove.
-         else
-            remove..
-         fi
+        if $all==1
+          rm.
+        else
+          rm..
+        fi
       fi
-   endl
-done
-verbose +
+    endl
+  done
+
 #@gui __
 # ========================================================== #
 #@gui <b>Artistic</b>
