@@ -121,9 +121,9 @@ fx_gcd_layeretch : skip ${1=16},${2=7},${3=14},${4=0.12},${5=100},${6=5},${7=4.6
         quantize. $3,0 deform. {u*$10+1}
       fi
       r. $nw,$nh n. 0,255
-      mul[$msk,-1] progress {$pc*100}
+      *[$msk,-1] progress {$pc*100}
     done
-    add[-$ml--1] c. 0,255
+    +[-$ml--1] c. 0,255
     n. 0,255 negate. apply_gamma. $11
     if $13 r. $w,$h,1,3,5 c. 0,255 fi
     k.
@@ -175,9 +175,9 @@ fx_gcd_etch :
     #reduce colour levels, add curve
     quantize[-$ml--1] 2,0 deform[-$ml--1] $14
     #combine image & etch layers
-    repeat $ml mul[{2+$>},-1] done
+    repeat $ml *[{2+$>},-1] done
     #merge layers down, remove negative
-    add[-$ml--1] n. 0,255 rm[1]
+    +[-$ml--1] n. 0,255 rm[1]
     negate. apply_gamma. $15
     #restore original size, combine colour
     if $16 r. $w,$h,1,3,5 c. 0,255 fi
@@ -450,7 +450,7 @@ gcd_tone_enhance :
   if $13 repeat $! l[$>]
     gcd_srgb2jpeg sh 1,2 median. 5,20 rm. gcd_jpeg2srgb c 0,255
   endl done fi
-  mode=${-arg\ 1+$11,hsi_i,hsv_v,lab_l,lrgb,rgb,ycbcr_y}
+  mode=${arg\ 1+$11,hsi_i,hsv_v,lab_l,lrgb,rgb,ycbcr_y}
   ac "_gcd_tone_enhance ${1-10}",$mode,{$12+1}
 
 _gcd_tone_enhance :
@@ -574,7 +574,7 @@ gcd_stereo : skip ${1=0},${2=1},${3=1.2%},${4=1}
     elif {$1==3} k. negate return fi
     wfac={if(${"is_percent $3"},$3*w,$3)} n. 0,$wfac
     if {$1<2" && "$2>0} gcd_balance_anaglyph[0] {2-$2} fi
-    i[1] [0] warp[0] .,1 mul. -1 warp[1] .,1 rm.
+    i[1] [0] warp[0] .,1 *. -1 warp[1] .,1 rm.
     if $1 rv[0,1] append[0,1] x else shift[0] {round(-$wfac*$4)} shift[1] {round($wfac*$4)}
     channels[0] 0 channels[1] 1,2 append[0,1] c
     fi
@@ -655,7 +655,7 @@ gcd_geometric_balance : skip ${1=0}
 gcd_fx_local_fmean : skip ${1=15},${2=0},${3=0},${4=5},${5=0}
   mode=${arg\ 1+$4,hsi_i,hsv_v,lab_l,lrgb,rgb,gcd_luminance,ycbcr_y}
   if $5 ac "r={[im,iM]} n 0.002,0.998 gcd_fmean_local $1%,{$3-1},$2 n $r",$mode,2
-  else ac "div 255 gcd_fmean_local $1%,{$3-1},$2 mul 255",$mode,1
+  else ac "/ 255 gcd_fmean_local $1%,{$3-1},$2 * 255",$mode,1
   fi u "{$1}{$2}_"{2-($3>1" && "$5==1)}"{$3}{$4}{$5}"
 
 #@cli gcd_fmean_local : std_deviation>=0[%],-1<=_mean_type<=2,_target>=0
@@ -670,18 +670,18 @@ gcd_fmean_local : check "${1=1}>=0 && isint(${2=0}) && $2>=-1 && $2<=2 && ${3=0}
   _gcd_$func m _gcd_func:$_gcd_f m _gcd_finv:$_gcd_i
   repeat $! l[$>] # [1]=nz [2]=(1-G(iz))
     +neq. 0 +eq. 0 +[0] . zs={is} b. $1 *. .. *. -1 +. 1 ($3)
-    _gcd_func[0,-1] mul[0] [1] # x = f(x), f(0) = 0
+    _gcd_func[0,-1] *[0] [1] # x = f(x), f(0) = 0
     d={0,$3==0?is/(whds-$zs):i#-1} rm. # d = global(f(X))
-    +b[0] $1 +eq. 0 add[-2,-1] div[-2,-1] # (1 - z) / b
-    mul[0] $d mul[0,-1] # x = x * d / local(f(X))
-    _gcd_finv[0] mul # x = f^-1(x), restore zeros
+    +b[0] $1 +eq. 0 +[-2,-1] /[-2,-1] # (1 - z) / b
+    *[0] $d *[0,-1] # x = x * d / local(f(X))
+    _gcd_finv[0] * # x = f^-1(x), restore zeros
   endl done
   uncommand _gcd_func,_gcd_finv
 
 _gcd_qmean : _gcd_f="sqr" _gcd_i="sqrt"
 _gcd_mean : _gcd_f="skip 0" _gcd_i="skip 0"
 _gcd_gmean : _gcd_f="log" _gcd_i="exp"
-_gcd_hmean : _gcd_f="pow -1 sub 1" _gcd_i="add 1 pow -1"
+_gcd_hmean : _gcd_f="^ -1 - 1" _gcd_i="+ 1 ^ -1"
 
 _ac_gcd_luminance : # not strictly correct due to gamut losses
   _p="to_color"
@@ -742,10 +742,10 @@ _crmt_tile_T : skip ${1=0},${2=0} # this command renders the tile
 #@gui : note = note("<small>Percentage sigma: make detail scale relative to image size.</small>")
 fx_gcd_blur_deblur_texture : skip ${1=4},${2=1},${3=0.5},${4=0},${5=2},${6=0}
   repeat $! l[$>]
-    mode=${-arg\ 1+$5,rgb,lrgb,ycbcr_y,ycbcr_cbcr}
+    mode=${arg\ 1+$5,rgb,lrgb,ycbcr_y,ycbcr_cbcr}
     if $6 r=$2% else r=$2 fi
     if $4 ac "repeat $1 gcd_blur_texture "$r",$3 done",$mode,1
-    else ac "repeat $1 +l +gcd_blur_texture "$r",$3 norm sub endl add done",$mode,1 fi
+    else ac "repeat $1 +l +gcd_blur_texture "$r",$3 norm - endl + done",$mode,1 fi
   endl done
 
 fx_gcd_blur_deblur_texture_preview :
@@ -758,8 +758,8 @@ fx_gcd_blur_deblur_texture_preview :
 gcd_blur_texture : skip ${1=1},${2=1}
   e[^-1] "Apply blur texture filter of size $1, on image$?."
   repeat $! l[$>] # i = i + (A(k) - i) / stddev(k)^p
-    [0] +sqr. b[-2,-1] $1 +sqr.. sub[-2,-1]
-    max. 0 +eq. 0 add[-2,-1] sqrt. pow. -$2
+    [0] +sqr. b[-2,-1] $1 +sqr.. -[-2,-1]
+    max. 0 +eq. 0 +[-2,-1] sqrt. ^. -$2
     j[0] ..,0,0,0,0,1,. k[0]
   endl done
 
@@ -786,7 +786,7 @@ gcd_balance_lms : skip ${1=1},${2=1},${3=1},${4=0},${5=0},${6=0}
     if $6 # Compare average with average of equalized geometric mean
       m={[im,iM]} +r 1,1,1,100%,2 +n.. 0.002,0.998 log. gm={ia} +r. 1,1,1,100%,2
       repeat {s#2} sh[2] $> *. {$gm/i[#3,$>]} rm. done
-      rm. exp. n. $m r. 1,1,1,100%,2 div[-2,-1]
+      rm. exp. n. $m r. 1,1,1,100%,2 /[-2,-1]
     else (1^1^1) fi
     # Adapt to new illuminant (CAT02 with D = 1)
     ($1^$2^$3) n={L=$4?[0.454369,0.473533,0.072098]:[1,1,1];dot(L,I#1)/dot(L,I#2)}
@@ -810,8 +810,8 @@ fx_gcd_cumul_math : skip ${1=0},${2=1},${3=1},${4=0}
 gcd_cumul_math : skip ${1=1},${2=1},${3="add"},${4=0}
   repeat $! l[$>]
     100%,100%,100%,1,1 (0,$2) if $4 z. 1,1 fi
-    +mul. $1 shift[1] {^} rm. m={^} rm. [0]
-    repeat $1 +shift. $m +mul. [1] $3[0,-1] rm.. done k[0] mod 256
+    +*. $1 shift[1] {^} rm. m={^} rm. [0]
+    repeat $1 +shift. $m +*. [1] $3[0,-1] rm.. done k[0] mod 256
   endl done
 
 fx_gcd_cumul_math_preview :
@@ -866,7 +866,7 @@ fx_gcd_geometric_median_preview :
 #@gui : Values = choice(1,"cut","normalize")
 #@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2018/06/26</i>.</small>")
 fx_gcd_quicktone : skip ${1=1},${2=4},${3=20},${4=0},${5=3},${6=1}
-  mode=${-arg\ 1+$5,hsi_i,hsv_v,lab_l,ycbcr_y}
+  mode=${arg\ 1+$5,hsi_i,hsv_v,lab_l,ycbcr_y}
   if {$4>0} r={[im,iM]} bilateral 1%,$4 c $r fi
   ac "+gcd_tonemap_gamma $2% +bilateral. $2%,{(iM#0-im#0)*$3/100} -[-2,-1] *. $1 +",$mode,{$6+1}
 
@@ -890,10 +890,10 @@ gcd_tonemap_gamma : skip ${1=100}
 #@gui : note = note("<small>Medium area and HSV for high contrast images.</small>")
 #@gui : note = note("<small>Smooth to reduce artifacts, however some detail may be lost.</small>")
 gcd_normalize_brightness : skip ${1=0},${2=10},${3=0},${4=3},${5=0},${6=0}
-  mode=${-arg\ 1+$4,hsi_i,hsv_v,lab_l,ycbcr_y,rgb}
+  mode=${arg\ 1+$4,hsi_i,hsv_v,lab_l,ycbcr_y,rgb}
   if {$3>0} bilateral 1%,$3 c 0,255 fi
   if {$5==0} ac "gcd_tonemap_area $2,$1,$6",$mode,2
-  else +ac "gcd_tonemap_area $2,$1,$6",$mode,2 blend ${-arg\ $5,darken,lighten} fi
+  else +ac "gcd_tonemap_area $2,$1,$6",$mode,2 blend ${arg\ $5,darken,lighten} fi
 
 gcd_tonemap_area : skip ${1=100},${2=0},${3=0}
   repeat $! l[$>]
@@ -912,7 +912,7 @@ gcd_tonemap_area : skip ${1=100},${2=0},${3=0}
 #@gui : Reduce RAM = bool(0)
 #@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2018/08/08</i>.</small>")
 gcd_auto_balance : skip ${1=30},${2=0},${3=0},${4=1},${5=0}
-  mode=${-arg\ 1+$3,hsi_i,hsv_v,lab_l,lrgb,rgb,ycbcr_y}
+  mode=${arg\ 1+$3,hsi_i,hsv_v,lab_l,lrgb,rgb,ycbcr_y}
   if {$2>0} bilateral 1%,$2 c 0,255 fi
   if {$4!=0} ac "gcd_rgb_balance",rgb fi
   if $5 ac "gcd_tonemap_inplace $1",$mode,2
@@ -930,9 +930,9 @@ gcd_tonemap : skip ${1=100},${2=255}
 
 gcd_tonemap_inplace : skip ${1=100},${2=255}
   repeat $! l[$>]
-    div $2 +boxfilter $1%
+    / $2 +boxfilter $1%
     f[0] "*A=i(#-1,x,y,z,c);B=1-2*A;Bx=A/B;-sign(A-0.5)*sqrt(i/B+Bx^2)-Bx;"
-    rm. mul $2
+    rm. * $2
   endl done
 
 gcd_rgb_balance :
@@ -1053,7 +1053,7 @@ gcd_blend_maxdelta : skip ${1=100},${2=0.5},${3=2},${4=0}
       ++[upper] 0.1 *. [alpha]
       s. c discard[-3--1] 0 a[-3--1] c
       r. 1,1,1,100%,2 r[-2,-1] [upper]
-    *[-2,-1] $2 sub[upper,-1] add[upper,-1] c[upper] 0,255
+    *[-2,-1] $2 -[upper,-1] +[upper,-1] c[upper] 0,255
 
     # get distance, full blending for lower layer transparency
     +distance[alpha] 0 nm. dist
@@ -1073,7 +1073,7 @@ gcd_blend_maxdelta : skip ${1=100},${2=0.5},${3=2},${4=0}
 
     # blend using distance as maximum difference
     n[dist] 0,{255*$1%}
-    +sub[upper] [lower] *. [alpha]
+    +-[upper] [lower] *. [alpha]
     +sign. abs.. min[dist,-2] *[dist,-1]
     +[lower] [dist] k[lower] c 0,255
   endl done fi
@@ -1195,11 +1195,11 @@ gcd_spectral :
 gcd_std_score_patch : skip ${1=3}
   repeat $! l[$>]
     +gcd_variance_patch $1 sqrt.
-    +boxfilter.. $1 sub[0,-1] +eq. 0 add[-2,-1] div
+    +boxfilter.. $1 -[0,-1] +eq. 0 +[-2,-1] /
   endl done
 
 gcd_variance_patch : skip ${1=3}
-  repeat $! l[$>] +sqr boxfilter $1 sqr.. rv sub max 0 endl done
+  repeat $! l[$>] +sqr boxfilter $1 sqr.. rv - max 0 endl done
 
 #@gui Layer Manipulation: gcd_layers, gcd_layers_preview(1)
 #@gui : note = note("\n<i>Transform</i>"), sep = separator()
@@ -1224,11 +1224,11 @@ gcd_variance_patch : skip ${1=3}
 #@gui : note = note("\n<small><b>Note:</b> preview is low quality for speed</small>")
 gcd_layers : skip ${1=100},${2=0},${3=1},${4=50},${5=50},${6=0},${7=0},${8=0},${9=1},${10=1},${11=0},${12=0},${13=0}
   one={$!<2}
-  l[${-arg\ 1+$one,0-1,0}]
+  l[${arg\ 1+$one,0-1,0}]
     if {$3" && "!$one" && "$1>100} r2dx. {w/$1%},{if($-1,2,6)} c. 0,255 fi # ** SCALE
     w={w} h={h} gcd_force_a[0]
     l[0]
-      if {$11} mirror ${-arg\ $11,x,y,xy} fi # FLIP
+      if {$11} mirror ${arg\ $11,x,y,xy} fi # FLIP
       if {!$3" || "$one" || "$1<100} r2dx {w*$1%},{if($-1,2,6)} c 0,255 fi # ** SCALE
       if {$2} split_opacity rotate. $2,{2-($-1)} rotate.. $2,{2-($-1)},1 a c c 0,255 fi # ** ROTATE
       if {$6" || "$7} # ** ERODE/SMOOTH
@@ -1240,7 +1240,7 @@ gcd_layers : skip ${1=100},${2=0},${3=1},${4=50},${5=50},${6=0},${7=0},${8=0},${
     pos={round(($w-w#0)/2+$w*$4%)},{round(($h-h#0)/2-$h*$5%)} # ** POSITION
     if {$-1" || "$12} i[0] $w,$h,1,{0,s} j[0] [1],$pos rm[1] pos=""
     else pos=,pos($pos) fi
-    mode=${-arg\ 1+$10,alpha,add,burn,darken,difference,\
+    mode=${arg\ 1+$10,alpha,add,burn,darken,difference,\
     divide,dodge,grainextract,grainmerge,hardlight,hue,lighten,\
     multiply,overlay,saturation,softlight,screen,subtract,value}
     if {$-1} if {$!>1} rv blend $mode,$9 else sh 100% *. $9 rm. fi
@@ -1434,11 +1434,11 @@ gcd_stereo_vid :
         fi
       done
       #sum of depths in [0], depths in [1], images in [2]
-      +l[0--{1+$scene}] ap "gcd_depth $7,$8,$9,$10" +add[0--1] a[0--2] z endl
+      +l[0--{1+$scene}] ap "gcd_depth $7,$8,$9,$10" ++[0--1] a[0--2] z endl
       mv. 0 mv. 1 a[2--{1+$scene}] z
     fi
 
-    +slices[2] 0 +div[0] {1,d} gcd_stereo[-2,-1] $4,$5,$6%
+    +slices[2] 0 +/[0] {1,d} gcd_stereo[-2,-1] $4,$5,$6%
 
     curnum={$fsnum+$>} curnum=${gcd_add0\ $curnum,$dgts}
     if ${-is_windows} o. "$3"""{`92`}${fsname}${curnum}.${st_ext}""
@@ -1454,8 +1454,8 @@ gcd_stereo_vid :
       ov=$vr oa=$av
       if {$12&&($pvr>0.1" || "$pav>0.1)} scene=1 scframe={$>+$bufsz+1}
       else
-        +gcd_depth. $7,$8,$9,$10 add[0] . a[1,-1] z a[2,-1] z
-        +slices[1] 0 sub[0,-1] slices[1] 1,100%
+        +gcd_depth. $7,$8,$9,$10 +[0] . a[1,-1] z a[2,-1] z
+        +slices[1] 0 -[0,-1] slices[1] 1,100%
       fi
     fi
   done
@@ -1538,7 +1538,7 @@ gcd_unquantize : skip ${1=6},${2=1},${3=1},${4=5},${5=15}
       j[0] .,0,0,0,0,1,.. rm[-2,-1]
     fi
     if {$4>0}
-      +median[0] 3 sub. [0]
+      +median[0] 3 -. [0]
       abs. ge. $5
       dilate. 3 n. 0,1
       +apply_parallel_overlap[0] "pde_flow "$4",7,iee,0",8
@@ -1590,7 +1590,7 @@ gcd_warp : skip ${1=5},${2=0},${3=0} # params: max_warp, smooth, blend_type (cur
 #@gui : note = note("<small>Lower layer will be used for color if available.</small>")
 gcd_wiremap : skip ${1=100},${2=100},${3=0.5},${4=0.5},${5=0}
   dm={$!>1" && "$5%2}
-  l[${-arg\ 1+$dm,0,0-1}]
+  l[${arg\ 1+$dm,0,0-1}]
     if {$dm} op=0
       if {s==2||s==4} split_opacity. rv[^0] op=1 remove_opacity[0]
       elif {0,s==2||s==4} split_opacity[0] op=1 fi
@@ -1692,7 +1692,7 @@ gcd_xbr2x :
     #else if red<=blue blend - not relevant for noblend
     #eq[lvl2] 0 and[lvl1,lvl2] +le[red,blue] and[lvl1,-1]
     #blend pixel using lvl1 mask
-    #-image[$n3] [px],0,0,0,0,0,[lvl1]
+    #image[$n3] [px],0,0,0,0,0,[lvl1]
     rm[red,blue,lvl1,lvl2,px] #cleanup
   done
   #render scaled image
@@ -1749,16 +1749,16 @@ gcd_comp_blur : skip ${1=2},${2=3},${3=1},${4=100},${5=1},${6=0}
     +to_gray[0] edges. 14.5% n. {100-$4}%,100%
     if {0,s>1" && "$5}
       +ac[0] "median 5",ycbcr_cbcr
-      -image[0] .,0,0,0,0,1,.. rm.
+      image[0] .,0,0,0,0,1,.. rm.
     fi
-    if {$1==0} {w},{h},1,1,255 mul[-2,-1] else
+    if {$1==0} {w},{h},1,1,255 *[-2,-1] else
       {w},{h},1,1,0
       grid. $gsz,$gsz,0,0,1,255
       if {$2>=2} grid. $gsz,$gsz,1,1,1,255 fi
       if {$2==3} grid. $gsz,$gsz,-1,-1,1,255 fi
-      b. $3,0 mul[-2,-1]
+      b. $3,0 *[-2,-1]
     fi
-    -i.. [0] -append[-2,-1] c
+    i.. [0] append[-2,-1] c
     smooth[1] {100*$6+100},0.6,0.3
     blend[0,1] alpha
     if {!$6} sharpen. 20 fi
@@ -1778,10 +1778,10 @@ gcd_anti_alias : skip ${1=10},${2=0.3},${3=10}
   repeat $! l[$>]
     remove_opacity.
     +smooth[0] $1,0,1,1.6,1.1,0.8,30,0.6
-    +gradient_norm[0] +n. 0,$3 -add[0,-1]
-    pow. $2 n. 0,255
-    +gradient_norm. pow. $2 n. 0,255
-    blend[-2,-1] overlay -append[-2,-1] c
+    +gradient_norm[0] +n. 0,$3 +[0,-1]
+    ^. $2 n. 0,255
+    +gradient_norm. ^. $2 n. 0,255
+    blend[-2,-1] overlay append[-2,-1] c
     blend[0,1] alpha c 0,255
   endl done
 
@@ -1793,7 +1793,7 @@ gcd_srgb2jpeg :
     if {s<3} continue fi
     if {s==4} split_opacity fi
     mix_rgb[0] 0.299,0.587,0.114,-0.1687,-0.3313,0.5,0.5,-0.4187,-0.0813
-    sh[0] 1,2 +. 128 rm. -a c
+    sh[0] 1,2 +. 128 rm. a c
   endl done
 
 gcd_jpeg2srgb :
@@ -1801,7 +1801,7 @@ gcd_jpeg2srgb :
     if {s<3} continue fi
     if {s==4} split_opacity fi
     sh[0] 1,2 -. 128 rm.
-    mix_rgb[0] 1,0,1.402,1,-0.34414,-0.71414,1,1.772,0 -a c
+    mix_rgb[0] 1,0,1.402,1,-0.34414,-0.71414,1,1.772,0 a c
   endl done
 
 gcd_srgb2luma :
@@ -1847,7 +1847,7 @@ gcd_label : skip ${1=4},${2=0.067}
     +histogram. $nb,0,{$nb-1}
     +map.. . rm..
     le. {$2%*w*h} *. 255
-    -inpaint.. . rm.
+    inpaint.. . rm.
   endl done
 
 gcd_shrink :
