@@ -590,8 +590,6 @@ fx_Squiggly :
 fx_Squiggly_Preview :
   gui_split_preview "fx_Squiggly ${1--2}",$-1
 
-#************END OF FILTER*************
-
 
 #################################################################################################################
 #@gui _<b>Details</b>
@@ -784,7 +782,7 @@ fx_import_image_16 :
 
 
 #******************************************
-#Luminance to alpha
+# Luminance to alpha
 #******************************************
 #@gui Luminance to Alpha : fx_split_luminance, fx_split_luminance(1)
 #@gui : note = note("Filter splits image to different levels of Luminance. Set preview output to "all outputs". Order of output to Gimp from top to bottom is Midtones,Light,LL,..,Dark,DD,.. If reduced overlap is used then first Light layer is removed from output as redundant if more than one level is processed. Mutilevel output becomes Midtones,,LL,LLL,..,Dark,DD,DDD.. with intermediary light and dark levels containing midtones. ")
@@ -796,159 +794,147 @@ fx_import_image_16 :
 #@gui : Keep Custom = bool(0)
 #@gui : Keep Custom = text(0,keep[-1])
 #@gui : sep = separator(), note = note("<small>Author: <i>Arto Huotari;</i>.      Latest update: <i>2014/04/13</i>.</small>")
-
-####################
 intersect_images:
-# Create masks to extract
-# Extract areas in L that are darker than those in D (white shows light areas)
-+lt[0] [1]
-*. 255
-# Extract areas in D that are darker than those in L (white shows dark areas)
-+lt[1] [0]
-*. 255
-# Subtract booleans from L and D -> areas with selected pixels will go to 0 or below
--[0] .
--[1] ..
-# Remove booleans
-rm[-1,-2]
-# Cut to 0-1 range - remove areas selected by booleans
-c[0] 0,255
-c[1] 0,255
-# Combine images - this image now contains
-# midtone area pixels but grey values = image pixel values
-+[0] [1]
-rm[1]
-# Normalize to create mask i.e. pixel with value of 127.5
-# will be shown with opacity of 255 when mask is used
-####################
+  # Create masks to extract
+  # Extract areas in L that are darker than those in D (white shows light areas)
+  +lt[0] [1]
+  *. 255
+  # Extract areas in D that are darker than those in L (white shows dark areas)
+  +lt[1] [0]
+  *. 255
+  # Subtract booleans from L and D -> areas with selected pixels will go to 0 or below
+  -[0] .
+  -[1] ..
+  # Remove booleans
+  rm[-1,-2]
+  # Cut to 0-1 range - remove areas selected by booleans
+  c[0] 0,255
+  c[1] 0,255
+  # Combine images - this image now contains
+  # midtone area pixels but grey values = image pixel values
+  +[0] [1]
+  rm[1]
+  # Normalize to create mask i.e. pixel with value of 127.5
+  # will be shown with opacity of 255 when mask is used
 
-####################
 create_base_levels:
-Levels=$1
-# Create Lighter levels
-# Darker levels are created by subtracting D from L repeatedly
-# there fore Li=L-i*D
-repeat {$Levels-1}
-	# Multiply D level with loop index+1
-	+*[2] {$>+1}
-	# Subtract i*D from L
-	+-[1] .
-	rm..
-	c. 0,255
-done
+  Levels=$1
+  # Create Lighter levels
+  # Darker levels are created by subtracting D from L repeatedly
+  # there fore Li=L-i*D
+  repeat $Levels-1
+    # Multiply D level with loop index+1
+    +*[2] {$>+1}
+    # Subtract i*D from L
+    +-[1] .
+    rm..
+    c. 0,255
+  done
 
-# Create Darker levels
-# Ligter levels are created by subtracting L repeatedly from D
-repeat {$Levels-1}
-	# Multiply L with loop index + 1
-	+*[1] {$>+1}
-	# Subtract i*L from D
-	+-[2] .
-	rm..
-	c. 0,255
-done
-####################
+  # Create Darker levels
+  # Ligter levels are created by subtracting L repeatedly from D
+  repeat $Levels-1
+    # Multiply L with loop index + 1
+    +*[1] {$>+1}
+    # Subtract i*L from D
+    +-[2] .
+    rm..
+    c. 0,255
+  done
 
-####################
 reorder_stack :
-Levels=$1
-# Subtract overlapping portions from Light masks
-# Stack is now
-#   O, L, D, M, LL,LLL,LLLL,DD,DDD,DDDD
-#   0, 1, 2, 3,  4,  5,   6, 7,  8,   9
-# -10,-9,-8,-7, -6, -5,  -4,-3, -2,  -1
-# Stack needs to be re-arranged to
-#   O,M,L,LL,LLL,LLLL,D,DD,DDD,DDDD
-#   O,M, L, D, _ , LL,LLL,LLLL,DD,DDD,DDDD
-move[3] 1
-#   O,M, L, D, LL,LLL,LLLL,DD,DDD,DDDD
-if {$Levels>1}
-	rv[2,3]
-#   O,M, D, L,LL,LLL,LLLL,DD,DDD,DDDD to
-#   O,M, _ , L,LL,LLL,LLLL,D,DD,DDD,DDDD
-	move[2] {-$Levels+1}
-fi
-####################
+  Levels=$1
+  # Subtract overlapping portions from Light masks
+  # Stack is now
+  #   O, L, D, M, LL,LLL,LLLL,DD,DDD,DDDD
+  #   0, 1, 2, 3,  4,  5,   6, 7,  8,   9
+  # -10,-9,-8,-7, -6, -5,  -4,-3, -2,  -1
+  # Stack needs to be re-arranged to
+  #   O,M,L,LL,LLL,LLLL,D,DD,DDD,DDDD
+  #   O,M, L, D, _ , LL,LLL,LLLL,DD,DDD,DDDD
+  mv[3] 1
+  #   O,M, L, D, LL,LLL,LLLL,DD,DDD,DDDD
+  if $Levels>1
+    rv[2,3]
+  #   O,M, D, L,LL,LLL,LLLL,DD,DDD,DDDD to
+  #   O,M, _ , L,LL,LLL,LLLL,D,DD,DDD,DDDD
+    mv[2] {-$Levels+1}
+  fi
 
-####################
 reduce_overlap :
-Levels=$1
-repeat {$Levels-1}
-	-[{2+$>}] [{3+$>}]
-	c[{2+$>}] 0,255
-done
-repeat {$Levels-1}
-	-[{-$Levels+$>}] [{-$Levels+$>+1}]
-	c[{-$Levels+$>}] 0,255
-done
-# subtract brights and lights from midtones
--[1] [{-$Levels-1}]
--[1] .
-c[1] 0,255
-#####################
+  Levels=$1
+  repeat $Levels-1
+    -[{2+$>}] [{3+$>}]
+    c[{2+$>}] 0,255
+  done
+  repeat $Levels-1
+    -[{-$Levels+$>}] [{-$Levels+$>+1}]
+    c[{-$Levels+$>}] 0,255
+  done
+  # Subtract brights and lights from midtones
+  -[1] [{-$Levels-1}]
+  -[1] .
+  c[1] 0,255
 
 fx_split_luminance:
-Levels=$1
-AlphaOutput=$2
-ReduceOverlap=$3
-KeepCustom=$4
-KeepText=$5
-to_rgb
-# L
-+rgb2lab
-s. c
-rm[-1,-2]
-n. 0,255
-# D
-+negate.
-# M
-+intersect_images[-1,-2]
-if {$ReduceOverlap==0}
-	n. 0,255
-fi
+  Levels=$1
+  AlphaOutput=$2
+  ReduceOverlap=$3
+  KeepCustom=$4
+  KeepText=$5
+  to_rgb
+  # L
+  +rgb2lab
+  s. c
+  rm[-1,-2]
+  n. 0,255
+  # D
+  +negate.
+  # M
+  +intersect_images[-1,-2]
+  if $ReduceOverlap==0
+    n. 0,255
+  fi
 
-# Create base levels
-create_base_levels $Levels
+  # Create base levels
+  create_base_levels $Levels
 
-# Reorder stack
-reorder_stack $Levels
-# Stack is now  O,M,L,LL,LLL,LLLL,D,DD,DDD,DDDD
+  # Reorder stack
+  reorder_stack $Levels
+  # Stack is now  O,M,L,LL,LLL,LLLL,D,DD,DDD,DDDD
 
-if {{$ReduceOverlap==1}" && "{$Levels>1}}
-	reduce_overlap $Levels
-fi
+  if $ReduceOverlap==1" && "$Levels>1
+    reduce_overlap $Levels
+  fi
 
-repeat {$!-1}
-	# add 1 to alpha  and cut 0,225 to avoid cutting of colour channels
-	# no idea why this is necessary, it yields correct results
-	# Ma and ma are already 0 and even though 1 is added the output is still
-	# 0 for transparent areas of the mask.
-	+[{$>+1}] 1
-	c[$>] 0,255
-done
+  repeat $!-1
+    # add 1 to alpha  and cut 0,225 to avoid cutting of colour channels
+    # no idea why this is necessary, it yields correct results
+    # Ma and ma are already 0 and even though 1 is added the output is still
+    # 0 for transparent areas of the mask.
+    +[{$>+1}] 1
+    c[$>] 0,255
+  done
 
-# Combine with original
-if $AlphaOutput
-repeat {$!-1}
-	+a[0,1] c
-	rm[1]
-done
-fi
+  # Combine with original
+  if $AlphaOutput
+    repeat $!-1
+      +a[0,1] c
+      rm[1]
+    done
+  fi
 
-if {{$ReduceOverlap==1}" && "{$Levels>1}}
-	# D and L are now equal, remove first
-	rm[2]
-fi
+  if $ReduceOverlap==1" && "$Levels>1
+    # D and L are now equal, remove first
+    rm[2]
+  fi
 
-# Remove original
-rm[0]
+  # Remove original
+  rm[0]
 
-if $KeepCustom
-	$KeepText
-fi
-#******************************************
-#END OF FILTER
-#******************************************
+  if $KeepCustom
+    $KeepText
+  fi
 
 
 #****************************************
