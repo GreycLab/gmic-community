@@ -86,7 +86,7 @@ jeje_boundingbox3d : skip ${1=10}
 
 #@cli render_volume : _size,_quality,_opacity
 #@cli : Pseudo volumic rendering
-#@cli : $ 100,100,100 noise 1 blur 10,0 max 0 r 100%,100%,100%,3,0 n 0,100 f 'if(c==0,z*i(x,y,z,0),if(c==1,i(x,y,z,0)*(100-z),0))' render_volume
+#@cli : $ 100,100,100 noise 1 b 10,0 max 0 r 100%,100%,100%,3,0 n 0,100 f 'if(c==0,z*i(x,y,z,0),if(c==1,i(x,y,z,0)*(100-z),0))' render_volume
 render_volume: check "${1=8}>3&${2=5}>2&${3=.1}>0"
   repeat $! l[$>]
     mirror x
@@ -105,7 +105,7 @@ render_volume: check "${1=8}>3&${2=5}>2&${3=.1}>0"
 #@cli display_volume : _size,_quality,_opacity
 #@cli : Display the volume with black background, a bounding box
 #@cli : and a volumic rendering of the data.
-#@cli : $ 100,100,100 noise 1 blur 10,0 max 0 r 100%,100%,100%,3,0 n 0,100 f 'if(c==0,z*i(x,y,z,0),if(c==1,i(x,y,z,0)*(100-z),0))' display_volume 8,5,.1
+#@cli : $ 100,100,100 noise 1 b 10,0 max 0 r 100%,100%,100%,3,0 n 0,100 f 'if(c==0,z*i(x,y,z,0),if(c==1,i(x,y,z,0)*(100-z),0))' display_volume 8,5,.1
 display_volume: check "${1=8}>3&${2=5}>2&${3=.1}>0"
   e[^-1] "Display_volume with size $1 quality $2 and opactiy $3."
   repeat $! l[$>]
@@ -118,7 +118,7 @@ d3d_black : 1 d3d[0--2] . rm.
 
 #@cli view3d : _angle1,_angle2
 #@cli : Apply a 3D view defined by two angles
-#@cli : $ 50,50,50,3 noise 10 blur 5 max 0 n 0,255 display_volume 32,5,1 view3d
+#@cli : $ 50,50,50,3 noise 10 b 5 max 0 n 0,255 display_volume 32,5,1 view3d
 view3d : skip ${1=25},${2=-120}
   e[^-1] "Apply 3D view."
   repeat $! l[$>]
@@ -127,7 +127,7 @@ view3d : skip ${1=25},${2=-120}
 
 #@cli colordepth
 #@cli : Color depth coding
-#@cli : $ 100,100,100 noise 1 blur 10,0 max 0 colordepth 5
+#@cli : $ 100,100,100 noise 1 b 10,0 max 0 colordepth 5
 colordepth: skip ${1=5}
   e[^-1] "Colordepth coding with LUT $1."
   repeat $! l[$>]
@@ -321,31 +321,32 @@ estimate_shift:
 #@cli : Correct drift along Z in a 3D volume (video stabilization)
 #@cli : $ image.jpg  luminance repeat  10 +shift. {2*u},{2*u},0,0,2 done a z +unshift 1 a x
 unshift: skip ${1=1}
-e[^-1] "unshift image stack"
- repeat $! l[$>]
-  repeat $1
-    s z repeat $!-1 l[$>,{$>+1}]
-      +estimate_shift[1] [0] *. -1
-      shift_subpixel[1] . rm.
-    endl done a z
-  done
-endl done
+  e[^-1] "unshift image stack"
+  repeat $! l[$>]
+    repeat $1
+      s z repeat $!-1 l[$>,{$>+1}]
+        +estimate_shift[1] [0] *. -1
+        shift_subpixel[1] . rm.
+      endl done
+      a z
+    done
+  endl done
 
 #@cli register_lucas_kanade : _iterations, _scale
 #@cli : Register images using lucas kanade motion estimation
 #@cli : $ movie.cimg luminance r 50%,50% a z register_lucas_kanade 5,10
 register_lucas_kanade : skip ${1=10},${2=10}
-+lucas_kanade $2 cumulate. z +warp2d
-repeat $1
-lucas_kanade. $2 cumulate. z +[-1,-2] +warp2d
-done
+  +lucas_kanade $2 cumulate. z +warp2d
+  repeat $1
+    lucas_kanade. $2 cumulate. z +[-1,-2] +warp2d
+  done
 
 #@cli detect_events : _scale_xy,_scale_t,_threshold
 #@cli : Detect space time events using space time interest points
-#@cli : $ 100,100,100 noise 1 blur 2 +detect_events , pointscoordinates. r[0] 100%,100%,100%,3,1 n[0] 0,255 circles[0] [1] k[0]
+#@cli : $ 100,100,100 noise 1 b 2 +detect_events , pointscoordinates. r[0] 100%,100%,100%,3,1 n[0] 0,255 circles[0] [1] k[0]
 detect_events : skip ${1=1},${2=1},${3=9}
   e[^-1] "detect events with scale_xy $1 scale_z $2 and threshold $3"
-   repeat $! l[$>]
+  repeat $! l[$>]
     blur_xy $1 blur_z $2 structuretensors blur_xy $1 blur_z $2
     s z apply_parallel "eigen k[0] s c k[2]" a z
     sqrt
@@ -355,42 +356,42 @@ detect_events : skip ${1=1},${2=1},${3=9}
 
 #@cli detect_spots : _scale,_threshold
 #@cli : Detect spots in the image
-#@cli : $ 100,100 noise .2,2 blur 1 n 0,255 noise 5 +detect_spots , pointscoordinates. r[0] 100%,100%,1,3,1 circles[0] [1] k[0]
+#@cli : $ 100,100 noise .2,2 b 1 n 0,255 noise 5 +detect_spots , pointscoordinates. r[0] 100%,100%,1,3,1 circles[0] [1] k[0]
 detect_spots : skip ${1=1},${2=4}
   e[^-1] "detect events with scale $1 and threshold $2"
-   repeat $! l[$>]
-    blur $1 +blur $1 - thres={$2*${-mad[0]}}
+  repeat $! l[$>]
+    b $1 +b $1 - thres={$2*${-mad[0]}}
     +max_patch[0] 3 +threshold[0] $thres *
   endl done
 
 #@cli measure_colocalization:
 #@cli : Colocalization analysis
 #@cli : Overlap RG/R RG/G RG/R+G MOC M1 and M2
-#@cli : $ 256,256,1,2 noise 3 blur 5 measure_colocalization
+#@cli : $ 256,256,1,2 noise 3 b 5 measure_colocalization
 measure_colocalization:
- repeat $! l[$>]
-  if {0,s}==2
-   # r,g,r>0,g>0,r.r,g.g,r.g,(r>0).(g>0)
-   s c +gt 0 +sqr[0,1] +*[0] [1] +*[2] [3] +or[2] [3]
-   O1={{7,is}/{2,is}}
-   O2={{7,is}/{3,is}}
-   O={{7,is}/{8,is}}
-   # r,g,(r>0).g,(g>0).r,r.r,g.g,r.g,(r>0).(g>0)
-   *[2] [1] *[3] [0]
-   MOC={{6,is}/sqrt({4,is}*{5,is})}
-   M1={{3,is}/{0,is}}
-   M2={{2,is}/{1,is}}
-   rm  1,6,1,1,$O1,$O2,$O,$MOC,$M1,$M2
-  else
-   echo "needs images with two channels"
-   1,6,1,1,0,0
-  fi
-endl done
+  repeat $! l[$>]
+    if {0,s}==2
+      # r,g,r>0,g>0,r.r,g.g,r.g,(r>0).(g>0)
+      s c +gt 0 +sqr[0,1] +*[0] [1] +*[2] [3] +or[2] [3]
+      O1={{7,is}/{2,is}}
+      O2={{7,is}/{3,is}}
+      O={{7,is}/{8,is}}
+      # r,g,(r>0).g,(g>0).r,r.r,g.g,r.g,(r>0).(g>0)
+      *[2] [1] *[3] [0]
+      MOC={{6,is}/sqrt({4,is}*{5,is})}
+      M1={{3,is}/{0,is}}
+      M2={{2,is}/{1,is}}
+      rm 1,6,1,1,$O1,$O2,$O,$MOC,$M1,$M2
+    else
+      e "needs images with two channels"
+      1,6,1,1,0,0
+    fi
+  endl done
 
 #@cli measure_colocalization_object:
 #@cli : Compute the number of intersecting objects
 #@cli : in each channels versus the number of objects
-#@cli : $ 256,256,1,2 noise 3 blur 5 gt 0 measure_object_colocalization
+#@cli : $ 256,256,1,2 noise 3 b 5 gt 0 measure_object_colocalization
 measure_object_colocalization:
  repeat $! l[$>]
   if {0,s}==2
@@ -410,7 +411,7 @@ measure_object_colocalization:
     rm
     1,2,1,1,$n1,$n2
   else
-    echo "needs images with two channels"
+    e "needs images with two channels"
     1,6,1,1,0,0
   fi
 endl done
@@ -420,11 +421,11 @@ endl done
 #@cli : http://en.wikipedia.org/wiki/Image_moment
 #@cli : $ image.jpg +local_moments 1
 local_moments : skip ${1=1}
- repeat $! l[$>]
-norm
-if d==1
-  +mul[0] 'x'   +mul[0] 'y'   +mul[0] 'x*x'
-  +mul[0] 'x*y' +mul[0] 'y*y' blur $1
+  repeat $! l[$>]
+    norm
+    if d==1
+      +mul[0] 'x'   +mul[0] 'y'   +mul[0] 'x*x'
+      +mul[0] 'x*y' +mul[0] 'y*y' b $1
   +sqr[1] /. [0] -[3,-1] /[3] [0]
   +*[1,2] /. [0] -[4,-1] /[4] [0]
   +sqr[2] /. [0] -[5,-1] /[5] [0]
@@ -432,7 +433,7 @@ if d==1
 else
   +mul[0] 'x'   +mul[0] 'y'   +mul[0] 'z'   +mul[0] 'x*x'
   +mul[0] 'x*y' +mul[0] 'x*z' +mul[0] 'y*y' +mul[0] 'y*z'
-  +mul[0] 'z*z' blur $1
+  +mul[0] 'z*z' b $1
   +sqr[1] /. [0] -[4,-1] /[4] [0]
   +*[1,2] /. [0] -[5,-1] /[5] [0]
   +*[1,3] /. [0] -[6,-1] /[6] [0]
@@ -559,7 +560,7 @@ croparound: skip ${2=3},${3=3},${4=3}
 #@cli random_walks : width,height,length,number,speed
 #@cli : Generate random walks tracks (list of coordinates x,y,t as a Nx3 image.)
 #@cli : $ 100,100,20 random_walks 100,100,20,5,1 circles[0] [1] k[0] blur_xy 1 s z max
-#@cli : $ 100,100,20 random_walks 100,100,20,10,1 circles[0] [1] k[0] blur 1 n 0,255 display_volume 8,10,1 r3d 0,0,1,25 r3d 1,0,0,-120 snapshot3d 600,1,0,0,0 autocrop
+#@cli : $ 100,100,20 random_walks 100,100,20,10,1 circles[0] [1] k[0] b 1 n 0,255 display_volume 8,10,1 r3d 0,0,1,25 r3d 1,0,0,-120 snapshot3d 600,1,0,0,0 autocrop
 random_walks :
 number=$4 width=$1 height=$2 length=$3 speed=$5
 $number,3
@@ -607,7 +608,7 @@ repeat $! l[$>]
 
 #@cli movavg : _size>=1
 #@cli : moving average of image list with a box filter of size _size
-#@cli : $ 11 f 'x>w/2' +l. s x movavg 9 a x endl  +blur[0] 1.2 a c display_graph
+#@cli : $ 11 f 'x>w/2' +l. s x movavg 9 a x endl  +b[0] 1.2 a c display_graph
 movavg : check "$1>=1"
 e[^-1] "moving average with size "$1
 n={$1-1}
@@ -740,7 +741,7 @@ deconvolve_goldmeinel : check ${is_image_arg\ $1}" && ${2=5}>=1 && ${3=1}>=1"
   pass$1 0
   repeat $!-1 l[$>,-1]
     r[1] {0,w},{0,h},{0,d},100%,0,0,.5,.5,.5 normalize_sum[1]
-    +blur[0] 0.75
+    +b[0] 0.75
     repeat $2
       +convolve_fft. [1] max. 1e-6 +/[0] . rm..
       -^. $3 *[-1,-2] # u *= (f / Hu)^$3
@@ -806,7 +807,7 @@ local_variance: skip ${1=2},${2=0}
   e[^-1] "Estimate local variance with scale "$1" and robustness "$2
    repeat $! l[$>]
     if $2==0
-      +blur $1,1,1 - sqr blur $1,1,1
+      +b $1,1,1 - sqr b $1,1,1
     else
        +median {2*$1+1} - abs median {2*$1+1} * 1.4826 sqr
     fi
@@ -829,7 +830,7 @@ normalize_local_variance: skip ${1=50},${2=2},${3=25},${4=1}
    repeat $! l[$>]
   repeat $4
    +local_variance $2 sqrt. max. $3 # compute local standard deviation
-   +blur[0] $2,1,1 +-[0,-1] /. [1] *. $1 +[-2,-1] k. # x = <x> + alpha * (x-<x>)/<x'x>
+   +b[0] $2,1,1 +-[0,-1] /. [1] *. $1 +[-2,-1] k. # x = <x> + alpha * (x-<x>)/<x'x>
   done
   endl done
 
@@ -841,7 +842,7 @@ local_wiener : skip ${1=2}
   e[^-1] "Local Wiener filtering"
    repeat $! l[$>]
     sigma=${-noise_std}
-    +blur $1 # mean
+    +b $1 # mean
     +local_variance[0] $1 +-. {$sigma*$sigma} rv[-1,-2] /[-1,-2] # variance
     +-[0,1] # img-mean
     *[-1,-2] +[-1,-2] k.
@@ -884,7 +885,7 @@ fouriermix : skip ${2=10%}
    pass$1 0 repeat $!-1 l[$>,-1]
   fft[0] fft[2] fftshift
     # make a mask
-    100%,100% circle. 50%,50%,$2,1,1 blur. 1,1,1 n. 0,1 d
+    100%,100% circle. 50%,50%,$2,1,1 b. 1,1,1 n. 0,1 d
     *[0,1] . negate. *[2,3] . rm. +[0,2] +[1,2] fftshift
     ifft
   endl done rm.
@@ -894,7 +895,7 @@ fouriermix : skip ${2=10%}
 blend_fft : skip ${2=2}
    pass$1 0
   +l.
-    tape powerspectrum blur 1 +blur 2 -
+    tape powerspectrum b 1 +b 2 -
     max '{ia+$2*sqrt(iv)}' circle 50%,50%,20,1,@{0,im} n 0,1 d
     fftshift
   endl fft.. *[-2,-3] . negate.
@@ -924,7 +925,7 @@ unstrip : skip ${1=25},${2=20},${3=4}
      tape powerspectrum norm detect_spots 1,$3 dilate_circ $2 gt 0
      n 0,1 negate circle 50%,50%,$2,1,1
      if im<.9 # check if some spots have been detected
-       active=1 blur $1 n 0,1 fftshift if iM==0 f 1 fi
+       active=1 b $1 n 0,1 fftshift if iM==0 f 1 fi
      else
        active=0
      fi
@@ -947,7 +948,7 @@ autocorrelate :
 #@cli : Make everything look like a spot
 #@cli : Default values '_nb_iter=1, _scale=1'
 #@cli : $ image.jpg +spotify 1,10
-#@cli : $ image.jpg +spotify 1,20 norm. gt. 5% blur 1 *
+#@cli : $ image.jpg +spotify 1,20 norm. gt. 5% b 1 *
 spotify : check "${1=1}>0 && ${2=1}>0"
 e[^-1] "Spotify with scale $1 with $2 iterations"
  repeat $! l[$>]
@@ -966,8 +967,8 @@ mapblur: check "${1=10}>0"
 e[^-1] "Blur images using a blur map (works using pairs of images)."
  repeat $!/2 l[{2*$>},{2*$>+1}]
   smin={1,im} smax={1,iM}
-  l[0] repeat $1 +blur[0] {$smin+$>*($smax-$smin)/($1)} done rm[0] a z endl
-  l[1] tones $1 gt 0 blur 1 a z endl
+  l[0] repeat $1 +b[0] {$smin+$>*($smax-$smin)/($1)} done rm[0] a z endl
+  l[1] tones $1 gt 0 b 1 a z endl
   * s z +
 endl done
 
@@ -982,7 +983,7 @@ endl done
 vesselness : skip ${1=1},${2=1},${3=1},${4=1}
 e[^-1] "Tubeness with scale $1."
  repeat $! l[$>]
-  blur $1
+  b $1
   s c repeat $! l[$>]
     # Hessian eigen values sorted by absolute value
     hessian a c eigen k[0] +sign abs.. sort.. +,c * +norm a c
@@ -1028,7 +1029,7 @@ smurf:
 
 #@cli bgsubstract : _length>0
 #@cli : Substract the background using a temporal top-hat filter
-#@cli : $ 100,100,100 noise 1 blur 1 +bgsubstract 10
+#@cli : $ 100,100,100 noise 1 b 1 +bgsubstract 10
 bgsubstract:  check "${1=5}>0"
   e[^-1] "Temporal background substraction with length $1."
    repeat $! l[$>]
@@ -1058,7 +1059,7 @@ schizo : skip ${1=100},${2=-50},${3=5},${4=.75}
 #@cli : $ image.jpg scandoc
 scandoc: skip ${1=3},${2=100},${3=10%},${4=90%}
    repeat $! l[$>] split_opacity l[0]
-    median $1 +blur $2 - min 0
+    median $1 +b $2 - min 0
     s c n 0,1 a c c $3,$4 n 0,255
   endl a c endl done
 
@@ -1172,16 +1173,16 @@ endl done
 #@cli vobs : _scale
 #@cli : Motion quantity (Normal motion)  h * (|Ixy|^2 |It|/|Ixy|) / h * Ixy^2
 #@cli : Irani, Michal and Rousso, Benny and Peleg, Shmuel, Detecting and tracking multiple moving objects using temporal integration, ECCV'92.
-#@cli : $ 100,100,10 noise 1 blur 1 +vobs
+#@cli : $ 100,100,10 noise 1 b 1 +vobs
 vobs : check "${1=1}>0 && ${2=3}>0"
   e[^-1] "Motion quantity with scale $1"
    repeat $! l[$>]
-    g a[0,1] c norm[0] abs[1] *[1] [0] sqr[0] blur $1,1,1 rv max[1] 5% /
+    g a[0,1] c norm[0] abs[1] *[1] [0] sqr[0] b $1,1,1 rv max[1] 5% /
   endl done
 
 #@cli display_vobs
 #@cli : Display local diffusion coefficient
-#@cli : $ 200,100 noise .7,2 ==. 1 blur 2,1,1 repeat 20 +l. +laplacian *. .05 + endl done  a z display_vobs
+#@cli : $ 200,100 noise .7,2 ==. 1 b 2,1,1 repeat 20 +l. +laplacian *. .05 + endl done  a z display_vobs
 display_vobs :
   +vobs 1 A={round(im,0.001)} B={round(iM,0.001)} *. '{128/max(im,iM)}' +. 128  map. 5
   r[0] 100%,100%,100%,3,1 apply_gamma[0] 1.5 n[0] 0,255
@@ -1239,7 +1240,7 @@ add_colorbar : skip ${5=0},${6=255},${7=6},${8=255},${9=""},${10=5}
 
 #@cli local_diffusion_coefficient : _scale,_threshold
 #@cli : Estimate local diffusion coefficient It - D (Ixx+Iyy)=0 using D=It/(Ixx+Iyy)
-#@cli : $ 100,100 noise .7,2 ==. 1 blur 2,1,1 repeat 20 +l. +laplacian *. .05 + endl done  a z local_diffusion_coefficient 2,.5
+#@cli : $ 100,100 noise .7,2 ==. 1 b 2,1,1 repeat 20 +l. +laplacian *. .05 + endl done  a z local_diffusion_coefficient 2,.5
 local_diffusion_coefficient : check "${1=2}>0 && ${2=.5}>=0"
 e[^-1] "Local diffusion coefficient estimation using scale $1 and threshold $2"
  repeat $! l[$>]
@@ -1251,7 +1252,7 @@ e[^-1] "Local diffusion coefficient estimation using scale $1 and threshold $2"
      a c f 'b=i(x,y,z,0);a=i(x,y,z,1);if(abs(a)>abs(b),b/a,if(abs(b)>$R,1/(b/a),0))'
      channels 0
    endl
-   *[0] [1] blur $1,1,1 max[1] {1,ia+$2*sqrt(iv)}  /
+   *[0] [1] b $1,1,1 max[1] {1,ia+$2*sqrt(iv)}  /
    channels 0
  endl done
 
@@ -1262,11 +1263,11 @@ ldc_residuals :
 +l[0] s z laplacian a z endl
 g[0] z,1
 *[1,2]
--- abs blur 1
+-- abs b 1
 
 #@cli display_ldc :
 #@cli : Display local diffusion coefficient
-#@cli : $ 200,100 noise .7,2 ==. 1 blur 2,1,1 repeat 20 +l. +laplacian *. .05 + endl done  a z display_ldc
+#@cli : $ 200,100 noise .7,2 ==. 1 b 2,1,1 repeat 20 +l. +laplacian *. .05 + endl done  a z display_ldc
 display_ldc :
 +ldc 2,3 A={round(im,0.001)} B={round(iM,0.001)} *. '{128/max(im,iM)}' +. 128  map. 5
 r[0] 100%,100%,100%,3,1 apply_gamma[0] 1.5 n[0] 0,255
@@ -1279,7 +1280,7 @@ a x
 
 #@cli print_psnr : _max_value
 #@cli : Display the psnr on the image list taking the first one as a reference
-#@cli : $ image.jpg +noise 20 +blur. 1 print_psnr
+#@cli : $ image.jpg +noise 20 +b. 1 print_psnr
 print_psnr : skip ${1=255}
 e[^-1] "Compute PSNR with image 0 and print it on the other images."
  +psnr $1
@@ -1457,7 +1458,7 @@ endl done
 #@cli analyze_camera_noise :
 analyze_camera_noise:
   repeat $! l[$>]
-   +local_noise_variance $1 blur[0] $1 y a c
+   +local_noise_variance $1 b[0] $1 y a c
    display_parametric 800,600,.0,1,1,0,signal,noise
  endl done
 
@@ -1469,7 +1470,7 @@ dehaze: skip ${1=5},${2=1},${3=.2},${4=1},${5=0},${6=0},${7=0}
    repeat $! l[$>]
    # Atmospheric light estimation
   +l
-    +l s c min blur 10 erode_circ $1 dilate_circ $1  endl
+    +l s c min b 10 erode_circ $1 dilate_circ $1  endl
     gt. 80% *
     s c aR={0,iM} aG={1,iM} aB={2,iM} rm
   endl
@@ -1497,7 +1498,7 @@ dehaze: skip ${1=5},${2=1},${3=.2},${4=1},${5=0},${6=0},${7=0}
 #@cli contour2d: _tolerance
 #@cli : Draw a 2D contour of regions with tolerance _tolerance
 #@cli : Default value _tolerance=.1
-#@cli : $ image.jpg norm blur 1 gt 50% +contour2d
+#@cli : $ image.jpg norm b 1 gt 50% +contour2d
 contour2d: skip ${1=.1}
  f 'if(abs(i-j(1,1))>$1||abs(i-j(1,0))>$1,1,0)'
 
@@ -1505,19 +1506,19 @@ contour2d: skip ${1=.1}
 #@cli : Segment an image using an adaptation of Chan and Vese's method.
 #@cli : Default values _nb_iter=10,_time_step=1,_smoothness=100,_threshold=50%
 #@cli : Reference Chan and L. Vese,Active contours without edges, IEEE transactions on image processing 10(2) (2001), pp. 266-277
-#@cli : $ 256,128 t "GMIC",40,10,100,1,255 blur 1 noise 20 +segment_snake , contour2d. , r. 100%,100%,1,3,0 n 0,255 blend add
+#@cli : $ 256,128 t "GMIC",40,10,100,1,255 b 1 noise 20 +segment_snake , contour2d. , r. 100%,100%,1,3,0 n 0,255 blend add
 segment_snake: skip ${1=100},${2=1},${3=.1},${4=.1},${5=10},${6=0}
 e[^-1] "Segment the image using active contours without edges using $1 iterations and time step $2, smoothness $3 and initialize with threshold of $4."
  repeat $! l[$>]
   if s>1 luminance fi
-  +blur $5 gt. {ia+$4*sqrt(iv)}                                # initialization
+  +b $5 gt. {ia+$4*sqrt(iv)}                                # initialization
   l. +distance 0 negate[0] distance[0] 0 *[0] -1 + endl # levelset
   repeat $1
     # compute mean and variance of the two regions (original version is with mean only)
     # the molified step function is given by a blur of the sharp step function
-    +lt. 0 blur. 1 +*[0,-1] swx={ia} sw={-2,ia} M1={$swx/$sw}
+    +lt. 0 b. 1 +*[0,-1] swx={ia} sw={-2,ia} M1={$swx/$sw}
     sqr. swx2={ia}  S1={max(1e-3,$swx2/$sw^2-$M1^2)} rm[-1,-2]
-    +gt. 0 blur. 1 +*[0,-1] swx={ia} sw={-2,ia} M2={$swx/$sw}
+    +gt. 0 b. 1 +*[0,-1] swx={ia} sw={-2,ia} M2={$swx/$sw}
     sqr. swx2={ia}  S2={max(1e-3,$swx2/$sw^2-$M2^2)} rm[-1,-2]
     +iee.                                                     # regularization
     +f[0] '(1.0/$3)*(((i(x,y)-$M1)^2)/$S1-((i(x,y)-$M2)^2)/$S2)' # data term
@@ -1530,7 +1531,7 @@ e[^-1] "Segment the image using active contours without edges using $1 iteration
     #if $>%10 l. gt 0 +distance 0 negate[0] distance[0] 0 *[0] -1 + endl fi
   done
 #  +e "("$M1","{sqrt($S1)}");("$M2", "{sqrt($S2)}")"
-  blur. 1 gt. 0 rm[0]
+  b. 1 gt. 0 rm[0]
 endl done
 
 #@cli segment_cells: scale1,scale2,threshold,size_threshold
@@ -1556,7 +1557,7 @@ f 'r=sqrt((x-$1)^2+(y-$2)^2);if(r<$3,a=atan2(y-$2,x-$1);$4+$5*2*r*sin(a)+$6*r*co
 #---------------------------------
 
 _challenge:
-108,86,1,3 l. fractional_brownian_motion .25  n 0,128 +norm gt. 60% * r 1080,860,1,3,1  +l. blur 10 shift. 10,10 endl max crop 10,10,100%,100% negate endl n 0,255
+108,86,1,3 l. fractional_brownian_motion .25  n 0,128 +norm gt. 60% * r 1080,860,1,3,1  +l. b 10 shift. 10,10 endl max crop 10,10,100%,100% negate endl n 0,255
 
 #@cli periodic_dots : _nb_angles,_scale,_start_angle
 #@cli : Generate a peridic dot pattern with 'nb angles', 'scale' and 'start angle'.
@@ -1589,7 +1590,7 @@ endl done
 #@cli : http://eprints.maths.ox.ac.uk/430/1/102.pdf
 turing_pattern: skip ${1=2000},${2=.1},${3=0.855},${4=-0.95},${5=2},${6=.1},${7=.5},${8=0}
    repeat $! l[$>]
-    r 100%,100%,100%,2 blur 1 n 0,1
+    r 100%,100%,100%,2 b 1 n 0,1
     repeat $1
       progress {$>/$1*100}
       +laplacian[0] mix_channels. ($7,0;0,1)
@@ -1871,7 +1872,7 @@ jeje_turing_pattern:
     r {$1*w},{$1*h},1,2
     turing_pattern $2,$3,$4,$5,$6,$7,$8
   endl
-  r[1] 100%,100%,100%,3,0 r[1] [0],[0],1,100%,5 rm[0] blur .75 n 0,255
+  r[1] 100%,100%,100%,3,0 r[1] [0],[0],1,100%,5 rm[0] b .75 n 0,255
 
 #@gui Clouds : jeje_clouds, jeje_clouds_preview
 #@gui : Density = float(50,0,100)
