@@ -172,12 +172,14 @@ _xpink :
   else error "Exec error "$_status"!!"
   fi
 
-#@cli _xpinks : pink_cmd,parameter_string(with spaces)
-#@cli : Splits c channel if necessary and executes "_xpink pink_cmd,parameter_string" to each image
-_xpinks : v -
-  s={s} if $s>1 s. c fi
-  repeat $! l[$>]  _xpink $1,"$2" k. endl done
-  if $s>1 a[-$s--1] c fi v +
+#@cli _xpinks : pink_cmd,parameter_string(with spaces!!)
+#@cli : Splits c channel if necessary and executes "_xpink pink_cmd,parameter_string".
+_xpinks : 
+  repeat $! l[$>]
+    s={s} s. c 
+    repeat $! l[$>]  _xpink $1,"$2" k. endl done
+    if $s>1 a c fi
+  endl done 
 
 _xframe :
 	f "i=y==0?0:x==0?0:y==h-1?0:x==w-1?0:i"
@@ -368,11 +370,12 @@ pink : pink_new $*
 #@cli :   <A href="https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/">Pink</A>
 #@cli : Shortcut 'pink'
 #@cli : Prepares input, calls external "pink_cmd input p1...pn output" and reads output (/tmp) \
-# and replaces positional image parameters bei temp. files. \
+# and replaces positional IMAGE parameters bei temp. files. \
+# These images are not splitted and merged. They have to have the necessary format for the respectice pink app. \
 # Only Pink routines with input file(s) and ONE output file can be called. \
 # Images with spectral channels (s>1) are splitted, processed one by one and merged.\n
 #@cli : ATTENTION positional image parameter are never spitted and merged \
-# similar to selected (input) and output images. Positional image parameter should already have the \
+# in contrast to selected (input) and output images. Positional image parameter should already have the \
 # needed format for the selected pink binary!\n
 #@cli : pink_new prepares selected images and image parameter as pnk files in 'auto' mode and \
 # creates a command string. File format of generated input pnk file can be forced by an option \
@@ -386,10 +389,10 @@ pink : pink_new $*
 #@cli : GMIC_PINK_VERBOSE == true: created cmd string and pink messages are printed
 #@cli : $ image.jpg +pink_new. asfr,5 pink_new.. asf,5
 #@cli : $ image.jpg +blur 2 pink_new maxima,4
-#@cli : $ sp ? to_gray ir. 0,50% +pink_new. distc,3 +negate.. +pink_new... dist,3 pink_new[1] \
+#@cli : $ sp to_gray ir. 0,50% +pink_new. distc,3 +negate.. +pink_new... dist,3 pink_new[1] \
 # bisector,[0] pink_new[3] bisector,[2] k[1,3] a c
 #@cli : $ sp 2 +pink_new. dilatballnum,5 +-
-#@cli : $ sp boats ir. 0,50% +pink_new. dilatballnum,10 +pink_new.. distgeo,.,4
+# # #@cli : $ sp boats ir. 0,50% +pink_new. dilatballnum,10 +pink_new.. distgeo,.,4
 #@cli : $ sp barbara +pink_new. seuilauto,128,max,3
 pink_new :
   $=pp
@@ -397,17 +400,18 @@ pink_new :
     np=""
     repeat $#-1
       if ${is_image_arg\ ${pp{$>+2}}}
-     pass${pp{$>+2}}
-     filename$>=${-file_rand}
-    o. ${filename$>}.pnk rm.
-     np=${np}\ ${filename$>}.pnk
-   else np=${np}\ ${pp{$>+2}} fi
+        pass${pp{$>+2}}
+        filename$>=${-file_rand}
+        o. ${filename$>}.pnk rm.
+        np=${np}\ ${filename$>}.pnk
+      else np=${np}\ ${pp{$>+2}} fi
     done
   else np=" " fi
-  v + e[^1] "Call pink_new package on image$? with cmd: \"$1 [img]"$np" [img]\"." v -
-  _xpinks[0] $1,$np
+  e[^1] "Call pink_new package on image$? with cmd: \"$1 [img]"$np" [img]\"."
+  _xpinks $1,$np
   if if(isnum($GMIC_PINK_NO_RM),0$GMIC_PINK_NO_RM,0)>0 no_rm=1 else no_rm=0 fi
- if $no_rm==0 repeat $#-1 strlen ${filename$>} if ${}>0 file_rm ${filename$>}.pnk fi done fi
+  if $no_rm==0 repeat $#-1 strlen ${filename$>} if ${}>0 file_rm ${filename$>}.pnk fi done fi
+
 # # #@cli pink : pink_cmd,p1,...,pn
 # # #@cli : Abbreviaton of pink_new (obsolet, use pink_new !!)
 # # #@cli : Pink wrapper (requires the PINK library to be installed).
