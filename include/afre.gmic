@@ -362,6 +362,64 @@ afre_portraitmontage_preview :
 #@cli Core Commands
 #------------------
 
+#@cli afre_jabz
+#@cli : Convert selected images from RGB to Jzazbz.\n
+#@cli : Implementation of "M Safdar, G Cui, Y Kim, M Luo. Perceptually uniform color space for image signals including high dynamic range and wide gamut. Opt Express, 25(13), 2017".
+afre_jabz :
+  e[] "[afre]^_^) jabz: Convert image$? from RGB to Jzazbz."
+  repeat $! l[$>] rgb2xyz to_color
+    f "begin(const B=1.15; const G=0.66);
+      [B*i0-(B-1)*i2,G*i1-(G-1)*i0,i2]"
+    mix_channels (0.41478972,0.579999,0.014648;\
+      -0.20151,1.120649,0.0531008;\
+      -0.0166008,0.2648,0.6684799)
+    f "begin(const C1=3424/4096; const C2=2413/128; const C3=2392/128;
+        const N=2610/16384; const P=1.7*2523/32; const PQ=10000);
+      ((C1+C2*(i/PQ)^N)/(1+C3*(i/PQ)^N))^P"
+    mix_channels (0.5,0.5,0;\
+      3.524,-4.066708,0.542708;\
+      0.199076,1.096799,-1.295875)
+    sh 0 f. "begin(const D=-0.56; const E=1.6295499532821566e-10);
+      (1+D)*i/(1+D*i)-E" rm.
+  endl done
+
+#@cli afre_ijabz
+#@cli : Convert selected images from Jzazbz to RGB.\n
+#@cli : Implementation of "M Safdar, G Cui, Y Kim, M Luo. Perceptually uniform color space for image signals including high dynamic range and wide gamut. Opt Express, 25(13), 2017".
+afre_ijabz :
+  e[] "[afre]^_^) ijabz: Convert image$? from Jzazbz to RGB."
+  repeat $! l[$>] to_color
+    sh 0 f. "begin(const D=-0.56; const E=1.6295499532821566e-10);
+      (i0+E)/(1+D-D*(i0+E))" rm.
+    mix_channels (1,0.1386050432715393,0.05804731615611891;\
+      1,-0.1386050432715393,-0.05804731615611891;\
+      1,-0.09601924202631895,-0.8118918960560390)
+    f "begin(const C1=3424/4096; const C2=2413/128; const C3=2392/128;
+        const N=2610/16384; const P=1.7*2523/32; const PQ=10000);
+      PQ*((C1-i^(1/P))/(C3*i^(1/P)-C2))^(1/N);"
+    mix_channels (1.924226435787607,-1.004792312595366,0.037651404030618;\
+      0.3503167620949991,0.7264811939316552,-0.06538442294808501;\
+      -0.09098281098284752,-0.3127282905230739,1.522766561305260)
+    f "begin(const B=1.15; const G=0.66); X=(i0+(B-1)*i2)/B;
+      [X,(i1+(G-1)*X)/G,i2]"
+  xyz2rgb endl done
+
+#@cli afre_jchz
+#@cli : Convert selected images from RGB to JzCzhz.
+afre_jchz :
+  e[] "[afre]^_^) jchz: Convert image$? from RGB to JzCzhz."
+  afre_jabz r 100%,100%,100%,3 repeat $! l[$>]
+    s c complex2polar[-2,-1] a c
+  endl done
+
+#@cli afre_ijchz
+#@cli : Convert selected images from JzCzhz to RGB.
+afre_ijchz :
+  e[] "[afre]^_^) ijchz: Convert image$? from JzCzhz to RGB."
+  r 100%,100%,100%,3 repeat $! l[$>]
+    s c polar2complex[-2,-1] a c
+  endl done afre_ijabz
+
 #@cli afre_gnorm
 #@cli : Compute custom gradient norm of selected images.
 afre_gnorm :
@@ -666,10 +724,15 @@ search_dichotomic : check ${3=1e-3}>0
 
 # List of Commands and Filters
 #-----------------------------
-# GUI CLI : afre_contrast afre_localcontrast afre_darksky afre_edge afre_cleantext afre_vigrect afre_vigcirc
-#           afre_softlight afre_sharpenfft afre_contrastfft afre_gleam afre_halfhalf afre_portraitmontage
-# CLI only: afre_gnorm afre_hnorm afre_sdpatch afre_reorder afre_section afre_cleanphoto afre_cleanphoto1 afre_compare
-#           afre_log2 afre_y50 afre_orien afre_conv afre_box afre_gui0 afre_gui1 afre_gui0c afre_gui1c search_dichotomic
+# GUI CLI : afre_contrast afre_localcontrast afre_darksky afre_edge
+#   afre_cleantext afre_vigrect afre_vigcirc afre_softlight
+#   afre_sharpenfft afre_contrastfft afre_gleam afre_halfhalf
+#   afre_portraitmontage
+# CLI only: afre_jabz afre_ijabz afre_jchz afre_ijchz afre_gnorm
+#   afre_hnorm afre_sdpatch afre_reorder afre_section afre_cleanphoto
+#   afre_cleanphoto1 afre_compare afre_log2 afre_y50 afre_orien
+#   afre_conv afre_box afre_gui0 afre_gui1 afre_gui0c afre_gui1c
+#   search_dichotomic
 # GUI old : fx_gamify fx_hnorm
 
 
