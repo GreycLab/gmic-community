@@ -44,6 +44,250 @@
 #
 #-------------------------------
 
+#@cli rep_x_graphical_tiling: [Images],_insertion_rate,_back_r,_back_g,_back_b
+#@cli : Launch the interactive graphical tiling window.\n
+#@cli : Details: The main purpose of this filter is to stimulate graphical tiling glitch observed in older operating system and computers. However, you can also use it to tile images by hand to artistic purpose.\n
+#@cli : '[Images]' are images to be assigned to be tiled. 
+#@cli : '_insertion_rate' defines the rate of insertion per milliseconds.
+#@cli : '_back_' defines the background color in the one of the preview mode.
+#@cli : Default values: '_insertion_rate=0','_back_r=0','_back_g=0','_back_b=0'
+rep_x_graphical_tiling:
+skip ${2=0},${3=0},${4=0},${5=0}
+is_windows_tileset=${"is_image_arg $1"}
+
+e[] "\n Instruction on how to work with interactive windows.\n
+ \ ---------------------------------------------------------\n\n
+ \ - All Modes -\n\n
+ \   * O: Change Preview Mode\n
+ \   * SPACE: Switch Mode\n
+ \   * ESC: End Interactive Window\n\n
+ \ Important Note: Check the message in the title bar.\n\n
+ \ - Image Placement Mode -\n\n
+ \   * D: Display Overlay Image\n
+ \   * H: Flip Image Horizontally\n
+ \   * V: Flip Image Vertically\n
+ \   * Mouse Click: Move/Place Image\n
+ \   * ARROW UP/DOWN:Change Tiling Image\n
+ \   * ARROW LEFT/RIGHT:Rotate Image\n
+ \ - Tiling Mode - \n\n
+ \   * Mouse Move: Place Tile at Insertion Rate\n
+ \   * ARROW UP/DOWN: Add/Subtract Insertion Rate by 100 ms\n
+ \   * ARROW LEFT/RIGHT: Add/Subtract Insertion Rate by 10 ms\n\n
+ \ Additional Note: Type in 'h rep_x_graphical_tiling' for more information.\n\n
+ \ ---------------------------------------------------------"
+
+insertion_rate={max(0,$2)}
+
+__r_back={max(0,abs($3))}
+__g_back={max(0,abs($4))}
+__b_back={max(0,abs($5))}
+
+if $!!=1 error imgs!=1 fi
+if !$is_windows_tileset error tile_imgs>0==F fi
+
+pass$1 0
+
+timg={$!}
+
+ms=${-max_s}
+
+if $ms>=3&&$ms<5 to_rgba
+elif $ms==1&&$ms<3 to_graya
+else error max_chan<5==F
+fi
+
+ntimg={$timg-1}
+
+u {"endvec=vector"$ntimg"(0);for (n=1,n<="$ntimg",++n,endvec[n-1]=w#n;);(endvec)"} vec_w=[${}]
+u {"endvec=vector"$ntimg"(0);for (n=1,n<="$ntimg",++n,endvec[n-1]=h#n;);(endvec)"} vec_h=[${}]
+
+r {w#0},{h#0},100%,100%,0
+
+{w},{h},1,{s},0
+
+__w={w#0}
+__h={h#0}
+cx={w#0/2}
+cy={h#0/2}
+px=$cx
+py=$cy
+cpx=$cx
+cpy=$cy
+nx=0
+ny=0
+
+__display_mode=0
+display_overlay_image=1
+
+util_insertion=0
+__ci=1
+
+m "pass2endimage : pass[{$__ci}] 0 shift. $""1,$""2 blend alpha"
+
+paint_mode=0
+insert_duplicate_start=1
+move_window=0
+old_window=0
+start_move=0
+current_image=0
+start=0
+ex=-1
+ey=-1
+
+do
+
+ if {*,SPACE}
+  if $paint_mode paint_mode=0
+  else paint_mode=1
+  fi
+  wait 50
+ fi
+ 
+ activate_preview=0
+ 
+ if {*,O} __display_mode+=1 __display_mode={$__display_mode%3} activate_preview=1 wait 200 fi
+ 
+ if !$start activate_preview=1 fi
+ 
+ x,y,b,ww,wh={*,x,y,b,w,h}
+ 
+ window_title=""
+ 
+ if $paint_mode
+  window_title.="Painting Mode [ Press SPACE TO Escape Painting Mode]"
+  window_title.="- Insertion Rate"
+  window_title.=$insertion_rate
+  if {*,ARROWUP}" || "{*,ARROWRIGHT}
+   if {*,ARROWUP} insertion_rate+=100
+   else insertion_rate+=10
+   fi
+  elif {*,ARROWDOWN}" || "{*,ARROWLEFT} 
+   if {*,ARROWDOWN} insertion_rate-=100
+   else insertion_rate-=10
+   fi
+   insertion_rate={max(0,$insertion_rate)}
+  fi
+ else
+  if $display_overlay_image
+   window_title.="Window Overlay Mode [ON]"
+  else
+   window_title.="Window Overlay Mode [OFF]"
+  fi
+  if {*,D} display_overlay_image+=1 display_overlay_image={$display_overlay_image%2} fi
+  if {*,ARROWUP}" || "{*,ARROWDOWN} 
+   if {*,ARROWUP} current_image+=1 
+   else current_image-=1 
+   fi
+   current_image={$current_image%($timg-1)}
+   __ci={$current_image+1}
+   wait 50 
+   activate_preview=1 
+  elif {*,ARROWLEFT}" || "{*,ARROWRIGHT}
+   activate_preview=1
+   r[$__ci] {($vec_w)[$__ci-1]},{($vec_h)[$__ci-1]},100%,100%,0
+   if {*,ARROWRIGHT}
+    rotate[$__ci] 90
+   else
+    rotate[$__ci] -90
+   fi
+   temp1={($vec_w)[$__ci-1]}
+   temp2={($vec_h)[$__ci-1]}
+   vec_w=[{"v=["$vec_w"];v["$__ci"-1]="$temp2";v"}]
+   vec_h=[{"v=["$vec_h"];v["$__ci"-1]="$temp1";v"}]
+   r[$__ci] {w#0},{h#0},100%,100%,0
+  elif {*,H}" || "{*,V}
+    r[$__ci] {($vec_w)[$__ci-1]},{($vec_h)[$__ci-1]},100%,100%,0
+    if {*,H} mirror[$__ci] x
+    elif {*,V} mirror[$__ci] y
+    fi
+    r[$__ci] {w#0},{h#0},100%,100%,0
+  fi
+ fi
+  
+ if {*,b}
+  move_window+=1 move_window={$move_window%2} 
+  wait 50
+  if !$start_move ox={$x} oy={$y} start_move=1 tpx=$px tpy=$py fi
+ fi
+ 
+ if !$paint_mode
+  if $move_window
+   if {*,C} tpx=$cx tpy=$cy ox={$x} oy={$y} fi
+  else
+   if {*,C} cpx=$cx cpy=$cy px=$cx py=$py fi
+  fi
+ fi
+  
+ if $move_window
+  cpx={$tpx+$x-$ox}
+  cpy={$tpy+$y-$oy}
+  activate_preview=1
+ fi
+  
+ if !$move_window&&$old_window
+  px=$cpx
+  py=$cpy
+  start_move=0
+  paint_mode=0
+ fi
+ 
+ old_window=$move_window
+ 
+ if $paint_mode
+  if ($ex!=$x)||($ey!=$y)
+   spx={$cpx-(($vec_w)[$__ci-1]/2)}
+   spy={$cpy-(($vec_h)[$__ci-1]/2)}
+   pass2endimage[-1] $spx,$spy
+   activate_preview=1
+   wait $insertion_rate
+  fi
+  if $activate_preview
+   if $__display_mode==0
+    +blend[0,-1] alpha drgba.
+   elif $__display_mode==1
+    +drgba. $__r_back,$__g_back,$__b_back
+   else
+    +drgba.
+   fi
+   w[-1] {w#0},{h#0},0,$window_title
+   k[0-$timg]
+  fi
+  ex=$x 
+  ey=$y
+ else
+  if $activate_preview
+   spx={$cpx-(($vec_w)[$__ci-1]/2)}
+   spy={$cpy-(($vec_h)[$__ci-1]/2)}
+   if $display_overlay_image
+    +shift[{$__ci}] $spx,$spy
+    if $__display_mode==0 
+     +blend[0,-2,-1] alpha drgba.
+    elif $__display_mode==1
+     +blend[-2,-1] alpha drgba. $__r_back,$__g_back,$__b_back
+    else
+     +blend[-2,-1] alpha drgba.
+    fi
+   else
+    if $__display_mode==0
+     +blend[0,-1] alpha drgba.
+    elif $__display_mode==1
+     +drgba. $__r_back,$__g_back,$__b_back
+    else
+     +drgba.
+    fi
+   fi
+   w[-1] {w#0},{h#0},0,$window_title
+   k[0-$timg]
+  fi
+ fi
+  
+ insert_duplicate_start=1
+ start=1
+ activate_preview=0
+ wait
+while {*}" && "!{*,ESC}
+
+um pass2endimage k[-1]
 #@cli rep_jr_bps : eq. to 'rep_jr_bitplane_shuffler' : (+)
 rep_jr_bps: rep_jr_bitplane_shuffler $*
 #@cli rep_jr_bitplane_shuffler: _seed,_binary_swap={ 0=reverse | 1=forward },_bitdepth
@@ -266,7 +510,7 @@ elif $include_tileset_image pass$1 0 rep_tiler_nonisometric[0] [-1],${2--1} rm.
 elif $include_tile_img pass$6 0 rep_tiler_nonisometric[0] ${1-5},[-1],${7--1} rm.
 else rep_tiler_nonisometric $*
 fi
-#@cli rep_tiler_nonisometric: { filename | [tileset] },__min_tile>=3,increment>=0,_tileset_iw_width>=1,_tileset_ih_width>=1,{ _filename | [placed_tiles] },_preserve_bgout={ 0=eliminate_bg | 1=preserve_bg },_drgba_r>=0,_drgba_g>=0,_drgba_b>=0,_gridcol>=0,_trackpadcol>=0
+#@cli rep_tiler_nonisometric: { filename | [tileset] },min_tile>=3,increment>=0,_tileset_iw_width>=1,_tileset_ih_width>=1,{ _filename | [placed_tiles] },_preserve_bgout={ 0=eliminate_bg | 1=preserve_bg },_drgba_r>=0,_drgba_g>=0,_drgba_b>=0,_gridcol>=0,_trackpadcol>=0
 #@cli : Launch the interactive non-isometric tiling toolkit. Mandatory variables are the first 3 ones!
 #@cli : More info: The interactive non-isometric tiling toolkit is a near final version. Final version will have tiledata import and export. Perhaps with a master developer editor to make overworld art.\n
 #@cli : (eq. to 'rep_tiler_n').\n
@@ -8802,6 +9046,55 @@ rep_jr_bitplane_shuffler $3,!$2,{($1*8)+8}
 if $1 / 257 fi
 fx_rep_jr_bps_preview:
 gui_split_preview "fx_rep_jr_bps ${1-3}",${-3--1}
+#@gui Graphical Tiling Glitch (Interactive): fx_rep_x_graphical_tiling,fx_rep_x_graphical_tiling_preview(0)
+#@gui :_=note("Launch the interactive graphical tiling window.\n\nDetails: The main purpose of this filter is to stimulate graphical tiling glitch observed in Microsoft Windows XP Operating System. However, you can also use it to tile images by hand to artistic purpose.\n\n<u>Please Read Instruction Below!</b>")
+#@gui :_=separator(),_=note("<b>Main</b>)
+#@gui :Initial Insertion Rate (milliseconds)=int(0,0,1000)
+#@gui :Background Color=color(0,0,0)
+#@gui :Autocrop and Separate?=bool(0)
+#@gui :Reverse Layers?=bool(0)
+#@gui :Output Mode=choice(1,"Tiled Only","New Layer","Blended")
+#@gui :_=separator(),_=note("<b>Preview</b>)
+#@gui :Background Mode=choice(0,"Image","Colored","Alpha")
+#@gui :Preview Split=point(50,50,0,1,255,255,255,255)
+#@gui :Duplicates=int(5,1,50)
+#@gui :Display Message?=bool(1)
+#@gui :_=separator(),_=note("<b><u>Instruction</u></b>)
+#@gui :_=note("\n<b>All Mode</b>\n\n- O: Change Preview Mode\n- SPACE: Switch Mode\n- ESC: End Interactive Window\n\n<u>Important Note: Check the message in the title bar.</u>\n\n<b>Image Placement Mode</b>\n\n- D: Display Overlay Image\n- H: Flip Image Horizontally\n- V: Flip Image Vertically\n- Mouse Click: Move/Place Image\n- ARROW UP/DOWN: Change Tiling Image\n- ARROW LEFT/RIGHT: Rotate Image\n\n<b>Tiling Mode</b>\n\n- Mouse Move: Place Tile at Insertion Rate\n- ARROW UP/DOWN: Add/Subtract Insertion Rate by 100 ms\n- ARROW LEFT/RIGHT: Add/Subtract Insertion rate by 10 ms")
+#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2020/8/27</i>.</small>")
+fx_rep_x_graphical_tiling:
+if $6 rv fi
+if $5 autocrop[^0]
+else autocrop_components[^0] 0%,0%,1,1
+fi
+if $7 +rep_x_graphical_tiling[0] [1--1],$1,${2-4} k[0,-1] if $7==2 blend alpha fi
+else rep_x_graphical_tiling[0] [1--1] k[0]
+fi
+fx_rep_x_graphical_tiling_preview:
+if $6 rv fi
+if $5 autocrop[1]
+else autocrop_components[1] 0%,0%,1,1
+fi
+k[0,1]
+r. {w#0},{h#0},1,{s#0},0,0,.5,.5
+r. 100%,100%,$11,100%,0,1
+f. "begin(
+const offx=(100-$9-50)%;
+const offy=(100-$10-50)%;
+);
+j(offx*w*(z/(d-1)),offy*h*(z/(d-1)));
+"
+if $8 k. fi
+s. z
+if $8!=1 blend alpha
+else blend alpha drgba ${2-4}
+fi
+if $12
+if s==2||s==4 
+sh. 0,{s-2} fi
+text="Interactive Filter" to. $text,.5~,.5~,10% 
+rm. 
+fi
 ######################
 
 # Local Variables:
