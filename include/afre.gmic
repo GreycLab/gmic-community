@@ -70,11 +70,11 @@ afre_contrast_preview :
 #@cli : Enhance local contrast.
 #@cli : Default values: 'radius=1' and 'amount=50'.
 afre_localcontrast : check "${1=1}>=1 && ${2=50}>=-100 && $1<=10 && $2<=100"
-  if $2==0 return fi e[] "[afre]^_^) localcontrast: Enhance local contrast of image$? using radius=$1 and amount=$2."
+  if $2==0 return fi rd={int($1)} e[] "[afre]^_^) localcontrast: Enhance local contrast of image$? using radius=$rd and amount=$2."
   repeat $! l[$>] r0={[im,iM]} n 0,255 rgb2lab 0 sh 0
     r1={[im,iM]} . +n. 0,1
-      f. "begin(const boundary=1; const L=$1*2+1; const A=4^($2/50));
-        ref(crop(x-$1,y-$1,0,c,L,L,1,1),N); M=avg(N)+1e-15;
+      f. "begin(const boundary=1; const L=$rd*2+1; const A=4^($2/50));
+        ref(crop(x-$rd,y-$rd,0,c,L,L,1,1),N); M=avg(N)+1e-15;
         if(i<M,M*(i/M)^A,1-(1-M)*((1-i)/(1-M))^A)" n. $r1
       +n.. 0,1 f. gauss(i-1/6) n. 0,1 blend_fade[2,3] . k[0-2]
     +n.. 0,1 f. "begin(const M=0.5; const G=0.05);
@@ -96,12 +96,12 @@ afre_localcontrast_preview :
 #@cli : Enhance landscape by darkening the sky.
 #@cli : Default values: 'blend=0', 'contrast=0', 'smooth_method=0' and 'smooth_radius=0'.
 afre_darksky : check "isbool(${1=0}) && ${2=0}>=-100 && isbool(${3=0}) && ${4=0}>=0 && $2<=100 && $4<=3"
-  b=${arg\ 1+$1,softlight,overlay} m=${arg\ 1+$3,fast,slow} e[] "[afre]^_^) darksky: Darken sky of image$? using blend="$b", contrast=$2, smooth_method="$m" and smooth_radius=$4."
+  b=${arg\ 1+$1,softlight,overlay} m=${arg\ 1+$3,fast,slow} rd={int($4)} e[] "[afre]^_^) darksky: Darken sky of image$? using blend="$b", contrast=$2, smooth_method="$m" and smooth_radius=$rd."
   repeat $! l[$>] if s<3||s>4 error[] "\n[afre]>_<) darksky: Select RGB images." fi endl done
   repeat $! l[$>] r0={[im,iM]} n 0,255
     +channels 1 +channels.. 2 -[^0]
-    if $4&&$3 afre_gui0. $4,1e0
-      elif $4 r1={[im,iM]} median. {$4*2+1} n. $r1 fi
+    if $rd&&$3 afre_gui0. $rd,1e0
+      elif $rd r1={[im,iM]} median. {$rd*2+1} n. $r1 fi
     c. 0%,0 +. 127 afre_contrast. {$2}
     +afre_y50.. 1 to_rgb. r1={[im,iM]} mv. 1 afre_orien... 1
     blend[^0] $b n. $r1
@@ -479,9 +479,9 @@ afre_hnorm :
 #@cli : Compute local standard deviation of selected images.
 #@cli : Default value: 'radius=1'.
 afre_sdpatch : skip ${1=1}
-  e[] "[afre]^_^) sdpatch: Compute local standard deviation of image$? using radius=$1."
+  rd={int($1)} e[] "[afre]^_^) sdpatch: Compute local standard deviation of image$? using radius=$rd."
   repeat $! l[$>] +gradient_norm r={[im,iM]} rm.
-    +sqr afre_box $1 sqr.. rv - max 0 sqrt
+    +sqr afre_box $rd sqr.. rv - max 0 sqrt
   n $r endl done
 
 #@cli afre_reorder : order,_order2,...
@@ -549,11 +549,11 @@ afre_cleanphoto : check "${1=3}>=2 && ${2=10}>=1 && ${3=1}>=-50 &&
 #@cli : \ \ Use 'afre_section' to determine region labels.
 afre_cleanphoto1 : check "${1=3}>=1 && ${2=1}>=1 &&
     $1<=10 && $2<=50" skip ${3=1}
-  m=min(w,h) err=int($m/25) if $err<$2 error[] "\n[afre]>_<) cleanphoto: Section image$? into no more than "{max(sqr($err),1)}" ("{max($err,1)}"x"{max($err,1)}") regions." fi
-  m "ip : s={$1*2+1} +l +erode_oct $s dilate_oct. $s - c 0,100% ^ 2
+  rd={int($1)} m=min(w,h) err=int($m/25) if $err<$2 error[] "\n[afre]>_<) cleanphoto: Section image$? into no more than "{max(sqr($err),1)}" ("{max($err,1)}"x"{max($err,1)}") regions." fi
+  m "ip : s={$rd*2+1} +l +erode_oct $s dilate_oct. $s - c 0,100% ^ 2
     c 5%,10% dilate_oct 3 n 0,1 endl +inpaint_pde.. . rm..
     +gaussian. {[w,h]*.3} c. 0,50% n. 0,1 blend_fade[0,1] . k[0]"
-  e[] "[afre]^_^) cleanphoto: Clean dust and scratches from image$? using radius=$1, xy_sections=$2 and maskN=${3--1}."
+  e[] "[afre]^_^) cleanphoto: Clean dust and scratches from image$? using radius=$rd, xy_sections=$2 and maskN=${3--1}."
   repeat $! l[$>] if $2>1
     iM={iM} w0,h0={[w,h]} w,h={[w,h]/$2} 100%,100%,1,3 l. (${3--1})
       c. 1,{sqr($2)} round. sort. discard. unroll. x
@@ -645,7 +645,7 @@ afre_conv : check ${is_image_arg\ $1}
 #@cli : Blur selected images with a soft box filter.
 #@cli : Default values: 'radius=1' and 'gaussian=1'.
 afre_box : check "${1=1}>=1 && isbool(${2=1})"
-  if $2 g="soft box" else g="box" fi w={$1*2+1}
+  rd={int($1)} if $2 g="soft box" else g="box" fi w={$rd*2+1}
   e[] "[afre]^_^) box: Blur image$? with a "${w}"x"${w}" "$g" filter."
   repeat $! l[$>]
     $w,$w f. 1 if $2 gaussian. {100/3}% fi afre_conv.. . rm.
@@ -658,15 +658,15 @@ afre_box : check "${1=1}>=1 && isbool(${2=1})"
 #@cli : - Reduce 'structure' to soften edges and artifacts.
 #@cli : * Improvement of "K He, J Sun, X Tang. Guided image filtering. TPAMI, 35(6):1397-1409, 2013".
 afre_gui0 : check "${1=1}>=1 && ${2=1e-2}>=0 && ${3=10}>=0 && $3<=10"
-  e[] "[afre]^_^) gui0: Blur image$? with a custom self-guided filter using radius=$1, smoothing=$2 and structure=$3."
-  kwh={sqr($1*2+1)} str={1e{-$3+2}}
+  rd={int($1)} e[] "[afre]^_^) gui0: Blur image$? with a custom self-guided filter using radius=$rd, smoothing=$2 and structure=$3."
+  kwh={sqr($rd*2+1)} str={1e{-$3+2}}
   repeat $! l[$>] nm={b} iM={iM} / $iM
-    . +sqr. afre_box[^0] $1 nm I,mI,mII
+    . +sqr. afre_box[^0] $rd nm I,mI,mII
     +sqr[mI] *. -1 +. [mII] rm[mII] nm. vI
     +l[vI] abs s c + endl *. $kwh +. $str ^. -1 *. $str nm. W
     ++[vI] {vI,$2*ia+1e-6} /[vI] . rm. nm[vI] a
     +*[a] [mI] *. -1 +. [mI] rm[mI] nm. b
-    *[a,b] [W] afre_box[^0] $1 nm[^0] ma,mW,mb
+    *[a,b] [W] afre_box[^0] $rd nm[^0] ma,mW,mb
     *[I] [ma] +[I] [mb] /[I] [mW] k[I]
   * $iM nm $nm endl done
 
@@ -677,18 +677,18 @@ afre_gui0 : check "${1=1}>=1 && ${2=1e-2}>=0 && ${3=10}>=0 && $3<=10"
 #@cli : - Reduce 'structure' to soften edges and artifacts.
 #@cli : * Improvement of "K He, J Sun, X Tang. Guided image filtering. TPAMI, 35(6):1397-1409, 2013".
 afre_gui1 : check ${is_image_arg\ $1}" && ${2=1}>=1 && ${3=1e-2}>=0 && ${4=5}>=0 && $4<=10"
-  e[] "[afre]^_^) gui1: Blur image$? with a custom guided filter using guide=["${"-pass$1 -1"}"], radius=$2, smoothing=$3 and structure=$4."
-  pass$1 0 to_colormode 0 kwh={sqr($2*2+1)} str={1e{-$4+2}}
+  rd={int($2)} e[] "[afre]^_^) gui1: Blur image$? with a custom guided filter using guide=["${"-pass$1 -1"}"], radius=$rd, smoothing=$3 and structure=$4."
+  pass$1 0 to_colormode 0 kwh={sqr($rd*2+1)} str={1e{-$4+2}}
   repeat $! if $>!=$! nm$>={$>,b} fi iM$>={$>,iM} /[$>] ${iM$>} done
   repeat $!-1 l[$>,-1]
     if w#0!=w#1||h#0!=h#1||d#0!=d#1 error[] "\n[afre]>_<) gui1: Image$? and guide ["${"-pass$1 -1"}"] must have the same width, height and depth." fi
-    . rv +*[1] [2] +sqr[1] afre_box[^0] $2 nm I,mI,mp,mIp,mII
+    . rv +*[1] [2] +sqr[1] afre_box[^0] $rd nm I,mI,mp,mIp,mII
     +*[mI] [mp] *. -1 +. [mIp] rm[mIp] nm. cIp
     +sqr[mI] *. -1 +. [mII] rm[mII] nm. vI
     +normp[vI] 1 *. $kwh +. $str ^. -1 *. $str nm. W
     ++[vI] {vI,$3*ia+1e-6} /[cIp] . rm[vI,-1] nm[cIp] a
     +*[a] [mI] *. -1 +. [mp] rm[mI,mp] nm. b
-    *[a,b] [W] afre_box[^0] $2 nm[^0] ma,mW,mb
+    *[a,b] [W] afre_box[^0] $rd nm[^0] ma,mW,mb
     *[ma] [I] +[ma] [mb] /[ma] [mW] k[I,ma]
     nm[ma] ${nm$>} rv
   endl done rm.
