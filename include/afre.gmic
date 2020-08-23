@@ -41,6 +41,28 @@
 #@gui _<b>Colors</b>
 #-------------------
 
+#@gui Brightness : afre_brightness, afre_brightness_preview(1)+
+#@gui : note = note("<strong>Enhance luminance brightness.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2020Aug22.</strong>\n\n")
+#@gui : Amount = int(50,-100,100)
+#@gui : note = note("\n\n<strong>Note</strong>\n\nG'MIC's preview is inaccurate. Apply the filter and review the results in your host editor.")
+#@cli afre_brightness : -100<=amount<=100
+#@cli : Enhance luminance brightness.
+#@cli : Default value: 'amount=50'.
+afre_brightness : check "${1=50}>=-100 && $1<=100"
+  if !$1 return fi e[] "[afre]^_^) brightness: Enhance luminance brightness of image$? using amount=$1."
+  repeat $! l[$>] r={[im,iM]} +afre_orien 1 +afre_y50.. 1 to_rgb.
+    r1={[im,iM]} n. 0,1 f. "begin(const A=2^($1/50); const M=ia);
+      1-(1-M)*((1-i)/(1-M))^A" n. $r1
+    c. $r *[^0] c. $r if $1<0
+      +n.. 0,1 f. gauss(i-1/6) n. 0,1 +blend_fade[1,2] . k[0,1,-1] fi
+    +n.. 0,1 f. "begin(const M=0.5; const G=0.05);
+      ref(if(i<=M,M-M*(i/M)^G,-M+M*((1-i)/M)^G),A)" n. 0,1
+    blend_fade[0,1] . k[0] if $1<0 c 0%,{${-afre_minmax}*.9} fi
+  n $r endl done
+
+afre_brightness_preview :
+  afre_brightness $*
+
 #@gui Contrast : afre_contrast, afre_contrast_preview(1)+
 #@gui : note = note("<strong>Enhance luminance contrast.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2020Jul21-Aug20.</strong>\n\n")
 #@gui : Amount = int(50,-100,100)
@@ -49,7 +71,7 @@
 #@cli : Enhance luminance contrast.
 #@cli : Default value: 'amount=50'.
 afre_contrast : check "${1=50}>=-100 && $1<=100"
-  e[] "[afre]^_^) contrast: Enhance luminance contrast of image$? using amount=$1." if !$1 return fi
+  if !$1 return fi e[] "[afre]^_^) contrast: Enhance luminance contrast of image$? using amount=$1."
   repeat $! l[$>] r0={[im,iM]} +afre_y50 1 to_rgb. afre_orien.. 1
     r1={[im,iM]} +n. 0,1 f. "begin(const A=2^($1/50); const M=ia);
       if(i<M,M*(i/M)^A,1-(1-M)*((1-i)/(1-M))^A)" n. $r1
@@ -413,6 +435,16 @@ afre_portraitmontage_preview :
 #@cli Core Commands
 #------------------
 
+#@cli afre_maxmin
+#@cli : Return the maximum of channel minimums.
+afre_maxmin :
+  sh 0 sh.. 1 sh... 2 u {max(im#1,im#2,im#3)} k[0]
+
+#@cli afre_minmax
+#@cli : Return the minimum of channel maximums.
+afre_minmax :
+  sh 0 sh.. 1 sh... 2 u {min(iM#1,iM#2,iM#3)} k[0]
+
 #@cli afre_jabz
 #@cli : Convert selected images from RGB to Jzazbz.\n
 #@cli : Implementation of "M Safdar, G Cui, Y Kim, M Luo. Perceptually uniform color space for image signals including high dynamic range and wide gamut. Opt Express, 25(13), 2017".
@@ -774,16 +806,18 @@ search_dichotomic : check ${3=1e-3}>0
 
 
 # List of Commands and Filters
-#---------37-----------17-----
-# GUI CLI : afre_contrast afre_localcontrast afre_darksky afre_edge
-#   afre_details afre_texture afre_cleantext afre_vigrect afre_vigcirc
-#   afre_softlight afre_sharpenfft afre_contrastfft afre_gleam
-#   afre_halfhalf afre_portraitmontage
-# CLI only: afre_jabz afre_ijabz afre_jchz afre_ijchz afre_gnorm
-#   afre_hnorm afre_sdpatch afre_reorder afre_section afre_cleanphoto
-#   afre_cleanphoto1 afre_compare afre_log2 afre_y50 afre_orien
-#   afre_conv afre_box afre_gui0 afre_gui1 afre_gui0c afre_gui1c
-#   search_dichotomic
+#---------40-----------18-----
+# GUI CLI
+#   afre_brightness afre_contrast afre_localcontrast afre_darksky
+#   afre_edge afre_details afre_texture afre_cleantext afre_vigrect
+#   afre_vigcirc afre_softlight afre_sharpenfft afre_contrastfft
+#   afre_gleam afre_halfhalf afre_portraitmontage
+# CLI only
+#   afre_maxmin afre_minmax afre_jabz afre_ijabz afre_jchz afre_ijchz
+#   afre_gnorm afre_hnorm afre_sdpatch afre_reorder afre_section
+#   afre_cleanphoto afre_cleanphoto1 afre_compare afre_log2 afre_y50
+#   afre_orien afre_conv afre_box afre_gui0 afre_gui1 afre_gui0c
+#   afre_gui1c search_dichotomic
 # GUI old : fx_gamify fx_hnorm
 
 
