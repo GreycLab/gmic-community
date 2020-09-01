@@ -88,17 +88,16 @@ afre_contrast_preview :
 #@cli : Enhance local contrast.
 #@cli : Default values: 'radius=1' and 'amount=50'.
 afre_localcontrast : check "${1=1}>=1 && ${2=50}>=-100 && $1<=10 && $2<=100"
-  if $2==0 return fi rd={int($1)} e[] "[afre]^_^) localcontrast: Enhance local contrast of image$? using radius="$rd" and amount=$2."
-  repeat $! l[$>] r0={[im,iM]} n 0,255 rgb2lab 0 sh 0
-    r1={[im,iM]} . +n. 0,1
-    f. "begin(const boundary=1; const L="$rd"*2+1; const A=4^($2/50));
-      ref(crop(x-"$rd",y-"$rd",0,c,L,L,1,1),N); M=avg(i,med(N))+1e-15;
-      if(i<M,M*(i/M)^A,1-(1-M)*((1-i)/(1-M))^A)" n. $r1
-    +n.. 0,1 f. gauss(i-1/6) n. 0,1 blend_fade[2,3] . k[0-2]
-    +n.. 0,1 f. "begin(const M=0.5; const G=0.05);
-      ref(if(i<=M,M-M*(i/M)^G,-M+M*((1-i)/M)^G),A)" n. 0,1
-    blend_fade[1,2] . k[0]
-  lab2rgb 0 n $r0 endl done
+  if !$2 return fi rd={int($1)} e[] "[afre]^_^) localcontrast: Enhance local contrast of image$? using radius="$rd" and amount=$2."
+  repeat $! l[$>] r0={[im,iM]} n 0,255 rgb2jzazbz 0 sh 0 r1={[im,iM]}
+    . +n. 0,1 f. "begin(const boundary=1; const D="$rd"*2+1;
+      const P=4^($2/50)); ref(crop(x-"$rd",y-"$rd",0,c,D,D,1,1),N);
+      A=avg(i,med(N))+1e-15; if(i<A,A*(i/A)^P,1-(1-A)*((1-i)/(1-A))^P)
+      " n. $r1
+    +n.. 0,1 f. gauss(i) n. 0,1 blend_fade[2,3] . k[0-2]
+    +n.. 0,1 f. "begin(const A=0.5; const P=0.05); if(i<=A,
+      A-A*(i/A)^P,-A+A*((1-i)/A)^P)" n. 0,1 blend_fade[1,2] . k[0]
+  jzazbz2rgb 0 n $r0 endl done
 
 afre_localcontrast_preview :
   afre_localcontrast $*
@@ -347,9 +346,9 @@ afre_contrastfft_preview :
 #@gui : sep = separator(), note = note("Filter by <i>afre</i>. Latest update: <i>2017-01-05</i>.")
 fx_gamify :
   if $3 n 0,255 fi
-  rgb2lab lab2lch
+  afre_jchz
   s c n... $1,100 *.. $2 a c
-  lch2lab lab2rgb
+  afre_ijchz
   split_details 2
   l.. adjust_colors 0,{-$4/1.5*20} endl
   *. $4
@@ -440,53 +439,11 @@ afre_maxmin :
 afre_minmax :
   sh 0 sh.. 1 sh... 2 u {min(iM#1,iM#2,iM#3)} k[0]
 
-#@cli afre_jabz
-#@cli : Convert selected images from RGB to Jzazbz.\n
-#@cli : Implementation of "M Safdar, G Cui, Y Kim, M Luo. Perceptually uniform color space for image signals including high dynamic range and wide gamut. Opt Express, 25(13), 2017".
-afre_jabz :
-  e[] "[afre]^_^) jabz: Convert image$? from RGB to Jzazbz."
-  repeat $! l[$>] rgb2xyz to_color
-    f "begin(const B=1.15; const G=0.66);
-      [B*i0-(B-1)*i2,G*i1-(G-1)*i0,i2]"
-    mix_channels (0.41478972,0.579999,0.014648;\
-      -0.20151,1.120649,0.0531008;\
-      -0.0166008,0.2648,0.6684799)
-    f "begin(const C1=3424/4096; const C2=2413/128; const C3=2392/128;
-        const N=2610/16384; const P=1.7*2523/32; const PQ=10000);
-      ((C1+C2*(i/PQ)^N)/(1+C3*(i/PQ)^N))^P"
-    mix_channels (0.5,0.5,0;\
-      3.524,-4.066708,0.542708;\
-      0.199076,1.096799,-1.295875)
-    sh 0 f. "begin(const D=-0.56; const E=1.6295499532821566e-10);
-      (1+D)*i/(1+D*i)-E" rm.
-  endl done
-
-#@cli afre_ijabz
-#@cli : Convert selected images from Jzazbz to RGB.\n
-#@cli : Implementation of "M Safdar, G Cui, Y Kim, M Luo. Perceptually uniform color space for image signals including high dynamic range and wide gamut. Opt Express, 25(13), 2017".
-afre_ijabz :
-  e[] "[afre]^_^) ijabz: Convert image$? from Jzazbz to RGB."
-  repeat $! l[$>] to_color
-    sh 0 f. "begin(const D=-0.56; const E=1.6295499532821566e-10);
-      (i0+E)/(1+D-D*(i0+E))" rm.
-    mix_channels (1,0.1386050432715393,0.05804731615611891;\
-      1,-0.1386050432715393,-0.05804731615611891;\
-      1,-0.09601924202631895,-0.8118918960560390)
-    f "begin(const C1=3424/4096; const C2=2413/128; const C3=2392/128;
-        const N=2610/16384; const P=1.7*2523/32; const PQ=10000);
-      PQ*((C1-i^(1/P))/(C3*i^(1/P)-C2))^(1/N);"
-    mix_channels (1.924226435787607,-1.004792312595366,0.037651404030618;\
-      0.3503167620949991,0.7264811939316552,-0.06538442294808501;\
-      -0.09098281098284752,-0.3127282905230739,1.522766561305260)
-    f "begin(const B=1.15; const G=0.66); X=(i0+(B-1)*i2)/B;
-      [X,(i1+(G-1)*X)/G,i2]"
-  xyz2rgb endl done
-
 #@cli afre_jchz
 #@cli : Convert selected images from RGB to JzCzhz.
 afre_jchz :
   e[] "[afre]^_^) jchz: Convert image$? from RGB to JzCzhz."
-  afre_jabz r 100%,100%,100%,3 repeat $! l[$>]
+  rgb2jzazbz 0 r 100%,100%,100%,3 repeat $! l[$>]
     s c complex2polar[-2,-1] a c
   endl done
 
@@ -496,7 +453,7 @@ afre_ijchz :
   e[] "[afre]^_^) ijchz: Convert image$? from JzCzhz to RGB."
   r 100%,100%,100%,3 repeat $! l[$>]
     s c polar2complex[-2,-1] a c
-  endl done afre_ijabz
+  endl done jzazbz2rgb 0
 
 #@cli afre_gnorm
 #@cli : Compute custom gradient norm of selected images.
@@ -801,18 +758,18 @@ search_dichotomic : check ${3=1e-3}>0
 
 
 # List of Commands and Filters
-#---------40-----------18-----
+#---------38-----------18-----
 # GUI CLI
 #   afre_brightness afre_contrast afre_localcontrast afre_darksky
 #   afre_edge afre_details afre_texture afre_cleantext afre_vigrect
 #   afre_vigcirc afre_softlight afre_sharpenfft afre_contrastfft
 #   afre_gleam afre_halfhalf afre_portraitmontage
 # CLI only
-#   afre_maxmin afre_minmax afre_jabz afre_ijabz afre_jchz afre_ijchz
-#   afre_gnorm afre_hnorm afre_sdpatch afre_reorder afre_section
-#   afre_cleanphoto afre_cleanphoto1 afre_compare afre_log2 afre_y50
-#   afre_orien afre_conv afre_box afre_gui0 afre_gui1 afre_gui0c
-#   afre_gui1c search_dichotomic
+#   afre_maxmin afre_minmax afre_jchz afre_ijchz afre_gnorm afre_hnorm
+#   afre_sdpatch afre_reorder afre_section afre_cleanphoto
+#   afre_cleanphoto1 afre_compare afre_log2 afre_y50 afre_orien
+#   afre_conv afre_box afre_gui0 afre_gui1 afre_gui0c afre_gui1c
+#   search_dichotomic
 # GUI old : fx_gamify fx_hnorm
 
 
