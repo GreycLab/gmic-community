@@ -2700,12 +2700,13 @@ elif $5==1 ($6^$7^$8) hsv2rgb. rgb2yuv.
 else ($6^$7^$8) rgb2yuv.
 fi
 f[^-1] "begin(
- ss=h>w?w:h; #Pick shortside as basis for gradient#
- ang=pi*((180-$4)/180); #Convert Angle to radians#
- rot_y(a,b)=a*sin(ang)+b*cos(ang); #Rotate Function#
+ const ss=h>w?w:h; #Pick shortside as basis for gradient#
+ const ang=pi*((180-$4)/180); #Convert Angle to radians#
+ const offset=$3-.5;
+ const sin_ang=sin(ang);
+ const cos_ang=cos(ang);
+ rot_y(a,b)=a*sin_ang+b*cos_ang; #Rotate Function#
  mm_val(a)=a>1?1:(a<0?0:a); #Cut values to 0,1 range#
- offset=$3;
- offset-=.5;
 );
 pos_x=[mm_val((rot_y(x-w/2,y-h/2)/ss)+offset)];
 Sub_YUV=[(1-i(#-1,0,0,z,0))*pos_x[0]*$2,i(#-1,0,0,z,1)*pos_x[0]*-1,i(#-1,0,0,z,2)*pos_x[0]*-1,0];
@@ -4087,20 +4088,24 @@ rm..
 endl done
 #@cli rep_trps: eq. to 'rep_tr_pixel_sharpener'. : (+)
 rep_trps: rep_tr_pixel_sharpener $*
-#@cli rep_tr_pixel_sharpener: sharpen,_internal_blur>=0,_type= { 0=Photo | 1= Horizontal | 2= Vertical | 3= One-Axis Angle | 4= Two-Axis Angle },-360<=_sharpening_angle<=360
+#@cli rep_tr_pixel_sharpener: sharpen,_internal_blur>=0,_type= { 0=Photo | 1= Horizontal | 2= Vertical | 3= One-Axis Angle | 4= Two-Axis Angle | 5= Two-Axis Disconnected},-360<=_sharpening_angle<=360
 #@cli : Extended version of the original TR's Pixel Sharpener for Paint.NET. Some code were changed to make more sense or is more practical. Negative values are enabled for first variable in the G'MIC version. The original code this was based on was created by TechnoRobbo. Source code - https://forums.getpaint.net/topic/26783-trs-pixel-sharpener-plugin-v20-dec-21-2014/
 #@cli : (eq. to 'rep_trps').\n
 #@cli : Default values: '_internal_blur=0','_blur_type=0','_sharpening_angle=0'\n
 #@cli : Author: Reptorian.
 rep_tr_pixel_sharpener:
-skip ${2=0},${3=0},${4=0}
+skip ${2=0},${3=0},${4=0},${5=0}
 f "
 begin(
-ang=pi*($4/180);
+const ang=pi*($4/180);
+const ang2=pi*($5/180);
 const cos_ang=cos(ang);
 const sin_ang=sin(ang);
+const cos_ang2=cos(ang2);
+const sin_ang2=sin(ang2);
 rot_x(a,b)=a*cos_ang-b*sin_ang;
 rot_y(a,b)=a*sin_ang+b*cos_ang;
+rot_y_alt(a,b)=a*sin_ang2+b*cos_ang2;
 const blur=(round(abs($2)+1)-1)*2+3;
 const qblur=sqr(blur);
 const eblur=floor(blur/2);
@@ -4113,11 +4118,12 @@ sum=i*mult;
 for(k=int(sblur),k<=eblur,k++,
     for(j=int(sblur),j<=eblur,j++,
         if(k!=0&j!=0,
-        if($3==4,nx=x+rot_x(j,k);ny=y+rot_y(j,k););
-        if($3==3,nx=x+rot_x(j,0);ny=y+rot_y(j,0););
-        if($3==2,nx=x;ny=y+k;);
-        if($3==1,nx=x+j;ny=y;);
-        if($3==0,nx=x+j;ny=y+k;);
+        $3==5?(nx=x+rot_x(j,k);ny=y+rot_y_alt(j,k);):
+        $3==4?(nx=x+rot_x(j,k);ny=y+rot_y(j,k);):
+        $3==3?(nx=x+rot_x(j,0);ny=y+rot_y(j,0);):
+        $3==2?(nx=x;ny=y+k;):
+        $3==1?(nx=x+j;ny=y;)
+        :(nx=x+j;ny=y+k;);
         nfcalc=i(nx,ny,z,c,0,1);
         sum-=nfcalc*coeff;
         );
@@ -8579,7 +8585,8 @@ gui_rep_trif_preview: gui_split_preview "gui_rep_trif ${1-4}",${-3--1}
 #@gui :Sharpening=float(0,0,50)
 #@gui :Internal Blurring=int(0,0,4)
 #@gui :Blur Type=choice(0,"Photo","Horizontal","Vertical","Angle - One Axis","Angle - Two Axis")
-#@gui :Angle = float(0,-180,180)
+#@gui :Angle= float(0,-180,180)
+#@gui :Angle 2= float(0,-180,180)
 #@gui :Channel(s)=choice(11,"All","RGBA [All]","RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","RGBA [Alpha]",
 #@gui :"Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]",
 #@gui :"YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]",
@@ -8590,15 +8597,16 @@ gui_rep_trif_preview: gui_split_preview "gui_rep_trif ${1-4}",${-3--1}
 #@gui :_=separator(), _=note("This is a extended filter which was based on a Paint.NET plugin that was created by <b>TechnoRobbo</b> - <a href="https://forums.getpaint.net/topic/26783-trs-pixel-sharpener-plugin-v20-dec-21-2014/">TR's Pixel Sharpener</a>")
 #@gui :_=separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui :_=separator(), _=note("<small>Author: Reptorian.      Latest Update: <i>2019/11/2</i>.</small>")
-gui_rep_trps: ac "rep_tr_pixel_sharpener ${1-4}",$5
-gui_rep_trps_preview: gui_split_preview "gui_rep_trps ${1-5}",${-3--1}
+gui_rep_trps: ac "rep_tr_pixel_sharpener ${1-5}",$6
+gui_rep_trps_preview: gui_split_preview "gui_rep_trps ${1-6}",${-3--1}
 u "{$1}"\
 "{$2}"\
 "{$3}"\
 "{$4}_"{$3>2?2:0}\
-"{$5}"\
+"{$5}_"{$3>4?2:0}\
 "{$6}"\
-"{$7}"
+"{$7}"\
+"{$8}"
 #@gui Glass Vignette:gui_rep_gv, gui_rep_gv_preview(0)
 #@gui :_=note("<small>Distorts images as if it is based from the view of a bulged car mirror or camera len. This G'MIC filter is a heavily extended version of <a href="https://forums.getpaint.net/topic/28355-trs-glass-vignette/">TR's Glass Vignette</a> plugin made by TechnoRobbo for Paint.NET. It can also be used for generating abstract art as well.</small>"), _=separator()
 #@gui :_=note("<b>Refraction Settings</b>")
