@@ -44,6 +44,94 @@
 #
 #-------------------------------
 
+#@cli rep_blur_splinter: _length,_duplicates,_angle,_thickness,-1<=_balance<=1,_contrast,_boundary={ 0=None | 1=Neumann | 2=Periodic | 3=Mirror },_bisided={ 0=one-line | two-line }
+#@cli : Apply Splinter Blur to Image. Based off observation from using Splinter Blur plugin within Paint.NET made by Ed Harvey, and it is inspired by this filter. Note that convolution result is different.
+#@cli : Default values: '_length=10%','_duplicates=5','_angle=0','_thickness=0','_balance=0','_contrastr=0','_boundary=1','_bisided=0'
+rep_blur_splinter:
+skip ${1=10%},${2=5},${3=0},${4=0},${5=0},${6=0},${7=1},${8=0}
+
+if $2<3 error \$\2>2==F fi
+
+start_ang={$3}
+angs_per_dups={360/$2}
+
+m "average_output: ti=$! add / $ti"
+
+if $5==-1 m "output_splinter : min"
+elif $5<0&&$5>-1 m "output_splinter : +average_output +min[^-1] f. lerp(i#-2,i,abs($5)) k."
+elif $5==0 m "output_splinter : average_output"
+elif $5>0&&$5<1 m "output_splinter : +average_output +max[^-1] f. lerp(i#-2,i,$5) k."
+elif $5==1 m "output_splinter : max"
+else error (-1<=\$\6<=1)=F
+fi
+
+repeat $! l[$>]
+ hypo={(sqrt(w^2+h^2)/2)}
+ if ${is_percent\ $1} length={round(abs($1)*$hypo)} 
+ else length={round(abs($1))} 
+ fi
+ 
+ if ${is_percent\ $4} thickness={round(abs($4)*$hypo)} 
+ else thickness={round(abs($4))} 
+ fi
+ 
+ ds={d},{s}
+ 
+ if $7!=2 expand_xy {round($length/2)},$7 fi
+ repeat $2
+  ang={$start_ang+$angs_per_dups*$>}
+  +rep_splinter_blur_convolve_map. $length,$thickness,$ang,$6,$8
+  +convolve_fft[0] [-1]
+  rm..
+ done
+ rm[0]
+ output_splinter
+ if $7!=2 shrink_xy {round($length/2)} fi
+endl done
+
+um average_output,output_splinter,splinter_convolve
+#@cli rep_splinter_blur_convolve_map: _length,_thickness,_angle,_contrastr,_bisided={ 0=one-line | two-line }
+#@cli : Create a convolve map for directional blur. This enables one to create a convolve map for one-direction motion blur.
+#@cli : Default values: '_length=10%','_thickness=5%','_angle=0','_bisided=1'
+rep_splinter_blur_convolve_map : skip ${1=10%},${2=5%},${3=0},${5=1}
+repeat $! l[$>]
+ hypo={(sqrt(w^2+h^2)/2)}
+ if ${is_percent\ $1} length={round($1*$hypo)} else length={round($1)} fi
+ if ${is_percent\ $2} thickness={max(round($2*$hypo),1)} else thickness={max(round($2),1)} fi
+ ds={d},{s} 
+ rm
+ {$length},{$length},1,1
+ f "begin(
+  const sides=$5;
+  const thickness="$thickness";
+  const hw=(w-1)/2;
+  const hh=(h-1)/2;
+  const ang=($3/180)*pi*-1;
+  const cos_ang=cos(ang);
+  const sin_ang=sin(ang);
+  rot_x(a,b)=a*cos_ang-b*sin_ang;
+  rot_y(a,b)=a*sin_ang+b*cos_ang;
+  cutval(v)=v<0?0:v;
+  maxcutval(v)=v>1?1:v;
+ );
+ xx=x/w-.5;
+ yy=y/h-.5;
+ lx=x-hw;
+ ly=y-hh;
+ radial_grad=1-sqrt(xx^2+yy^2)*2;
+ radial_grad=cutval(radial_grad);
+ line=1-maxcutval(abs(rot_x(lx,ly))/thickness);
+ sides?(line?radial_grad*line):(rot_y(lx,ly)<=0?(line?radial_grad*line));
+ "
+ / {is}
+ if $4
+  avgstat={ia}
+  +f (i*2-$avgstat)
+  f.. lerp(i,i#1,min(1,min(abs($4),1)))
+  k[0]
+ fi
+ r 100%,100%,$ds,0,1
+endl done
 #@cli rep_bgfill: eq. to 'rep_fill_background' : (+)
 rep_bgfill: rep_fill_background $*
 #@cli rep_fill_background: color,alpha,max_alp
@@ -9804,6 +9892,22 @@ u "{$1}"\
 "{$21}_"{$2?2:1}\
 "{$22}"\
 "{$23}"
+#@gui Blur[Splinter]: fx_rep_blur_splinter,fx_rep_blur_splinter_preview
+#@gui :_=note(" Apply Splinter Blur.\n\nBased off observation from using Splinter Blur plugin within Paint.NET made by Ed Harvey, and it is inspired by this filter.\n\nComputationally intensive!"),_=separator()
+#@gui :Half-Hypotenuse(%) = float(20,0.1,100)
+#@gui :Duplicates=int(3,3,100)
+#@gui :Angle=float(0,-180,180)
+#@gui :Thickness(%)=float(0,0,100)
+#@gui :Contrast(%)=float(0,0,100)
+#@gui :Balance(%)=float(0,-100,100)
+#@gui :Boundary=choice(0,"None","Neumann","Periodic","Mirror")
+#@gui :Use Bi-sided Convolution?=bool(0)
+#@gui :_=separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui :_=separator(), _=note("<small>Author: Reptorian. Latest Update: <i>2020/9/9</i>.</small>")
+fx_rep_blur_splinter:
+rep_blur_splinter $1%,$2,$3,$4%,{$6%},{$5%},$7,$8
+fx_rep_blur_splinter_preview:
+gui_split_preview "fx_rep_blur_splinter ${1-8}",${-3--1}
 ######################
 
 # Local Variables:
