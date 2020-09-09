@@ -102,7 +102,31 @@ afre_localcontrast : check "${1=1}>=1 && ${2=50}>=-100 && $1<=10 && $2<=100"
 afre_localcontrast_preview :
   afre_localcontrast $*
 
-#@gui Dark Sky : afre_darksky, afre_darksky_preview(1)+
+#@gui Softlight : afre_softlight, afre_softlight_preview(1)+
+#@gui : note = note("<strong>Blend image with itself or another image using softlight.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019-2020Sept8.</strong>\n\n")
+#@gui : Amount = int(50,-100,100)
+#@gui : Reverse Order = bool(0)
+#@gui : note = note("\n\n<strong>Hint</strong>\n\nUse the &nbsp;<code>Input</code> <code>layers</code>&nbsp; menu to select the layer&#40;s&#41; you would like to blend.")
+#@gui : note = note("\n<strong>Note</strong>\n\nG'MIC's preview is inaccurate. Apply the filter and review the results in your host editor.")
+#@cli afre_softlight : -100<=amount<=100,_reverse_order={ 0 | 1 }
+#@cli : Blend image with itself or another image using softlight.
+#@cli : Default values: 'amount=50' and 'reverse_order=0'.
+afre_softlight : check "${1=50}>=-100 && isbool(${2=0}) && $1<=100"
+  if !$1 return fi
+  if $!>2 error[] "\n[afre]>_<) softlight: Select 1-2 images."
+    elif $!==2&&$2 rv e0=" in reverse order"
+    elif $!==1 . e1=" itself and"
+    elif w#0!=w||h#0!=h||s#0!=s error[] "\n[afre]>_<) softlight: Select images with the same dimensions." fi
+  if s#0!=1?s#0!=3 error[] "\n[afre]>_<) softlight: Select image(s) with 1 or 3 channels (I or RGB)." fi
+  if $1<0 negate. fi
+  e[] "[afre]^_^) softlight: Blend image$?"${e0}" using"${e1}" amount=$1."
+  iM={0,iM} / $iM f.. "begin(const A=0.5*abs($1)/100+0.5);
+    i#0^((A*2)^(A*(1-2*i#1)))" *.. $iM rm.
+
+afre_softlight_preview :
+  afre_softlight $*
+
+#@gui Dark Sky: afre_darksky, afre_darksky_preview(1)+
 #@gui : note = note("<strong>Enhance landscape by darkening the sky.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2017-2020Sep5.</strong>\n\n")
 #@gui : Blend = choice("Softlight","Overlay")
 #@gui : Contrast = int(0,-100,100)
@@ -118,8 +142,8 @@ afre_darksky : check "isbool(${1=0}) && ${2=0}>=-100 && isbool(${3=0}) && ${4=0}
   repeat $! l[$>] r0={[im,iM]} n 0,255 +channels 1 +channels.. 2 -[^0]
     if $rd&&$3 afre_gui0. $rd,1e0 elif $rd r1={[im,iM]}
       median. {$rd*2+1} n. $r1 fi c. 0%,0 +. 127 afre_contrast. {$2}
-    +afre_y50.. 1 r1={[im,iM]} afre_orien[0] 1 blend. ..,$b rm..
-      n. $r1 *
+    +afre_y50.. 1 r1={[im,iM]} afre_orien[0] 1 if $1 blend. ..,$b rm..
+      else l[-2--1] rv afre_softlight 100 endl fi n. $r1 *
   n $r0 endl done
 
 afre_darksky_preview :
@@ -274,30 +298,6 @@ afre_vigcirc : check "${1=90}>=50 && ${2=75}>=-500 && ${3=50}>=0 && ${4=50}>=0 &
 afre_vigcirc_preview :
   afre_vigcirc $*
 
-#@gui Softlight : afre_softlight, afre_softlight_preview(1)+
-#@gui : note = note("<strong>Blend image with itself or another image using softlight.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019-2020Sept8.</strong>\n\n")
-#@gui : Amount = int(50,-100,100)
-#@gui : Reverse Order = bool(0)
-#@gui : note = note("\n\n<strong>Hint</strong>\n\nUse the &nbsp;<code>Input</code> <code>layers</code>&nbsp; menu to select the layer&#40;s&#41; you would like to blend.")
-#@gui : note = note("\n<strong>Note</strong>\n\nG'MIC's preview is inaccurate. Apply the filter and review the results in your host editor.")
-#@cli afre_softlight : -100<=amount<=100,_reverse_order={ 0 | 1 }
-#@cli : Blend image with itself or another image using softlight.
-#@cli : Default values: 'amount=50' and 'reverse_order=0'.
-afre_softlight : check "${1=50}>=-100 && isbool(${2=0}) && $1<=100"
-  if !$1 return fi
-  if $!>2 error[] "\n[afre]>_<) softlight: Select 1-2 images."
-    elif $!==2&&$2 rv e0=" in reverse order"
-    elif $!==1 . e1=" itself and"
-    elif w#0!=w||h#0!=h||s#0!=s error[] "\n[afre]>_<) softlight: Select images with the same dimensions." fi
-  if s#0!=1?s#0!=3 error[] "\n[afre]>_<) softlight: Select image(s) with 1 or 3 channels (I or RGB)." fi
-  if $1<0 negate. fi
-  e[] "[afre]^_^) softlight: Blend image$?"${e0}" using"${e1}" amount=$1."
-  iM={0,iM} / $iM f.. "begin(const A=0.5*abs($1)/100+0.5);
-    i#0^((A*2)^(A*(1-2*i#1)))" *.. $iM rm.
-
-afre_softlight_preview :
-  afre_softlight $*
-
 #@gui Sharpen FFT : afre_sharpenfft, afre_sharpenfft_preview(0)+
 #@gui : note = note("<strong>Sharpen with Fourier transform.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019-2020Jan18.</strong>\n\n")
 #@gui : Strength = int(15,1,50)
@@ -319,11 +319,11 @@ afre_sharpenfft_preview :
 #@gui : Strength = int(75,1,100)
 #@gui : Amount = int(50,0,100)
 #@gui : Iterations = int(1,1,10)
-#@cli afre_contrastfft : 1<=strength<=100,0<=_amount<=150,1<=_iterations<=10
+#@cli afre_contrastfft : 1<=strength<=100,0<=_amount<=100,1<=_iterations<=10
 #@cli : Enhance contrast for selected images with Fourier transform.
 #@cli : Default values: 'strength=75', 'amount=50' and 'iterations=1'.
 afre_contrastfft : check "${1=75}>=1 && ${2=50}>=0 && ${3=1}>=1 &&
-    $1<=100 && $2<=150 && $3<=10"
+    $1<=100 && $2<=100 && $3<=10"
   e[] "[afre]^_^) contrastfft: Enhance contrast for image$? with Fourier transform using strength=$1, amount=$2 and iterations=$3."
   repeat $! l[$>] repeat $3
     +fftpolar ^.. {($1-0.5)/100} ifftpolar[^0] afre_softlight $2
@@ -755,9 +755,9 @@ search_dichotomic : check ${3=1e-3}>0
 # List of Commands and Filters
 #---------38-----------18-----
 # GUI CLI
-#   afre_brightness afre_contrast afre_localcontrast afre_darksky
-#   afre_edge afre_details afre_texture afre_cleantext afre_vigrect
-#   afre_vigcirc afre_softlight afre_sharpenfft afre_contrastfft
+#   afre_brightness afre_contrast afre_localcontrast afre_softlight
+#   afre_darksky afre_edge afre_details afre_texture afre_cleantext
+#   afre_vigrect afre_vigcirc afre_sharpenfft afre_contrastfft
 #   afre_gleam afre_halfhalf afre_portraitmontage
 # CLI only
 #   afre_maxmin afre_minmax afre_jchz afre_ijchz afre_gnorm afre_hnorm
