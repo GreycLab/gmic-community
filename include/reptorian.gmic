@@ -77,31 +77,54 @@ repeat $! l[$>]
  
  ds={d},{s}
  
- if $7!=2 expand_xy {round($length/2)},$7 fi
  repeat $2
   ang={$start_ang+$angs_per_dups*$>}
   +rep_splinter_blur_convolve_map. $length,$thickness,$ang,$6,$8
-  +convolve_fft[0] [-1]
+  +convolve_fft[0] [-1],$7
   rm..
  done
  rm[0]
  output_splinter
- if $7!=2 shrink_xy {round($length/2)} fi
+ 
 endl done
-
-um average_output,output_splinter,splinter_convolve
 #@cli rep_splinter_blur_convolve_map: _length,_thickness,_angle,_contrastr,_bisided={ 0=one-line | two-line }
 #@cli : Create a convolve map for directional blur. This enables one to create a convolve map for one-direction motion blur.
 #@cli : Default values: '_length=10%','_thickness=5%','_angle=0','_bisided=1'
-rep_splinter_blur_convolve_map : skip ${1=10%},${2=5%},${3=0},${5=1}
+rep_splinter_blur_convolve_map : skip ${1=10%},${2=5%},${3=0},${4=0},${5=1}
+ang={($3/180)*pi*-1}
+cos_ang={cos($ang)};
+sin_ang={sin($ang)};
 repeat $! l[$>]
  hypo={(sqrt(w^2+h^2)/2)}
  if ${is_percent\ $1} length={round($1*$hypo)} else length={round($1)} fi
  if ${is_percent\ $2} thickness={max(round($2*$hypo),1)} else thickness={max(round($2),1)} fi
- ds={d},{s} 
- rm
- {$length},{$length},1,1
- f "begin(
+ 
+ ds={d},{s} rm
+ 
+ point_b_x=0
+ point_b_y={$length/2}
+ point_c_x={$thickness/2}
+ max_dim={max($point_b_y,$point_c_x)}
+ min_dim={min($point_b_y,$point_c_x)}
+ point_c_y={sqrt(sqr($max_dim)-sqr($min_dim))}
+ point_a_x=-$point_c_x
+ point_a_y=$point_c_y
+ 
+ n_pax={abs($point_a_x*$cos_ang+$point_a_y*$sin_ang)}
+ n_pay={abs($point_a_x*$sin_ang+$point_a_y*$cos_ang)}
+ n_pbx={abs($point_b_x*$cos_ang+$point_b_y*$sin_ang)}
+ n_pby={abs($point_b_x*$sin_ang+$point_b_y*$cos_ang)}
+ n_pcx={abs($point_c_x*$cos_ang+$point_c_y*$sin_ang)}
+ n_pcy={abs($point_c_x*$sin_ang+$point_c_y*$cos_ang)}
+ 
+ rect_width={ceil(max($n_pax,$n_pbx,$n_pcx)*2)}
+ rect_height={ceil(max($n_pay,$n_pby,$n_pcy)*2)} 
+ 
+ {max(1,$rect_width)},{max(1,$rect_height)},1,1,"
+ begin(
+  const strokelength="$length";
+  sx=w/strokelength;
+  sy=h/strokelength;
   const sides=$5;
   const thickness="$thickness";
   const hw=(w-1)/2;
@@ -114,8 +137,8 @@ repeat $! l[$>]
   cutval(v)=v<0?0:v;
   maxcutval(v)=v>1?1:v;
  );
- xx=x/w-.5;
- yy=y/h-.5;
+ xx=(x/w-.5)*sx;
+ yy=(y/h-.5)*sy;
  lx=x-hw;
  ly=y-hh;
  radial_grad=1-sqrt(xx^2+yy^2)*2;
@@ -9900,10 +9923,10 @@ u "{$1}"\
 #@gui :Thickness(%)=float(0,0,100)
 #@gui :Contrast(%)=float(0,0,100)
 #@gui :Balance(%)=float(0,-100,100)
-#@gui :Boundary=choice(0,"None","Neumann","Periodic","Mirror")
+#@gui :Boundary=choice(3,"None","Neumann","Periodic","Mirror")
 #@gui :Use Bi-sided Convolution?=bool(0)
 #@gui :_=separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui :_=separator(), _=note("<small>Author: Reptorian. Latest Update: <i>2020/9/9</i>.</small>")
+#@gui :_=separator(), _=note("<small>Author: Reptorian. Latest Update: <i>2020/9/10</i>.</small>")
 fx_rep_blur_splinter:
 rep_blur_splinter $1%,$2,$3,$4%,{$6%},{$5%},$7,$8 cut 0,255
 fx_rep_blur_splinter_preview:
