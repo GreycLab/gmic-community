@@ -44,6 +44,169 @@
 #
 #-------------------------------
 
+#@cli rep_dla : eq. to 'rep_diffusion_limited_aggregation' : (+)
+rep_dla: rep_diffusion_limited_aggregation $*
+#@cli rep_diffusion_limited_aggregation: _point_proximity,_escape,_mode,_target={ 0=light | 1=dark },_border,_keep_erase_mask={ 0=maskless | 1=mask },[mask]
+#@cli : Generate Diffusion Limited Aggregation
+#@cli : (eq. to 'rep_dla').\n
+#@cli : '_point_proximity' defines how frequently noises are generated based on the proximity of pixels. The lower the number, the higher the density.
+#@cli : '_escape' defines how much attempts on filling the aggregation form before finishing.
+#@cli : '_mode' defines how particles aggregate on the aggregation form.
+#@cli : '_target' defines where the aggregation form will fill on.
+#@cli : '_border' is only applicable if there is a planting seed map. It is used to limit particles based on proximity away from existing structure.
+#@cli : '_keep_erase_mask' is only applicable on single images with variance or '[map]' with variance. This defines whether to preserve or erase mask.
+#@cli : '[map]' is used as a map for planting seed of aggregation form. Only applicable if there is more than one image. If using a single image, then the filter will determine whether the single mask is a mask, so this argument is not needed for single image. If an image argument is not used, then the form will aggregate from the center of the image.\n
+#@cli : Author: Reptorian\n
+#@cli : Default values: '_point_proximity=2','_escape=80','_mode=1','_target=1','_border=0','_keep_erase_mask=1','[mask]=0'
+rep_diffusion_limited_aggregation:
+skip ${1=2},${2=10},${3=1},${4=0},${5=0},${6=1},${7=0}
+
+m "dla_target_2s : n 0,1 s. c *"
+m "dla_target_3s : n 0,1 s c add / 3"
+m "dla_target_4s_plus : n 0,1 ts={s-1} s c add[^-1] /.. $ts *"
+m "dla_target : if s==1 n 0,1 elif s==2 dla_target_2s elif s==3 dla_target_3s elif s>3 dla_target_4s_plus fi"
+m "dla_check_variance : tv=0 repeat s sh. $> tv+={iv#-1} rm. if $tv u $tv return fi done u $tv"
+
+if $4
+ m "dla_expand : if $5 dilate_circ $5 else rm. fi"
+else
+ m "dla_expand : if $5 erode_circ $5 else rm. fi"
+fi
+
+include_dla_map=0
+
+if $!==1
+ dla_check_variance
+ if ${}
+  dla_target
+  if iv#-1 include_dla_map=1 fi
+ else
+  channels 0 f 0
+ fi
+else
+ include_dla_map=${"is_image_arg $7"}
+ world_width=${-max_w}
+ world_height=${-max_h}
+ if $include_dla_map
+  pass$7 0
+  dla_target.
+  if !iv#-1 include_dla_map=0 f. 0 fi
+  r. $world_width,$world_height,100%,100%
+ else
+  $world_width,$world_height,1,1
+ fi
+fi
+
+l. . f.. 0
+
+ noise_poissondisk.. {max($1,2)},5
+ 
+ if $include_dla_map
+  f. i>.5?1
+  +dla_expand.
+  if $!==3
+   f[0] i#-2!=i#-1?i
+   rm.
+  else
+   if $4
+    f[0] i*(1-i#-1)
+   else
+    f[0] i*i#-1
+   fi
+  fi
+  if !$6
+   if $4
+    *. .001
+   else
+    replace. 0,.999
+   fi
+  fi
+ else
+  f.. "begin(
+   const ww=w-1;
+   const hh=h-1;
+   const cx=(w-1)/2;
+   const cy=(h-1)/2;
+  );
+  xx=(x/ww-.5)*2;
+  yy=(y/hh-.5)*2;
+  sqrt(xx^2+yy^2)<1?i
+  "
+  if !$4 f. 1 fi
+  eval "
+   const ww=w-1;
+   const hh=h-1;
+   const cx=round((w-1)/2);
+   const cy=round((h-1)/2);
+   i(#-2,cx,cy)=0;
+   i(#-1,cx,cy)=!i(#-1,cx,cy);
+  "
+ fi
+ 
+ extract[0] "i==1",1 channels[0] 0,1
+ 
+ 1,1,1,2
+ 
+ 
+ if $4
+  if $3==0 mode=(i(#-2,xp-1,yp-1,0,0,0,2)||i(#-2,xp-1,yp+1,0,0,0,2))||(i(#-2,xp+1,yp-1,0,0,0,2)||i(#-2,xp+1,yp+1,0,0,0,2))
+  elif $3==1 mode=(i(#-2,xp-1,yp,0,0,0,2)||i(#-2,xp+1,yp,0,0,0,2))||(i(#-2,xp,yp-1,0,0,0,2)||i(#-2,xp,yp+1,0,0,0,2))
+  elif $3==2 mode=((i(#-2,xp-1,yp-1,0,0,0,2)||i(#-2,xp-1,yp+1,0,0,0,2))||(i(#-2,xp+1,yp-1,0,0,0,2)||i(#-2,xp+1,yp+1,0,0,0,2)))||((i(#-2,xp-1,yp,0,0,0,2)||i(#-2,xp+1,yp,0,0,0,2))||(i(#-2,xp,yp-1,0,0,0,2)||i(#-2,xp,yp+1,0,0,0,2)))
+  elif $3==3 mode=altern?(i(#-2,xp-1,yp-1,0,0,0,2)||i(#-2,xp-1,yp+1,0,0,0,2))||(i(#-2,xp+1,yp-1,0,0,0,2)||i(#-2,xp+1,yp+1,0,0,0,2)):(i(#-2,xp-1,yp,0,0,0,2)||i(#-2,xp+1,yp,0,0,0,2))||(i(#-2,xp,yp-1,0,0,0,2)||i(#-2,xp,yp+1,0,0,0,2))
+  fi
+ else
+  if $3==0 mode=(i(#-2,xp-1,yp-1,0,0,0,2)<1||i(#-2,xp-1,yp+1,0,0,0,2)<1)||(i(#-2,xp+1,yp-1,0,0,0,2)<1||i(#-2,xp+1,yp+1,0,0,0,2)<1)
+  elif $3==1 mode=(i(#-2,xp-1,yp,0,0,0,2)<1||i(#-2,xp+1,yp,0,0,0,2)<1)||(i(#-2,xp,yp-1,0,0,0,2)<1||i(#-2,xp,yp+1,0,0,0,2)<1)
+  elif $3==2 mode=((i(#-2,xp-1,yp-1,0,0,0,2)<1||i(#-2,xp-1,yp+1,0,0,0,2)<1)||(i(#-2,xp+1,yp-1,0,0,0,2)<1||i(#-2,xp+1,yp+1,0,0,0,2)<1))||((i(#-2,xp-1,yp,0,0,0,2)<1||i(#-2,xp+1,yp,0,0,0,2)<1)||(i(#-2,xp,yp-1,0,0,0,2)<1||i(#-2,xp,yp+1,0,0,0,2)<1))
+  elif $3==3 mode=altern?(i(#-2,xp-1,yp-1,0,0,0,2)<1||i(#-2,xp-1,yp+1,0,0,0,2)<1)||(i(#-2,xp+1,yp-1,0,0,0,2)<1||i(#-2,xp+1,yp+1,0,0,0,2)<1):(i(#-2,xp-1,yp,0,0,0,2)<1||i(#-2,xp+1,yp,0,0,0,2)<1)||(i(#-2,xp,yp-1,0,0,0,2)<1||i(#-2,xp,yp+1,0,0,0,2)<1)
+  fi
+ fi
+ 
+ eval ${-math_lib}"
+  const ww=w#-2;
+  const hh=h#-2;
+  const lim_atmp=$2;
+  const use_altern=$3==3;
+  const dlmode=$4>0?1:0;
+  newpos_x=[-1,-1,-1,0,0,1,1,1];
+  newpos_y=[-1,0,1,-1,1,-1,0,1];
+  altern=round(u(0,1));
+  attempts=0;
+  for(p=0,p<h#0,p++,dar_insert(#-1,I(#0,0,p)););
+  do(n=0;
+   do(
+    temp_vec=I(#-1,0,n);
+    xp=temp_vec[0];
+    yp=temp_vec[1];
+    if("$mode",
+     i(#-2,xp%ww,yp%hh)=dlmode;
+     dar_remove(#-1,n);
+     n--;
+     attempts=0;
+    );
+    n++;
+   ,n<dar_size(#-1));
+  
+   for(p=0,p<dar_size(#-1),p++,
+    temp_vec=I(#-1,0,p);
+    px=temp_vec[0];
+    py=temp_vec[1];
+    pv=round(u(0,7));
+    npx=newpos_x[pv];
+    npy=newpos_y[pv];
+    I(#-1,0,p)=[px+npx,py+npy];
+   );
+   
+   run('w[-2] -1,-1');
+   attempts++;
+   if(use_altern,altern=(altern+1)%2;);
+   
+  ,dar_size(#-1)&&(attempts<lim_atmp));
+ "
+ if !$6 round.. fi
+ k..
+endl
+um dla_target_2s,dla_target_3s,dla_target_4s_plus,dla_target,dla_check_variance
 #@cli rep_blur_splinter: _length,_duplicates,_angle,_thickness,-1<=_balance<=1,_contrast,_boundary={ 0=None | 1=Neumann | 2=Periodic | 3=Mirror },_bisided={ 0=one-line | two-line }
 #@cli : Apply Splinter Blur to Image. Based off observation from using Splinter Blur plugin within Paint.NET made by Ed Harvey, and it is inspired by this filter. Note that convolution result is different.
 #@cli : Default values: '_length=10%','_duplicates=5','_angle=0','_thickness=0','_balance=0','_contrastr=0','_boundary=1','_bisided=0'
@@ -9930,6 +10093,18 @@ fx_rep_blur_splinter:
 rep_blur_splinter $1%,$2,$3,$4%,{$6%},{$5%},$7,$8 cut 0,255
 fx_rep_blur_splinter_preview:
 gui_split_preview "fx_rep_blur_splinter ${1-8}",${-3--1}
+#@gui Diffusion Limited Aggregation: fx_rep_dla,fx_rep_dla_preview(0)
+#@gui :_=note("Create Diffusion Limited Aggregation. Please read instructions!"),_=separator()
+#@gui :Pixel Proximity=int(2,2,8)
+#@gui :Escape Point=int(15,5,150)
+#@gui :Aggregation Mode=choice(0,"Corners","Axis[Slow!]","All-Around","Alternating")
+#@gui :Target=choice(1,"Light","Dark")
+#@gui :Border=int(0,0,200)
+#@gui :Keep Mask?=bool(1)
+#@gui :Negate Image?=bool(0)
+#@gui :_=separator(),_=note("<b>Instructions</b>"),_=note("If the image is a single color, then aggregation form will be created using a point from center. Border will limit the points in specified proximity away from mask.\n\n Time-consuming!\n\n<u>Apply, then undo to check result. Do not close!</u>\n\n<b>Note:</b> Mask will be treated as a binary mask. ")
+fx_rep_dla: if $7 negate[0] fi rep_diffusion_limited_aggregation[0] ${1-6} n[0] 0,255
+fx_rep_dla_preview: gui_no_preview $*
 ######################
 
 # Local Variables:
