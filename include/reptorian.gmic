@@ -44,6 +44,146 @@
 #
 #-------------------------------
 
+#@cli rep_mj_prn : eq. to 'rep_mj_pseudorandom_noise : (+)
+rep_mj_prn:rep_mj_pseudorandom_noise $*
+#@cli rep_mj_pseudorandom_noise : _k1,_k2,_internal_shift,_ang,_px_size,_cx,_cy,_color_output,_kmode,_grid,_gridcol,_axis_thickness
+#@cli : Render regular noise. Filter is a extended version of MadJik's Regular Noise PDN plugin and based off MadJik's code. The G'MIC version has been extended.\n
+#@cli : (eq. to 'rep_mj_prn').\n
+#@cli : '_k1' defines value for k-1
+#@cli : '_k2' defines value for k-2
+#@cli : '_internal_shift' shift rows based on this value. The more, the more distortion there will be.
+#@cli : '_ang' defines the color/shade angle.
+#@cli : '_px_size' defines how big the pixels are.
+#@cli : '_cx' refers to the x-position of center based on world coordinate of -1,1
+#@cli : '_cy' refers to the y-position of center based on world coordinate of -1,1
+#@cli : '_color_output' is the function used to color the output.
+#@cli : '_kmode' defines how the noise will be processed.
+#@cli : '_grid' option is used to whether to output a grid.
+#@cli : '_gridcol' defines the value of grid. Only gray color is supported.
+#@cli : '_axis_thickness' defines whether the axis has 2 pixel instead of 1.\n
+#@cli : Default values: '_k1=8','_k2=2','_internal_shift=1','_ang=0','_px_size=1','_cx=0','_cy=0','_coloroutput=1','_grid=0','_gridcol=0','_axis_thickness=0'\n
+#@cli : Author: Reptorian.
+#@cli : $ gmic rep_mj_pseudorandom_noise 8,2,1,95,4,0,0,1,0,,,0
+rep_mj_pseudorandom_noise:
+skip ${1=8},${2=2},${3=1},${4=0},${5=1},${6=0},${7=0},${8=1},${9=0},${10=0},${11=0},${12=0}
+r 100%,100%,1,{$8?3:1}
+3000,100,1,1,round((1-(x*(x^2*15731+789221)+1376312589&2147483647)/1073741824)*100000)/100000;
+
+if $8%4==2 
+ outmode=i(#-1,num+($4/180*3000),0,0,0,0,2)
+ formulachoice=DoubleToColorRGB(noise_gen)
+else
+ outmode=i(#-1,num%3000,0,0,0,0,2)
+ if $8%4==3 formulachoice=DoubleToColorTan(noise_gen)%256
+ elif $8%4==1 formulachoice=formulachoice=DoubleToColorSin(noise_gen)
+ else formulachoice=(((ang/pi*256)+noise_gen)/3000*256)%256
+ fi
+fi
+
+if $10
+ tempval={abs($5)+1}
+ if $8 gridcol=[$11,$11,$11]
+ else gridcol=$11
+ fi
+ temp_formulachoice=((x%$tempval)&&(y%$tempval))?
+ temp_formulachoice.=$formulachoice:$gridcol
+ formulachoice=$temp_formulachoice
+fi
+
+f[0--2] "
+  begin(
+   const ww=w/2;
+   const halfh=h/2;
+   const zoom=1/round(abs(abs($5)+($10?1:0)));
+   if($9
+   ,const k_one=$1/2;
+   ,const k_one=$1/10;
+   );
+   if($9
+   ,const k_two=$2/4;
+   ,const k_two=($2*-1)/10;
+   );
+   noise2d(nx,ny)=(
+    a=int(nx);b=int(ny);
+    num=abs(a+b*$3)%3000;
+    "$outmode";
+   );
+   const ang=$4/180*pi;
+   smoothnoise(nx,ny)=(
+    a=int(nx);b=int(ny);
+    num=(noise2d(a-1,b-1)*4)/$1;
+    num2=(noise2d(a-1,b)*4)/k_one;
+    num3=noise2d(a,b)/k_two;
+    num4=num+num2+num3;
+    num4*256;
+   );
+   DoubleToColorSin(v)=(
+    num=ceil((v*1/pi*10^3))/10^3;
+    num2=int(128+127*sin(num+ang));
+    num3=int(128+127*sin(pi/2+num+ang));
+    num4=int(128+127*sin(pi+num+ang));
+    [num4,num3,num2];
+   );
+   DoubleToColorRGB(t)=(
+    num=int(t*65536.0);
+    num2=(num&16711680)>>16;
+    num3=(num&65280)>>8;
+    num4=num&255;
+    [num4,num3,num2];
+   );
+   DoubleToColorTan(w)=(
+    num=ceil((w*1/pi)*10^3)/10^3;
+    num2=int(128+127*tan(num+ang));
+    num3=int(128+127*tan(num+pi/2+ang));
+    num4=int(128+127*tan(num+pi+ang));
+    [num4,num3,num2];
+   );
+  );
+  xx=abs(int(zoom*(x+0.5)));
+  yy=abs(int(zoom*(y+0.5)));
+  noise_gen=smoothnoise(xx,yy);
+  "$formulachoice";
+"
+if $12&&(($6!=-1)||($7!=-1))
+ if $10
+ f[0--2] "begin(
+  const sfx=int(($6*.5+.5)*w)+($10?1:0);
+  const sfy=int(($7*.5+.5)*h)+($10?1:0);
+ );
+ psfx=x-sfx;
+ psfy=y-sfy;
+ i(
+  psfx>=0?x-sfx:x-sfx-1,
+  psfy>=0?y-sfy:y-sfy-1,z,c,0,3
+  );
+ "
+ else
+ f[0--2] "begin(
+  const sfx=($6*.5+.5)*w+($10?1:0);
+  const sfy=($7*.5+.5)*h+($10?1:0);
+ );
+ i(x-sfx,y-sfy,z,c,0,3);
+ "
+ fi
+elif $6!=-1||$7!=-1
+ f[0--2] "begin(
+  const gridfix=($10?1:0);
+  const pxlsize=abs($5)+gridfix;
+  const errfix=!(pxlsize%2);
+  const sw=int(w-pxlsize);
+  const sfx=int(($6*.5+.5)*sw);
+  const sh=int(h-pxlsize);
+  const sfy=int(($7*.5+.5)*sh);
+  const errfix2=abs($5)==1;
+ );
+ psfx=x-sfx;
+ psfy=y-sfy;
+ i(
+ psfx>=0?psfx+errfix2:psfx*-1+pxlsize-errfix,
+ psfy>=0?psfy+errfix2:psfy*-1+pxlsize-errfix
+ );"
+fi
+rm.
 #@cli rep_dla : eq. to 'rep_diffusion_limited_aggregation' : (+)
 rep_dla: rep_diffusion_limited_aggregation $*
 #@cli rep_diffusion_limited_aggregation: _point_proximity,_escape,_mode,_target={ 0=light | 1=dark },_border,_keep_erase_mask={ 0=maskless | 1=mask },[mask]
@@ -10107,6 +10247,40 @@ gui_split_preview "fx_rep_blur_splinter ${1-8}",${-3--1}
 #@gui :_=separator(),_=note("<b>Instructions</b>"),_=note("If the image is a single color, then aggregation form will be created using a point from center. Border will limit the points in specified proximity away from mask.\n\n Time-consuming!\n\n<u>Apply, then undo to check result. Do not close!</u>\n\n<b>Note:</b> Mask will be treated as a binary mask. ")
 fx_rep_dla: if $7 negate[0] fi rep_diffusion_limited_aggregation[0] ${1-6} n[0] 0,255
 fx_rep_dla_preview: gui_no_preview $*
+#@gui Pseudorandom Noise: fx_rep_mj_prn,fx_rep_mj_prn_preview
+#@gui :_=note("Generates pseudorandom noise.\n\nBased off <a href="https://forums.getpaint.net/topic/111659-regular-noise-texture-ymd-20170815/">MadJik's Regular Noise Paint.NET Plugin</a>. This is a extended version. Preview may not be accurate!")
+#@gui :_=separator(),_=note("<b>Preliminary</b>")
+#@gui :K-1=float(8,-8,8)
+#@gui :K-2=float(2,-8,8)
+#@gui :K Mode=choice(0,"Mode 0","Mode 1")
+#@gui :Shift=float(1,-256,256)
+#@gui :_=separator(),_=note("<b>Non-K Factors</b>")
+#@gui :Color Angle=float(0,-180,180)
+#@gui :Pixel Size=int(1,1,16)
+#@gui :Position=point(50,50,0,1,128,128,128,255)
+#@gui :Formula=choice(1,"Gray","Sinusoidal","RGB","Tangent")
+#@gui :Double Pixel Axis?=bool(0)
+#@gui :_=separator(),_=note("<b>Grid</b>")
+#@gui :Activate Grid?=bool(0)
+#@gui :Shade=float(0,0,255)
+#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2020/9/18</i>.</small>")
+fx_rep_mj_prn:
+pos_x={min(max(($7/100-.5)*2,-1),1)}
+pos_y={min(max(($8/100-.5)*2,-1),1)}
+rep_mj_prn ${1-2},${4-6},$pos_x,$pos_y,$9,$3,${11-12},$10
+fx_rep_mj_prn_preview:
+fx_rep_mj_prn $*
+u "{$1}"\
+"{$2}"\
+"{$3}"\
+"{$4}"\
+"{$5}"\
+"{$6}"\
+"{$7,$8}"\
+"{$9}"\
+"{$10}"\
+"{$11}"\
+"{$12}_"{$11?2:1}
 ######################
 
 # Local Variables:
