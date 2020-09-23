@@ -1386,6 +1386,8 @@ m "shift_rowcolumn : if $__altmode_orientation $__isr if !($__shiftboundary>0&&$
 
 m "place_rowcolumn : if $__altmode_orientation if $__altplace_replacemode $__isr pass$""1 0 {w#-1},{h#-1},1,1,i(#-2,floor(y/$__min_tile)+$__pmin,0,0,0) j[0] [-2],0,$""3,0,0,1,[-1],1 else pass$""1 0 {w#0},{h#0},1,{s#0},j(#-1,0,-$""3) rm.. if $__altplacebackmode rv fi blend alpha fi else if $__altplace_replacemode $__isc pass$""1 0 {w#-1},{h#-1},1,1,i(#-2,floor(x/$__min_tile)+$__pmin,0,0,0) j[0] [-2],$""2,0,0,0,1,[-1],1 else pass$""1 0 {w#0},{h#0},1,{s#0},j(#-1,-$""2,0) rm.. if $__altplacebackmode rv fi blend alpha fi fi k[0]"
 
+m "fill_tiles2canvas : if $__fill_boundary==0 f[0] i(#-1,x%w#-1,y%h#-1) elif $__fill_boundary==1 f[0] i(#-1,int(x/w#-1)%2?w#-1-1-x%w#-1:x%w#-1,int(y/h#-1)%2?h#-1-1-y%h#-1:y%h#-1) elif $__fill_boundary==2 f[0] i(#-1,int(x/w#-1)%2?w#-1-1-x%w#-1:x%w#-1,y%h#-1) elif $__fill_boundary==3 f[0] i(#-1,x%w#-1,int(y/h#-1)%2?h#-1-1-y%h#-1:y%h#-1) fi"
+
 v +
 e[] "\n Instruction on how to work with interactive windows.\n
  \ ---------------------------------------------------------\n\n
@@ -1423,6 +1425,12 @@ e[] "\n Instruction on how to work with interactive windows.\n
  \   * CTRL+ARROWKEY: Mirror alongside axis\n
  \   * ARROWKEY: Rotate Tile\n
  \   * MOUSE BUTTON: Switch between Place/Eraser Mode\n\n
+ \   -- On Tile [No Symmetry Mode] --\n
+ \     * 1: Switch Fill Boundary to Periodic\n
+ \     * 2: Switch Fill Boundary to Mirror\n
+ \     * 3: Switch Fill Boundary to Mirror X\n
+ \     * 4: Switch Fill Boundary to Mirror Y\n
+ \     * B: Increment Fill Boundary Mode\n\n
  \ *** ROW/COLUMN EDITING MODE ***\n\n
  \ - On any window - \n
  \   * W: Restore All Windows\n
@@ -1550,6 +1558,8 @@ mode=0
  current_csx=-1
  current_csy=-1
  optinsert=1
+ 
+ __fill_boundary=0
 
 #mode=1#
 
@@ -1890,9 +1900,15 @@ do
   fi
 
  else
-  if {*,G} canvas_gridmode+=1   canvas_gridmode={$canvas_gridmode%2} fi
-  if {*,Q} canvas_background+=1 canvas_background={$canvas_background%2} fi
-  if {*,A} canvas_tracker+=1 canvas_tracker={$canvas_tracker%2} fi
+  if {*,G} 
+   canvas_gridmode+=1   
+   canvas_gridmode={$canvas_gridmode%2} fi
+  if {*,Q} 
+   canvas_background+=1 
+   canvas_background={$canvas_background%2} fi
+  if {*,A} 
+   canvas_tracker+=1 
+   canvas_tracker={$canvas_tracker%2} fi
 
   undo_state=0
   canvas_set=""
@@ -1922,6 +1938,13 @@ do
    if {*,ARROWDOWN} symmetry_posy+=1 wait 200 fi
    symmetry_posx={$symmetry_posx>=0?min($ttw,$symmetry_posx):max(-$ttw,$symmetry_posx)}
    symmetry_posy={$symmetry_posy>=0?min($tth,$symmetry_posy):max(-$tth,$symmetry_posy)}
+  else
+   if {*2,1} __fill_boundary=0 wait 200
+   elif {*2,2} __fill_boundary=1 wait 200
+   elif {*2,3} __fill_boundary=2 wait 200
+   elif {*2,4} __fill_boundary=3 wait 200
+   fi
+   if {*2,B} __fill_boundary={($__fill_boundary+1)%4} wait 200 fi 
   fi
 
   if $canvas_gridmode
@@ -1986,6 +2009,12 @@ do
     wait 100
    fi
 
+   if {*2,O}" && "!$symmetrymode
+    +store[0] undo_image
+    fill_tiles2canvas
+    wait 100
+   fi
+   
    if $transform_tile
     +out2display. , w2[-1] {$d2rw+($d2rw*$icx)},{$d2rw+($d2rw*$icy)} rm.
     transform_tile=0
@@ -2236,6 +2265,14 @@ do
      fi
     fi
    fi
+   
+   if !$symmetrymode
+    if $__fill_boundary==0 main_w_title.=" Fill Boundary [Periodic] - "
+    elif $__fill_boundary==1 main_w_title.=" Fill Boundary [Mirror] - "
+    elif $__fill_boundary==2 main_w_title.=" Fill Boundary [Mirror X] - "
+    elif $__fill_boundary==3 main_w_title.=" Fill Boundary [Mirror Y] - "
+    fi
+   fi
 
    if $canvas_tracker main_w_title.="(Tracker)" fi
    if $canvas_gridmode main_w_title.="(Grid)" fi
@@ -2263,7 +2300,7 @@ do
  fi
  wait 100
 while {*}" && "!{*,ESC}
-uncommand xalp,xalpa,out2display,pass2tile,tile2canvas,tile2canvas_r,tile2canvas_sym,tile2canvas_r_sym,addsym2display,filter_to_selected_row_column,out2display_alt,out2display_alt_perp,keeperase_rowcolumn,shift_rowcolumn,place_rowcolumn
+uncommand xalp,xalpa,out2display,pass2tile,tile2canvas,tile2canvas_r,tile2canvas_sym,tile2canvas_r_sym,fill_tiles2canvas,addsym2display,filter_to_selected_row_column,out2display_alt,out2display_alt_perp,keeperase_rowcolumn,shift_rowcolumn,place_rowcolumn
 w1[] 0
 w2[] 0
 k[0]
@@ -9981,8 +10018,8 @@ u "{$1}"\
 #@gui :_=note("<b>Section 1 - Preview Window</b>"),_=separator()
 #@gui :_=note("Before processing to the interactive window - Test the following conditions:\n\n<b>1. </b>Tileset is correct\n<b>2. </b>Grid fits and is very visible\n<b>3. </b>Tracker is very visible\n\nIf the preview looks good, then proceed to the interactive tool by clicking OK.\n\n<b>Warning: </b>Apply will only waste your time!")
 #@gui :_=separator(),_=note("<b>Section 2 - Interactive Windows</b>"),_=separator()
-#@gui :_=note("Press Escape on Canvas Window to exit!\n\n<u>Main Editing Mode</u>\n\n<b>On Any Windows</b>\n\n- D: Switch between Place/Eraser Mode\n- R: Activate Replace Mode\n- W: Restore All Windows\n- SPACEBAR: Switch Editing Mode\n\n<b>On Canvas Window</b>\n\n- C: Copy Mode On/Off\n- X: Cut Mode On/Off\n- Z: Undo Canvas Change\n- F: Activate/Deactivate Background Tile Layering Mode\n- G: Grid Mode On/Off\n- Q: Remove/Restore Background\n- A: Tracker On/Off\n- S: Symmetry Mode On/Off\n\n=== On Canvas[Symmetry Mode] ===\n--- 1: Switch Symmetry Axis to X-Axis\n--- 2: Switch Symmetry Axis to Y-Axis\n--- 3: Switch Symmetry Axis to Cross XY-Axis\n--- 4: Switch Symmetry Axis to Mirror XY-Axis\n--- ARROWKEY: Move Symmetry Line\n--- B: Switch Axis in Symmetry Mode\n--- M: Switch Axis in Periodic/Mirror Mode\n--- J: Symmetry Line to Center\n--- S: Deactivate Symmetry Mode\n\n<b>On Tileset Window</b>\n\n- G: Grid Mode On/Off\n- CTRL+ARROWKEY : Resize Tile Selection\n- ARROWKEY : Scroll Through Tileset\n\n<b>On Tile Window</b>\n\n- CTRL+ARROWKEY : Resize Tile Selection\n- ARROWKEY : Scroll Through Tileset\n- MOUSE BUTTON : Switch Between Place/Eraser Mode\n\n<u>Row/Column Editing Mode</u>\n\n<b>On Any Windows</b>\n\n- W: Restore All Windows\n- SPACEBAR: Switch Editing Mode\n\n<b>On Canvas Window</b>\n\n- Z: Undo Canvas Change\n- T: Enable Row/Column Shifting Mode\n- E: Place Mode On/Off\n- G: Grid Mode On/Off\n- Q: Remove/Restore Background\n- A: Tracker On/Off\n- S: Activate Symmetrical Selection Mode\n\n=== On Canvas[Selection] ===\n--- C: Keep Selected Row/Column\n--- X: Delete Selected Row/Column\n--- D: Select/Deselect\n--- R: Clear Selection\n--- V: View Selection Box/Hide Selection Box\n--- Mouse Button: Select/Deselect\n--- ARROWKEY: Switch between Row/Column Selection\n\n=== On Canvas[Symmetry Mode-Symmetry] ===\n--- J: Symmetry Line to Center\n--- ARROWKEY: Move Symmetry Line\n--- S: Deactivate Symmetrical Selection Mode\n\n=== On Canvas[Row/Column Shifting Mode] ===\n--- Mouse Button[1st Click]: Activate Shifting\n--- Mouse Button[2nd Click]: Finalize Shifting\n--- 0: Shift Boundary Mode - None\n--- 1: Shift Boundary Mode - Neumann [Periodic]\n--- 2: Shift Boundary Mode - Neumann [Mirror]\n--- 3: Shift Boundary Mode - Neumann [Alternating]\n--- 4: Shift Boundary Mode - Periodic\n--- 5: Shift Boundary Mode - Mirror\n--- ARROWKEY: Switch between Row/Column Selection\n--- T: Disable Row/Column Shifting Mode\n\n=== On Canvas[Place Mode] ===\n--- Mouse Button: Place Row/Column\n--- B: Switch between Replacement/Placement Mode\n--- F: Place Row/Column as Foreground/Background\n--- Mouse Button: Place Row/Column\n--- E: Deactivate Place Mode\n\n<b>On Tile Window</b>\n\n- ARROWKEY: Flip Row/Column")
-#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2020/5/26</i>.</small>")
+#@gui :_=note("Press Escape on Canvas Window to exit!\n\n<u>Main Editing Mode</u>\n\n<b>On Any Windows</b>\n\n- D: Switch between Place/Eraser Mode\n- R: Activate Replace Mode\n- W: Restore All Windows\n- SPACEBAR: Switch Editing Mode\n\n<b>On Canvas Window</b>\n\n- C: Copy Mode On/Off\n- X: Cut Mode On/Off\n- Z: Undo Canvas Change\n- F: Activate/Deactivate Background Tile Layering Mode\n- G: Grid Mode On/Off\n- Q: Remove/Restore Background\n- A: Tracker On/Off\n- S: Symmetry Mode On/Off\n\n=== On Canvas[Symmetry Mode] ===\n--- 1: Switch Symmetry Axis to X-Axis\n--- 2: Switch Symmetry Axis to Y-Axis\n--- 3: Switch Symmetry Axis to Cross XY-Axis\n--- 4: Switch Symmetry Axis to Mirror XY-Axis\n--- ARROWKEY: Move Symmetry Line\n--- B: Switch Axis in Symmetry Mode\n--- M: Switch Axis in Periodic/Mirror Mode\n--- J: Symmetry Line to Center\n--- S: Deactivate Symmetry Mode\n\n<b>On Tileset Window</b>\n\n- G: Grid Mode On/Off\n- CTRL+ARROWKEY : Resize Tile Selection\n- ARROWKEY : Scroll Through Tileset\n\n<b>On Tile Window</b>\n\n- CTRL+ARROWKEY : Resize Tile Selection\n- ARROWKEY : Scroll Through Tileset\n- MOUSE BUTTON : Switch Between Place/Eraser Mode\n\n=== On Tile[No Symmetry Mode] ===\n--- 1: Switch Fill Boundary to Periodic\n--- 2: Switch Fill Boundary to Mirror\n--- 3: Switch Fill Boundary to Mirror X\n--- 4: Switch Fill Boundary to Mirror Y\n--- B: Switch Fill Boundary Mode\n\n<u>Row/Column Editing Mode</u>\n\n<b>On Any Windows</b>\n\n- W: Restore All Windows\n- SPACEBAR: Switch Editing Mode\n\n<b>On Canvas Window</b>\n\n- Z: Undo Canvas Change\n- T: Enable Row/Column Shifting Mode\n- E: Place Mode On/Off\n- G: Grid Mode On/Off\n- Q: Remove/Restore Background\n- A: Tracker On/Off\n- S: Activate Symmetrical Selection Mode\n\n=== On Canvas[Selection] ===\n--- C: Keep Selected Row/Column\n--- X: Delete Selected Row/Column\n--- D: Select/Deselect\n--- R: Clear Selection\n--- V: View Selection Box/Hide Selection Box\n--- Mouse Button: Select/Deselect\n--- ARROWKEY: Switch between Row/Column Selection\n\n=== On Canvas[Symmetry Mode-Symmetry] ===\n--- J: Symmetry Line to Center\n--- ARROWKEY: Move Symmetry Line\n--- S: Deactivate Symmetrical Selection Mode\n\n=== On Canvas[Row/Column Shifting Mode] ===\n--- Mouse Button[1st Click]: Activate Shifting\n--- Mouse Button[2nd Click]: Finalize Shifting\n--- 0: Shift Boundary Mode - None\n--- 1: Shift Boundary Mode - Neumann [Periodic]\n--- 2: Shift Boundary Mode - Neumann [Mirror]\n--- 3: Shift Boundary Mode - Neumann [Alternating]\n--- 4: Shift Boundary Mode - Periodic\n--- 5: Shift Boundary Mode - Mirror\n--- ARROWKEY: Switch between Row/Column Selection\n--- T: Disable Row/Column Shifting Mode\n\n=== On Canvas[Place Mode] ===\n--- Mouse Button: Place Row/Column\n--- B: Switch between Replacement/Placement Mode\n--- F: Place Row/Column as Foreground/Background\n--- Mouse Button: Place Row/Column\n--- E: Deactivate Place Mode\n\n<b>On Tile Window</b>\n\n- ARROWKEY: Flip Row/Column")
+#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2020/9/23</i>.</small>")
 fx_rep_rpgtiler_noniso:
 skip ${3=""}
 ww={w}
