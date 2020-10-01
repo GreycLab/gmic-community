@@ -44,11 +44,120 @@
 #
 #-------------------------------
 
+#@cli rep_cstdmap: eq. to 'rep_chirikov' : (+)
+rep_cstdmap:rep_chirikov $*
+#@cli rep_chirikov: size!=0,_lines>0,_pts_per_line>0,_k,_chirikov_mode={ 0=standard | 1=chirikov_karimov },_offmode={ 0=default | 1=center },_orientation={ 0=xy | 1=yx }
+#@cli : Creates Chirikov discrete map. Chirikov map can be the standard version which is created by Boris Chirikov or modification done by Artur I. Karimov.\n
+#@cli : (eq. to 'rep_cstdmap')\n
+#@cli : 'size' can be either in percent or integer. It can be negative or positive. Percentage mode is always based on the size of image. Positive values will lead to square value regardless of initial image. Negative value will create a new image based on whether the width or height is smaller, and scale based on the ratio of max dim vs min dim.
+#@cli : '_lines' defines the number of lines created within image. It defaults to 1 if the user inputs a value in which the absolute of value is less than 1.
+#@cli : '_pts_per_line' defines how much points is generated per lines.
+#@cli : '_k' can be considered distortion factor. It can be negative.
+#@cli : '_chirikov_mode' defines whether to apply a symmetric modification to the original version of chirikov standard map. The symmetric modification is based on the paper 'The Study of the Modified Chirikov Map' by Artur I.Karimov, Denis N. Butusov,Vyacheslav G. Rybin, Timur I.Karimov within Department of Computer Aided Design at Saint Petersburg Electrotechnical University.
+#@cli : '_offmode' defines whether the main rotor will be centered. The technique used for this is based on a naive approach i.e shifting image. Note: Maybe in the future the removal of the naive approach will be done.
+#@cli : '_orientation' defines whether to switch axis for generation of chirikov map.\n
+#@cli : Author: Reptorian.\n
+#@cli : Default values: '_lines=500','_pts_per_line=5000','_k=1','_chirikov_mode=0','_offmode=0','_orientation=0'\n
+rep_chirikov:
+skip ${2=500},${3=5000},${4=1},${5=0},${6=0},${7=0}
+
+if ${is_percent\ $1}
+ if $!
+  if $1>0
+   mw=${-max_w}
+   mh=${-max_h}
+   md={max($mw,$mh)}
+   chirikov_w,chirikov_h={$md*$1}
+  else
+   mw=${-max_w}
+   mh=${-max_h}
+   sd={max($mw,$mh)/min($mw,$mh)}
+   if $mh>$mw
+    chirikov_w={$mw*abs($1)}
+    chirikov_h={$sd*$chirikov_w}
+   else
+    chirikov_h={$mh*abs($1)}
+    chirikov_w={$sd*$chirikov_h}
+   fi
+  fi
+ else error \$\!>0==F
+ fi
+else
+ if $1>0 
+  chirikov_w,chirikov_h=$1
+ elif $1<0
+  if $!
+   mw=${-max_w}
+   mh=${-max_h}
+   sd={max($mw,$mh)/min($mw,$mh)}
+   if $mh>$mw
+    chirikov_w={abs($1)}
+    chirikov_h={$sd*$chirikov_w}
+   else
+    chirikov_h={abs($1)}
+    chirikov_w={$sd*$chirikov_h}
+   fi
+  else error \$\!>0==F
+  fi
+ else error \$\1!=0==F
+ fi
+fi
+
+$chirikov_w,$chirikov_h,1,1
+
+if $5 
+ chirikov_mode=txi=fmod(xi+.5*yi);yi=fmod(yi-k*sin(txi));xi=fmod(txi+.5*yi)
+ if $4>=0 off_mode=i(abs(x-sfx),abs(y-sfy))
+ else 
+  if $7 off_mode=i(abs(x-sfx),y)
+  else off_mode=i(x,abs(y-sfy))
+  fi
+ fi
+else 
+ chirikov_mode=yi=fmod(yi+k*sin(xi));xi=fmod(xi+yi)
+ if $4>=0
+  if $7 off_mode=i((x-sfx)%w,y)
+  else off_mode=i(x,(y-sfy)%h)
+  fi
+ else
+  off_mode=i((x-sfx)%w,(y-sfy)%h)
+ fi
+fi
+
+if $7 pt2image=i(#-1,round(yi/dpi*width),round(xi/dpi*height))=nline
+else pt2image=i(#-1,round(xi/dpi*width),round(yi/dpi*height))=nline
+fi
+
+eval ${-math_lib}"
+ const width=w#-1;
+ const height=h#-1;
+ const lines=min(100*height,abs($2))+1;
+ const pts=max(1,abs(round($3)));
+ const k=$4;
+ const dpi=2*pi;
+ fmod(a)=a-dpi*floor(a/dpi);
+ xi=0;
+ iy=expr('x/w*2*pi',lines,1);
+ for(nline=1,nline<=lines,nline++,
+  yi=iy[nline];
+  for(ptn=0,ptn<pts,ptn++,
+   "$chirikov_mode";
+   "$pt2image";
+  );
+ );"
+ 
+if $6 
+ f. "begin(
+ const sfx=ceil(w/2);
+ const sfy=ceil(h/2);
+ );
+ "$off_mode";"
+fi
 #@cli : rep_rvi : eq. to 'rep_reverse_integer' :(+)
 rep_rvi:rep_reverse_integer
 #@cli rep_reverse_integer
-#@cli : (eq. to 'rep_rvi')\n
 #@cli : Reverse integers of images.
+#@cli : (eq. to 'rep_rvi')\n
 rep_reverse_integer:
 f "rv=0;n=i;
 do(rv=int(rv)*10+n%10;n=int(n)/10;,int(n)>0);
@@ -10514,6 +10623,81 @@ repeat $! l[$>]
 endl done
 fx_rep_rvi_preview:
 gui_split_preview "fx_rep_rvi ${1-3}",${-3--1}
+#@gui Chirikov: fx_rep_cstdmap,fx_rep_cstdmap_preview
+#@gui :_=note("Creates Chirikov discrete map.")
+#@gui :_=separator(),_=note("<b>Main</b>")
+#@gui :Lines=int(500,1,10000)
+#@gui :Points per line=int(5000,1,100000)
+#@gui :K=float(1,-5,5)
+#@gui :Mode=choice(0,"Regular","Symmetric Modified")
+#@gui :Center Main Rotor=bool(0)
+#@gui :Orientation=choice(0,"XY",YX")
+#@gui :_=separator(),_=note("<b>Scaling</b>")
+#@gui :Factor=float(1,.1,10)
+#@gui :Use Image Ratio?=bool(0)
+#@gui :_=separator(),_=note("<b>Coloring</b>"),_=separator()
+#@gui :_=separator(),_=note("<u>Preliminary</u>")
+#@gui :Mode=choice(0,"Grayscale","HSX","Palette","Random")
+#@gui :Use Alpha?=bool(1)
+#@gui :_=separator(),_=note("<u>Additional</u>")
+#@gui :HSX Mode=choice(0,"HCY","HSI","HSL/HSV")
+#@gui :Palette=choice(0,"RGB-{3}","B-RGB-{4}","BW-RGB-{5}","CMY-{3}","CMYK-{4}","W-CMYK-{5}","RGBCMY-{6}","1-Bit-RGB-{8}","Aurora-{256}","PLAYPAL-{249}","Sonic Robo Blast 2-{256}","Famicube-{64}","Andrew Kensler - 16","Andrew Kensler - 32","Andrew Kensler - 54","AAP-Micro 12","AAP-16","AAP-64","AAP-SPLENDOR128","DB8","DB16","DB32","DB-ISO22","DimWiddy 17","DimWiddy 23","Endesga-4","Endesga-8","Endesga-16","Endesga-32","Endesga-36","Endesga-64","Juicy-32","Juicy-56","XAIUE-22","15P-DX","20P-DX","24P-DX","Cabana-64","Fantasy 16","Fantasy 24","Tranquil Fantasy 23","Tranquility Plus 39","Faraway 48","Fleja Master Palette-{33}","Koni32","Linear Color Palette Basic-{31}","Vines Flexible Linear Ramps-{38}","Arcade Standard 29","ARQ16","BLK 36","BLK-NEO-{46}","Broken Facility","Bubblegum-16","Cade 15","Calder 8-{11}","Chromatic16","CD-BAC-{16}","CG Arne-{16}","CPC BOY-{32}","Dinoknight 16","||||-22","FZT Ethereal 16","GZXP-{11}","Indecision-{17}","Island Joy 16","Journey-{64}","Juicy 17","Oak21","Nature's Embrace 55","Nauris-16","Pear 36","Peachy Pop 16-{16}","Pineapple 32","Resurrect 32-{32}","Rosy 42","SLSO-CLR17","Softy 15","SPEC12","Starmancer-{52}","Superb 8","SuperFuture25","Sweetie 16","Taffy 16","Todayland Palette V2-{25}","Vivid-17","Voodo34","Zughy 32","ENOS16","Undertones-17","Equpix 15","Night 16","Star 29","Star 34","Still-Life-{14}","SimpleJPC-16","Acid 15","Battery 24","Clumpy 18","Cthulhu-{16}","Crimso 11","Copper-Tech-{16}","DRZ15A","Eggy 15","Eroge-Copper","Europa 16-{16}","GreyT-bit-{8}","Jewel-{15}","Polar 11","Sheltzy 32","Rube-Goldberg-{9}","BoomBoom-{7}","Generic-8","Matriax8c","NT1H-{26}","Autum 15","Autum 15 [Yellow]","JerryPie 22","Naji 16","Blessing-{5}","Crayola Blind-{9}","Easter Island-{16}","Fairy Tales-{8}","Fuzzy Four-{4}","0xdb-01-{17}","Ocaso-{17}","Pastel-{15}","17 Pastels","Pollen-8","Nopal-12","Sy17","Syz15","TUI-15","Cave-{8}","Psygnosia-{16}","MarshMellow32","Rabbit 7","Finlal 11","Vinik 24","YKB-22","Graveyard-21","Steam Lords-{16}","AAP-RadiantXV-{15}","AAP-Majesty XVII-{17}","Daruda 22","Rust-6","XAIUE-Radiant-{22}","Firestorm-{9}","SuperNova 7","NYX8","OIL6","SGM-Palette 2-{17}","Fornax Void I-{256}","Fornax Void II-{128}","Pixelwave-{12}","Spacey Easter-{17}","Moonlit-39","Petite-8","Petite-8 Afterdark","Autochrome 3","Autochrome 5","GB Default #1-{4}","GB Default #2-{4}","GB Andrade-{4}","GB Blue Seni-{4}","GB Blackzone-{4}","GB Crimson-{4}","GB Didi-{4}","GB Dirty-{4}","GB Arne-{4}","GB Easy-{4}","GB Forest-{4}","GB Harsh Green-{4}","GB Light Green-{4}","GB Nostalgia-{4}","GB Platinum-{4}","GB Kirokaze-{4}","GB PJ-{4}","GB Cyber-{4}","GB Wish-{4}","GB Grapefruit-{4}","GB Ice Cream-{4}","GB Red_Blue-{4}","GB Spacehaze-{4}","GB Chocolate-{4}","GB Purple Dawn-{4}","GB Gray-{4}","ARNE4","HallowPumpkin-{4}","Amiga 2600 NTSC-{128}","Amiga 2600 PAL-{104}","Amiga 2600 SECAM-{8}","Amiga 7800 M.E.S.S-{256}","Amiga 7800-{256}","Amstrad CPC-{27}","Apple II-{15}","CGA-{16}","CGA Mode 0 [Low]-{4}","CGA Mode 0 [High]-{4}","CGA Mode 1 [Low]-{4}","CGA Mode 1 [High]-{4}","CGA Mode 2 [Low]-{4}","CGA Mode 2 [High]-{4}","Commodore 64 [Pepto Interpretation]-{16}","Commodore 64 [Colodore Interpretation]-{16}","Commodore VIC-20-{16}","Colecovision-{15}","Japanese Machine Palette-{16}","Macintosh II-{16}","NES-{52}","PICO-8-{16}","RISC OS-{16}","SAM Coupe-{128}","Thomson MO5-{16}","VGA-{244}","ZX Spectrum-{15}","GNOME 32-{32}","Electronic Crayon 22","Chip16","MSX-{15}","Deluxe Paint-{222}","Legacy Paint-{16}","XP Paint-{28}","Vista Paint-{28}")
+#@gui :Color Count=int(20,2,360)
+#@gui :Color Seed=int(0,0,100000)
+#@gui :_=separator(), _=note("<small>Author: Reptorian. Latest Update: <i>2020/9/30</i>.</small>")
+fx_rep_cstdmap:
+srand $14
+if $9==4 $13,1,1,1,u(0,1) store. randorder fi
+ww={w}
+hh={h}
+ld={w>h}
+md={max(w,h)}
+ti={$!-1}
+rep_cstdmap {$8?-1*$7*100:$7*100}%,${1-6}
++f. i?1 store. chan
+if $9
+ if $9==1 
+  -. 1 *. {359.999999/iM#-1} $chan . if $10 . *. 255 fi a[^0-$ti] c
+  if $11==0 sh. 2 *. .5 rm. hcy2rgb.
+  elif $11==1 hsi2rgb.
+  elif $11==2 hsv2rgb.
+  fi
+ elif $9==2
+  pal {$12+1} r. {w+1},100%,100%,100%,0,0,1 map.. [-1],2 rm. if $10 $chan *. 255 a[-2,-1] c fi
+ elif $9==3
+  $13,1,1,3,u(0,255) r. {w+1},100%,100%,100%,0,0,1 map.. [-1],2 rm. if $10 $chan *. 255 a[-2,-1] c fi
+ elif $9==4
+  #TODO: Fix This#
+  +colormap.. $13,0,0 $randorder pixelsort.. +,x,[-1] rm. r. {w+1},100%,100%,100%,0,0,1 map.. [-1],1 rm. if $10 $chan *. 255 a[-2,-1] c fi
+ fi
+fi
+if $7<1
+ if $ld r. $ww,{max($hh,$md)},100%,100%,0,2,.5,.5
+ else r. {max($ww,$md)},$hh,100%,100%,0,2,.5,.5
+ fi
+elif $7>1
+ if !$8 r. $md,$md,100%,100%,6
+ else r. $ww,$hh,100%,100$,6
+ fi
+fi
+mv. 0
+if '$host'=='paintdotnet' k[0] fi
+fx_rep_cstdmap_preview:
+fx_rep_cstdmap $*
+u "{$1}"\
+"{$2}"\
+"{$3}"\
+"{$4}_"{!$5?2:1}\
+"{$5}"\
+"{$6}"\
+"{$7}"\
+"{$8}"\
+"{$9}"\
+"{$10}"\
+"{$11}_"{$9==1?2:0}\
+"{$12}_"{$9==2?2:0}\
+"{$13}_"{(($9==3)||($9==4))?2:0}\
+"{$14}_"{(($9==3)||($9==4))?2:0}
 ######################
 
 # Local Variables:
