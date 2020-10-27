@@ -80,6 +80,12 @@ karos_about :
     +to_gray. skeleton. , n[-1--2] 0,255 dilate.. 2 -[-1--2] + n 0,255
   fi
 
+#------------------------------------
+#
+#@cli :: KaRo's Test custom utility functions
+#
+#------------------------------------
+
 #@cli karos_error : "message"
 #@cli : Message in karos_about image for gui
 karos_error :
@@ -106,10 +112,51 @@ text \
 text \
 " PATH:\n"${-_kr_path},0.2~,0.1~,14,1,255 fi v +
 
+_xframe :
+  f "i=y==0?0:x==0?0:y==h-1?0:x==w-1?0:i"
+
+#@cli karo_frame : _width(1), _border(0)
+#@cli : _width thickness of border
+#@cli : _border==false border is set 0, inner region copied
+#@cli : _border==true border is copied, inner region is set 0
+karo_frame :
+  skip "${1=1} ${2=0}"
+  if $2 e[^2] "Copy border Delete inner width $1." f "bb="$1";i=y<bb?i:x<bb?i:y>=h-bb?i:x>=w-bb?i:0;"
+  else  e[^2] "Delete border Copy inner width $1." f "bb="$1";i=y<bb?0:x<bb?0:y>=h-bb?0:x>=w-bb?0:i;" fi
+
 _kr_path : ('$PATH')
   if ${-is_windows}  replace_str. ";","\n"
  else replace_str. ":","\n" fi
  u {-1,t} rm.
+
+#@cli karo_li2st : p1,p2,...,pn
+#@cli : Convert comma separated list to space separated string.
+karo_li2st :
+  v - u "" if $#>=1 ({"'${1--1}'"}) replace. {','},{"' '"} u {t} rm. fi v +
+
+#@cli karo_rndbit0 :
+#@cli : Randomize in [0..255] (byte) image$? bit level 0. wow randomize numbers to even and odd"
+karo_rndbit0 :
+  e[^-1] "Randomize in [0..255] (byte) image$? bit level 0." v -
+  repeat $! l[$>] and 254 +rand 0,1 round. or endl done v +
+
+#@cli _kr_ch2ch : number
+#@cli : return alpha channel mode string from number in status.
+#@cli : Ex. v - repeat 38 _kr_ch2ch \$\> echo_stdout \$\>,\${} done v +
+#@cli : Ex. sp 0 repeat 38 +ac[0] \"blur 2%\",$>,2 _kr_ch2ch $> nm[$>] ${} done
+_kr_ch2ch :
+  if isnum("$1") if isint("$1")
+    mode=${arg\ 1+$1,all,rgba,rgb,rgb_r,rgb_g,rgb_b,\
+rgba_a,lrgb,lrgb_r,lrgb_g,lrgb_b,\
+ycbcr_y,ycbcr_cbcr,ycbcr_cb,ycbcr_cr,ycbcr_cg,\
+lab_l,lab_ab,lab_a,lab_b,\
+lch_ch,lch_c,lch_h,\
+hsv_h,hsv_s,hsv_v,hsi_i,hsl_l,\
+cmyk_c,cmyk_m,cmyk_y,cmyk_k,\
+yiq_y,yiq_iq,\
+ryb,ryb_r,ryb_y,ryb_b}
+    u $mode
+  else u "$1" fi else u "$1" fi
 
 #------------------------------------
 #
@@ -180,18 +227,6 @@ _xpinks :
     repeat $! l[$>]  _xpink $1,"$2" k. endl done
     if $s>1 a c fi
   endl done
-
-_xframe :
-  f "i=y==0?0:x==0?0:y==h-1?0:x==w-1?0:i"
-
-#@cli karo_frame : _width(1), _border(0)
-#@cli : _width thickness of border
-#@cli : _border==false border is set 0, inner region copied
-#@cli : _border==true border is copied, inner region is set 0
-karo_frame :
-  skip "${1=1} ${2=0}"
-  if $2 e[^2] "Copy border Delete inner width $1." f "bb="$1";i=y<bb?i:x<bb?i:y>=h-bb?i:x>=w-bb?i:0;"
-  else  e[^2] "Delete border Copy inner width $1." f "bb="$1";i=y<bb?0:x<bb?0:y>=h-bb?0:x>=w-bb?0:i;" fi
 
 #@cli output_pink3d : filename,_type
 #@cli : Save selected images as _type-coded (P5,P8,P9) PNK files (PINK extension for 3d volumetric images).
@@ -418,18 +453,6 @@ pink_new :
     done
   fi
 
-# # #@cli pink : pink_cmd,p1,...,pn
-# # #@cli : Abbreviaton of pink_new (obsolet, use pink_new !!)
-# # #@cli : Pink wrapper (requires the PINK library to be installed).
-# # #@cli : (https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/)
-# # #@cli : prepares input, calls external "pink_cmd input p1...pn output" and reads output (/tmp)
-# # #@cli : $ image.jpg +pink asfr,5 pink[0] asf,5
-# # #@cli : $ image.jpg +blur 2 pink maxima,4
-# # #  v -
-# # #  if $#>1 ({"'${2--1}'"}) replace. {','},{"' '"} p={t} rm. else p=" " fi
-# # #  v + e[^-1] "Call pink package on image$? with cmd: \"$1 [img] "$p" [img]\"." v -
-# # #  repeat $! l[$>] _xpinks $1,$p endl done v +
-
 #@cli pink_grayskel : _connectivity={ 4 }, _lambda=0
 #@cli : (https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/grayskel_8c.html)
 #@cli : Grayscale homotopic skeleton (requires the PINK library to be installed).
@@ -598,16 +621,26 @@ output_pinklist :
 #@cli : _mode == 0 a 3d object or
 #@cli : _mode != 0 the vertice, hull, edge lists and the adjacency matrix
 #@cli : $ 2,50,1,1 rand 0,512 pink_delaunay. 0
-pink_delaunay : skip ${1=0} v -
+pink_delaunay : skip ${1=0}
   file_rand nn=${}
   output_pinklist. $nn".tmp"
   x 0,"pink.delaunay "$nn".tmp "$nn".del"
   input_pinklist[] $nn".del",$1
   file_rm $nn.tmp
   file_rm $nn.del
-  v +
 
-#@cli :: KaRo's Test custom functions
+#@cli karo_zerleg :
+#@cli : Partition of binary image zero areas
+#@cli : using pink watershed (https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/wshedtopo_8c.html)
+#@cli : $ sp 6 to_gray +threshold 140 +karo_zerleg. negate. label_fg. 0
+#@cli : Author : <i>KaRo</i>. Latest update : <i>2017/11/30</i>.
+karo_zerleg :
+  e[^1] "Partition of binary image"$?" with pink watershed"
+  repeat $! l[$>]
+    +distance. 1 pink_wshed. 8,1 f. "j(0,0)!=j(1,1) || j(1,0)!=j(0,1)" skeleton. , or[0,-1]
+  endl done
+
+#@cli :: KaRo's Test custom input functions
 
 #@cli osteo :
 #@cli : Load osteoblast cell image (transmitted light)
@@ -771,6 +804,7 @@ YTJbqehqb2bz+x1vjLOnrnPTgbnQx+Cg6L5xzEl/nJQ5Atvf/ASavTQ8xIDEwIDEgMSAjMTgKeJxz941
     nm. osteo
   endl v +
 # # osteo : v - l[] karo_dtpread ~/Images/Beispiele/tra005.cel,1 rm. nm osteo endl v +
+
 #@cli osteo_ :
 #@cli : Load osteoblast cell image and cell mask (transmitted light)
 osteo_ :
@@ -787,7 +821,7 @@ F0vFAHgApxAN4"
   endl v +
 
 #@cli follic :
-#@cli : Load follicle cells sample image from thyroid (transmitted light)
+#@cli : Load follicle cells sample image from thyroid (transmitted light) from internet or local storage.
 #@cli : For frequent usage do "gmic follic o ${_path_rc}follic.pgm" to store the image locally, \
 # follic looks there first!
 follic :
@@ -798,7 +832,7 @@ follic :
    i http://karo03.bplaced.net/gmic/Repo/follic.pgm endif nm follic
 
 #@cli follic_ :
-#@cli : Load follicle cells image and masks from thyroid (transmitted light)
+#@cli : Load follicle cells image and masks from thyroid (transmitted light) from internet or local storage.
 follic_ :
   e[^-1] "Load thyroid follicle nuclei and mask example image"
   v - l[] follic
@@ -828,8 +862,6 @@ hgKGdCDNwAAAZYIFpg=="
     decompress_rle.
     nm follic,follic_
   endl v +
-
-#@cli :: KaRo's Test custom input functions
 
 #@cli karo_read_bd : name,_verbosity(=0),_append_type(=z) {z|c|x|y},_no_delete(=0)
 #@cli : Read biodata with external bfconvert from OME
@@ -946,6 +978,24 @@ wykoread : skip "${1=Wyko_Example.ASC}"
     else rm fi
   endl
 
+#@cli karo_dtpread : filename,_bit0
+#@cli : Read dtp image file format
+#@cli :   (512 byte header, col[22-24] x row[25-27] byte image)
+#@cli : with _bit0 != 0 bit level 1 is extracted as binary mask
+#@cli :   and bit level 1 in the gray image is randomized with karo_rndbit0
+#@cli : Ex.: karo_dtpread Images/Beispiele/tra005.cel,1
+karo_dtpread : check isfile(['{/$1}']) check "${2=0}>=0"
+  e[^-1] "Read dtp image file from "$1"."
+  i raw:$1,uchar
+  ({@22-24}) x={t} rm.
+  ({@25-27}) y={t} rm.
+  ({@0-79}) _dtph={t} rm.
+  crop. 0,512,0,{h}
+  resize. $x,$y,1,1,-1
+  if $2
+    +and. 1 karo_rndbit0..
+  fi
+
 #@cli :: KaRo's Test cli custom functions
 
 #@cli cimg2tiff : filenamein, _pathout(=pathin), _type(=integer)
@@ -972,11 +1022,13 @@ cimg2tiff :
   o ${2}{b}".tif",$ty
   rm
 
-#@cli pseudo_c : Pseudo coloring of greyscale image
-pseudo_c : v - if s!=1 to_gray. fi {iM},1,1,3,u(255) round. map.. . rm.  v +
+#@cli pseudo_c : 
+#@cli : Pseudo coloring of greyscale images
+pseudo_c : 
+  if s!=1 to_gray. fi {iM},1,1,3,u(255) round. map.. . rm.
 
 #@cli sincos : _w(512), _h(512), _new(0)
-#@cli : testimage
+#@cli : Generation of a testimage
 #@cli : $ sincos , +shift. 50%,0,0,0,2 +shift.. 0,50%,0,0,2 a c
 #@cli : $ sincos , sincos ,,1 +- f. 'if(i<-1,0,i)'
 sincos :
@@ -1022,11 +1074,10 @@ karo_luminance : skip ${1=itur1990}
 #@cli : $ image.jpg  +karo_close 15 +karo_close[0] 15,1 +karo_close[0] 15,2 rm[0]
 karo_close :
   e "Compute closing image"$?", with size "$1" (only 2d)."
-  skip ${1=5},${2=0},${3=0},${4=0},${5=0} check $2<3 v -
+  skip ${1=5},${2=0},${3=0},${4=0},${5=0} check $2<3
  if $4 negate fi
   ac "karo_morpho 3,$2,$1",$5,$4
  if $4 negate fi
-  v +
 
 #@cli karo_open : _size>0,_shape=0|1|2 (square|octagon|circle), _invert=0|1,
 #@cli : '_scale=0|1|2','_channel' see value action, color_channels in 'apply_channels'
@@ -1035,30 +1086,30 @@ karo_close :
 #@cli : $ image.jpg  +karo_open 15 +karo_open[0] 15,1 +karo_open[0] 15,2 rm[0]
 karo_open :
   e "Compute opening image"$?", with size "$1" (only 2d)."
-  skip ${1=5},${2=0},${3=0},${4=0},${5=0} check $2<3 v -
+  skip ${1=5},${2=0},${3=0},${4=0},${5=0} check $2<3
  if $4 negate fi
   ac "karo_morpho 2,$2,$1",$5,$4
  if $4 negate fi
-  v +
 
 #@cli karo_doc : _size>0,_shape=0|1|2 (square|octagonal|circular),
 #@cli : _channel see color_channels in 'apply_channels'
 #@cli : compute difference of open+close and original (only 2d)
 #@cli : $ image.jpg +karo_doc 15,2,5
 karo_doc :
-  e "Compute difference of open/close and original image"$?", with window size "$1" (only 2d)." v -
+  e "Compute difference of open/close and original image"$?", with window size "$1" (only 2d)."
   skip ${1=5},${2=1},${3=0}
   repeat $! l[$<]
     +karo_open[0] $1,$2,0,0,$3 +karo_close[0] $1,$2,0,0,$3
     +[-2,-1] /. 2 -
-  endl done v +
+  endl done
+
 #@cli karo_doo : _size1>0,_size2>0,_type=0..3 (ero/dil/open/close),_shape=0|1|2 (sqaure|octagon|circle),_scale=0|1,\
 # _scale,_channel see value action, color_channels in apply_channels
 #@cli : Compute difference of math. morph operation type on selected images (only 2d).
 #@cli : $ image.jpg +karo_doo 10,15,2,2,0,3
 karo_doo : skip ${1=5},${2=7},${3=2},${4=1},${5=0},${6=0}
   e[^-1] "Compute difference of math. morph. operator \'"${arg\ {$3+1},Erosion,Dilation,Opening,Closing}"\' \
-on image"$?", with sizes "$1" and "$2" (only 2d)." v -
+on image"$?", with sizes "$1" and "$2" (only 2d)."
   repeat $! l[$<]
     +ac. "karo_morpho $3,$4,$1",$6,0
 #    +fx_morpho. $3,$1,0,$4,$6,0
@@ -1067,7 +1118,7 @@ on image"$?", with sizes "$1" and "$2" (only 2d)." v -
     if (${3}&1)==0 rv[-2,-1] fi
     -[-2,-1]
     if $5 n. 0,255 fi
-  endl done v +
+  endl done
 
 #@cli karo_label_sort :
 #@cli : Rearrange a label image (the selected image) according to the region size
@@ -1082,7 +1133,7 @@ karo_label_sort :
    100%,1,1,1,x a[-2,-1] y sort. -,x rows. 1
    100%,1,1,1,x a[-2,-1] y sort. +,x rows. 1
    map.. . rm.
-  endl done v +
+  endl done
 
 #@cli karo_label : tolerance>=0,is_high_connectivity={ 0 | 1 },sort={ 0 | 1}
 #@cli : Label connected components in selected images and possibly sort by region size.
@@ -1093,7 +1144,7 @@ karo_label_sort :
 karo_label : check "$1>=0" skip ${2=0} skip ${3=0}
   e[^-1] "Label connected components on image"$?", with tolerance "$1", "${arg\ 1+!$2,high,low}" \
 connectivity and "${arg\ 1+!$3,sorted,unsorted}" by size"
-  v - repeat $! l[$>]
+  repeat $! l[$>]
     label. $1,$2
     if $3
       nb={1+iM} +histogram. $nb,0,{iM}
@@ -1101,7 +1152,7 @@ connectivity and "${arg\ 1+!$3,sorted,unsorted}" by size"
       100%,1,1,1,x a[-2,-1] y sort. +,x rows. 1
       map.. . rm.
     fi
-  endl done v +
+  endl done
 
 #@cli karo_bin_fill :
 #@cli : Fill holes in binary pattern
@@ -1138,17 +1189,6 @@ karo_segmentarea :
     map.. . u {is} rm.
   endl done
 
-#@cli karo_zerleg :
-#@cli : Partition of binary image zero areas
-#@cli : using pink watershed (https://perso.esiee.fr/~talboth/ISBS/Morpho/pink/doc/wshedtopo_8c.html)
-#@cli : $ sp 6 to_gray +threshold 140 +karo_zerleg. negate. label_fg. 0
-#@cli : Author : <i>KaRo</i>. Latest update : <i>2017/11/30</i>.
-karo_zerleg :
-  e[^1] "Partition of binary image"$?" with pink watershed" v -
-  repeat $! l[$>]
-    +distance. 1 pink_wshed. 8,1 f. "j(0,0)!=j(1,1) || j(1,0)!=j(0,1)" skeleton. , or[0,-1]
-  endl done v +
-
 #@cli karo_threshold : _method={ triangle | yen | otsu | _otsu | bgt | intermeans | intera | rats | \
 # fixnnn | huang | huang2 | li | moments | minerrori | maxentropy | mean | \
 # renyientropy | shanbhag | bgt2 },_delclass>0,_smooth>0
@@ -1166,7 +1206,6 @@ karo_zerleg :
 #@cli : $ image.jpg luminance. karo_threshold. otsu
 karo_threshold : skip ${1="triangle"} skip ${2=0} skip ${3=0}
   e[^-1] "Calculate \'"$1"\' thresholded mask from images"$?" with histogram in range [0,255] and binsize 1."
-  v -
   if ${strcontains\ $1,fix} meth=fix
   else meth=$1 fi
   if ['$meth']=='otsu' otsu 256
@@ -1185,7 +1224,6 @@ karo_threshold : skip ${1="triangle"} skip ${2=0} skip ${3=0}
 # Concatenate results for image list
       if $>==0 sres=$th else sres=$sres,$th fi
     endl done u $sres fi
-  v +
 
 #@cli karo_threshold_demo :
 #@cli : Display 4x4 different threshold methods applied to selected image
@@ -1214,7 +1252,6 @@ _karo_fix :
 #@cli : $ image.jpg luminance +histogram 256,0,255 _karo_triangle. , +threshold[0] ${}
 _karo_triangle : skip "${1=0} ${2=1}"
   e[^-1] "Calculate triangle threshold from 1d histogram"$?" in range ["$1","{$1+(w-1)*$2}"]."
-  v -
   repeat $! l[$>]
     ac=${-autocrop_coords.} wd={w}
     min={${arg\ 1,$ac}} if $min==1" && "{@0}!=0 min=0 fi # corr autocrop_coords
@@ -1237,11 +1274,11 @@ _karo_triangle : skip "${1=0} ${2=1}"
 # Concatenate results for image list
     if $>==0 sres=$res else sres=$sres\,$res fi
     rm[0]
-  endl done u $sres v +
+  endl done u $sres
 
 #@cli _karo_yen : _minval,_bins
 #@cli : Calculate yen threshold (from ImageJ auto thresholder)
-_karo_yen :  skip "${1=0} ${2=1}" v -
+_karo_yen :  skip "${1=0} ${2=1}"
   repeat $! l[$>]
     if $> r_yen=${} fi
     autocrop_coords. 0 range=${} mn=${arg\ 1,$range} mx=${arg\ 4,$range}
@@ -1257,14 +1294,14 @@ _karo_yen :  skip "${1=0} ${2=1}" v -
     res={xM*$2+$1}
     rm.
     if $> u $r_yen,$res else u $res fi
-  endl done v +
+  endl done
 
 #@cli _karo__otsu : _minval(0) _bins(1)
 #@cli : Calculate otsu threshold from a histogram
 #@cli : with class o = _minval and bin size = _bins
 #@cli : Threshold is stored in status
 #@cli : $ image.jpg to_gray +histogram 256,0,255 _karo__otsu , threshold ${}
-_karo__otsu : skip "${1=0} ${2=1}" v -
+_karo__otsu : skip "${1=0} ${2=1}"
   l.
   /. {is} #p
   +cumulate. x #q_L
@@ -1278,17 +1315,16 @@ _karo__otsu : skip "${1=0} ${2=1}" v -
   u {xM*$2+$1}
   rm
   endl
-  v +
 
 #@cli _karo_bgt : _minval,_bins
 #@cli : Autothreshold using SD from whole image starting from the mode of the histogram (image range 0,255)
-_karo_bgt: skip "${1=0} ${2=1}" v - fact=1.5
+_karo_bgt: skip "${1=0} ${2=1}" fact=1.5
   l.
     hft=${-hist_feature\ -2} mn=${arg\ 5,$hft} mx=${arg\ 6,$hft} sd=${arg\ 4,$hft} md=${arg\ 1,$hft}
     if $mx-$md<=$md-$mn res={$md-$fact*$sd}
     else res={$md+$fact*$sd} fi
     u {$res*$2+$1} rm
-  endl v +
+  endl
 
 #@cli _karo_bgt2 : _minval,_bins
 #@cli : Threshold using SD from mode left or right distribution mirrored of the histogram (image range 0,255)
@@ -1311,7 +1347,7 @@ _karo_bgt2: skip "${1=0} ${2=1} ${3=2.5}" fact=$3
 #@cli : Calculate intermeans threshold (from ImageJ autothreshold IsoData)
 #@cli : from last selected data and store it in status
 _karo_intermeans : skip "${1=0} ${2=1}"
-  e[^-1] "Calculate intermeans threshold from last selected (1d) histogram$? in range ["$1","{$1+(w-1)*$2}"]." v -
+  e[^-1] "Calculate intermeans threshold from last selected (1d) histogram$? in range ["$1","{$1+(w-1)*$2}"]."
   l. if h>1" || "d>1" || "s>1 u "?" else
     split={"
       min=0; while(i(min)==0,min++);
@@ -1325,21 +1361,21 @@ _karo_intermeans : skip "${1=0} ${2=1}"
         (mvI+1)<=res && mvI<(max-1)));
       round(res)"} rm
     u {$1+$split*$2} fi
-  endl v +
+  endl
 
 #@cli karo_rats : _pow(0.5)
 #@cli : Robust automatic threshold selection (Kittler et al. 1985)
 #@cli : Input image (not histogram similar otsu!)
 karo_rats :
   check ${1=0.5}>0
-  e[^-1] "Calculate rats from image$? with power "$1"." v -
+  e[^-1] "Calculate rats from image$? with power "$1"."
   repeat $! l[$>]
     +gradient_norm. pow. $1 gr={is} *. .. gri={is} res={$gri/$gr} rm.
     threshold. $res
 # Concatenate results for image list
     if $>==0 sres=$res else sres=$sres\,$res fi
   endl done
-  u $sres v +
+  u $sres
 
 _karo_huang : skip "${1=0} ${2=1}"
 # public static int Huang(int [] data ) {
@@ -2066,7 +2102,7 @@ hist_percentile :
   check "${1=25%}>=0"
   skip ${2=0},${3=0},${4=1}
   e[^-1] "Calculate $1 percentile from 1d histogram$?."
-  v - repeat $!
+  repeat $!
     l[$>]
       if h>1" || "d>1" || "s>1 v + e[^-1] "Image "$>" seemingly not 1d!" v - continue fi
   # Delete class zero
@@ -2085,7 +2121,91 @@ hist_percentile :
   # Concatenate results for image list
       if $>==0 sres=$res else sres=$sres\,$res fi
     endl
-  done u $sres v +
+  done u $sres
+
+#@cli karo_xcimg : programname, parameterlist :
+#@cli : Call external CImg Example 'programname'
+#@cli : which has to be found in PATH by external call by
+#@cli : 'programname' image_in 'parameterlist' image_out
+#@cli : with writing image_in and reading after execution image_out
+karo_xcimg :
+  filename=${-file_rand}
+  if !${-is_windows}
+    x "which "$1" >/dev/null 2>&1"
+    if ${} v + e "executable $1 not found in PATH, status = "${}"!! Returning!!\n" v -
+    {w},{h} karos_error "exec Error !!" return fi
+  fi
+  o ${filename}.cimg
+  x "$1 -i "${filename}".cimg $2 -o "${filename}".cimg"
+  if ${} v + e "Status is "${}"." v - {w},{h} karos_error "exec Error !!"
+  else i ${filename}.cimg fi
+  file_rm ${filename}.cimg
+
+#@cli karo_skeleton : _p1,..,p2n : (-median,0,-inv,0|1,-t,-0.3,-curve,0|1,-corr,0|1,-dlt,1)
+#@cli : Execute use_skeleton (CImg demo) external.
+#@cli : E.G. ... karo_skeleton "-median,5,-inv,1"
+#@cli : For help execute $ use_skeleton -help in shell
+karo_skeleton : v - if $#>0 karo_li2st ${1--1} p=${} else p="" fi v +
+  e "Compute use_skeleton exec with options \'"$p"\' on"$? v -
+  repeat $! l[$>]
+   s={s} if $s>1 s. c fi
+   repeat $! l[$>] karo_xcimg use_skeleton,${p}" -visu 0" mv. 0 k[0] endl done
+   if $s>1 a[-$s--1] c fi
+  endl done v +
+
+#@cli karo_nlmeans : _p1,..,pn=-zoom,1,-ng,0|1,-nu,0|1,-ns,0|1,-p,1,-lambda,-1,-sigma,-1,-alpha,3,-sampling,1
+#@cli : Execute use_nlmeans  (CImg demo) external. (see also q-nlmeans p=4,lambda=4,sigma=10)
+#@cli : For help execute $ use_nlmeans -help in shell
+karo_nlmeans : v - if $#>0 karo_li2st ${1--1} p=${} else p="" fi v +
+  e "Compute use_nlmeans exec with options "${p}" on"$? v -
+  repeat $! l[$>]
+   s={s} if $s>1 s. c fi
+   repeat $! l[$>] karo_xcimg use_nlmeans,${p}" -visu 0" mv. 0 k[0] endl done
+   if $s>1 a[-$s--1] c fi
+  endl done v +
+
+#@cli karo_morpho : action, _kernel(0), _size(5), _ckernel("1,0,1; 0,1,0; 1,0,1")
+#@cli : Mathematical morphology filter
+#@cli : action={0=Ero | 1=Dil | 2=Open | 3=Close | 4=Ori-Ero | 5=Dil-Ori | 6=Ori-Open | 7=Close-Ori | \
+# 8=(Ori*2-(Open+Close))*0.5 | 9=Close-Open}
+#@cli : _kernel={0=Square | 1=Octogon | 2=Circle | 3=Custom}
+#@cli : _size>=2(5)
+#@cli : _ckernel (custom kernel only if _kernel==3)
+#@cli : Derived from D Tschumperle's older fx_morpho (formerly gmic_stdlib) and extended by action 4..9
+#@cli : $ osteo_ k. +karo_morpho 4,3,,"0\,1\,0\;1\,1\,1\;0\,1\,0"
+karo_morpho :
+  skip "${2=0} ${3=5} ${4='1,0,1;0,1,0;1,0,1'}"
+  v - ac=Ero,Dil,Open,Close,"Ori-Ero","Dil-Ori","Ori-Open","Close-Ori","(Ori*2-(Open+Close))*0.5","Close-Open"
+  ke=Square,Octagon,Circle,Custom v +
+  e[^-1] "Math. morph. filter "${arg\ {$1+1},$ac}" with kernel "${arg\ {$2+1},$ke}" and size "$3 v -
+  ({'"$4"'}) f. "(i>=_'0' && i<=_'9') || i==_',' || i==_';'?i:-1" discard. -1 ckernel={t} rm.
+  if $2==0 m "my_erode: erode $""1" m "my_dilate: dilate $""1"
+  elif $2==1 m "my_erode: erode_oct $""1" m "my_dilate: dilate_oct $""1"
+  elif $2==2 m "my_erode: erode_circ $""1" m "my_dilate: dilate_circ $""1"
+  else
+  m "my_erode : ("$ckernel") erode[^-1] . skip $""1"" rm."
+  m "my_dilate : ("$ckernel") dilate[^-1] . skip $""1"" rm."
+  fi
+  if $1==0 m "my_action : my_erode $3"
+  elif $1==1 m "my_action : my_dilate $3"
+  elif $1==2 m "my_action : my_erode $3 my_dilate $3"
+  elif $1==3 m "my_action : my_dilate $3 my_erode $3"
+  elif $1==4 m "my_action : +my_erode $3 -"
+  elif $1==5 m "my_action : +my_dilate $3 rv -"
+  elif $1==6 m "my_action : +my_erode $3 my_dilate. $3 -"
+  elif $1==7 m "my_action : +my_dilate $3 my_erode. $3 rv -"
+  elif $1==8 m "my_action : +my_erode $3 my_dilate. $3 +- rm.. +my_dilate.. $3 my_erode. $3 \
+rv[-1,-3] -[-1,-3] rv - / 2"
+  elif $1==9 m "my_action : +my_erode $3 my_dilate. $3 my_dilate.. $3 my_erode.. $3 -"
+  else m "my_action : +my_dilate $3 my_erode. $3 rv -"
+  fi
+  repeat $! l[$>]
+  my_action[0]
+  endl done
+  uncommand my_erode,my_dilate,my_action
+  v +
+
+#@cli :: KaRo's Test cli feature functions
 
 #@cli hist_feature : _nofeature>=-2,_nth>0,_zero={0|1},_min0,_stepw,_percent[%]>0
 #@cli : Estimation from histogram (frequency dist, 1d image) the features
@@ -2108,7 +2228,6 @@ hist_feature :
   check ${1=-2}>=-2" && "$1<=8" && "isint($1)" && "isint(${2=1})" && "$2>0
   skip ${3=0},${4=0},${5=1},${6=25%}
   e[^-1] "Calculate md,m0,m1,m2,$2.min,$2.max,med,iqr,loq,hiq from 1d histogram$?."
-  v -
   repeat $!
     l[$>]
       if h>1" || "d>1" || "s>1 v + e[^-1] "Data["$>"] seemingly not 1d!" v - continue fi
@@ -2137,7 +2256,7 @@ hist_feature :
   # Concatenate results for image list
      if $>==0 sres=$res else sres=$sres\,$res fi
     endl
-  done u $sres v +
+  done u $sres
 
 #@cli hist_feature_demo : Parameters like in hist_feature
 #@cli : (Plot) of features in blue into the histogram with Gaussian in green
@@ -2145,7 +2264,7 @@ hist_feature :
 hist_feature_demo :
   check ${1=-2}>=-2" && "$1<=8" && "isint($1)" && "isint(${2=1})" && "$2>0
   skip ${3=0},${4=0},${5=1},${6=25%}
-  e[^-1] "Plot features from hist_feature into 1d histogram$?." v -
+  e[^-1] "Plot features from hist_feature into 1d histogram$?."
   l.
   hist_feature. -2,${2-6} vv=${}
   md=${arg\ 1,$vv} m0=${arg\ 2,$vv} m1=${arg\ 3,$vv} m2=${arg\ 4,$vv}
@@ -2158,7 +2277,7 @@ hist_feature_demo :
   =. {$v*(1-$6)},$lo =. {$v*(1-$6)},$hi
   a c
   u $vv
-  endl v +
+  endl
 
 #@cli karo_nth_max : _n(1),_ind(=0)
 #@cli : Return in the status the _n-th max or the index of the n-th max of an image
@@ -2184,52 +2303,6 @@ karo_nth_min : check isint(${1=1})" && "$1>0 skip ${2=0}
      if $>==0 mn1=$mn else mn1=$mn1,$mn fi
   endl done u $mn1 v +
 
-#@cli karo_xcimg : programname ,parameterlist :
-#@cli : Call external CImg Example 'programname'
-#@cli : which has to be found in PATH by external call by
-#@cli : 'programname' image_in 'parameterlist' image_out
-#@cli : with writing image_in and reading after execution image_out
-karo_xcimg :
-  filename=${-file_rand}
-  if !${-is_windows}
-    x "which "$1" >/dev/null 2>&1"
-    if ${} v + e "executable $1 not found in PATH, status = "${}"!! Returning!!\n" v -
-    {w},{h} karos_error "exec Error !!" return fi
-  fi
-  o ${filename}.cimg
-  x "$1 -i "${filename}".cimg $2 -o "${filename}".cimg"
-  if ${} v + e "Status is "${}"." v - {w},{h} karos_error "exec Error !!"
-  else i ${filename}.cimg fi
-  file_rm ${filename}.cimg
-
-#@cli karo_li2st : p1,p2,...,pn
-#@cli : Convert comma separated list to space separated string.
-karo_li2st :
-  v - u "" if $#>=1 ({"'${1--1}'"}) replace. {','},{"' '"} u {t} rm. fi v +
-
-#@cli karo_skeleton : _p1,..,p2n : (-median,0,-inv,0|1,-t,-0.3,-curve,0|1,-corr,0|1,-dlt,1)
-#@cli : Execute use_skeleton (CImg demo) external.
-#@cli : E.G. ... karo_skeleton "-median,5,-inv,1"
-#@cli : For help execute $ use_skeleton -help in shell
-karo_skeleton : v - if $#>0 karo_li2st ${1--1} p=${} else p="" fi v +
-  e "Compute use_skeleton exec with options \'"$p"\' on"$? v -
-  repeat $! l[$>]
-   s={s} if $s>1 s. c fi
-   repeat $! l[$>] karo_xcimg use_skeleton,${p}" -visu 0" mv. 0 k[0] endl done
-   if $s>1 a[-$s--1] c fi
-  endl done v +
-
-#@cli karo_nlmeans : _p1,..,pn=-zoom,1,-ng,0|1,-nu,0|1,-ns,0|1,-p,1,-lambda,-1,-sigma,-1,-alpha,3,-sampling,1
-#@cli : Execute use_nlmeans  (CImg demo) external. (see also q-nlmeans p=4,lambda=4,sigma=10)
-#@cli : For help execute $ use_nlmeans -help in shell
-karo_nlmeans : v - if $#>0 karo_li2st ${1--1} p=${} else p="" fi v +
-  e "Compute use_nlmeans exec with options "${p}" on"$? v -
-  repeat $! l[$>]
-   s={s} if $s>1 s. c fi
-   repeat $! l[$>] karo_xcimg use_nlmeans,${p}" -visu 0" mv. 0 k[0] endl done
-   if $s>1 a[-$s--1] c fi
-  endl done v +
-
 #@cli karo_VST : _inverse(=0)
 #@cli : Variance Stabilizing Transformation
 #@cli : following http://hal.archives-ouvertes.fr/docs/00/51/08/66/PDF/Burst_Hal.pdf
@@ -2246,13 +2319,13 @@ karo_VST :
 #@cli : $ image.jpg +shift -30,-20 pearson_correlation e ${}
 pearson_correlation :
   e[^-1] "Compute pearson-correlation using two-by-two image"$?"."
-  v - repeat int($!/2) l[{$>*2},{$>*2+1}]
+  repeat int($!/2) l[{$>*2},{$>*2+1}]
     +-[0] {0,ia} +-[1] {1,ia} +*[2,3]
     sqr[2,3] #*[2,3]
     r={ia/sqrt({2,ia}*{3,ia})}
     if $>==0 u $r else u ${},$r fi
     rm[2-4]
-  endl done v +
+  endl done
 
 #@cli karo_extinction : _whitevalue[%]
 #@cli : Convert (integer) transmission image into extinction with _whitevalue.
@@ -2263,49 +2336,6 @@ karo_extinction : check "${1=100%}>0"
     if ${-is_percent\ $1} WW={iM*$1} else WW=$1 fi
     c. 1,{iM} /. $WW log10. *. -1
   endl done v +
-
-#@cli karo_rndbit0 :
-#@cli : Randomize in [0..255] (byte) image$? bit level 0. wow randomize numbers to even and odd"
-karo_rndbit0 :
-  e[^-1] "Randomize in [0..255] (byte) image$? bit level 0." v -
-  repeat $! l[$>] and 254 +rand 0,1 round. or endl done v +
-
-#@cli karo_dtpread : filename,_bit0
-#@cli : Read dtp image file format
-#@cli :   (512 byte header, col[22-24] x row[25-27] byte image)
-#@cli : with _bit0 != 0 bit level 1 is extracted as binary mask
-#@cli :   and bit level 1 in the gray image is randomized with karo_rndbit0
-#@cli : Ex.: karo_dtpread Images/Beispiele/tra005.cel,1
-karo_dtpread : check isfile(['{/$1}']) check "${2=0}>=0"
-  e[^-1] "Read dtp image file from "$1"." v -
-  i raw:$1,uchar
-  ({@22-24}) x={t} rm.
-  ({@25-27}) y={t} rm.
-  ({@0-79}) _dtph={t} rm.
-  crop. 0,512,0,{h}
-  resize. $x,$y,1,1,-1
-  if $2
-    +and. 1 karo_rndbit0..
-  fi
-  v +
-
-#@cli _kr_ch2ch : number
-#@cli : return alpha channel mode string from number in status.
-#@cli : Ex. v - repeat 38 _kr_ch2ch \$\> echo_stdout \$\>,\${} done v +
-#@cli : Ex. sp 0 repeat 38 +ac[0] \"blur 2%\",$>,2 _kr_ch2ch $> nm[$>] ${} done
-_kr_ch2ch :
-  if isnum("$1") if isint("$1")
-    mode=${arg\ 1+$1,all,rgba,rgb,rgb_r,rgb_g,rgb_b,\
-rgba_a,lrgb,lrgb_r,lrgb_g,lrgb_b,\
-ycbcr_y,ycbcr_cbcr,ycbcr_cb,ycbcr_cr,ycbcr_cg,\
-lab_l,lab_ab,lab_a,lab_b,\
-lch_ch,lch_c,lch_h,\
-hsv_h,hsv_s,hsv_v,hsi_i,hsl_l,\
-cmyk_c,cmyk_m,cmyk_y,cmyk_k,\
-yiq_y,yiq_iq,\
-ryb,ryb_r,ryb_y,ryb_b}
-    u $mode
-  else u "$1" fi else u "$1" fi
 
 #@cli region_feature : [labelimage],_region_label(1),_feature({wh})
 #@cli : Return feature for a specified region in status.
@@ -2463,47 +2493,6 @@ kr_mean_lch :
  else k[0] fi
  u $_kr_mean_lch
 
-#@cli karo_morpho : action, _kernel(0), _size(5), _ckernel("1,0,1; 0,1,0; 1,0,1")
-#@cli : Mathematical morphology filter
-#@cli : action={0=Ero | 1=Dil | 2=Open | 3=Close | 4=Ori-Ero | 5=Dil-Ori | 6=Ori-Open | 7=Close-Ori | \
-# 8=(Ori*2-(Open+Close))*0.5 | 9=Close-Open}
-#@cli : _kernel={0=Square | 1=Octogon | 2=Circle | 3=Custom}
-#@cli : _size>=2(5)
-#@cli : _ckernel (custom kernel only if _kernel==3)
-#@cli : Derived from D Tschumperle's older fx_morpho (formerly gmic_stdlib) and extended by action 4..9
-#@cli : $ osteo_ k. +karo_morpho 4,3,,"0\,1\,0\;1\,1\,1\;0\,1\,0"
-karo_morpho :
-  skip "${2=0} ${3=5} ${4='1,0,1;0,1,0;1,0,1'}"
-  v - ac=Ero,Dil,Open,Close,"Ori-Ero","Dil-Ori","Ori-Open","Close-Ori","(Ori*2-(Open+Close))*0.5","Close-Open"
-  ke=Square,Octagon,Circle,Custom v +
-  e[^-1] "Math. morph. filter "${arg\ {$1+1},$ac}" with kernel "${arg\ {$2+1},$ke}" and size "$3 v -
-  ({'"$4"'}) f. "(i>=_'0' && i<=_'9') || i==_',' || i==_';'?i:-1" discard. -1 ckernel={t} rm.
-  if $2==0 m "my_erode: erode $""1" m "my_dilate: dilate $""1"
-  elif $2==1 m "my_erode: erode_oct $""1" m "my_dilate: dilate_oct $""1"
-  elif $2==2 m "my_erode: erode_circ $""1" m "my_dilate: dilate_circ $""1"
-  else
-  m "my_erode : ("$ckernel") erode[^-1] . skip $""1"" rm."
-  m "my_dilate : ("$ckernel") dilate[^-1] . skip $""1"" rm."
-  fi
-  if $1==0 m "my_action : my_erode $3"
-  elif $1==1 m "my_action : my_dilate $3"
-  elif $1==2 m "my_action : my_erode $3 my_dilate $3"
-  elif $1==3 m "my_action : my_dilate $3 my_erode $3"
-  elif $1==4 m "my_action : +my_erode $3 -"
-  elif $1==5 m "my_action : +my_dilate $3 rv -"
-  elif $1==6 m "my_action : +my_erode $3 my_dilate. $3 -"
-  elif $1==7 m "my_action : +my_dilate $3 my_erode. $3 rv -"
-  elif $1==8 m "my_action : +my_erode $3 my_dilate. $3 +- rm.. +my_dilate.. $3 my_erode. $3 \
-rv[-1,-3] -[-1,-3] rv - / 2"
-  elif $1==9 m "my_action : +my_erode $3 my_dilate. $3 my_dilate.. $3 my_erode.. $3 -"
-  else m "my_action : +my_dilate $3 my_erode. $3 rv -"
-  fi
-  repeat $! l[$>]
-  my_action[0]
-  endl done
-  uncommand my_erode,my_dilate,my_action
-  v +
-
 #@cli karo_shape_moments
 #@cli : selected image considered as binary or skalar pattern \
 # with pixle values==0 outside the pattern or region and either \
@@ -2586,6 +2575,8 @@ karo_shape_moments_example :
  ellipse. {sm=[$_sm];[sm[1]+0.5,sm[2]+0.5,sm[13]/2,sm[14]/2,(sm[3]<0?sm[3]+pi/2:sm[3])/pi*180]},1,0xf0f0f0f0,255,0,0
  circle.  {sm=[$_sm];[sm[1]+0.5,sm[2]+0.5]},1%,1,255,0,0
  e {sm=[$_karo_shape_moments];sm[40]=(sm[40]<0?sm[40]+pi/2:sm[40])/pi*180;sm[40,4]}
+
+#@cli :: Karo's Test gui utility functions
 
 #@cli fx_karo_mm_diff : _size,_size2,_operation,_shape,_channel,_scale
 #@cli : Compute difference of math. morph. operation with two sizes on selected images.
