@@ -700,45 +700,61 @@ rep_pfrac: rep_popcorn_fractal $*
 #@cli : \ \ \ \ If _mode=1: ... = '_f1=_f4=0','_f2=_f5=1','_f3=_f6=2'\n
 rep_popcorn_fractal:
 skip ${1=50},${2=1},${3=.05},${4=3},${5=1},${6=0},${7=0},${8=0},${9=0},${10=},${11=},${12=},${13=},${14=},${15=}
-if ($6-360*floor($6/360))?1
- fvx=round(((rot_x(xnew,ynew)-osx)*cx_zoom+cxsx)/sx)
- fvy=round(((rot_y(xnew,ynew)-osy)*cy_zoom+cysy)/sy)
-else
- fvx=round(((xnew-osx)*cx_zoom+cxsx)/sx)
- fvy=round(((ynew-osy)*cy_zoom+cysy)/sy)
-fi
+
 channels. 0 f. 0
-eval ${-math_lib}"
- const ww=w-1;
- const hh=h-1;
- const pts=$1;
- const density=1/abs($2);
+
+density={1/abs($2)}
+ww={w-1}
+hh={h-1}
+sd={max(w,h)/min(w,h)}
+sx={w>h?$sd:1}
+sy={w>h?1:$sd}
+cx={$ww/2}
+cy={$hh/2}
+cxsx={$cx*$sx}
+cysy={$cy*$sy}
+zoom={1/$5}
+zcxsx={$zoom/$cxsx}
+zcysy={$zoom/$cysy}
+cx_zoom={$cx/$zoom}
+cy_zoom={$cy/$zoom}
+origin_x={$7*-1*$zoom}
+origin_y={$8*$zoom}
+osx={$origin_x*$sx}
+osy={$origin_y*$sy}
+
+
+{int(w/$density)},{int(h/$density)},1,2,"
+begin(
+const density="$density";
+const cx="$cx";
+const cy="$cy";
+const zoom="$zoom";
+const zcxsx="$zcxsx";
+const zcysy="$zcysy";
+const origin_x="$origin_x";
+const origin_y="$origin_y";
+const ang=($6/180)*pi;
+const cos_ang=cos(ang);
+const sin_ang=sin(ang);
+rot_x(a,b)=a*cos_ang-b*sin_ang;
+rot_y(a,b)=a*sin_ang+b*cos_ang;
+);
+ix=x*density;
+iy=y*density;
+xx=(ix-cx)*zcxsx;
+yy=(iy-cy)*zcysy;
+nxx=rot_x(xx,yy)+origin_x;
+nyy=rot_y(xx,yy)+origin_y;
+[nxx,nyy];
+"
+
+100%,100%,$1,2
+
+repeat $1
+ f.. "begin(
  const H=$3;
  const K=$4;
- const zoom=1/$5;
- const ang=($6/180)*pi;
- const origin_x=$7*-1*zoom;
- const origin_y=$8*zoom;
- const sd=max(w,h)/min(w,h);
- const sx=w>h?sd:1;
- const sy=w>h?1:sd;
- const cx=w/2;
- const cy=h/2;
- const osx=origin_x*sx;
- const osy=origin_y*sy;
- const cx_zoom=cx/zoom;
- const cy_zoom=cy/zoom;
- const cxsx=cx*sx;
- const cysy=cy*sy;
- const zcxsx=zoom/cxsx;
- const zcysy=zoom/cysy;
- const cos_ang=cos(ang);
- const sin_ang=sin(ang);
- const total_pts=wh*pts*$2;
- rot_x(a,b)=a*cos_ang-b*sin_ang;
- rot_y(a,b)=a*sin_ang+b*cos_ang;
- count=0;
- np=0;
  if($9,
   if(narg($10),
    if(($10%4)==0,func_a(a)=sin(a);,
@@ -906,23 +922,48 @@ eval ${-math_lib}"
   popcorn_x(a,b)=a-H*func_a(b+func_b(K*b));
   popcorn_y(a,b)=b-H*func_c(a+func_d(K*a));
  );
- for(iy=0,iy<h,iy+=density,
-  tziy_cy=(iy-cy)*zcysy+origin_y;
-  for(ix=0,ix<w,ix+=density,
-   xx=(ix-cx)*zcxsx+origin_x;
-   yy=tziy_cy;
-   for(ptn=0,ptn<pts,ptn++,
-    xnew=popcorn_x(xx,yy);
-    ynew=popcorn_y(xx,yy);
-    xval="$fvx";
-    yval="$fvy";
-    if(inrange(xval,0,ww,1)&&inrange(yval,0,hh,1),i(xval,yval,0,0)++;);
-    xx=xnew;
-    yy=ynew;
+ );
+ [popcorn_x(i0,i1),popcorn_y(i0,i1)]
+ "
+ j. ..,0,0,$>
+done
+
+rm..
+
+f. "begin(
+ const cx_zoom="$cx_zoom";
+ const cy_zoom="$cy_zoom";
+ const osx="$osx";
+ const osy="$osy";
+ const sx="$sx";
+ const sy="$sy";
+ const cxsx="$cxsx";
+ const cysy="$cysy";
+);
+[round(((i0-osx)*cx_zoom+cxsx)/sx),round(((i1-osy)*cy_zoom+cysy)/sy)]
+"
+
+sh. 0
+sh.. 1
+
+eval ${-math_lib}"
+begin(
+ const ww="$ww";
+ const hh="$hh";
+);
+for(px=0,px<w,px++,
+ for(py=0,py<h,py++,
+  for(pz=0,pz<d,pz++,
+   cx=i(#-2,px,py,pz);
+   cy=i(#-1,px,py,pz);
+   if((cx>=0&&cx<w)&&(cy>=0&&cy<h),
+    i(#-4,cx,cy)++;
    );
   );
  );
+);
 "
+rm[-3--1]
 #@cli rep_x_graphical_tiling: [Images],_insertion_rate,_back_r,_back_g,_back_b
 #@cli : Launch the interactive graphical tiling window.\n
 #@cli : Details: The main purpose of this filter is to stimulate graphical tiling glitch observed in older operating system and computers. However, you can also use it to tile images by hand to artistic purpose.\n
@@ -1409,8 +1450,8 @@ fi
 #@cli : '_trackpadcol' defines the color of tracker pad within interactive window. Only grayscale value.\n
 #@cli : Default values: '_tileset_iw_width=16','_tileset_ih_width=16','_filename=""','_preserve_bgout=0','_drgba_r=','_drgba_g=','_drgba_b=','_gridcol=0','_trackpadcol=0'\n
 #@cli : Author: Reptorian
-#@cli : $ 640,480,1,4 rep_tileset_n generic_platform rep_tiler_n[0] [-1],32,3,16,16,,0,,,,0,0
-#@cli : $ 640,480,1,4 rep_tiler_n[0] tile.png,16,1
+##@cli : $ 640,480,1,4 rep_tileset_n generic_platform rep_tiler_n[0] [-1],32,3,16,16,,0,,,,0,0
+##@cli : $ 640,480,1,4 rep_tiler_n[0] tile.png,16,1
 rep_tiler_nonisometric:
 skip ${4=16},${5=16},${6=},${7=0},${8=},${9=},${10=},${11=0},${12=50}
 include_tileset_image=${"is_image_arg $1"}
