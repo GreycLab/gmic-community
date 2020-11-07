@@ -2957,7 +2957,41 @@ if $4<0||$4>7 error "0<="$"4<=7=F" fi
 if narg($5) if $5<0||$5>7 error "0<="$"5<=7=F" fi fi
 if $6<0||$6>1 error "0<="$"6<=1=f" fi
 
-if $12>0 r2dx 200%,1 fi
+if $4==0 mode_1=(cos(v*(2*pi)-pi)+1)/2
+elif $4==1 mode_1=abs(cos(v*pi+pi/2))
+elif $4==2 mode_1=sqrt(1-(abs(v-.5)*2)^2)
+elif $4==3 mode_1=(1-(abs(v-.5)*2)^2)^(1/(2+(1-v)))
+elif $4==4 mode_1=cos(v*pi)*boundary
+elif $4==5 mode_1=(cos(v*pi)*-1)*boundary
+elif $4==6 mode_1=1-abs(v-.5)*2
+elif $4==7 mode_1=(r=(1-abs(v-.5)*2)*2;r>1?1:r)
+fi
+
+if narg($5)
+ if $5==0 mode_2=(cos(v*(2*pi)-pi)+1)/2
+ elif $5==1 mode_2=abs(cos(v*pi+pi/2))
+ elif $5==2 mode_2=sqrt(1-(abs(v-.5)*2)^2)
+ elif $5==3 mode_2=(1-(abs(v-.5)*2)^2)^(1/(2+(1-v)))
+ elif $5==4 mode_2=cos(v*pi)*boundary
+ elif $5==5 mode_2=(cos(v*pi)*-1)*boundary
+ elif $5==6 mode_2=1-abs(v-.5)*2
+ elif $5==7 mode_2=(r=(1-abs(v-.5)*2)*2;r>1?1:r)
+ fi
+fi
+
+include_alp_cut={$10&&(s==2||s>3)}
+
+if $include_alp_cut 
+ vnull=[vectors(0)]
+ outcolor=vnull
+else outcolor=I
+fi
+
+if $12>0 boundary=avg(bndcut(radial_gradient_v[0]),bndcut(radial_gradient_v[1]),bndcut(radial_gradient_v[2]),bndcut(radial_gradient_v[3]))
+calc_antialias=ox=sur_x(start_x(x+.5));oy=sur_y(start_y(y+.5));radial_gradient_v=[nm(sqrt(sqr(xx)+sqr(yy))),nm(sqrt(sqr(ox)+sqr(yy))),nm(sqrt(sqr(xx)+sqr(oy))),nm(sqrt(sqr(ox)+sqr(oy)))];
+else boundary=bndcut(radial_gradient)
+fi
+
 f "
 begin(
  boundary=0;
@@ -2975,6 +3009,9 @@ begin(
  const offx=cx*$7*-1;
  const offy=cy*$8;
  const eps=10^-10;
+ 
+ const interpolation=abs($12)?2:0;
+ const outboundary=$13;
 
  vallim_x(v)=v-ww*floor(v/(ww+eps));
  vallim_y(v)=v-hh*floor(v/(hh+eps));
@@ -2989,96 +3026,54 @@ begin(
 
  const torus_val_1=$1;
  const torus_val_2=$2;
- new_min=min(torus_val_1,torus_val_2);
- new_max=max(torus_val_1,torus_val_2);
- nm(v)=(v-new_min)*(1/(new_max-new_min));
- limcut(v)=v>1?1:(v<0?0:v);
+ const new_min=min(torus_val_1,torus_val_2);
+ const new_max=max(torus_val_1,torus_val_2);
+ const end_diff=(1/(new_max-new_min));
+ nm(v)=(v-new_min)*end_diff;
+ limcut(v)=max(min(1,v),0);
  bndcut(v)=v>1||v<0?0:1;
 
- const maxang=$3*-1;
+ const iang=$3*-1;
  ang2rad(v)=pi*(v/180);
- rot_x(a,b,c)=a*cos(ang2rad(c))-b*sin(ang2rad(c));
- rot_y(a,b,c)=a*sin(ang2rad(c))+b*cos(ang2rad(c));
+ const maxang=ang2rad(iang);
+ rot_x(a,b,c)=a*cos(c)-b*sin(c);
+ rot_y(a,b,c)=a*sin(c)+b*cos(c);
 
  sur_x(v)=(v/ww-.5)*2*sx;
  sur_y(v)=(v/hh-.5)*2*sy;
  unsur_x(v)=(v/(2*sx)+.5)*ww;
  unsur_y(v)=(v/(2*sy)+.5)*hh;
 
- softmode(v)=(cos(v*(2*pi)-pi)+1)/2;
- midmode(v)=abs(cos(v*pi+pi/2));
- hardmode(v)=sqrt(1-(abs(v-.5)*2)^2);
- hardmode_alt(v)=(1-(abs(v-.5)*2)^2)^(1/(2+(1-v)));
- distroymode(v)=cos(v*pi)*boundary;
- invdistroymode(v)=(cos(v*pi)*-1)*boundary;
- quadextrudemode(v)=1-abs(v-.5)*2;
- hexextrudemode(v)=(r=(1-abs(v-.5)*2)*2;r>1?1:r);
-
-  if($4==0,mode_1(v)=softmode(v);
- ,if($4==1,mode_1(v)=midmode(v);
- ,if($4==2,mode_1(v)=hardmode(v);
- ,if($4==3,mode_1(v)=hardmode_alt(v);
- ,if($4==4,mode_1(v)=distroymode(v);
- ,if($4==5,mode_1(v)=invdistroymode(v);
- ,if($4==6,mode_1(v)=quadextrudemode(v);
- ,if($4==7,mode_1(v)=hexextrudemode(v);
- );
- );
- );
- );
- );
- );
- );
- );
-
  if(narg($5),
 
-   if($5==0,mode_2(v)=softmode(v);
-  ,if($5==1,mode_2(v)=midmode(v);
-  ,if($5==2,mode_2(v)=hardmode(v);
-  ,if($5==3,mode_2(v)=hardmode_alt(v);
-  ,if($5==4,mode_2(v)=distroymode(v);
-  ,if($5==5,mode_2(v)=invdistroymode(v);
-  ,if($5==6,mode_2(v)=quadextrudemode(v);
-  ,if($5==7,mode_2(v)=hexextrudemode(v);
-  );
-  );
-  );
-  );
-  );
-  );
-  );
-  );
-
   if($6==0||$6==1
-  ,if($6,mode(v)=mode_2(v);,mode(v)=mode_1(v););
-  ,mode(v)=$6*mode_2(v)+(1-$6)*mode_1(v);
+  ,if($6,mode(v)="$mode_2";,mode(v)="$mode_1";);
+  ,mode(v)=lerp("$mode_1","$mode_2",$6);
   );
  ,
-  mode(v)=mode_1(v);
+  mode(v)="$mode_1";
  );
 
- if($10&&(s==2||s>3)
-  ,out(a,b)=[vectors_id(J(a,b,z,abs($12)?2:0,$13)),j(a,b,z,s_id,abs($12)?2:0,$13)*boundary]
-  ,out(a,b)=J(a,b,z,abs($12)?2:0,$13);
+ if("$include_alp_cut"
+  ,out(a,b)=[vectors_id(J(a,b,z,interpolation,$13)),j(a,b,z,s_id,0,outboundary)*boundary];vnull="$vnull";
+  ,out(a,b)=lerp(I,J(a,b,z,interpolation,outboundary),boundary);
  );
 );
-xx=start_x(x);
-yy=start_y(y);
-xx=sur_x(xx);
-yy=sur_y(yy);
-radial_gradient=nm(sqrt(xx^2+yy^2));
+nxx=start_x(x);
+nyy=start_y(y);
+xx=sur_x(nxx);
+yy=sur_y(nyy);
+"$calc_antialias"
+radial_gradient=nm(sqrt(sqr(xx)+sqr(yy)));
 norm_gradient=limcut(radial_gradient);
-boundary=bndcut(radial_gradient);
+boundary="$boundary";
 z_depth=mode(norm_gradient)*maxang;
 XX=rot_x(xx,yy,z_depth);
 YY=rot_y(xx,yy,z_depth);
 XX=unsur_x(XX);
 YY=unsur_y(YY);
-xx=unsur_x(xx);
-yy=unsur_y(yy);
-diff_x=XX-xx;
-diff_y=YY-yy;
+diff_x=XX-nxx;
+diff_y=YY-nyy;
 out(diff_x,diff_y);
 "
 
@@ -3091,8 +3086,6 @@ if $11&&$10
   fi
  endl done
 fi
-
-if $12>0 r2dx 50%,3 fi
 #@cli rep_pxpush: eq. to 'rep_pixel_push' : (+)
 rep_pxpush: rep_pixel_push $*
 #@cli rep_pixel_push: -1<=_push_x<=1,-1<=_push_y<=1
