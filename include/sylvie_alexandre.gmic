@@ -21986,6 +21986,216 @@ samj_rien_various :
 ####     #@gui :_=note("7 \303\277   ÿ   )
 #################################################
 ##                                             ##
+##             samj_montage_row                ##
+##                                             ##
+#################################################
+
+##### exemples
+## gmic repeat 10 sample done samj_montage_row 1,3800,4,10,0 o 1montage.jpg
+## gmic repeat 10 sample done samj_montage_row 1,3800,4,10,1 o 2montage.jpg
+## gmic repeat 10 sample done samj_montage_row 2,3800,4,10,0 o 3montage.jpg
+## gmic repeat 10 sample done samj_montage_row 2,3800,4,10,1 o 4montage.jpg
+## gmic repeat 10 sample done samj_montage_row 3,3800,4,10,0 o 5montage.jpg
+## gmic repeat 10 sample done samj_montage_row 3,3800,4,10,1 o 6montage.jpg
+
+#### variables
+## $1 = Type_Proportions_Finales -> 1=Conserver proportions grandeurs en pixels images à assembler 2=Montage classique 3=Respect des Contours et Padding | autres valeurs=Montage classique sans Contours et Padding
+## $2 = LargeurRow -> Largeur de l'image
+## $3 = Contour Largeur
+## $4 = Padding Largeur
+## $5 = Rotation 90° images à assembler -> 1=oui 0=non
+
+samj_montage_row :
+Type_Proportions_Finales=$1
+LargeurRow=$2
+Contour=$3
+Padding=$4
+Rotation=$5
+
+to_rgb
+if $Rotation==1 permute yxzc mirror x endif
+NbImg=$!
+
+if $Type_Proportions_Finales==1
+	Index=0
+	Hmax=0
+	Wmax=0
+	Htot=0
+	Wtot=0
+	repeat $NbImg
+		Index={$Index-1}
+		Htemp={h(#$Index)}
+		Htot={$Htot+$Htemp}
+		if $Htemp>$Hmax
+			Hmax=$Htemp
+		endif
+		Wtemp={w(#$Index)}
+		Wtot={$Wtot+$Wtemp}
+		if $Wtemp>$Wmax
+			Wmax=$Wtemp
+		endif
+	done
+
+	ContourTot={$NbImg*$Contour*2}
+	PaddingTot={$NbImg*$Padding*2}
+	LargeurImages={$LargeurRow-$ContourTot-$PaddingTot}
+	Echelle={$LargeurImages/$Wtot}
+	Index=0
+	repeat $NbImg
+		Index={$Index-1}
+		Htemp={h(#$Index)}
+		Wtemp={w(#$Index)}
+		resize[$Index] {$Wtemp*$Echelle},{$Htemp*$Echelle}
+		if $Contour>0 frame_xy[$Index] $Contour,$Contour,0 endif
+		if $Padding>0 frame_xy[$Index] $Padding,$Padding,255 endif
+	done
+
+	Index=0
+	Hmaxmontage=0
+	Wmaxmontage=0
+	repeat $NbImg
+		Index={$Index-1}
+		Htemp={h(#$Index)}
+		if $Htemp>$Hmaxmontage
+			Hmaxmontage=$Htemp
+		endif
+		Wtemp={w(#$Index)}
+		Wmaxmontage={$Wmaxmontage+$Wtemp}
+	done
+
+	Index=0
+	repeat $NbImg
+		Index={$Index-1}
+		Htemp={h(#$Index)}
+		Wtemp={w(#$Index)}
+		expand_y[$Index] {{$Hmaxmontage-$Htemp}/2},1
+	done
+
+	append x
+
+	Erreur={{w}-$LargeurRow}
+	if $Erreur>0
+		crop 0,0,{$LargeurRow-1},{{h}-1}
+	elif $Erreur<0
+		expand_x {-$Erreur-1},1
+	endif
+	if {{w}!=$LargeurRow} resize $LargeurRow,{{h}/{w}*$LargeurRow},1,3 endif # gestion d'erreur à voir...
+
+elif $Type_Proportions_Finales==2
+	Index=0
+	repeat $NbImg
+		Index={$Index-1}
+		if $Contour>0 frame_xy[$Index] $Contour,$Contour,0 endif
+		if $Padding>0 frame_xy[$Index] $Padding,$Padding,255 endif
+	done
+	montage H
+	resize $LargeurRow,{{h}/{w}*$LargeurRow},1,3
+
+elif $Type_Proportions_Finales==3
+	Index=0
+	Hmax=0
+	Wmax=0
+	repeat $NbImg
+		Index={$Index-1}
+		Htemp={h(#$Index)}
+		if $Htemp>$Hmax
+			Hmax=$Htemp
+		endif
+		Wtemp={w(#$Index)}
+		if $Wtemp>$Wmax
+			Wmax=$Wtemp
+		endif
+	done
+
+	Index=0
+	Htot=0
+	Wtot=0
+	repeat $NbImg
+		Index={$Index-1}
+		Htemp={h(#$Index)}
+		Wtemp={w(#$Index)}
+		resize[$Index] {$Wtemp/$Htemp*$Hmax},$Hmax,1,3
+	done
+
+	# idem Type_Proportions_Finales==1 à optimiser un jour...
+	Index=0
+	Hmax=0
+	Wmax=0
+	Htot=0
+	Wtot=0
+	repeat $NbImg
+		Index={$Index-1}
+		Htemp={h(#$Index)}
+		Htot={$Htot+$Htemp}
+		if $Htemp>$Hmax
+			Hmax=$Htemp
+		endif
+		Wtemp={w(#$Index)}
+		Wtot={$Wtot+$Wtemp}
+		if $Wtemp>$Wmax
+			Wmax=$Wtemp
+		endif
+	done
+
+	ContourTot={$NbImg*$Contour*2}
+	PaddingTot={$NbImg*$Padding*2}
+	LargeurImages={$LargeurRow-$ContourTot-$PaddingTot}
+	Echelle={$LargeurImages/$Wtot}
+	Index=0
+	repeat $NbImg
+		Index={$Index-1}
+		Htemp={h(#$Index)}
+		Wtemp={w(#$Index)}
+		resize[$Index] {$Wtemp*$Echelle},{$Htemp*$Echelle}
+		if $Contour>0 frame_xy[$Index] $Contour,$Contour,0 endif
+		if $Padding>0 frame_xy[$Index] $Padding,$Padding,255 endif
+	done
+
+	Index=0
+	Hmaxmontage=0
+	Wmaxmontage=0
+	repeat $NbImg
+		Index={$Index-1}
+		Htemp={h(#$Index)}
+		if $Htemp>$Hmaxmontage
+			Hmaxmontage=$Htemp
+		endif
+		Wtemp={w(#$Index)}
+		Wmaxmontage={$Wmaxmontage+$Wtemp}
+	done
+
+	Index=0
+	repeat $NbImg
+		Index={$Index-1}
+		Htemp={h(#$Index)}
+		Wtemp={w(#$Index)}
+		expand_y[$Index] {{$Hmaxmontage-$Htemp}/2},1
+	done
+
+	append x
+
+	Erreur={{w}-$LargeurRow}
+	if $Erreur>0
+		crop 0,0,{$LargeurRow-1},{{h}-1}
+	elif $Erreur<0
+		expand_x {-$Erreur-1},1
+	endif
+	if {{w}!=$LargeurRow} resize $LargeurRow,{{h}/{w}*$LargeurRow},1,3 endif # gestion d'erreur à voir...
+
+else
+	montage H
+	resize $LargeurRow,{{h}/{w}*$LargeurRow},1,3
+endif
+
+to_rgb
+
+#################################################
+##                                             ##
+##            FIN samj_montage_row             ##
+##                                             ##
+#################################################
+#################################################
+##                                             ##
 ##        samj_paulmatth_montage_row           ##
 ##                                             ##
 #################################################
