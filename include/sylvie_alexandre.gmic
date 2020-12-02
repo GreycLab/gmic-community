@@ -36,7 +36,7 @@
 #@gui :_=link("https://github.com/dtschump/gmic-community","https://github.com/dtschump/gmic-community")
 #@gui :_=note("Les filtres contenus dans ce répertoire sont majoritairement traduits en français et/ou en cours de développement.")
 #@gui :_=note("The filters included in this directory are mostly translated into French and/or experimental.")
-#@gui :_=note("Version 2020/12/01 GMIC 2.9.4")
+#@gui :_=note("Version 2020/12/02 GMIC 2.9.4")
 
 samj_about :
 
@@ -21990,23 +21990,23 @@ samj_rien_various :
 ##                                             ##
 #################################################
 
+# 20201202 simplification à 2 "Type_Proportions_Finales" , ajout Pivoter_En_Colonne et modification expand
 # 20201201 ajout de variables crées dynamiquement ( NewW$AbsInd et NewH$AbsInd ) pour éviter un resize inutile dans $Type_Proportions_Finales==3
 # 20201130 origine
 
 ##### exemples
-## gmic repeat 10 sample done samj_montage_row 1,3800,4,10,0 o 1montage.jpg
-## gmic repeat 10 sample done samj_montage_row 1,3800,4,10,1 o 2montage.jpg
-## gmic repeat 10 sample done samj_montage_row 2,3800,4,10,0 o 3montage.jpg
-## gmic repeat 10 sample done samj_montage_row 2,3800,4,10,1 o 4montage.jpg
-## gmic repeat 10 sample done samj_montage_row 3,3800,4,10,0 o 5montage.jpg
-## gmic repeat 10 sample done samj_montage_row 3,3800,4,10,1 o 6montage.jpg
+## gmic repeat 10 sample done samj_montage_row 0,3800,4,10,0,0 o 1montage.jpg
+## gmic repeat 10 sample done samj_montage_row 0,3800,4,10,1,1 o 2montage.jpg
+## gmic repeat 10 sample done samj_montage_row 1,3800,4,10,0,0 o 3montage.jpg
+## gmic repeat 10 sample done samj_montage_row 1,3800,4,10,1,1 o 4montage.jpg
 
 #### variables
-## $1 = Type_Proportions_Finales -> 1=Conserver proportions grandeurs en pixels images à assembler 2=Montage classique 3=Respect des Contours et Padding | autres valeurs=Montage classique sans Contours et Padding
+## $1 = Type_Proportions_Finales -> 0=Conserver proportions grandeurs en pixels images à assembler | 1=Images sur toute la hauteur.
 ## $2 = LargeurRow -> Largeur de l'image
-## $3 = Contour Largeur
-## $4 = Padding Largeur
-## $5 = Rotation 90° images à assembler -> 1=oui 0=non
+## $3 = Contour Largeur -> de 0 (sans) à ...
+## $4 = Padding Largeur -> de 0 (sans) à ...
+## $5 = Rotation 90° images à assembler -> 1=oui
+## $6 = Rotation 90° de l'ensemble pour créer une colonne -> 1=oui
 
 samj_montage_row :
 Type_Proportions_Finales=$1
@@ -22014,17 +22014,19 @@ LargeurRow=$2
 Contour=$3
 Padding=$4
 Rotation=$5
+Pivoter_En_Colonne=$6
 
 to_rgb
 if $Rotation==1 permute yxzc mirror x endif
 NbImg=$!
 
-if $Type_Proportions_Finales==1
+if $Type_Proportions_Finales==0
 	Index=0
 	Hmax=0
 	Wmax=0
 	Htot=0
 	Wtot=0
+	# trouver la somme Wtot et Htot
 	repeat $NbImg
 		Index={$Index-1}
 		Htemp={h(#$Index)}
@@ -22044,6 +22046,7 @@ if $Type_Proportions_Finales==1
 	LargeurImages={$LargeurRow-$ContourTot-$PaddingTot}
 	Echelle={$LargeurImages/$Wtot}
 	Index=0
+	# resize aux dimensions finales des images
 	repeat $NbImg
 		Index={$Index-1}
 		Htemp={h(#$Index)}
@@ -22053,48 +22056,7 @@ if $Type_Proportions_Finales==1
 		if $Padding>0 frame_xy[$Index] $Padding,$Padding,255 endif
 	done
 
-	Index=0
-	Hmaxmontage=0
-	Wmaxmontage=0
-	repeat $NbImg
-		Index={$Index-1}
-		Htemp={h(#$Index)}
-		if $Htemp>$Hmaxmontage
-			Hmaxmontage=$Htemp
-		endif
-		Wtemp={w(#$Index)}
-		Wmaxmontage={$Wmaxmontage+$Wtemp}
-	done
-
-	Index=0
-	repeat $NbImg
-		Index={$Index-1}
-		Htemp={h(#$Index)}
-		Wtemp={w(#$Index)}
-		expand_y[$Index] {{$Hmaxmontage-$Htemp}/2},1
-	done
-
-	append x
-
-	Erreur={{w}-$LargeurRow}
-	if $Erreur>0
-		crop 0,0,{$LargeurRow-1},{{h}-1}
-	elif $Erreur<0
-		expand_x {-$Erreur-1},1
-	endif
-	if {{w}!=$LargeurRow} resize $LargeurRow,{{h}/{w}*$LargeurRow},1,3 endif # gestion d'erreur à voir...
-
-elif $Type_Proportions_Finales==2
-	Index=0
-	repeat $NbImg
-		Index={$Index-1}
-		if $Contour>0 frame_xy[$Index] $Contour,$Contour,0 endif
-		if $Padding>0 frame_xy[$Index] $Padding,$Padding,255 endif
-	done
-	montage H
-	resize $LargeurRow,{{h}/{w}*$LargeurRow},1,3
-
-elif $Type_Proportions_Finales==3
+else
 	Index=0
 	Hmax=0
 	Wmax=0
@@ -22161,44 +22123,51 @@ elif $Type_Proportions_Finales==3
 		if $Padding>0 frame_xy[$Index] $Padding,$Padding,255 endif
 	done
 
-	Index=0
-	Hmaxmontage=0
-	Wmaxmontage=0
-	repeat $NbImg
-		Index={$Index-1}
-		Htemp={h(#$Index)}
-		if $Htemp>$Hmaxmontage
-			Hmaxmontage=$Htemp
-		endif
-		Wtemp={w(#$Index)}
-		Wmaxmontage={$Wmaxmontage+$Wtemp}
-	done
-
-	Index=0
-	repeat $NbImg
-		Index={$Index-1}
-		Htemp={h(#$Index)}
-		Wtemp={w(#$Index)}
-		expand_y[$Index] {{$Hmaxmontage-$Htemp}/2},1
-	done
-
-	append x
-
-	Erreur={{w}-$LargeurRow}
-	if $Erreur>0
-		crop 0,0,{$LargeurRow-1},{{h}-1}
-	elif $Erreur<0
-		expand_x {-$Erreur-1},1
-	endif
- ########## gestion d'erreur avec expand_x ???  à voir... => ligne ci-dessous avec un resize => vérifier cette commande expand_x.
-	if {{w}!=$LargeurRow} resize $LargeurRow,{{h}/{w}*$LargeurRow},1,3 endif
-
-else
-	montage H
-	resize $LargeurRow,{{h}/{w}*$LargeurRow},1,3
 endif
 
+Index=0
+Hmaxmontage=0
+Wmaxmontage=0
+repeat $NbImg
+	Index={$Index-1}
+	Htemp={h(#$Index)}
+	if $Htemp>$Hmaxmontage
+		Hmaxmontage=$Htemp
+	endif
+	Wtemp={w(#$Index)}
+	Wmaxmontage={$Wmaxmontage+$Wtemp}
+done
+
+Index=0
+repeat $NbImg
+	Index={$Index-1}
+	Htemp={h(#$Index)}
+	Wtemp={w(#$Index)}
+	expand_y[$Index] {{$Hmaxmontage-$Htemp}/2},0
+	rectangle[$Index] 0,0,$Wtemp,{{$Hmaxmontage-$Htemp}/2},1,255,255,255
+	mirror[$Index] y
+	rectangle[$Index] 0,0,$Wtemp,{{$Hmaxmontage-$Htemp}/2},1,255,255,255
+	mirror[$Index] y
+done
+
+append x
+
+Erreur={{w}-$LargeurRow}
+if $Erreur>0
+	crop 0,0,{$LargeurRow-1},{{h}-1}
+elif $Erreur<0
+	expand_x {-$Erreur-1},0
+	rectangle 0,0,{-$Erreur-1},{h},1,255,255,255
+	mirror x
+	rectangle 0,0,{-$Erreur-1},{h},1,255,255,255
+	mirror x
+endif
+########## gestion d'erreur avec expand_x ???  à voir... => ligne ci-dessous avec un resize => vérifier cette commande expand_x.
+if {{w}!=$LargeurRow} resize $LargeurRow,{{h}/{w}*$LargeurRow},1,3 endif
+
 to_rgb
+
+if $Pivoter_En_Colonne==1 rotate 270,2,0 endif
 
 #################################################
 ##                                             ##
