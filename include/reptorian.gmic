@@ -700,53 +700,43 @@ rep_pfrac: rep_popcorn_fractal $*
 #@cli : \ \ \ \ If _mode=1: ... = '_f1=_f4=0','_f2=_f5=1','_f3=_f6=2'\n
 rep_popcorn_fractal:
 skip ${1=50},${2=1},${3=.05},${4=3},${5=1},${6=0},${7=0},${8=0},${9=0},${10=},${11=},${12=},${13=},${14=},${15=}
-
-channels. 0 f. 0
+if ($6-360*floor($6/360))?1
+ fvx="((rot_x(xnew,ynew)-osx)*cx_zoom+cxsx)/sx"
+ fvy="((rot_y(xnew,ynew)-osy)*cy_zoom+cysy)/sy"
+else
+ fvx="((xnew-osx)*cx_zoom+cxsx)/sx"
+ fvy="((ynew-osy)*cy_zoom+cysy)/sy"
+fi
 
 density={1/abs($2)}
-ww={w-1}
-hh={h-1}
-sd={max(w,h)/min(w,h)}
-sx={w>h?$sd:1}
-sy={w>h?1:$sd}
-cx={$ww/2}
-cy={$hh/2}
-cxsx={$cx*$sx}
-cysy={$cy*$sy}
-zoom={1/$5}
-zcxsx={$zoom/$cxsx}
-zcysy={$zoom/$cysy}
-cx_zoom={$cx/$zoom}
-cy_zoom={$cy/$zoom}
-origin_x={$7*-1*$zoom}
-origin_y={$8*$zoom}
-osx={$origin_x*$sx}
-osy={$origin_y*$sy}
 
-{int(w/$density)},{int(h/$density)},1,2,"
-begin(
-const density="$density";
-const cx="$cx";
-const cy="$cy";
-const zoom="$zoom";
-const zcxsx="$zcxsx";
-const zcysy="$zcysy";
-const origin_x="$origin_x";
-const origin_y="$origin_y";
-);
-ix=x*density;
-iy=y*density;
-xx=(ix-cx)*zcxsx+origin_x;
-yy=(iy-cy)*zcysy+origin_y;
-[xx,yy]
-"
-
-100%,100%,$1,2
-
-repeat $1
- f.. "begin(
+{int(w/$density)},{int(h/$density)},1,{int($1)*2},"begin(
+ const pts=$1;
+ const density=1/abs($2);
  const H=$3;
  const K=$4;
+ const zoom=1/$5;
+ const ang=($6/180)*pi;
+ const origin_x=$7*-1*zoom;
+ const origin_y=$8*zoom;
+ const sd=max(w,h)/min(w,h);
+ const sx=w>h?sd:1;
+ const sy=w>h?1:sd;
+ const cx=w/2;
+ const cy=h/2;
+ const osx=origin_x*sx;
+ const osy=origin_y*sy;
+ const cx_zoom=cx/zoom;
+ const cy_zoom=cy/zoom;
+ const cxsx=cx*sx;
+ const cysy=cy*sy;
+ const cos_ang=cos(ang);
+ const sin_ang=sin(ang);
+ const angcondition=($6-360*floor($6/360))?1;
+ const total_pts=wh*pts*$2;
+ rot_x(a,b)=a*cos_ang-b*sin_ang;
+ rot_y(a,b)=a*sin_ang+b*cos_ang;
+ output=vectors(0);
  if($9,
   if(narg($10),
    if(($10%4)==0,func_a(a)=sin(a);,
@@ -844,8 +834,8 @@ repeat $1
   );
   );
   );
-  popcorn_x(a,b)=(Kb=K*b;a-H*func_a(b+func_b(Kb+func_c(Kb))));
-  popcorn_y(a,b)=(Ka=K*a;b-H*func_d(a+func_e(Ka+func_f(Ka))));
+  popcorn_x(a,b)=a-H*func_a(b+func_b(K*b+func_c(K*b)));
+  popcorn_y(a,b)=b-H*func_d(a+func_e(K*a+func_f(K*a)));
  ,
   if(narg($10),
    if(($10%4)==0,func_a(a)=sin(a);,
@@ -915,39 +905,27 @@ repeat $1
   popcorn_y(a,b)=b-H*func_c(a+func_d(K*a));
  );
  );
- [popcorn_x(i0,i1),popcorn_y(i0,i1)]
- "
- j. ..,0,0,$>
-done
-
-rm..
-
-if ($6-360*floor($6/360))?1
- fvx=round(((rot_x(i0,i1)-osx)*cx_zoom+cxsx)/sx)
- fvy=round(((rot_y(i0,i1)-osy)*cy_zoom+cysy)/sy)
-else
- fvx=round(((i0-osx)*cx_zoom+cxsx)/sx)
- fvy=round(((i1-osy)*cy_zoom+cysy)/sy)
-fi
-
-f. "begin(
- const cx_zoom="$cx_zoom";
- const cy_zoom="$cy_zoom";
- const osx="$osx";
- const osy="$osy";
- const sx="$sx";
- const sy="$sy";
- const cxsx="$cxsx";
- const cysy="$cysy";
- const ang=($6/180)*pi;
- const cos_ang=cos(ang);
- const sin_ang=sin(ang);
- rot_x(a,b)=a*cos_ang-b*sin_ang;
- rot_y(a,b)=a*sin_ang+b*cos_ang;
-);
-["$fvx","$fvy"];
+ xx=zoom*(x-cx)/cx;
+ yy=zoom*(y-cy)/cy;
+ xx*=sx;
+ yy*=sy;
+ xx+=origin_x;
+ yy+=origin_y;
+ for(ptn=0,ptn<pts,ptn++,
+    xnew=popcorn_x(xx,yy);
+    ynew=popcorn_y(xx,yy);
+    xval="$fvx";
+    yval="$fvy";
+    xpos=round(xval);
+    ypos=round(yval);
+    output[ptn*2]=xpos;
+    output[ptn*2+1]=ypos;
+    xx=xnew;
+    yy=ynew;
+ );
+ [output];
 "
-
+l. s c,-2 a z endl
 eval. "++i(#-2,[I,0])"
 rm.
 #@cli rep_x_graphical_tiling: [Images],_insertion_rate,_back_r,_back_g,_back_b
