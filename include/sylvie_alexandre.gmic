@@ -36,7 +36,7 @@
 #@gui :_=link("https://github.com/dtschump/gmic-community","https://github.com/dtschump/gmic-community")
 #@gui :_=note("Les filtres contenus dans ce répertoire sont majoritairement traduits en français et/ou en cours de développement.")
 #@gui :_=note("The filters included in this directory are mostly translated into French and/or experimental.")
-#@gui :_=note("Version 2020/12/06 GMIC 2.9.4")
+#@gui :_=note("Version 2020/12/07 GMIC 2.9.4")
 
 samj_about :
 
@@ -90,6 +90,178 @@ samj_rien_arrays_and_tiles :
  Je_passe_l_hiver_en_Floride[-1]
 
 #@gui <b>Arrays & Tiles</b>
+#################################################
+##                                             ##
+##      samj_Montage_Annular_Steiner_Chain     ##
+##                                             ##
+#################################################
+
+#@gui Montage Annular Steiner Chain : samj_Montage_Annular_Steiner_Chain, samj_Montage_Annular_Steiner_Chain_Preview
+#@gui :_=note("<span foreground="orangered">Montage Annular Steiner Chain</span>")
+#@gui :_=separator()
+#@gui :_=note("<span foreground="orangered"><b>Image Finale</b></span>")
+#@gui : 1 - Dimension Pix. = int(2400,800,7200)
+#@gui : 2 - Nb Images Extérieures/Annular Chain = int(12,3,180)
+#@gui : 3 - Sélection = choice(1,"Calques du Bas/Bottom Layers","Calques du Haut/Top Layers")
+#@gui : 4-5-6-7 Fond/Background = color(0,0,0,0)
+#@gui :_=separator()
+#@gui :_=note("<span foreground="orangered"><b>Image Centrale</b></span>")
+#@gui : 8 - Position X Origine (%) = float(0,-100,100)
+#@gui : 9 - Position Y Origine (%) = float(0,-100,100)
+#@gui : 10 - Agrandissement/Enlarging = float(1,1,100)
+#@gui : 11 - Décalage/Shift X (%) = float(0,-100,100)
+#@gui : 12 - Décalage/Shift Y (%) = float(0,-100,100)
+#@gui :_=separator()
+#@gui :_=note("<span foreground="orangered"><b>Images Extérieures/Annular Chain</b></span>")
+#@gui : 13 - Angle Décalage Image Contour = float(90,0,360)
+#@gui : 14 - Rotation Images = bool(1)
+#@gui : 15 - Image Contour Dimension = float(100,1,100)
+#@gui : 16 - Angle Inclinaison/Tilt = float(0,0,360)
+#@gui : 17 - Agrandissement/Enlarging = float(1,0.2,2)
+#@gui : 18 - Décalage/Shift X (%) = float(0,-100,100)
+#@gui : 19 - Décalage/Shift Y (%) = float(0,-100,100)
+#@gui :_=separator()
+#@gui :_=note("<small>samj - Dernière mise à jour : <i>2020/12/07</i>.</small>")
+
+samj_Montage_Annular_Steiner_Chain:
+
+Dimension_Finale=$1
+Nb_Circles_Surrounding=$2
+InvSelect=$3
+Rf=$4
+Vf=$5
+Bf=$6
+Af=$7
+varx=$8
+vary=$9
+Dimension_Image={101-$10}
+Shift_X=$11
+Shift_Y=$12
+Decalage_Angle_Images_Contour=$13
+RotAng=$14
+Image_Contour_Dimension=$15
+Angle_inclinaison=$16
+Agr=$17
+Shift_Xe=$18
+Shift_Ye=$19
+
+if $InvSelect==1 rv endif
+to_rgb
+
+NbImg=$!
+NbImgMont={$Nb_Circles_Surrounding+1}
+if $!>$NbImgMont rm[-{$NbImgMont+1}--$!] endif
+
+# ajouter images nécessaires
+Wsrc={w}
+Hsrc={h}
+WHsrc={$Wsrc/$Hsrc}
+HWsrc={$Hsrc/$Wsrc}
+NbImg=$! # màj
+if $NbImg<4
+	repeat {4-$NbImg}
+		$Wsrc,$Hsrc,1,3
+		fill_color[-1] 200,200,200
+		samj_Motifs_Rapides_B[-1] 1,0,16,0,8
+		to_rgb[-1]
+	done
+	if $NbImg==2 rv[-1,-3] elif $NbImg==3 rv[-1,-2] endif
+endif
+
+NbImg=$! # màj
+if $Nb_Circles_Surrounding>{$NbImg-1} Nb_Circles_Surrounding={$NbImg-1} endif
+Angle_Theta={pi/$Nb_Circles_Surrounding}
+# variables dimensions
+Rayon_Cercle_Exterieur_Final={round({$Dimension_Finale/2})}
+Rayon_Cercle_Centre_Final={round({{$Rayon_Cercle_Exterieur_Final*{1-{sin($Angle_Theta)}}}/{{1+{sin($Angle_Theta)}}}})}
+Rayon_Cercles_Ext_Final={round({{$Rayon_Cercle_Exterieur_Final-$Rayon_Cercle_Centre_Final}/2})}
+Rayon_Centres_C_Ext_Final={round({$Rayon_Cercle_Centre_Final+$Rayon_Cercles_Ext_Final})}
+Rayon_Tang_Final={round({{{$Rayon_Centres_C_Ext_Final*$Rayon_Centres_C_Ext_Final}-{$Rayon_Cercles_Ext_Final*$Rayon_Cercles_Ext_Final}}^0.5})}
+Dim_Img_Ext={round({{$Rayon_Centres_C_Ext_Final-$Rayon_Cercle_Centre_Final}*2*$Agr})}
+X={round({$Wsrc*{$varx/100}})}
+Y={round({$Hsrc*{$vary/100}})}
+Fin_X={round({{$Wsrc-$X}*$Dimension_Image/{100}})}
+Fin_Y={round({{$Hsrc-$Y}*$Dimension_Image/{100}})}
+
+if $Fin_X>$Fin_Y
+	Rayon_Cercle_Centre_Origine={$Fin_Y/2}
+else
+	Rayon_Cercle_Centre_Origine={$Fin_X/2}
+endif
+
+# masque image centrale
+{$Rayon_Cercle_Centre_Final*2},{$Rayon_Cercle_Centre_Final*2},1,4
+fill_color[-1] 0,0,0,0
+circle[-1] 50%,50%,{{w}/2},1,0,0,0,255
+
+# image centrale
+shift[-2] $Shift_X%,$Shift_Y%,0,0,2
++Je_passe_l_hiver_en_Floride[-2]
+crop[-1] $X,$Y,{$X+{$Rayon_Cercle_Centre_Origine*2}},{$Y+{$Rayon_Cercle_Centre_Origine*2}}
+resize2dy[-1] {$Rayon_Cercle_Centre_Final*2}
+blend[-1,-2] alpha,1,1
+expand_xy[-1] {$Rayon_Cercle_Exterieur_Final-$Rayon_Cercle_Centre_Final},0
+rm[-2]
+
+Nb_boucles=0
+X_ext=0
+Y_ext=0
+Angle=0
+Dimension_Img_pivotee=0
+X_Deplacement=0
+Y_Deplacement=0
+
+repeat $Nb_Circles_Surrounding
+
+	Angle={$Nb_boucles*{360/$Nb_Circles_Surrounding}}
+	X_ext={$Rayon_Cercle_Exterieur_Final+{$Rayon_Centres_C_Ext_Final*{cos({pi/180*{$Angle+$Angle_inclinaison}})}}}
+	Y_ext={$Rayon_Cercle_Exterieur_Final+{$Rayon_Centres_C_Ext_Final*{sin({pi/180*{$Angle+$Angle_inclinaison}})}}}
+	Nb_boucles={$Nb_boucles+1}
+
+	# masque images extérieures
+	{$Rayon_Cercles_Ext_Final*2*$Image_Contour_Dimension/100},{$Rayon_Cercles_Ext_Final*2*$Image_Contour_Dimension/100},1,4
+	fill_color[-1] 0,0,0,0
+	circle[-1] 50%,50%,{{w}/2},1,0,0,0,255
+
+	# images extérieures
+	+Je_passe_l_hiver_en_Floride[-3]
+	if {w}>{h}
+		resize[-1] {{w}/{h}*$Dim_Img_Ext},$Dim_Img_Ext
+	else
+		resize[-1] $Dim_Img_Ext,{{h}/{w}*$Dim_Img_Ext}
+	endif
+	shift[-1] $Shift_Xe%,$Shift_Ye%,0,0,2
+	blend[-1,-2] alpha
+	rm[-3]
+	if $RotAng==1 rotate[-1] {$Angle+$Decalage_Angle_Images_Contour} endif
+	# genre d'autocrop
+	crop[-1] {{{w}-{$Rayon_Cercles_Ext_Final*2}}/2},{{{h}-{$Rayon_Cercles_Ext_Final*2}}/2},{{{{w}-{$Rayon_Cercles_Ext_Final*2}}/2}+{$Rayon_Cercles_Ext_Final*2}},{{{{h}-{$Rayon_Cercles_Ext_Final*2}}/2}+{$Rayon_Cercles_Ext_Final*2}}
+	# déplacer aux bonnes coordonnées
+	X_Deplacement={$X_ext-$Rayon_Cercles_Ext_Final}
+	Y_Deplacement={$Y_ext-$Rayon_Cercles_Ext_Final}
+	crop[-1] {-$X_Deplacement},{-$Y_Deplacement},{{2*$Rayon_Cercle_Exterieur_Final}-$X_Deplacement-1},{{2*$Rayon_Cercle_Exterieur_Final}-$Y_Deplacement-1},0
+	# mélange vers image centrale
+	blend[-1,-2] alpha,1,1
+
+done
+
+if {$Rf+$Vf+$Bf+$Af}>0
+	replace_color[-1] 1,0,0,0,0,0,$Rf,$Vf,$Bf,$Af
+endif
+c 0,255
+
+# text_outline $Wsrc-$Hsrc,20,20,36,1,255,0,0,255
+# text_outline $Dimension_Finale-$Rayon_Cercle_Centre_Final-$Rayon_Cercle_Exterieur_Final-$Rayon_Centres_C_Ext_Final-$Rayon_Tang_Final-$Dim_Img_Ext,20,20,36,1,255,0,0,255
+
+samj_Montage_Annular_Steiner_Chain_Preview :
+
+samj_Montage_Annular_Steiner_Chain 1200,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
+
+#################################################
+##                                             ##
+##   FIN samj_Montage_Annular_Steiner_Chain    ##
+##                                             ##
+#################################################
 #################################################
 ##                                             ##
 ##          samj_montage_append_tiles          ##
