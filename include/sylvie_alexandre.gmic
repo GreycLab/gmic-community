@@ -36,7 +36,7 @@
 #@gui :_=link("https://github.com/dtschump/gmic-community","https://github.com/dtschump/gmic-community")
 #@gui :_=note("Les filtres contenus dans ce répertoire sont majoritairement traduits en français et/ou en cours de développement.")
 #@gui :_=note("The filters included in this directory are mostly translated into French and/or experimental.")
-#@gui :_=note("Version 2020/12/11 GMIC 2.9.4")
+#@gui :_=note("Version 2020/12/12 GMIC 2.9.4")
 
 samj_about :
 
@@ -22761,6 +22761,7 @@ samj_rien_various :
 ##                                             ##
 #################################################
 
+# 20201212 ajout gestion erreur avec $7
 # 20201209 fond blanc
 # 20201202 simplification à 2 "Type_Proportions_Finales" , ajout Pivoter_En_Colonne et modification expand + simplification
 # 20201201 ajout de variables crées dynamiquement ( NewW$AbsInd et NewH$AbsInd ) pour éviter un resize inutile dans $Type_Proportions_Finales==3
@@ -22779,8 +22780,10 @@ samj_rien_various :
 ## $4 = Padding Largeur -> de 0 (sans) à ...
 ## $5 = Rotation 90° images à assembler -> 1=oui
 ## $6 = Rotation 90° de l'ensemble pour créer une colonne -> 1=oui
+## $7 = Dimension minimale pour une image (option)
 
 samj_montage_row :
+skip ${7=2}
 Type_Proportions_Finales=$1
 LargeurRow=$2
 Contour=$3
@@ -22788,169 +22791,176 @@ Padding=$4
 Rotation=$5
 Pivoter_En_Colonne=$6
 
-# Fond blanc systématiquement. À voir {i3}<1
+# Vérification paramètres
 NbImg=$!
-Index=0
-repeat $NbImg
-	Index={$Index-1}
-	Htemp={h(#$Index)}
-	Wtemp={w(#$Index)}
-	$Wtemp,$Htemp,1,4
-	fill_color[-1] 255,255,255,255
-	rv[-1,{$Index-1}]
-	blend[-1,{$Index-1}] alpha
-done
-to_rgb
-if $Rotation==1 permute yxzc mirror x endif
-NbImg=$!
-
-if $Type_Proportions_Finales==0
-	Index=0
-	Hmax=0
-	Wmax=0
-	Htot=0
-	Wtot=0
-	# trouver la somme Wtot et Htot
-	repeat $NbImg
-		Index={$Index-1}
-		Htemp={h(#$Index)}
-		Htot={$Htot+$Htemp}
-		if $Htemp>$Hmax
-			Hmax=$Htemp
-		endif
-		Wtemp={w(#$Index)}
-		Wtot={$Wtot+$Wtemp}
-		if $Wtemp>$Wmax
-			Wmax=$Wtemp
-		endif
-	done
-
-	ContourTot={$NbImg*$Contour*2}
-	PaddingTot={$NbImg*$Padding*2}
-	LargeurImages={$LargeurRow-$ContourTot-$PaddingTot}
-	Echelle={$LargeurImages/$Wtot}
-	Index=0
-	# resize aux dimensions finales des images
-	repeat $NbImg
-		Index={$Index-1}
-		Htemp={h(#$Index)}
-		Wtemp={w(#$Index)}
-		resize[$Index] {$Wtemp*$Echelle},{$Htemp*$Echelle}
-		if $Contour>0 frame_xy[$Index] $Contour,$Contour,0 endif
-		if $Padding>0 frame_xy[$Index] $Padding,$Padding,255 endif
-	done
-
+DimensionMini=$7
+if {{$NbImg*{{2*{$3+$4}}+$DimensionMini}}>$2}
+	echo "ERREUR-ERROR - Diminuer $3,$4 et/ou augmenter $2 / Decrease $3,$4 et/ou increase $2"
+	rm
 else
+	# Fond blanc systématiquement. À voir {i3}<1
 	Index=0
-	Hmax=0
-	Wmax=0
-	# trouver les valeurs max W et H
 	repeat $NbImg
 		Index={$Index-1}
 		Htemp={h(#$Index)}
-		if $Htemp>$Hmax
-			Hmax=$Htemp
-		endif
 		Wtemp={w(#$Index)}
-		if $Wtemp>$Wmax
-			Wmax=$Wtemp
-		endif
+		$Wtemp,$Htemp,1,4
+		fill_color[-1] 255,255,255,255
+		rv[-1,{$Index-1}]
+		blend[-1,{$Index-1}] alpha
 	done
+	to_rgb
+	if $Rotation==1 permute yxzc mirror x endif
+	NbImg=$!
 
-	Index=0
-	Htot=0
-	Wtot=0
-	# nouvelles dimensions NewW et NewH pour obtenir de grandes images pour éviter un resize
-	repeat $NbImg
-		Index={$Index-1}
-		AbsInd={abs($Index)}
-		Htemp={h(#$Index)}
-		Wtemp={w(#$Index)}
-		NewW$AbsInd={$Wtemp/$Htemp*$Hmax}
-		NewH$AbsInd=$Hmax
-	done
+	if $Type_Proportions_Finales==0
+		Index=0
+		Hmax=0
+		Wmax=0
+		Htot=0
+		Wtot=0
+		# trouver la somme Wtot et Htot
+		repeat $NbImg
+			Index={$Index-1}
+			Htemp={h(#$Index)}
+			Htot={$Htot+$Htemp}
+			if $Htemp>$Hmax
+				Hmax=$Htemp
+			endif
+			Wtemp={w(#$Index)}
+			Wtot={$Wtot+$Wtemp}
+			if $Wtemp>$Wmax
+				Wmax=$Wtemp
+			endif
+		done
 
-	Index=0
-	Hmax=0
-	Wmax=0
-	Htot=0
-	Wtot=0
-	# trouver la somme Wtot et Htot
-	repeat $NbImg
-		Index={$Index-1}
-		AbsInd={abs($Index)}
-		Htemp=${NewH$AbsInd}
-		Htot={$Htot+$Htemp}
-		if $Htemp>$Hmax
-			Hmax=$Htemp
-		endif
-		Wtemp=${NewW$AbsInd}
-		Wtot={$Wtot+$Wtemp}
-		if $Wtemp>$Wmax
-			Wmax=$Wtemp
-		endif
-	done
+		ContourTot={$NbImg*$Contour*2}
+		PaddingTot={$NbImg*$Padding*2}
+		LargeurImages={$LargeurRow-$ContourTot-$PaddingTot}
+		Echelle={$LargeurImages/$Wtot}
+		Index=0
+		# resize aux dimensions finales des images
+		repeat $NbImg
+			Index={$Index-1}
+			Htemp={h(#$Index)}
+			Wtemp={w(#$Index)}
+			resize[$Index] {$Wtemp*$Echelle},{$Htemp*$Echelle}
+			if $Contour>0 frame_xy[$Index] $Contour,$Contour,0 endif
+			if $Padding>0 frame_xy[$Index] $Padding,$Padding,255 endif
+		done
 
-	ContourTot={$NbImg*$Contour*2}
-	PaddingTot={$NbImg*$Padding*2}
-	LargeurImages={$LargeurRow-$ContourTot-$PaddingTot}
-	Echelle={$LargeurImages/$Wtot}
-	Index=0
-	# resize aux dimensions finales des images
-	repeat $NbImg
-		Index={$Index-1}
-		AbsInd={abs($Index)}
-		Htemp=${NewH$AbsInd}
-		Wtemp=${NewW$AbsInd}
-		resize[$Index] {$Wtemp*$Echelle},{$Htemp*$Echelle}
-		if $Contour>0 frame_xy[$Index] $Contour,$Contour,0 endif
-		if $Padding>0 frame_xy[$Index] $Padding,$Padding,255 endif
-	done
+	else
+		Index=0
+		Hmax=0
+		Wmax=0
+		# trouver les valeurs max W et H
+		repeat $NbImg
+			Index={$Index-1}
+			Htemp={h(#$Index)}
+			if $Htemp>$Hmax
+				Hmax=$Htemp
+			endif
+			Wtemp={w(#$Index)}
+			if $Wtemp>$Wmax
+				Wmax=$Wtemp
+			endif
+		done
 
-endif
+		Index=0
+		Htot=0
+		Wtot=0
+		# nouvelles dimensions NewW et NewH pour obtenir de grandes images pour éviter un resize
+		repeat $NbImg
+			Index={$Index-1}
+			AbsInd={abs($Index)}
+			Htemp={h(#$Index)}
+			Wtemp={w(#$Index)}
+			NewW$AbsInd={$Wtemp/$Htemp*$Hmax}
+			NewH$AbsInd=$Hmax
+		done
 
-Index=0
-Hmaxmontage=0
-# Wmaxmontage=0
-repeat $NbImg
-	Index={$Index-1}
-	Htemp={h(#$Index)}
-	if $Htemp>$Hmaxmontage
-		Hmaxmontage=$Htemp
+		Index=0
+		Hmax=0
+		Wmax=0
+		Htot=0
+		Wtot=0
+		# trouver la somme Wtot et Htot
+		repeat $NbImg
+			Index={$Index-1}
+			AbsInd={abs($Index)}
+			Htemp=${NewH$AbsInd}
+			Htot={$Htot+$Htemp}
+			if $Htemp>$Hmax
+				Hmax=$Htemp
+			endif
+			Wtemp=${NewW$AbsInd}
+			Wtot={$Wtot+$Wtemp}
+			if $Wtemp>$Wmax
+				Wmax=$Wtemp
+			endif
+		done
+
+		ContourTot={$NbImg*$Contour*2}
+		PaddingTot={$NbImg*$Padding*2}
+		LargeurImages={$LargeurRow-$ContourTot-$PaddingTot}
+		Echelle={$LargeurImages/$Wtot}
+		Index=0
+		# resize aux dimensions finales des images
+		repeat $NbImg
+			Index={$Index-1}
+			AbsInd={abs($Index)}
+			Htemp=${NewH$AbsInd}
+			Wtemp=${NewW$AbsInd}
+			resize[$Index] {$Wtemp*$Echelle},{$Htemp*$Echelle}
+			if $Contour>0 frame_xy[$Index] $Contour,$Contour,0 endif
+			if $Padding>0 frame_xy[$Index] $Padding,$Padding,255 endif
+		done
+
 	endif
-	Wtemp={w(#$Index)}
-	# Wmaxmontage={$Wmaxmontage+$Wtemp}
-done
 
-Index=0
-repeat $NbImg
-	Index={$Index-1}
-	Htemp={h(#$Index)}
-	Wtemp={w(#$Index)}
-	expand_y[$Index] {{$Hmaxmontage-$Htemp}/2},0
-	rectangle[$Index] 0,0,$Wtemp,{{$Hmaxmontage-$Htemp}/2},1,255,255,255
-	mirror[$Index] y
-	rectangle[$Index] 0,0,$Wtemp,{{$Hmaxmontage-$Htemp}/2},1,255,255,255
-	mirror[$Index] y
-done
+	Index=0
+	Hmaxmontage=0
+	# Wmaxmontage=0
+	repeat $NbImg
+		Index={$Index-1}
+		Htemp={h(#$Index)}
+		if $Htemp>$Hmaxmontage
+			Hmaxmontage=$Htemp
+		endif
+		Wtemp={w(#$Index)}
+		# Wmaxmontage={$Wmaxmontage+$Wtemp}
+	done
 
-append x
+	Index=0
+	repeat $NbImg
+		Index={$Index-1}
+		Htemp={h(#$Index)}
+		Wtemp={w(#$Index)}
+		expand_y[$Index] {{$Hmaxmontage-$Htemp}/2},0
+		rectangle[$Index] 0,0,$Wtemp,{{$Hmaxmontage-$Htemp}/2},1,255,255,255
+		mirror[$Index] y
+		rectangle[$Index] 0,0,$Wtemp,{{$Hmaxmontage-$Htemp}/2},1,255,255,255
+		mirror[$Index] y
+	done
 
-Erreur={{w}-$LargeurRow}
-if $Erreur>0
-	crop 0,0,{$LargeurRow-1},{{h}-1}
-elif $Erreur<0
-	expand_x {-$Erreur-1},0
-	rectangle 0,0,{-$Erreur-1},{h},1,255,255,255
-	mirror x
-	rectangle 0,0,{-$Erreur-1},{h},1,255,255,255
-	mirror x
-	crop 0,0,{$LargeurRow-1},{{h}-1}
+	append x
+
+	Erreur={{w}-$LargeurRow}
+	if $Erreur>0
+		crop 0,0,{$LargeurRow-1},{{h}-1}
+	elif $Erreur<0
+		expand_x {-$Erreur-1},0
+		rectangle 0,0,{-$Erreur-1},{h},1,255,255,255
+		mirror x
+		rectangle 0,0,{-$Erreur-1},{h},1,255,255,255
+		mirror x
+		crop 0,0,{$LargeurRow-1},{{h}-1}
+	endif
+
+	to_rgb
+
+	if $Pivoter_En_Colonne==1 mirror x permute yx endif
 endif
-
-to_rgb
-
-if $Pivoter_En_Colonne==1 mirror x permute yx endif
 
 #################################################
 ##                                             ##
