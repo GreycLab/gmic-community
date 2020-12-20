@@ -573,7 +573,7 @@ um dla_target_2s,dla_target_3s,dla_target_4s_plus,dla_target,dla_check_variance
 #@cli : Apply Splinter Blur to Image. Based off observation from using Splinter Blur plugin within Paint.NET made by Ed Harvey, and it is inspired by this filter. Note that convolution result is different.
 #@cli : Default values: '_length=10%','_duplicates=5','_angle=0','_thickness=0','_balance=0','_contrastr=0','_boundary=1','_bisided=0'
 rep_blur_splinter:
-skip ${1=10%},${2=5},${3=0},${4=0},${5=0},${6=0},${7=1},${8=0}
+skip ${1=10%},${2=5},${3=0},${4=0},${5=0},${6=0},${7=2},${8=0}
 
 if $2<3 error \$\2>2==F fi
 
@@ -599,57 +599,57 @@ repeat $! l[$>]
  if ${is_percent\ $4} thickness={round(abs($4)*$hypo)}
  else thickness={round(abs($4))}
  fi
-
- ds={d},{s}
+ 
+ img_dims={w},{h}
 
  repeat $2
   ang={$start_ang+$angs_per_dups*$>}
-  +rep_splinter_blur_convolve_map. $length,$thickness,$ang,$6,$8
+  rep_splinter_blur_convolve_map[^0--1] $length,$thickness,$ang,$6,$8,$img_dims
   +convolve_fft[0] [-1],$7
   rm..
  done
+ 
  rm[0]
+ 
  output_splinter
-
+ 
 endl done
-#@cli rep_splinter_blur_convolve_map: _length,_thickness,_angle,_contrastr,_bisided={ 0=one-line | two-line }
+um output_splinter
+#@cli rep_splinter_blur_convolve_map: _length,_thickness,_angle,_contrast,_bisided={ 0=one-line | two-line }
 #@cli : Create a convolve map for directional blur. This enables one to create a convolve map for one-direction motion blur.
 #@cli : Default values: '_length=10%','_thickness=5%','_angle=0','_bisided=1'
-rep_splinter_blur_convolve_map : skip ${1=10%},${2=5%},${3=0},${4=0},${5=1}
+rep_splinter_blur_convolve_map : skip ${1=10%},${2=5%},${3=0},${4=0},${5=1},${6=w},${7=h}
 ang={($3/180)*pi*-1}
 cos_ang={cos($ang)};
 sin_ang={sin($ang)};
-repeat $! l[$>]
- hypo={(sqrt(w^2+h^2)/2)}
- if ${is_percent\ $1} length={round($1*$hypo)} else length={round($1)} fi
- if ${is_percent\ $2} thickness={max(round($2*$hypo),1)} else thickness={max(round($2),1)} fi
+hypo={(sqrt($6^2+$7^2)/2)}
+if ${is_percent\ $1} length={round($1*$hypo)} else length={round($1)} fi
+if ${is_percent\ $2} thickness={max(round($2*$hypo),1)} else thickness={max(round($2),1)} fi
 
- rm
+point_b_x=0
+point_b_y={$length/2}
+point_c_x={$thickness/2}
+max_dim={max($point_b_y,$point_c_x)}
+min_dim={min($point_b_y,$point_c_x)}
+point_c_y={sqrt(sqr($max_dim)-sqr($min_dim))}
+point_a_x=-$point_c_x
+point_a_y=$point_c_y
 
- point_b_x=0
- point_b_y={$length/2}
- point_c_x={$thickness/2}
- max_dim={max($point_b_y,$point_c_x)}
- min_dim={min($point_b_y,$point_c_x)}
- point_c_y={sqrt(sqr($max_dim)-sqr($min_dim))}
- point_a_x=-$point_c_x
- point_a_y=$point_c_y
+n_pax={abs($point_a_x*$cos_ang+$point_a_y*$sin_ang)}
+n_pay={abs($point_a_x*$sin_ang+$point_a_y*$cos_ang)}
+n_pbx={abs($point_b_x*$cos_ang+$point_b_y*$sin_ang)}
+n_pby={abs($point_b_x*$sin_ang+$point_b_y*$cos_ang)}
+n_pcx={abs($point_c_x*$cos_ang+$point_c_y*$sin_ang)}
+n_pcy={abs($point_c_x*$sin_ang+$point_c_y*$cos_ang)}
 
- n_pax={abs($point_a_x*$cos_ang+$point_a_y*$sin_ang)}
- n_pay={abs($point_a_x*$sin_ang+$point_a_y*$cos_ang)}
- n_pbx={abs($point_b_x*$cos_ang+$point_b_y*$sin_ang)}
- n_pby={abs($point_b_x*$sin_ang+$point_b_y*$cos_ang)}
- n_pcx={abs($point_c_x*$cos_ang+$point_c_y*$sin_ang)}
- n_pcy={abs($point_c_x*$sin_ang+$point_c_y*$cos_ang)}
+rect_width={ceil(max($n_pax,$n_pbx,$n_pcx)*2)}
+rect_height={ceil(max($n_pay,$n_pby,$n_pcy)*2)}
 
- rect_width={ceil(max($n_pax,$n_pbx,$n_pcx)*2)}
- rect_height={ceil(max($n_pay,$n_pby,$n_pcy)*2)}
-
- {max(1,$rect_width)},{max(1,$rect_height)},1,1,"
+{max(1,$rect_width)},{max(1,$rect_height)},1,1,"
  begin(
   const strokelength="$length";
-  sx=w/strokelength;
-  sy=h/strokelength;
+  const sx=w/strokelength;
+  const sy=h/strokelength;
   const sides=$5;
   const thickness="$thickness";
   const hw=(w-1)/2;
@@ -671,14 +671,13 @@ repeat $! l[$>]
  line=1-maxcutval(abs(rot_x(lx,ly))/thickness);
  sides?(line?radial_grad*line):(rot_y(lx,ly)<=0?(line?radial_grad*line));
  "
- / {is}
- if $4
-  avgstat={ia}
-  +f (i*2-$avgstat)
-  f.. lerp(i,i#1,min(1,min(abs($4),1)))
-  k[0]
- fi
-endl done
+/. {is}
+if $4
+ avgstat={ia}
+ +*. 2 -. $avgstat
+ f.. lerp(i,i#1,min(1,min(abs($4),1)))
+ rm.
+fi
 #@cli rep_bgfill: eq. to 'rep_fill_background' : (+)
 rep_bgfill: rep_fill_background $*
 #@cli rep_fill_background: color,alpha,max_alp
