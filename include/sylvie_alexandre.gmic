@@ -36,7 +36,7 @@
 #@gui :_=link("https://github.com/dtschump/gmic-community","https://github.com/dtschump/gmic-community")
 #@gui :_=note("Les filtres contenus dans ce répertoire sont majoritairement traduits en français et/ou en cours de développement.")
 #@gui :_=note("The filters included in this directory are mostly translated into French and/or experimental.")
-#@gui :_=note("Version 2020/12/19 GMIC 2.9.5_pre")
+#@gui :_=note("Version 2020/12/20 GMIC 2.9.5_pre")
 
 samj_about :
 
@@ -90,6 +90,127 @@ samj_rien_arrays_and_tiles :
  Je_passe_l_hiver_en_Floride[-1]
 
 #@gui <b>Arrays & Tiles</b>
+#################################################
+##                                             ##
+##             samj_Montage_Zigzag             ##
+##                                             ##
+#################################################
+
+#@gui Montage Zigzag : samj_Montage_Zigzag, samj_Montage_Zigzag
+#@gui :_=link("Documentation","https://samjcreations.blogspot.com/2020/12/samuser-avec-gmic-gimp-filtre-montage.html")
+#@gui :_=note("La hauteur du montage sera automatiquement ajustée si la valeur du paramètre 1 est dépassée.")
+#@gui :_=note("The mounting height will be automatically adjusted if the value of parameter 1 is exceeded.")
+#@gui :_=separator()
+#@gui :_=note("<span foreground="orangered"><b>Largeur Max. Approximative/Approximate Maximum Width</b></span>")
+#@gui : 1 - Dimensions Max. Pixels = int(4800,1200,11400)
+#@gui :_=note("<span foreground="orangered"><b>Montage Zigzag</b></span>")
+#@gui : 2 - Nb Images = int(8,1,200)
+#@gui : 3 - Sélection = choice(1,"Calques du Bas/Bottom Layers","Calques du Haut/Top Layers")
+#@gui : 4 - Demi Hauteur/Half Height = int(256,0,1200)
+#@gui : 5 - Inverser Inclinaison/Reverse Tilt = bool(0)
+#@gui : 6 - Adoucir/Smooth = int(0,0,100)
+#@gui : 7-8-9-10 Fond/Background = color(0,0,0,0)
+#@gui :_=separator()
+#@gui :_=note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2020/12/20</i>.</small>")
+
+samj_Montage_Zigzag :
+DH=$4
+if $3==0 rv endif
+if $!>$2 rm[-{$2+1}--$!] endif
+NbImg=$!
+Index=0
+Wmax=0
+Wtot=0
+# trouver la somme Wtot et Htot
+repeat $NbImg
+	Index={$Index-1}
+	Htemp={h(#$Index)}
+	Wtemp={w(#$Index)}
+	#if {h}>{w} resize $Haut,$Haut else resize {{w}/{h}*$Haut},$Haut endif
+	if $Htemp>$Wtemp Wtemp=$DH else Wtemp={$Wtemp/$Htemp*$DH} endif
+	Wtot={$Wtot+round($Wtemp)}
+done
+if $Wtot>$1 DH={round($DH/$Wtot*$1)} endif
+Index=0
+repeat $NbImg
+	Index={$Index-1}
+	if {abs($Index+$5)%2}==0
+		samj_inclinaison_h[$Index] 0,$DH
+		Wtemp={w(#$Index)}
+		Htemp={h(#$Index)}
+		if $6>0
+			smooth[$Index] $6
+			polygon[$Index] 3,0,0,{$Wtemp-1},0,0,{$DH-1},1,0,0,0,0
+			polygon[$Index] 3,1,{$Htemp-1},{$Wtemp-1},$DH,{$Wtemp-1},{$Htemp-1},1,0,0,0,0
+		endif
+	else
+		samj_inclinaison_h[$Index] 1,$DH
+		Wtemp={w(#$Index)}
+		Htemp={h(#$Index)}
+		if $6>0
+			smooth[$Index] $6
+			polygon[$Index] 3,1,0,{$Wtemp-1},0,{$Wtemp-1},{$DH-1},1,0,0,0,0
+			polygon[$Index] 3,0,$DH,{$Wtemp-1},{$Htemp-1},0,{$Htemp-1},1,0,0,0,0
+		endif
+	endif	
+done
+append x
+replace_color[-1] 1,0,0,0,0,0,$7,$8,$9,$10
+
+#####
+samj_inclinaison_h :
+skip ${1=2} # modulo = pente
+skip ${2=128} # 1/2 hauteur
+to_rgba
+if {$1%2}==0
+	#pente
+	+samj_demi_haut $2
+	rv
+	samj_demi_bas[-1] $2
+	append y
+else
+	#pente négative
+	mirror y
+	+samj_demi_haut $2
+	rv
+	samj_demi_bas[-1] $2
+	append y
+	mirror y
+endif
+samj_demi_haut :
+skip ${1=256} # hauteur
+Haut=$1
+if {h}>{w} resize $Haut,$Haut else resize {{w}/{h}*$Haut},$Haut endif
+split x,$Haut
+Index=0
+Decalage=1
+repeat $Haut
+	Index={$Index-1}
+	shift[$Index] 0,$Decalage,0,0,0
+	Decalage={$Decalage+1}
+done 
+append x
+samj_demi_bas :
+skip ${1=256} # hauteur
+Haut=$1
+if {h}>{w} resize $Haut,$Haut else resize {{w}/{h}*$Haut},$Haut endif
+split x,$Haut
+Index=0
+Decalage=$Haut
+mirror y
+repeat {$Haut-1}
+	Index={$Index-1}
+	shift[$Index] 0,$Decalage,0,0,0
+	Decalage={$Decalage-1}
+done 
+append x
+mirror y
+
+#################################################
+##                                             ##
+##           FIN samj_Montage_Zigzag           ##
+##                                             ##
+#################################################
 #################################################
 ##                                             ##
 ##      samj_Montage_Figures_Geometriques      ##
