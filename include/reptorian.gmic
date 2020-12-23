@@ -6561,102 +6561,98 @@ rep_sptbwgp: rep_shift_pixel_to_boundary_with_group_pixels $*
 #@cli : Default values: '_position=-1','_axis=1','_influence_factor=1','_threshold=0','_channel_mode='
 rep_shift_pixel_to_boundary_with_group_pixels:
 skip ${1=-1},${2=1},${3=1},${4=0},${5=}
+
 any_channels=0
 tcr=3
 influence_factor={min(abs($3),1)}
 position={(($1+1)/2)}
+
 if   $position<0 position=0
 elif $position>1 position=1
 fi
+
 if narg($5)
- if $5>=0
+ if $5>0
   tcr+=1
  else
   any_channels=1
  fi
 fi
+
+if $4 cond=>=$4
+else cond=>0 fi
+
 if $influence_factor
  repeat $! l[$>]
-  if (s==2||s>$tcr)||$any_channels
+  if s==2||s>$tcr||$any_channels
    sh {s-1}
    if $2
-    if $4 {w},1,1,1,val=[crop(#-1,x,0,0,0,1,h#-1,1,1)];sum(val>=$4)
-    else  {w},1,1,1,val=[crop(#-1,x,0,0,0,1,h#-1,1,1)];sum(val>0)
-    fi
+    {w},1,{d},{h#-1},"begin(
+     const influence_factor="$influence_factor";
+     const invert_factor=1-influence_factor;
+     const position="$position";
+     pixid=expr('x',h#-1);
+     if(position==1
+     ,func(a)=ceil(a);
+     ,func(a)=floor(a);
+     );
+    );
+    posval=expr('-1',h#-1);
+    alpval=[crop(#-1,x,0,z,0,1,h#-1,1,1)];
+    count=sum(alpval"$cond");
+    nyy=h#-1-1;
+    count!=h#-1&&count!=0?(
+     N=count;
+     tyy=h#-1-N;
+     nyy-=tyy*position;
+     for(pos=h#-1-1,pos>-1,pos--,
+      N?(if(i(#-1,x,pos,z)"$cond",
+        N--;
+        tnyy=influence_factor*nyy+invert_factor*pos;
+        posval[func(tnyy)]=pos;
+        nyy--;
+       );
+      ):
+      break();      
+     );
+     posval;
+    ):(count?pixid:posval;);"
+    permute. xczy rm..
+    f.. pos=i(#-1,x,y,z,0);pos!=-1?I(x,pos); rm.
    else
-    if $4 {h},1,1,1,val=[crop(#-1,0,x,0,0,w#-1,1,1,1)];sum(val>=$4)
-    else  {h},1,1,1,val=[crop(#-1,0,x,0,0,w#-1,1,1,1)];sum(val>0)
-    fi
-   fi
-   alpinfo={crop(i#-1)}
-   rm[-2,-1]
-   if $2 100%,100%,100%,100%,begin(alpi=[$alpinfo];);if(alpi[x]==h,I#0);
-   else  100%,100%,100%,100%,begin(alpi=[$alpinfo];);if(alpi[y]==w,I#0);
-   fi
-   eval ${-math_lib}"
-    const influence_factor="$influence_factor";
-    const invert_factor=1-influence_factor;
-    const position="$position";
-    const alp=s-1;
-    alpi=["$alpinfo"];
-    if($4,alpc(a)=(a>=$4?1);
-      ,alpc(a)=a;
-    );
-    if($2
-    ,
-     if(position==1
-     ,func(a)=ceil(a);
-     ,func(a)=floor(a);
-     );
-    ,
+    1,{h},{d},{w#-1},"begin(
+     const influence_factor="$influence_factor";
+     const invert_factor=1-influence_factor;
+     const position="$position";
+     pixid=expr('x',w#-1);
      if(position==1
      ,func(a)=floor(a);
      ,func(a)=ceil(a);
      );
     );
-    if($2,
-     for(xx=0,xx<w,xx++,
-      nyy=h-1;
-      if(alpi[xx]&&alpi[xx]<h,
-       N=alpi[xx];
-       tyy=h-N;
-       nyy-=tyy*position;
-       for(yy=h-1,yy>-1,yy--,
-        if(N,
-         if(alpc(i(#0,xx,yy,z,alp)),
-          N--;
-          tnyy=influence_factor*nyy+invert_factor*yy;
-          I(#1,xx,func(tnyy))=I(#0,xx,yy);
-          nyy--;
-         );
-         ,break();
-        );
+    posval=expr('-1',w#-1);
+    alpval=[crop(#-1,0,y,z,0,w#-1,1,1,1)];
+    count=sum(alpval"$cond");
+    nxx=0;
+    count!=h#-1&&count!=0?(
+     N=count;
+     txx=w#-1-N;
+     nxx+=txx*position;
+     for(pos=0,pos<w#-1,pos++,
+      N?(if(i(#-1,pos,y,z)"$cond",
+        N--;
+        tnxx=influence_factor*nxx+invert_factor*pos;
+        posval[func(tnxx)]=pos;
+        nxx++;
        );
-      );
+      ):
+      break();      
      );
-    ,
-     for(yy=0,yy<h,yy++,
-      nxx=0;
-      if(alpi[yy]&&alpi[yy]<w,
-       N=alpi[yy];
-       txx=w-N;
-       nxx+=txx*position;
-       for(xx=0,xx<w,xx++,
-        if(N,
-         if(alpc(i(#0,xx,yy,z,alp)),
-          N--;
-          tnxx=influence_factor*nxx+invert_factor*xx;
-          I(#1,func(tnxx),yy)=I(#0,xx,yy);
-          nxx++;
-         );
-         ,break();
-        );
-       );
-      );
-     );
-    );
-   "
-   rm..
+     posval;
+    ):(count?pixid:posval;);"
+    permute. cyzx rm..
+    f.. pos=i(#-1,x,y,z,0);pos!=-1?I(pos,y); rm.
+   fi
   fi
  endl done
 fi
