@@ -3782,66 +3782,104 @@ repeat $! l[$>]
  else echo "Not applicable to images with 3 channels!"
  fi
 endl done
-#@cli rep_axis_streak: orientation,direction,_alpha_exponential_factor
+#@cli rep_axis_streak: orientation,direction,_alpha_exponential_factor,_maxval>0_cmykmode={ 0=non-cmyk | 1=cmyka_mode }
 #@cli : Streaks pixels based on distance away from center and placement of visible objects.
-#@cli : '_alpha_exponential_factor' is used to manipulate the alpha mixing within pixels. The more power that is assigned to the alpha, the less mixing there would be.\n
+#@cli : '_alpha_exponential_factor' is used to manipulate the alpha mixing within pixels. The more power that is assigned to the alpha, the more mixing there would be.
+#@cli : '_maxval' divides the alpha channel internally to normalize ranges to 0-1. A error will appear if not normalized. By default, it used the max alpha channel value.
+#@cli : '_cmykmode' is only used in case of using only cmyk images. Not needed in normal cases at all.
+#@cli : Default values: '_alpha_exponential_factor=0','_maxalp=n/a','_cmykmode=0'
+#@cli :
 #@cli : Author: Reptorian.
 rep_axis_streak:
-skip ${3=0}
+skip ${3=0},${4=},${5=0}
 repeat $! l[$>]
-    if s==2||s>3 rep_axis_streak_color ${1-3}
-    elif s==1 rep_axis_streak_distance ${1-3}
-    fi
+ if s==1 rep_axis_streak_distance $*
+ else rep_axis_streak_color $*
+ fi
 endl done
-#@cli rep_axis_streak_distance: orientation,direction,_alpha_exponential_factor
+#@cli rep_axis_streak_distance: orientation,direction,_alpha_exponential_factor,_maxval
 #@cli : Extract the alpha, then streaks pixels based on distance away from center and placement of visible objects.
-#@cli : '_alpha_exponential_factor' is used to manipulate the alpha mixing within pixels. The more power that is assigned to the alpha, the less mixing there would be.\n
+#@cli : '_alpha_exponential_factor' is used to manipulate the alpha mixing within pixels. The more power that is assigned to the alpha, the more mixing there would be.
+#@cli : '_maxval' divides the alpha channel internally to normalize ranges to 0-1. A error will appear if not normalized. By default, it used the max alpha channel value.
+#@cli : Default values: '_alpha_exponential_factor=0','_maxalp=n/a'
+#@cli :
 #@cli : Author: Reptorian.
 rep_axis_streak_distance:
-skip ${3=0}
+skip ${3=0},${4=}
+
 repeat $! l[$>]
-  channels {s-1}
-  alp={iM}
-  / $alp
-  if $3<=-1 exp_f=-{1-10^-8} else exp_f=$3 fi
-  f i^(1+$exp_f)
-  eval ${-math_lib}"
-   const hh=h-1;
-   const ww=w-1;
-   const orientation=$1;
-   const direction=$2;
-   if(orientation
-      ,if(direction
-      ,for(xx=0,xx<=ww,xx++,break=0;
-        for(yy=hh,yy>=0,yy--,
-         if(!break,if(i(xx,yy),break=1));if(break==1,z_level=hh;break+=1;alp=i(xx,yy));if(break==2,alp=alp+(1-alp)*i(xx,yy);z_level=yy*i(xx,yy)+(1-i(xx,yy))*z_level;if(yy,i(xx,yy)=(yy/z_level)*alp;););
-        );
-       );
-      ,for(xx=0,xx<=ww,xx++,break=0;
-        for(yy=0,yy<=hh,yy++,
-         if(!break,if(i(xx,yy),break=1));if(break==1,z_level=hh;break+=1;alp=i(xx,yy));if(break==2,alp=alp+(1-alp)*i(xx,yy);z_level=(hh-yy)*i(xx,yy)+(1-i(xx,yy))*z_level;if(hh-yy,i(xx,yy)=((hh-yy)/z_level)*alp;););
-        );
-       );
-     );
-      ,if(direction
-      ,for(yy=0,yy<=hh,yy++,break=0;
-        for(xx=0,xx<=ww,xx++,
-         if(!break,if(i(xx,yy),break=1));if(break==1,z_level=ww;break+=1;alp=i(xx,yy));if(break==2,alp=alp+(1-alp)*i(xx,yy);z_level=(ww-xx)*i(xx,yy)+(1-i(xx,yy))*z_level;if(ww-xx,i(xx,yy)=((ww-xx)/z_level)*alp;););
-        );
-       );
-      ,for(yy=0,yy<=hh,yy++,break=0;
-        for(xx=ww,xx>=0,xx--,
-         if(!break,if(i(xx,yy),break=1));if(break==1,z_level=ww;break+=1;alp=i(xx,yy));if(break==2,alp=alp+(1-alp)*i(xx,yy);z_level=xx*i(xx,yy)+(1-i(xx,yy))*z_level;if(xx,i(xx,yy)=(xx/z_level)*alp;););
-        );
-       );
-     );
-      );
+
+ sh {s-1}
+ if !iv#-1 rm. break else rm. fi
+ 
+ if s>1 channels {s-1} fi
+ 
+ if narg($4) alp={abs($4)}
+ else alp={iM#-1}
+ fi
+ / $alp
+ if iM>1||im<0 error alpval(valid)==F fi
+ if $3<=-1 exp_f=-{1-10^-8} else exp_f=$3 fi
+ f i^(1+$exp_f)
+ 
+ if $1 
+  outdata_dim={w},1,{d},{h}
+  outdata_coords=x,yy,z,0
+  outdata_pos=yy
+  if $2 
+   direction=yy=ss,yy>=0,yy--
+   end_level=yy
+  else 
+   direction=yy=0,yy<=ss,yy++
+   end_level=(ss-yy)
+  fi
+ else 
+  outdata_dim=1,{h},{d},{w}
+  outdata_coords=xx,y,z,0
+  outdata_pos=xx
+  if $2 
+   direction=xx=0,xx<=ss,xx++
+   end_level=(ss-xx)
+  else 
+   direction=xx=ss,xx>=0,xx--
+   end_level=xx
+  fi
+ fi
+ 
+ $outdata_dim,":begin(
+  const ss=s-1;
+ );
+ mode=0;
+ outdata=vectors(0);
+ for("$direction",
+  imgval=i(#-1,"$outdata_coords");
+  !mode?(i(#-1,imgval?mode=1;););
+  mode==1?(z_level=ss;mode=2;alp=imgval);
+  mode==2?(
+   alp=alp+(1-alp)*imgval;
+   z_level="$end_level"*imgval+(1-imgval)*z_level;
+   if(ss-"$outdata_pos",outdata["$outdata_pos"]="$end_level"/z_level*alp;);
+  );
+ );
+ outdata;
  "
+ 
+ if $1 permute. xcyz
+ else permute. cyzx
+ fi
+ 
+ rm..
+ 
 endl done
-#@cli rep_axis_streak_color: orientation,direction,_alpha_exponential_factor
+#@cli rep_axis_streak_color: orientation,direction,_alpha_exponential_factor,_maxval>0_cmykmode={ 0=non-cmyk | 1=cmyka_mode }
 #@cli : Streaks colored pixels taking into account of opacity.
-#@cli : '_alpha_exponential_factor' is used to manipulate the alpha mixing within pixels. The more power that is assigned to the alpha, the less mixing there would be.\n
+#@cli : '_alpha_exponential_factor' is used to manipulate the alpha mixing within pixels. The more power that is assigned to the alpha, the more mixing there would be.
+#@cli : '_maxval' divides the alpha channel internally to normalize ranges to 0-1. A error will appear if not normalized. By default, it used the max alpha channel value.
+#@cli : '_cmykmode' is only used in case of using only cmyk images. Not needed in normal cases at all.
+#@cli : Default values: '_alpha_exponential_factor=0','_maxalp=n/a','_cmykmode=0'
+#@cli :
 #@cli : Author: Reptorian.
+
 rep_axis_streak_color:
 skip ${3=0},${4=},${5=0}
 
@@ -3872,6 +3910,7 @@ repeat $! l[$>]
  else alp={iM#-1}
  fi
  /. $alp
+ if iM#-1>1||im#-1<0 error alpval(valid)==F fi
  if $3<=-1 exp_f=-{1-10^-8} else exp_f=$3 fi
  f. i^(1+$exp_f)
  
@@ -4011,7 +4050,8 @@ rep_recpoltrans: rep_rectangular_polar_transformation $*
 #@cli : Converts images to inversion of rectangular polar format or to rectangular polar format. Adapted for development of perspective filters. The first two variables defines the coordinates of revolution based on -1,1 ranges. 1,1 means the point of revolution is on top-right part of the image.
 #@cli : (eq. to rep_recpoltrans).\n
 #@cli : Note: When using 2 for $3, you need to define the orientation of every images. For every images, insert one argument per image after $3.
-#@cli : Default values: '_xpos=0','_ypos=0','_from_to=0'\n
+#@cli : Default values: '_xpos=0','_ypos=0','_from_to=0'
+#@cli :
 #@cli : Author: Reptorian.
 rep_rectangular_polar_transformation:
 skip ${1=0},${2=0},${3=0}
