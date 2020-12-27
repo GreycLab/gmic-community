@@ -5179,37 +5179,60 @@ if $3
 fi
 #@cli rep_regm: eq. to 'rep_reverse_engineer_gradient_map'. : (+)
 rep_regm: rep_reverse_engineer_gradient_map $*
-#@cli rep_reverse_engineer_gradient_map: _array_size>0
+#@cli rep_reverse_engineer_gradient_map: [images],_array_size>0
 #@cli : The array size is used to define the depth of gradient map, if you're using float, then you need to scale image to something higher than 256. The only instruction is to have two images of same width and height dimension with the first one being a grayscale image.
-#@cli : (eq. to 'rep_regm').\n
-#@cli : Default values: '_array_size=256'\n
+#@cli : (eq. to 'rep_regm').
+#@cli :
+#@cli : Default values: '_array_size=auto'\n
 #@cli : Author: Reptorian.
 rep_reverse_engineer_gradient_map:
-skip ${1=256}
-if $!!=2 v + e "Only 2 images are acceptable!" v - fi
-if w#0!=w#1||h#0!=h#1 v + e "Dimensions do not match!" v - fi
-if s#0==3||s#0==4 if !{(i0==i1)&&(i1==i2)} rgb2hsl8.. channels.. 2 else to_gray.. fi #Lightness is at least continuous all-around within RGB model, hence why this is used.#
-elif s#0==5 s c.. -3 rm.. cmyk2rgb.. rgb2hsl8.. channels.. 2 #Extracting Lightness from CMYKA model#
-elif s#0==2||s#0>5 channels.. 0
+skip ${1=},${2=}
+
+if $!!=1 error n(imgs)!=1 fi
+
+ww={w#0}
+hh={h#0}
+dd={d#0}
+
+if s==2 s c rm.
+elif s==3 to_rgb rgb2hsl channels 2
+elif s==4 s c,-3 to_rgb.. rm. rgb2hsl channels 2
 fi
-if im#-2<0 -.. {im#-2} fi
-f.. round(i)
+
+if narg($2)
+ if im<0 mv={abs(im)+abs($2)} - {im}  
+ else mv={abs($2)} fi
+else
+ if im<0 - {im} fi
+ mv={iM}
+fi
+round store refimg
+
+if !narg($1) narg("$"1)?==F fi
+if !${"is_image_arg $1"} is_imgarg("$"1)==F fi
+
+pass$1 0
+
+repeat $!
+ if w#$>!=$ww||h#$>!=$hh||d#$>!=$dd error dims(#$>)!=dims(ref) fi
+done
+
+repeat $! l[$>]
+ $refimg
+ _new_rep_regm[0,-1] $mv
+endl done
+
+_new_rep_regm:
+rv
+round.. 1
 $1,1,1,{s#-1}
-eval ${-math_lib}"
- const ar = $1 ;
- for(v=0,v<ar,v++,
-   p=0;
-   for(xx=0,xx<w#0,xx++,
-    for(yy=0,yy<h#0,yy++,
-     if(i(#0,xx,yy)==v,
-      I(#2,v)+=I(#1,xx,yy);
-      p+=1;
-     );
-    );
-   );
-   if(p,I(#2,v)/=p);
-  );
-"
+f[0] "I[#-1,i]+=I(#1,x,y,z);i"
++histogram[0] $1,0,$1
++eq. 0 
+add[-2] [-1] 
+div[-3,-2]
+inpaint_pde.. .
+rm[-4,-3,-1]
 #@cli rep_primelist:
 #@cli : Return vector of boolean values up to the maximum image value rounded. Values are found by whether the argument number within vector is a prime.
 rep_primelist:
@@ -9431,7 +9454,7 @@ u "{$1}"\
 #@gui :sep separator()
 #@gui :Set of Color(s)=choice(1,"Nonexistent Colors","Existing Colors")
 #@gui :_=separator(),_=note("<small>Author: Reptorian.      Latest Update: <i>2019/9/20</i>.</small>")
-#@gui Gradient Mapping Reverse Engineering : gui_rep_regm, gui_rep_regm_preview(0)
+##@gui Gradient Mapping Reverse Engineering : gui_rep_regm, gui_rep_regm_preview(0)
 #@gui :_=note("<b>Instruction:</b>\n\nFor <b>GIMP</b> and <b>Krita</b> Users: If you're using <u>Per Two layers</u>, you need to paste grayscale image for every first layer per 2 layer. <u>You must have a even amount of layers</u> when using <u>Per Two Layers</u> option.\n\nFor <b>Paint.NET Users</b>: It is recommended that you set do not use <u>Per Two Layers</u> for ease of usage with this filter, otherwise you would have to use Active and Below.\n\n<i>Warning!</i> Result will <u>not resize</u> in Paint.NET, so apply this filter into a image where both dimensions are bigger than 256!\n\nIn the case of using Active and Below: The Reverse Layer option is used to determine the result given by the preview, pick the one which leads into the reverse-engineered gradient."), _=separator()
 #@gui :_=note("<b>Processing Setting</b>")
 #@gui :Background Color = color(0,0,0)
