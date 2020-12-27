@@ -5179,50 +5179,51 @@ if $3
 fi
 #@cli rep_regm: eq. to 'rep_reverse_engineer_gradient_map'. : (+)
 rep_regm: rep_reverse_engineer_gradient_map $*
-#@cli rep_reverse_engineer_gradient_map: [images],_array_size>0
-#@cli : The array size is used to define the depth of gradient map, if you're using float, then you need to scale image to something higher than 256. The only instruction is to have two images of same width and height dimension with the first one being a grayscale image.
+#@cli rep_reverse_engineer_gradient_map: _array_size>0,_norm={ 0=do_not_norm | 1=norm }
+#@cli : Automatically reverse engineer gradient map. All images after [0] will be converted into gradient map while [0] is the gray reference.
 #@cli : (eq. to 'rep_regm').
+#@cli : '_array_size' is used to define the depth of gradient map, if you're using float, then you need to scale image to something higher than 256. If array size is not inserted, then this filter will automatically find the array size.
+#@cli : '_normalize' is used to normalize image to max array id number. Useful when using float as reference.
+#@cli : Default values: '_array_size=n/a','_normalize=0'
 #@cli :
-#@cli : Default values: '_array_size=auto'\n
-#@cli : Author: Reptorian.
+#@cli : Author: Reptorian, Garagecoder.
 rep_reverse_engineer_gradient_map:
-skip ${1=},${2=}
+skip ${1=},${2=0}
 
-if $!!=1 error n(imgs)!=1 fi
+if !$!>1 error n(imgs)>2==F fi
 
 ww={w#0}
 hh={h#0}
 dd={d#0}
 
-if s==2 s c rm.
-elif s==3 to_rgb rgb2hsl channels 2
-elif s==4 s c,-3 to_rgb.. rm. rgb2hsl channels 2
+if s#0==2 s[0] c rm[1]
+elif s#0==3 to_rgb[0] rgb2hsl8[0] channels[0] 2
+elif s#0==4 s[0] c,-3 to_rgb[0] rm[1] rgb2hsl8[0] channels[0] 2
 fi
 
-if narg($2)
- if im<0 mv={abs(im)+abs($2)} - {im}  
- else mv={abs($2)} fi
+if narg($1)
+ if im#0<0 mv={abs(im#0)+abs($1)} -[0] {im#0}  
+ else mv={abs($1)} fi
 else
- if im<0 - {im} fi
- mv={iM}
+ if im#0<0 -[0] {im#0} fi
+ mv={iM#0}
 fi
-round store refimg
 
-if !narg($1) narg("$"1)?==F fi
-if !${"is_image_arg $1"} is_imgarg("$"1)==F fi
+if $2&&narg($1) n[0] 0,{$mv-1} fi
 
-pass$1 0
+store[0] refimg
 
 repeat $!
- if w#$>!=$ww||h#$>!=$hh||d#$>!=$dd error dims(#$>)!=dims(ref) fi
+ pos={$>+1}
+ if w#$>!=$ww||h#$>!=$hh||d#$>!=$dd error dims(#$pos)!=dims(ref) fi
 done
 
 repeat $! l[$>]
  $refimg
- _new_rep_regm[0,-1] $mv
+ gcd_regm[0,-1] $mv
 endl done
 
-_new_rep_regm:
+gcd_regm:
 rv
 round.. 1
 $1,1,1,{s#-1}
@@ -9454,87 +9455,40 @@ u "{$1}"\
 #@gui :sep separator()
 #@gui :Set of Color(s)=choice(1,"Nonexistent Colors","Existing Colors")
 #@gui :_=separator(),_=note("<small>Author: Reptorian.      Latest Update: <i>2019/9/20</i>.</small>")
-##@gui Gradient Mapping Reverse Engineering : gui_rep_regm, gui_rep_regm_preview(0)
-#@gui :_=note("<b>Instruction:</b>\n\nFor <b>GIMP</b> and <b>Krita</b> Users: If you're using <u>Per Two layers</u>, you need to paste grayscale image for every first layer per 2 layer. <u>You must have a even amount of layers</u> when using <u>Per Two Layers</u> option.\n\nFor <b>Paint.NET Users</b>: It is recommended that you set do not use <u>Per Two Layers</u> for ease of usage with this filter, otherwise you would have to use Active and Below.\n\n<i>Warning!</i> Result will <u>not resize</u> in Paint.NET, so apply this filter into a image where both dimensions are bigger than 256!\n\nIn the case of using Active and Below: The Reverse Layer option is used to determine the result given by the preview, pick the one which leads into the reverse-engineered gradient."), _=separator()
-#@gui :_=note("<b>Processing Setting</b>")
-#@gui :Background Color = color(0,0,0)
-#@gui :Layer Processing Mode=choice(0,"Per Two layers","Autocrop components","Split Width into 2","Split Height into 2")
+#@gui Gradient Mapping Reverse Engineering : gui_rep_regm, gui_rep_regm_preview(0)
+#@gui :_=note("Reverse engineer gradient map. You must export, and then import to your program of choice!"),_=separator()
+#@gui :_=note("<b>Processing</b>")
 #@gui :Gradient Thickness=int(10,1,100)
-#@gui :Reverse Layers?=bool(0)
-#@gui :_=separator(), _=note("<b>Preview Setting</b>")
+#@gui :Use first layer?=bool(1)
+#@gui :Normalize?=bool(0)
+#@gui :_=separator(), _=note("<b>Export</b>")
+#@gui :Folder=folder()
+#@gui :Filename=text("gradient.png")
+#@gui :Export Gradient?=button()
+#@gui :_=separator(), _=note("<b>Preview</b>")
 #@gui :Preview all gradient at once?=bool(1)
-#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2019/9/20</i>.</small>")
-gui_rep_regm:
-to_a
-ww={w}
-hh={h}
-portrait_mode={h>w}
-if $4==0
-    if $!%2 v + error "Odd number of layers are not accepted!" fi
-    repeat $!/2 l[{$>*2},{$>*2+1}]
-        if $6 rv fi
-        rep_regm 256
-        r. 256,$5,100%,100%,1
-        if $portrait_mode rotate. 90 fi
-        f.. x>(w#-1-1)||y>(h#-1-1)?[${1-3},255]:I#-1
-        rm.
-        if $6 rv fi
-    endl done
-    rv #To avoid layer ordering changes using All Layer as option!#
-else
-    repeat $! l[$>]
-        if $4==1
-            r {w+1},{h+1},100%,100%,0,0,1,1
-            autocrop_components 100,,1,1
-        elif $4==2
-            s x,2
-        elif $4==3
-            s y,2
-        fi
-        if $6 rv fi
-        rep_regm 256
-        r. 256,$5,100%,100%,1
-        if $portrait_mode rotate. 90 fi
-        r.. $ww,$hh,100%,100%,0,0,1,1
-        f.. x>(w#-1-1)||y>(h#-1-1)?[${1-3},255]:I#-1
-        k..
-        if $6 rv fi
-    endl done
-fi
+#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2020/12/27</i>.</small>")
+gui_rep_regm: error "Use Export Button to export gradient! This filter does nothing on host!"
 gui_rep_regm_preview:
-if $7
-    to_a
-    ww={w}
-    hh={h}
-    if $4==0
-        if $!%2 v + error "Odd number of layers are not accepted!" fi
-        repeat $!/2 l[{$>*2},{$>*2+1}]
-            if $6 rv fi
-            rep_regm 256
-            r. 256,$5,100%,100%,1
-            rm..
-        endl done
-        repeat $!/2 rm[$>] done a y
-    else
-        repeat $! l[$>]
-            if $4==1
-                r {w+1},{h+1},100%,100%,0,0,1,1
-                autocrop_components 100,,1,1
-            elif $4==2
-                s x,2
-            elif $4==3
-                s y,2
-            fi
-            if $6 rv fi
-            rep_regm 256
-            r. 256,$5,100%,100%,1
-            k.
-        endl done
-        a y
-    fi
+filename="$4/$5"
+if $2 mv. 0 fi
+if $6
+ rep_reverse_engineer_gradient_map 256,$3
+ r 100%,$1
+ o $filename
+ remove_opacity to "Exported!",.5~,.5~,50%,2,255
 else
-    gui_rep_regm ${1--2}
+ rep_reverse_engineer_gradient_map 256,$3
+ r 100%,$1
+ if $7 a y fi
 fi
+u "{$1}"\
+"{$2}"\
+"{$3}"\
+"{$4}"\
+"{$5}"\
+"{0}"\
+"{$7}"
 #@gui Autofill Coloring Book :gui_rep_acb,gui_rep_acb_preview(0)
 #@gui :_=note("This filter is specifically designed to autofill areas with random colors that only appear once.\n\n<b>Don't trust the preview for colors, test the result first!</b>")
 #@gui :_=separator()
