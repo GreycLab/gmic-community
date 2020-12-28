@@ -36,7 +36,7 @@
 #@gui :_=link("https://github.com/dtschump/gmic-community","https://github.com/dtschump/gmic-community")
 #@gui :_=note("Les filtres contenus dans ce répertoire sont majoritairement traduits en français et/ou en cours de développement.")
 #@gui :_=note("The filters included in this directory are mostly translated into French and/or experimental.")
-#@gui :_=note("Version 2020/12/27 GMIC 2.9.5_pre")
+#@gui :_=note("Version 2020/12/28 GMIC 2.9.5_pre")
 
 samj_about :
 
@@ -23234,25 +23234,35 @@ samj_rien_various :
 ##              samj_test_cercle               ##
 ##                                             ##
 #################################################
-# version 20201227
+# version 20201228
 samj_test_cercle :
-skip ${1=1},${2=400},${3=250},${4=0} # type/largeur/éloignement cercle/angle départ arc/
+skip ${1=1},${2=400},${3=250},${4=0} # type : arc-cercle-spirale a-spirale b/largeur/éloignement cercle spirales/angle départ rendu deg./
 if $1==0
 	# Arc
 	skip ${1=300}
-	if {{w}/{h}}>{pi/2}
-		crop 0,0,{{{h}*pi/2}-1},{{h}-1}
+	if {{w}/{h}}>{2*pi}
+		crop 0,0,{{{h}*2*pi}-1},{{h}-1}
 	endif
 	resize[-1] $2,{{h}/{w}*$2}
 	Larg={w}
 	Haut={h}
 	RayonInt=$Haut
 	RayonExt={$RayonInt+$Haut}
-	AngDep=$4 # rad
+	AngDep=0 # rad
 	CirconfInt={2*pi*$RayonInt}
 	AngArrivee={$Larg/$RayonInt} # rad
-elif $1==1
-	# Cercle
+elif $1==2
+	# Spirale a
+	to_rgba
+	samj_inclinaison_h 1,{h}
+elif $1==3
+	# Spirale b
+	to_rgba
+	samj_inclinaison_h 2,{h}
+endif
+
+if $1==1||$1==2||$1==3
+	# Cercle et spirales
 	resize[-1] $2,{{h}/{w}*$2}
 	EloigC=$3
 	Larg={w}
@@ -23269,6 +23279,7 @@ elif $1==1
 	RayonExt={$RayonInt+$Haut}
 endif
 
+AngDepDeg={pi/180*$4}
 CirconfExt={2*pi*$RayonExt}
 DimLigneDebut={$RayonInt*$AngArrivee}
 DimLigneFin={$RayonExt*$AngArrivee}
@@ -23302,13 +23313,13 @@ repeat $Haut
 	IncA={$AngArrivee/$LargLigne}
 	repeat $LargLigne
 		Rn={$RayonInt+$IncY}
-		An={$AngDep+{$IncX*$IncA}}
+		An={$AngDepDeg+{$IncX*$IncA}}
 		Xp={$Xc+{$Rn*cos($An)}}
 		Yp={$Yc+{$Rn*sin($An)}}
 		Xf={$Xc+{$RayonExt*cos($An)}}
 		Yf={$Yc+{$RayonExt*sin($An)}}
 		PosX=$IncX
-		PosY={$Haut-$IncY}
+		PosY={{$Haut-1}-$IncY}
 		+crop[-2] $PosX,$PosY,$PosX,$PosY,0
 		line[-2] $Xp,$Yp,$Xf,$Yf,1,{I(#-1)},255
 		rm[-1]
@@ -23322,13 +23333,14 @@ $DimNewImg,$DimNewImg,1,4
 fill_color[-1] 0,0,0,0
 circle[-1] $Xc,$Yc,$RayonInt,1,0xFFFFFFFF,255,0,0,255
 circle[-1] $Xc,$Yc,$RayonExt,1,0xFFFFFFFF,0,255,0,255
-Xa={$Xc+{$RayonInt*cos($AngDep)}}
-Ya={$Yc+{$RayonInt*sin($AngDep)}}
-Xb={$Xc+{$RayonInt*cos($AngDep+$AngArrivee)}}
-Yb={$Yc+{$RayonInt*sin($AngDep+$AngArrivee)}}
+Xa={$Xc+{$RayonInt*cos($AngDepDeg)}}
+Ya={$Yc+{$RayonInt*sin($AngDepDeg)}}
+Xb={$Xc+{$RayonInt*cos($An)}}
+Yb={$Yc+{$RayonInt*sin($An)}}
 polygon[-1] 3,$Xc,$Yc,$Xa,$Ya,$Xb,$Yb,1,255,255,0,255
-text[-1] $1-$2-$3-$4,20,20,30,1,255,0,0,255
-text[-1] $AngArrivee,20,40,30,1,255,0,0,255
+text[-1] $1-$2-$3-$4-$AngDepDeg,20,20,30,1,255,0,0,255
+text[-1] {$An/pi*180}-$An,20,40,30,1,255,0,0,255
+text[-1] $Haut-$RayonInt-$RayonExt,20,60,30,1,255,0,0,255
 rv[-1,-2,-3]
 
 #################################################
