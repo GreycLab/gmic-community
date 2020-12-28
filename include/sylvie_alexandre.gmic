@@ -36,7 +36,7 @@
 #@gui :_=link("https://github.com/dtschump/gmic-community","https://github.com/dtschump/gmic-community")
 #@gui :_=note("Les filtres contenus dans ce répertoire sont majoritairement traduits en français et/ou en cours de développement.")
 #@gui :_=note("The filters included in this directory are mostly translated into French and/or experimental.")
-#@gui :_=note("Version 2020/12/26 GMIC 2.9.5_pre")
+#@gui :_=note("Version 2020/12/27 GMIC 2.9.5_pre")
 
 samj_about :
 
@@ -23231,28 +23231,44 @@ samj_rien_various :
 ####     #@gui :_=note("7 \303\277   ÿ   )
 #################################################
 ##                                             ##
-##           samj_test_cercle et B             ##
+##              samj_test_cercle               ##
 ##                                             ##
 #################################################
-# version 20201226
-samj_test_cercle_B :
-# Cercle
-skip ${1=400}
-skip ${2=250}
-resize[-1] $1,{{h}/{w}*$1}
-EloigC=$2
-Larg={w}
-Haut={h}
-if $EloigC>{round({{$Larg/2}/{2*pi}})}
-	RayonInt={round({{$Larg/2}/{2*pi}})+$EloigC}
-else
-	RayonInt={round({{$Larg/2}/{2*pi}})}
+# version 20201227
+samj_test_cercle :
+skip ${1=1},${2=400},${3=250},${4=0} # type/largeur/éloignement cercle/angle départ arc/
+if $1==0
+	# Arc
+	skip ${1=300}
+	if {{w}/{h}}>{pi/2}
+		crop 0,0,{{{h}*pi/2}-1},{{h}-1}
+	endif
+	resize[-1] $2,{{h}/{w}*$2}
+	Larg={w}
+	Haut={h}
+	RayonInt=$Haut
+	RayonExt={$RayonInt+$Haut}
+	AngDep=$4 # rad
+	CirconfInt={2*pi*$RayonInt}
+	AngArrivee={$Larg/$RayonInt} # rad
+elif $1==1
+	# Cercle
+	resize[-1] $2,{{h}/{w}*$2}
+	EloigC=$3
+	Larg={w}
+	Haut={h}
+	if $EloigC>{round({{$Larg/2}/{2*pi}})}
+		RayonInt={round({{$Larg/2}/{2*pi}})+$EloigC}
+	else
+		RayonInt={round({{$Larg/2}/{2*pi}})}
+	endif
+	DiamInt={$RayonInt*2}
+	AngDep=0 # rad
+	CirconfInt={2*pi*$RayonInt}
+	AngArrivee={$AngDep+{2*pi}} # rad
+	RayonExt={$RayonInt+$Haut}
 endif
-DiamInt={$RayonInt*2}
-AngDep=0 # rad
-CirconfInt={2*pi*$RayonInt}
-AngArrivee={$AngDep+{2*pi}} # rad
-RayonExt={$RayonInt+$Haut}
+
 CirconfExt={2*pi*$RayonExt}
 DimLigneDebut={$RayonInt*$AngArrivee}
 DimLigneFin={$RayonExt*$AngArrivee}
@@ -23265,12 +23281,12 @@ LaTrai=0
 repeat $Haut
 	LaTrai={$LaTrai-1}
 	AbsLaTrai={abs($LaTrai)}
-	resize[$LaTrai] {$CirconfInt+{abs($LaTrai)*$Inc}},{h}
-	LargSplit$AbsLaTrai={$CirconfInt+{abs($LaTrai)*$Inc}}
+	resize[$LaTrai] {$CirconfInt+{{abs($LaTrai)-1}*$Inc}},{h}
+	LargSplit$AbsLaTrai={$CirconfInt+{{abs($LaTrai)-1}*$Inc}}
 done
 append y
 
-#### Nouvelle image
+#### Nouvelle image rendu
 DimNewImg={{$RayonExt+3}*2}
 $DimNewImg,$DimNewImg,1,4
 fill_color[-1] 0,0,0,0
@@ -23300,45 +23316,10 @@ repeat $Haut
 	done
 	IncY={$IncY+1}
 done
-#################################################
-samj_test_cercle :
-# Arc
-skip ${1=300}
-if {{w}/{h}}>{pi/2}
-	crop 0,0,{{{h}*pi/2}-1},{{h}-1}
-endif
-resize[-1] $1,{{h}/{w}*$1}
-Larg={w}
-Haut={h}
-RayonInt=$Haut
-RayonExt={$RayonInt+$Haut}
-AngDep=0 # rad
-CirconfInt={2*pi*$RayonInt}
-AngArrivee={$Larg/$RayonInt} # rad
-CirconfExt={2*pi*$RayonExt}
-DimLigneDebut={$RayonInt*$AngArrivee}
-DimLigneFin={$RayonExt*$AngArrivee}
-Inc={{$DimLigneFin-$DimLigneDebut}/$Haut}
 
-#### Étirer l'image selon les arcs
-to_rgba
-split[-1] y,$Haut
-LaTrai=0
-repeat $Haut
-	LaTrai={$LaTrai-1}
-	AbsLaTrai={abs($LaTrai)}
-	resize[$LaTrai] {$Larg+{abs($LaTrai)*$Inc}},{h}
-	LargSplit$AbsLaTrai={$Larg+{abs($LaTrai)*$Inc}}
-done
-append y
-
-#### Nouvelle image
-DimNewImg={{$RayonExt+3}*2}
+#### Nouvelle image infos
 $DimNewImg,$DimNewImg,1,4
-fill_color[-1] 255,255,255,255
-Xc={$DimNewImg/2}
-Yc={$DimNewImg/2}
-
+fill_color[-1] 0,0,0,0
 circle[-1] $Xc,$Yc,$RayonInt,1,0xFFFFFFFF,255,0,0,255
 circle[-1] $Xc,$Yc,$RayonExt,1,0xFFFFFFFF,0,255,0,255
 Xa={$Xc+{$RayonInt*cos($AngDep)}}
@@ -23346,35 +23327,13 @@ Ya={$Yc+{$RayonInt*sin($AngDep)}}
 Xb={$Xc+{$RayonInt*cos($AngDep+$AngArrivee)}}
 Yb={$Yc+{$RayonInt*sin($AngDep+$AngArrivee)}}
 polygon[-1] 3,$Xc,$Yc,$Xa,$Ya,$Xb,$Yb,1,255,255,0,255
-
-LaTrai=0
-IncY=0
-repeat $Haut
-	LaTrai={$LaTrai-1}
-	AbsLaTrai={abs($LaTrai)}
-	LargLigne=${LargSplit$AbsLaTrai} # AbsLaTrai max = ligne du haut la + large
-	IncX=0
-	IncA={$AngArrivee/$LargLigne}
-	repeat $LargLigne
-		Rn={$RayonInt+$IncY}
-		An={$AngDep+{$IncX*$IncA}}
-		Xp={$Xc+{$Rn*cos($An)}}
-		Yp={$Yc+{$Rn*sin($An)}}
-		Xf={$Xc+{$RayonExt*cos($An)}}
-		Yf={$Yc+{$RayonExt*sin($An)}}
-		PosX=$IncX
-		PosY={$Haut-$IncY}
-		+crop[-2] $PosX,$PosY,$PosX,$PosY,0
-		line[-2] $Xp,$Yp,$Xf,$Yf,1,{I(#-1)},255
-		rm[-1]
-		IncX={$IncX+1}
-	done
-	IncY={$IncY+1}
-done
+text[-1] $1-$2-$3-$4,20,20,30,1,255,0,0,255
+text[-1] $AngArrivee,20,40,30,1,255,0,0,255
+rv[-1,-2,-3]
 
 #################################################
 ##                                             ##
-##          FIN samj_test_cercle et B          ##
+##            FIN samj_test_cercle             ##
 ##                                             ##
 #################################################
 #################################################
