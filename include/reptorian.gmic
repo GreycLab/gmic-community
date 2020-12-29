@@ -84,7 +84,7 @@ rep_cstdmap:rep_chirikov_taylor $*
 #@cli : Author: Reptorian.\n
 #@cli : Default values: '_lines=500','_pts_per_line=5000','_k=1','_chirikov_mode=0','_offmode=0','_orientation=0'\n
 rep_chirikov_taylor:
-skip ${2=500},${3=5000},${4=1},${5=0},${6=0},${7=0}
+skip ${2=500},${3=5000},${4=1},${5=0},${6=0},${7=0},${8=1}
 
 if ${is_percent\ $1}
  if $!
@@ -128,42 +128,61 @@ else
  fi
 fi
 
-$chirikov_w,$chirikov_h,1,1
-
 if $5
  chirikov_mode=txi=fmod(xi+.5*yi);yi=fmod(yi-k*sin(txi));xi=fmod(txi+.5*yi)
 else
  chirikov_mode=yi=fmod(yi+k*sin(xi));xi=fmod(xi+yi)
 fi
 
-if $7 pt2image=i(#-1,round(yi/dpi*width),round(xi/dpi*height))=nline
-else pt2image=i(#-1,round(xi/dpi*width),round(yi/dpi*height))=nline
+if $7
+ coordinates=[round(yi/dpi*width),round(xi/dpi*height)]
+else
+ coordinates=[round(xi/dpi*width),round(yi/dpi*height)]
 fi
 
-eval ${-math_lib}"
- const width=w#-1;
- const height=h#-1;
- const lines=min(100*height,abs($2))+1;
- const pts=max(1,abs(round($3)));
- const tpts=lines*pts;
- const k=$4;
- const dpi=2*pi;
- fmod(a)=a-dpi*floor(a/dpi);
- ptsc=0;
- xi=0;
- iy=expr('x/w*2*pi',lines,1);
- for(nline=1,nline<=lines,nline++,
-  yi=iy[nline];
-  for(ptn=0,ptn<pts,ptn++,
-   "$chirikov_mode";
-   "$pt2image";
-   ptsc++;
-   if(!(ptsc%200000),run('progress ',100*(ptsc/tpts)));
-  );
- );"
+lines={min(100*$chirikov_h,abs($2))+1}
 
-progress 100
-progress -1
+$chirikov_w,$chirikov_h,1,1,-1
+
+$lines,1,1,1,"begin(const ww=w-1;const dpi=2*pi;);x/w*dpi;"
+
+if $8
+ f. ":begin(
+  const width=w#-2;
+  const height=h#-2;
+  const pts=max(1,abs(round($3)));
+  const k=$4;
+  const dpi=2*pi;
+  fmod(a)=a-dpi*floor(a/dpi);
+  xi=0;
+ );
+ yi=i;
+ for(ptn=0,ptn<pts,ptn++,
+  "$chirikov_mode";
+  coordinates="$coordinates";
+  cv=i(#-2,coordinates[0],coordinates[1]);
+  i(#-2,coordinates[0],coordinates[1])=max(cv,x);
+ );"
+else
+ f. ">begin(
+  const width=w#-2;
+  const height=h#-2;
+  const pts=max(1,abs(round($3)));
+  const k=$4;
+  const dpi=2*pi;
+  fmod(a)=a-dpi*floor(a/dpi);
+ xi=0;
+ );
+ yi=i;
+ for(ptn=0,ptn<pts,ptn++,
+  "$chirikov_mode";
+  coordinates="$coordinates";
+  cv=i(#-2,coordinates[0],coordinates[1]);
+  i(#-2,coordinates[0],coordinates[1])=max(cv,x);
+ );"
+fi
+
+rm.
 
 if $6
  if $7
