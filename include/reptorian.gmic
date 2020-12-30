@@ -3881,7 +3881,6 @@ endl done
 #@cli : Default values: '_alpha_exponential_factor=0','_maxalp=n/a','_cmykmode=0'
 #@cli :
 #@cli : Author: Reptorian.
-
 rep_axis_streak_color:
 skip ${3=0},${4=},${5=0}
 
@@ -3917,65 +3916,45 @@ repeat $! l[$>]
  f. i^(1+$exp_f)
  
  if $1 
-  outdata_dim={w},1,{d},{s#-3*h}
+  outdata_dim={w},1,{d},{s#0}
   outdata_coords=x,yy
-  outdata_pos=yy*ss
   if $2 direction=yy=hh-1,yy>=0,yy--
   else direction=yy=0,yy<hh,yy++
   fi
  else 
-  outdata_dim=1,{h},{d},{s#-3*w}
+  outdata_dim=1,{h},{d},{s#0}
   outdata_coords=xx,y
-  outdata_pos=xx*ss
   if $2 direction=xx=0,xx<ww,xx++
   else direction=xx=ww-1,xx>=0,xx--
   fi
  fi
  
  $outdata_dim,":begin(
-  const ww=w#-1;
-  const hh=h#-1;
-  const ss=s#-3;
-  const cols=s#-2;
+  const ww=w#0;
+  const hh=h#0;
  );
  start_val=1;
- outdata=vectors(0);
  for("$direction",
-  pos="$outdata_pos";
-  start_val?
-  (
+  start_val?(
+   start_val=0;
    col=I(#-2,"$outdata_coords",z);
    alp=i(#-1,"$outdata_coords",z,0);
    temp=[col,alp];
-   for(posv=0,posv<ss,posv++,outdata[pos+posv]=temp[posv];);
-   start_val=0;
   ):(
    newcol=I(#-2,"$outdata_coords",z);
    newalp=i(#-1,"$outdata_coords",z,0);
    newinfo=[newcol,newalp];
-   !newalp?(
-    for(posv=0,posv<ss,posv++,outdata[pos+posv]=temp[posv];);
-   ):
-   newalp==1?(
-    col=newcol;
-    alp=newalp;
-    temp=[col,alp];
-    for(posv=0,posv<ss,posv++,outdata[pos+posv]=temp[posv];);
+   !newalp?(I(#0,"$outdata_coords",z)=temp;):
+   newalp==1?(temp=newinfo;
    ):(
       col=newcol*newalp+(1-newalp)*col;
       alp=alp+newalp*(1-alp);
       temp=[col,alp];
-      for(posv=0,posv<ss,posv++,outdata[pos+posv]=temp[posv];);
+      I(#0,"$outdata_coords",z)=temp;
    );
   );
- );
- outdata;
- "
- l. 
-  s c,-4 
-  if $1 a y else a x fi 
- endl
- k. sh. {s-1} *. $alp rm.
+ );"
+ rm[1-3]
 endl done
 #@cli rep_mn: eq. to 'rep_multinormalize' : (+)
 rep_mn: rep_multinormalize $*
@@ -6565,12 +6544,8 @@ skip ${1=-1},${2=1},${3=1},${4=0},${5=}
 any_channels=0
 tcr=3
 influence_factor={min(abs($3),1)}
-position={(($1+1)/2)}
+position={min(max(($1+1)/2,1),0)}
 if $2 position={1-$position} fi
-
-if   $position<0 position=0
-elif $position>1 position=1
-fi
 
 if narg($5)
  if $5>0
@@ -6587,20 +6562,19 @@ if $2
  count_limit=h#0
  out_mode=q_val[x]?I#0
  check_coords=x,pos
- pos_copy=I(#4,x,et_pos)=I(#0,x,pos)
+ pos_copy=I(#-1,x,et_pos)=I(#0,x,pos)
 else
  count_limit=w#0
  out_mode=q_val[y]?I#0
  check_coords=pos,y
- pos_copy=I(#4,et_pos,y)=I(#0,pos,y)
+ pos_copy=I(#-1,et_pos,y)=I(#0,pos,y)
 fi
 
 if $influence_factor
  repeat $! l[$>]
   if s==2||s>$tcr||$any_channels
   
-   sh 0,{s-2}
-   sh.. {s}
+   sh. {s-1}
    
    if $2 {w},1,{d},1,:sum([crop(#-1,x,0,z,0,1,h#-1,1,1)]$cond)
    else  1,{h},{d},1,:sum([crop(#-1,0,y,z,0,w#-1,1,1,1)]$cond)
@@ -6614,7 +6588,7 @@ if $influence_factor
    );
    "$out_mode""
    
-   f.. ":begin(
+   f.. "*begin(
     const influence_factor="$influence_factor";
     const position="$position";
     const count_limit="$count_limit";
@@ -6631,7 +6605,7 @@ if $influence_factor
     n_pos+=t_pos*position;
     for(pos=0,pos<count_limit,pos++,
      if(N,
-      i(#2,"$check_coords",z,0)"$cond"?(
+      i(#-3,"$check_coords",z,0)"$cond"?(
         N--;
         et_pos=lerp(pos,n_pos,influence_factor);
         "$pos_copy";
@@ -6641,9 +6615,7 @@ if $influence_factor
      );
     );
    );"
-   
-   rm[^-1]
-   
+   rm[0-2]
   fi
  endl done
 fi
