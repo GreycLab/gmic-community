@@ -816,6 +816,38 @@ gcd_cumul_math : skip ${1=1},${2=1},${3="add"},${4=0}
 fx_gcd_cumul_math_preview :
   gui_split_preview "fx_gcd_cumul_math ${1--2}",$-1
 
+#@gui Upscale [Edge] : gcd_upscale_edge, gcd_upscale_edge_preview(0)
+#@gui : note = note("<i>Edge preserving upscale</i>"), sep = separator()
+#@gui : Factor = int(2,1,8)
+#@gui : Values = choice("cut","normalize","unbounded")
+#@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2021/01/04</i>.</small>")
+#@gui : note = note("\n<small>Median filtered upscale for high scale factors.</small>")
+#@gui : note = note("<small>Dimensions are multiplied by specified factor.</small>")
+gcd_upscale_edge : skip ${1=2},${2=1}
+  repeat $! l[$>]
+    mx={[im,iM]}
+    nw,nh,ms,bs={[w,h,1.75,1.5]*$1}
+    +r $nw,$nh,100%,100%,3
+    gcd_l2median_patch. $ms
+    +ri. [0],2 -[0,-1] ri[0] .
+    boxfilter.. $bs +
+    if $2<1 c $mx elif $2<2 n $mx fi
+  endl done
+
+gcd_upscale_edge_preview :
+  z 25%,25%,75%,75% gcd_upscale_edge $*
+
+# Allows non-integer median kernel sizes
+gcd_l2median_patch : skip ${1=3},${2=5} # area, iters
+  repeat $! l[$>]
+  m={iM} / $m +boxfilter $1 # initial estimate
+  repeat $2 # average euclidean distance
+    +sqr.. boxfilter. $1 +boxfilter[0] $1 *. -2 *. [1] sqr[1]
+    add[^0] compose_channels. add max. 0 +lt. 1e-10 +[-2,-1]
+    +/[0,-1] ^.. -1 rv[-2,-1] # x/d(y), 1/d(y)
+    boxfilter[-2,-1] $1 +eq. 0 +[-2,-1] /[-2,-1] max. 0
+  done k. * $m endl done
+
 #@gui Upscale [Noise] : gcd_upscale_noise, gcd_upscale_noise_preview(0)
 #@gui : note = note("<i>Upscale 2x using randomized estimation of original</i>"), sep = separator()
 #@gui : Noise = int(16,0,32)
