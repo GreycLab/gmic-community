@@ -48,7 +48,7 @@
 #@cli : Apply dynamic contrast using formula found by Remake at forums.getpaint.net. Original source code - https://forums.getpaint.net/topic/117538-dynamic-contrast/?tab=comments#comment-578867 . It is similar to Photoshop's Dynamic Contrast.
 #@cli :
 #@cli : Author: Reptorian.
-#@cli : Default values: '_threshold=128','_intensity=255' 
+#@cli : Default values: '_threshold=128','_intensity=255'
 rep_dynamic_contrast:
 skip ${2=128},${3=255}
 repeat $!
@@ -612,7 +612,7 @@ repeat $! l[$>]
  if ${is_percent\ $4} thickness={round(abs($4)*$hypo)}
  else thickness={round(abs($4))}
  fi
- 
+
  img_dims={w},{h}
 
  repeat $2
@@ -621,11 +621,11 @@ repeat $! l[$>]
   +convolve_fft[0] [-1],$7
   rm..
  done
- 
+
  rm[0]
- 
+
  output_splinter
- 
+
 endl done
 um output_splinter
 #@cli rep_splinter_blur_convolve_map: _length,_thickness,_angle,_contrast,_bisided={ 0=one-line | two-line }
@@ -3738,7 +3738,7 @@ repeat $! l[$>]
     !i?(
      v=vectorcols(0);
      vb=J(#-2,0,-1);
-     vd=J(#-2,-1,0);                
+     vd=J(#-2,-1,0);               
      vf=J(#-2,1,0);
      vh=J(#-2,0,1);
      j(0,-1)?(targ++;v+=vb;);
@@ -3839,19 +3839,19 @@ repeat $! l[$>]
  if $3<=-1 exp_f=-{1-10^-8} else exp_f=$3 fi
  f i^(1+$exp_f)
 
- if $1 
+ if $1
   outdata_dim={w},1,{d},1
   outdata_coords=x,yy,z
   outdata_dimref=hh
   outdata_pos=yy
-  if $2 
+  if $2
    direction=yy=hh,yy>0,yy--
    end_level=yy
-  else 
+  else
    direction=yy=0,yy<hh,yy++
    end_level=(hh-yy)
   fi
- else 
+ else
   outdata_dim=1,{h},{d},1
   outdata_coords=xx,y,z
   outdata_dimref=ww
@@ -3859,7 +3859,7 @@ repeat $! l[$>]
   if $2
    direction=xx=0,xx<ww,xx++
    end_level=(ww-xx)
-  else 
+  else
    direction=xx=ww,xx>0,xx--
    end_level=xx
   fi
@@ -3883,27 +3883,28 @@ repeat $! l[$>]
  rm.
 
 endl done
-#@cli rep_axis_streak_color: orientation,direction,_alpha_exponential_factor,_maxval>0_cmykmode={ 0=non-cmyk | 1=cmyka_mode }
+#@cli rep_axis_streak_color: orientation,direction,_alpha_exponential_factor,_maxval>0,_add2new={ 0=add2old | 1=add2new },_cmykmode={ 0=non-cmyk | 1=cmyka_mode }
 #@cli : Streaks colored pixels taking into account of opacity.
 #@cli : '_alpha_exponential_factor' is used to manipulate the alpha mixing within pixels. The more power that is assigned to the alpha, the more mixing there would be.
 #@cli : '_maxval' divides the alpha channel internally to normalize ranges to 0-1. A error will appear if not normalized. By default, it used the max alpha channel value.
+#@cli : '_add2new' defines whether to streak data on old image or to streak pixel data onto a new image. Used for Perspective Streak.
 #@cli : '_cmykmode' is only used in case of using only cmyk images. Not needed in normal cases at all.
 #@cli : Default values: '_alpha_exponential_factor=0','_maxalp=n/a','_cmykmode=0'
 #@cli :
 #@cli : Author: Reptorian.
 rep_axis_streak_color:
-skip ${3=0},${4=},${5=0}
+skip ${3=0},${4=},${5=0},${6=0}
 
 tcr=3
 
-if $5 tcr+=1 fi
+if $6 tcr+=1 fi
 
 if narg($4) if $4==0 return fi fi
 
 repeat $! l[$>]
- 
+
  if s==1||s==$tcr break fi
- 
+
  vv=0
  repeat s
   sh $>
@@ -3911,7 +3912,7 @@ repeat $! l[$>]
   rm.
  done
  if !$vv break fi
- 
+
  sh. 0,{s-2}
  sh.. {s}
  f.. i#-1?I
@@ -3922,14 +3923,14 @@ repeat $! l[$>]
  if iM#-1>1||im#-1<0 error alpval(valid)==F fi
  if $3<=-1 exp_f=-{1-10^-8} else exp_f=$3 fi
  f. i^(1+$exp_f)
- 
- if $1 
+
+ if $1
   outdata_dim={w},1,{d},{s#0}
   outdata_coords=x,yy
   if $2 direction=yy=hh-1,yy>=0,yy--
   else direction=yy=0,yy<hh,yy++
   fi
- else 
+ else
   outdata_dim=1,{h},{d},{s#0}
   outdata_coords=xx,y
   if $2 direction=xx=0,xx<ww,xx++
@@ -3937,6 +3938,18 @@ repeat $! l[$>]
   fi
  fi
  
+ if $5 {w#0},{h#0},{d#0},{s#0}
+  col_info=-3
+  alp_info=-2
+  targ_info=#-1
+  outdata_gen_1=I($targ_info,$outdata_coords,z)=temp;
+ else
+  col_info=-2
+  alp_info=-1
+  targ_info=#0
+  outdata_gen_0=I($targ_info,$outdata_coords,z)=temp;
+ fi
+
  $outdata_dim,":begin(
   const ww=w#0;
   const hh=h#0;
@@ -3945,24 +3958,27 @@ repeat $! l[$>]
  for("$direction",
   start_val?(
    start_val=0;
-   col=I(#-2,"$outdata_coords",z);
-   alp=i(#-1,"$outdata_coords",z,0);
+   col=I(#"$col_info","$outdata_coords",z);
+   alp=i(#"$alp_info","$outdata_coords",z,0);
    temp=[col,alp];
   ):(
-   newcol=I(#-2,"$outdata_coords",z);
-   newalp=i(#-1,"$outdata_coords",z,0);
+   newcol=I(#"$col_info","$outdata_coords",z);
+   newalp=i(#"$alp_info","$outdata_coords",z,0);
    newinfo=[newcol,newalp];
-   !newalp?(I(#0,"$outdata_coords",z)=temp;):
+   !newalp?(I("$targ_info","$outdata_coords",z)=temp;):
    newalp==1?(temp=newinfo;
    ):(
+      "$outdata_gen_1"
       col=newcol*newalp+(1-newalp)*col;
       alp=alp+newalp*(1-alp);
       temp=[col,alp];
-      I(#0,"$outdata_coords",z)=temp;
+      "$outdata_gen_0"
    );
   );
  );"
- rm[1-3]
+ if $5 rm[^-2]
+ else rm[1-3]
+ fi
  sh. {s-1} *. $alp rm.
 endl done
 #@cli rep_mn: eq. to 'rep_multinormalize' : (+)
@@ -5187,7 +5203,7 @@ dd={d#0}
 ss={s#0}
 
 if narg($1)
- if im#0<0 mv={abs(im#0)+abs($1)} -[0] {im#0}  
+ if im#0<0 mv={abs(im#0)+abs($1)} -[0] {im#0} 
  else mv={abs($1)} fi
 else
  if im#0<0 -[0] {im#0} fi
@@ -5252,7 +5268,7 @@ elif s#0==4 s[0] c,-3 to_rgb[0] rm[1] rgb2hsl8[0] channels[0] 2
 fi
 
 if narg($1)
- if im#0<0 mv={abs(im#0)+abs($1)} -[0] {im#0}  
+ if im#0<0 mv={abs(im#0)+abs($1)} -[0] {im#0} 
  else mv={abs($1)} fi
 else
  if im#0<0 -[0] {im#0} fi
@@ -5279,8 +5295,8 @@ round.. 1
 $1,1,1,{s#-1}
 f[0] "I[#-1,i]+=I(#1,x,y,z);i"
 +histogram[0] $1,0,$1
-+eq. 0 
-add[-2] [-1] 
++eq. 0
+add[-2] [-1]
 div[-3,-2]
 inpaint_pde.. .
 rm[-4,-3,-1]
@@ -6642,9 +6658,9 @@ fi
 if $influence_factor
  repeat $! l[$>]
   if s==2||s>$tcr||$any_channels
-  
+ 
    sh. {s-1}
-   
+  
    if $2 {w},1,{d},1,:sum([crop(#-1,x,0,z,0,1,h#-1,1,1)]$cond)
    else  1,{h},{d},1,:sum([crop(#-1,0,y,z,0,w#-1,1,1,1)]$cond)
    fi
@@ -6656,7 +6672,7 @@ if $influence_factor
     q_val=veq(p_val,count_limit);
    );
    "$out_mode""
-   
+  
    f.. "*begin(
     const influence_factor="$influence_factor";
     const position="$position";
@@ -7481,7 +7497,7 @@ rep_tfrac: rep_thorn_fractal $*
 #@cli : - Style List -
 #@cli :
 #@cli : List here below contains all the list of style. The 'asterisk' or * means the line contains a note.
-#@cli : 
+#@cli :
 #@cli :   n<-1* = Custom Alternating Formula
 #@cli :   -1 = Custom Formula
 #@cli :   0  = Normal
@@ -7505,37 +7521,40 @@ rep_tfrac: rep_thorn_fractal $*
 #@cli :   18 = Unearthing Origami
 #@cli :   19 = Cubic Unearthing
 #@cli :   20 = Webbing Cubic Unearthing
-#@cli :   21 = Chaotic Hooks
-#@cli :   22 = Echo Wide
-#@cli :   23 = Echo Squircle
-#@cli :   24 = Echo Hall
-#@cli :   25 = Echo Hall 2
-#@cli :   26 = Liquid Parabolic
-#@cli :   27 = Chaos-Vibrato
-#@cli :   28 = Chaos Deep-Vibrato
-#@cli :   29 = Chaos Spacetime
-#@cli :   30 = Parabolic
-#@cli :   31 = Parabolic Chaos
-#@cli :   32 = Cubic-Diamond Chaos
-#@cli :   33 = C-Line
-#@cli :   34 = Contour Chaos
-#@cli :   35 = Spiderweb-Diamond
-#@cli :   36 = Acrylica
-#@cli :   37 = Refractive Space
-#@cli :   38 = Smooth-Artistry
-#@cli :   39 = Ferrofluid
-#@cli :   40 = Triangular Interweaving
-#@cli :   41 = Fabric Chaos
-#@cli :   42 = Reverse Tangent Division
-#@cli :   43 = Chaotic Tangent
-#@cli :   44 = Alternating Chaos 1 (Legacy)
-#@cli :   45 = Alternating Chaos 2 (Legacy)
-#@cli :   46 = Alternating Chaos 3 (Legacy)
-#@cli :   47 = Alternating Chaos 4 (Legacy)
-#@cli :   48 = Alternating Chaos 1
-#@cli :   49 = Alternating Chaos 2
-#@cli :   50 = Alternating Chaos 3
-#@cli :   51 = Alternating Chaos 4
+#@cli :   21 = Unearthing Chaotic Hooks
+#@cli :   22 = Chaotic Hooks
+#@cli :   23 = Sinusoidal Liquid
+#@cli :   24 = Cosinusoidal Liquid
+#@cli :   25 = Echo Wide
+#@cli :   26 = Echo Squircle
+#@cli :   27 = Echo Hall
+#@cli :   28 = Echo Hall 2
+#@cli :   29 = Liquid Parabolic
+#@cli :   30 = Chaos-Vibrato
+#@cli :   31 = Chaos Deep-Vibrato
+#@cli :   32 = Chaos Spacetime
+#@cli :   33 = Parabolic
+#@cli :   34 = Parabolic Chaos
+#@cli :   35 = Cubic-Diamond Chaos
+#@cli :   36 = C-Line
+#@cli :   37 = Contour Chaos
+#@cli :   38 = Spiderweb-Diamond
+#@cli :   39 = Acrylica
+#@cli :   40 = Refractive Space
+#@cli :   41 = Smooth-Artistry
+#@cli :   42 = Ferrofluid
+#@cli :   43 = Triangular Interweaving
+#@cli :   44 = Fabric Chaos
+#@cli :   45 = Reverse Tangent Division
+#@cli :   46 = Chaotic Tangent
+#@cli :   47 = Alternating Chaos 1 (Legacy)
+#@cli :   48 = Alternating Chaos 2 (Legacy)
+#@cli :   49 = Alternating Chaos 3 (Legacy)
+#@cli :   50 = Alternating Chaos 4 (Legacy)
+#@cli :   51 = Alternating Chaos 1
+#@cli :   52 = Alternating Chaos 2
+#@cli :   53 = Alternating Chaos 3
+#@cli :   54 = Alternating Chaos 4
 #@cli :
 #@cli : * = The absolute of value is the numbers of vx,vy next to '_function_angle'. Per loop, every two different functions are assigned instead.
 #@cli :
@@ -7547,12 +7566,12 @@ rep_tfrac: rep_thorn_fractal $*
 rep_thorn_fractal:
 skip ${2=50000},${3=255},${4=4},${5=0},${6=0},${7=1},${8=1},${9=1},${10=1},${11=0},${12=0},${13=0},${14=},${15=}
 if $1<0 if !(narg($14)&&narg($15)) error "When using custom formula, there must be an arguments into custom_x and custom_y variables" fi fi
-if $1>51 error "Formula variable cannot be greater than 47" fi
+if $1>54 error "Formula variable cannot be greater than 54" fi
 if $2<=0 error "Escape Variable cannot be zero or less than zero!" fi
 if $3<1 error "Iteration Variable must be at least 1!" fi
 if $4<1 error "Subsampling level must be at least 1!" fi
 if !(($7>0&&$8>0)&&$9>0) error "Repeat variables cannot be 0!" fi
-if $1>47
+if $1>50
  chaos_a=a/cfb
  chaos_b=b/cfa
 else
@@ -7589,7 +7608,7 @@ if $activate_overload==2
 else
  fta=atan(vx)
  ftb=atan(vy)
- if $1>47 ovf_place_pos=if(use_altlim,if(altern==altlim,cfa=fta();cfb=ftb(););); fi
+ if $1>50 ovf_place_pos=if(use_altlim,if(altern==altlim,cfa=fta();cfb=ftb(););); fi
 fi
 repeat $! l[$>]
 
@@ -7604,7 +7623,7 @@ else sd=yy*=sd;
 fi
 
 f "begin(altern=0;
- const chaos=$1>43;
+ const chaos=$1>46;
  const ang=pi*($13/180);
  const sd=max(w,h)/min(w,h);
  const cos_ang=cos(ang);
@@ -7616,7 +7635,7 @@ f "begin(altern=0;
  const szy=$9*rpi*$7;
  const overload="$activate_overload";
  const activate_alt_bool=chaos||$1<-1||($1==-1&&overload);
- const use_altlim=($1<0&&(overload==2))||$1>47;
+ const use_altlim=($1<0&&(overload==2))||$1>50;
  chaos?(const altlim=3;)
  :(use_altlim?(
     const max_vec_pos=(overload?($-1<0?0:1):1);
@@ -7634,8 +7653,8 @@ f "begin(altern=0;
  overload?(const count_overload=abs($-1);):(const count_overload=0;);
  chaos?(
   if(use_altlim
-  ,const ff=$1-44;
-  ,const ff=$1-40;
+  ,const ff=$1-47;
+  ,const ff=$1-43;
   );
  ):(const ff=abs($1)-1+count_overload;);
  ($1<-1||($1==-1&&overload))?(
@@ -7646,7 +7665,7 @@ f "begin(altern=0;
    ):(
     vxf(a,b)=([${14--2}])[min(altern,overlim)*2];
     vyf(a,b)=([${14--2}])[min(altern,overlim)*2+1];
-   ); 
+   );
   ):(
    vxf(a,b)=([${14--1}])[altern*2];
    vyf(a,b)=([${14--1}])[altern*2+1];
@@ -7741,98 +7760,110 @@ f "begin(altern=0;
   vyf(a,b)=(a+tan(b)/tan(a))/sin(b);
  ):
  $1==21?(
+  vxf(a,b)=b+tan(a)/a/cos(b)+a/sin(b);
+  vyf(a,b)=a+tan(b)/b/cos(a)+b/sin(a);
+ ):
+ $1==22?(
   vxf(a,b)=b+tan(a)/(a/cos(b))+a/sin(b);
   vyf(a,b)=a+tan(b)/(b/cos(a))+b/sin(a);
  ):
- $1==22?(
+ $1==23?(
+  vxf(a,b)=a+3*sin(b)-pi;
+  vyf(a,b)=a+b+3*sin(a)-pi;
+ ):
+ $1==24?(
+  vxf(a,b)=a+3*cos(b)-pi;
+  vyf(a,b)=a+b+3*cos(a)-pi;
+ ):
+ $1==25?(
   vxf(a,b)=a/sin(a/sin(b));
   vyf(a,b)=b/cos(b/cos(a));
  ):
- $1==23?(
+ $1==26?(
   vxf(a,b)=a/cos(a/sin(b));
   vyf(a,b)=b/sin(b/cos(a));
  ):
- $1==24?(
+ $1==27?(
   vxf(a,b)=a/cos(a/atan(sin(b)));
   vyf(a,b)=b/sin(b/atan(cos(a)));
  ):
- $1==25?(
+ $1==28?(
   vxf(a,b)=a/sin(a/atan(cos(b)));
   vyf(a,b)=b/cos(b/atan(sin(a)));
  ):
- $1==26?(
+ $1==29?(
   vxf(a,b)=a/atan(cos(b));
   vyf(a,b)=b/atan(sin(a));
  ):
- $1==27?(
+ $1==30?(
   vxf(a,b)=(a+tanh(a*b))/cos(b);
   vyf(a,b)=(b+tanh(a*b))/sin(a);
  ):
- $1==28?(
+ $1==31?(
   vxf(a,b)=b+tan(b)/(a/(cos(b)))+a/(sin(a));
   vyf(a,b)=a+tan(a)/(b/(cos(a)))+b/(sin(b));
  ):
- $1==29?(
+ $1==32?(
   vxf(a,b)=(a+tanh(a+b))/cos(b);
   vyf(a,b)=(b+tanh(a+b))/sin(a);
  ):
- $1==30?(
+ $1==33?(
   vxf(a,b)=a/sin(b)/tan(b);
   vyf(a,b)=b/cos(a)/tan(a);
  ):
- $1==31?(
+ $1==34?(
   vxf(a,b)=a/(tan(b)*cos(b)*sin(b));
   vyf(a,b)=b/(tan(a)*cos(a)*sin(a));
  ):
- $1==32?(
+ $1==35?(
   vxf(a,b)=a/tan(cos(b));
   vyf(a,b)=b/tan(sin(a));
  ):
- $1==33?(
+ $1==36?(
   vxf(a,b)=(a+tanh(a*b))/(cos(b)*sin(a));
   vyf(a,b)=(b+tanh(a*b))/(sin(b)*cos(a));
  ):
- $1==34?(
+ $1==37?(
   vxf(a,b)=(a+tan(cos(a)*sin(b)))/cos(a);
   vyf(a,b)=(b+tan(sin(a)*cos(b)))/sin(b);
  ):
- $1==35?(
+ $1==38?(
   vxf(a,b)=(tan(a+b)*b)/cos(b);
   vyf(a,b)=(tan(a-b)*a)/sin(a);
  ):
- $1==36?(
+ $1==39?(
   vxf(a,b)=a/cos(b)*sin(a);
   vyf(a,b)=b/sin(a)*cos(b);
  ):
- $1==37?(
+ $1==40?(
   vxf(a,b)=a/tan(cos(b)+sin(b));
   vyf(a,b)=b/tan(cos(a)+sin(a));
  ):
- $1==38?(
+ $1==41?(
   vxf(a,b)=a+(tanh(a+b)/cos(b));
   vyf(a,b)=b+(tanh(a+b)/sin(a));
  ):
- $1==39?(
+ $1==42?(
   vxf(a,b)=(a/(cos(b)))/(b/(sin(a)));
   vyf(a,b)=(b/(cos(a)))/(a/(sin(b)));
  ):
- $1==40?(
+ $1==43?(
   vxf(a,b)=(a*tan(a+b))/sin(b);
   vyf(a,b)=(b*tan(a+b))/cos(a);
  ):
- $1==41?(
+ $1==44?(
   vxf(a,b)=a/(atan2(b^2,a^2)*tan(b));
   vyf(a,b)=b/(atan2(b^2,a^2)*tan(a));
  ):
- $1==42?(
+ $1==45?(
   vxf(a,b)=tan(a)/b;
   vyf(a,b)=tan(b)/a;
  ):
- $1==43?(
+ $1==46?(
   vxf(a,b)=a/atan(b/cos(a/sin(a)));
   vyf(a,b)=b/atan(a/sin(b/cos(b)));
  ):
- $1>43?(
+ $1>46?(
   vxf(a,b)=
    altern==0?a/cos(b):
    altern==1?a/sin(b):
@@ -9574,7 +9605,7 @@ gui_split_preview "gui_rep_acb $*",${-3--1}
 #@gui Thorn Fractal - Secant Sea:gui_rep_tfrac,gui_rep_tfrac_preview
 #@gui :_=note("Thorn Fractal is the fractal attributed to Andrew Wayne Graff, alternatively named the "Secant Sea".\nThe code was adapted from <a href="http://paulbourke.net/fractals/thorn/thorn_code.c">Sample C source code</a> provided by Adam Majewski.\n\nDocumentation - <a href="http://paulbourke.net/fractals/thorn/#dane">Thorn Fractal</a> by <a href="http://paulbourke.net/fractals/">Paul Bourke</a>\n\nAlternating Chaos formula are made by <a href="https://forums.getpaint.net/profile/45895-madjik/">MadJik</a>, and they are originally used in <a href="https://forums.getpaint.net/topic/111491-fractal-attractor-ymd170628/">Fractal Attractor</a> plugin for Paint.NET software."), _=separator()
 #@gui :_=note("<b>Style Setting</b>")
-#@gui :Predefined Formula=choice(0,"Normal","Normal Inverted","Arctangent","Tangent","Tanh Stroke","Asymphological Vibrato","Asymphological Basic","Asymphological Basic 2","Asymphochaos","Petallian","Semi-Thorny Petallian","Thorny Petal 1","Thorny Petal 2","Inflation","Inflation 2","Chaotic Creation","Earthing","Acrylic Earthing","Unearthing Origami","Cubic Unearthing","Webbing Cubic Unearthing","Chaotic Hooks","Echo Wide","Echo Squircle","Echo Hall","Echo Hall 2","Liquid Parabolic","Chaos-Vibrato","Chaos Deep-Vibrato","Chaos Spacetime","Parabolic","Parabolic Chaos","Cubic-Diamond Chaos","C-Line","Contour Chaos","Spiderweb-Diamond","Acrylica","Refractive Space","Smooth-Artistry","Ferrofluid","Triangular Interweaving","Fabric Chaos","Reverse Tangent Division","Chaotic Tangent","Alternating Chaos 1 [Legacy]","Alternating Chaos 2 [Legacy]","Alternating Chaos 3 [Legacy]","Alternating Chaos 4 [Legacy]","Alternating Chaos 1","Alternating Chaos 2","Alternating Chaos 3","Alternating Chaos 4")
+#@gui :Predefined Formula=choice(0,"Normal","Normal Inverted","Arctangent","Tangent","Tanh Stroke","Asymphological Vibrato","Asymphological Basic","Asymphological Basic 2","Asymphochaos","Petallian","Semi-Thorny Petallian","Thorny Petal 1","Thorny Petal 2","Inflation","Inflation 2","Chaotic Creation","Earthing","Acrylic Earthing","Unearthing Origami","Cubic Unearthing","Webbing Cubic Unearthing","Chaotic Hooks Unearthing","Chaotic Hooks","Sinusoidal Liquid","Cosinusoidal Liquid","Echo Wide","Echo Squircle","Echo Hall","Echo Hall 2","Liquid Parabolic","Chaos-Vibrato","Chaos Deep-Vibrato","Chaos Spacetime","Parabolic","Parabolic Chaos","Cubic-Diamond Chaos","C-Line","Contour Chaos","Spiderweb-Diamond","Acrylica","Refractive Space","Smooth-Artistry","Ferrofluid","Triangular Interweaving","Fabric Chaos","Reverse Tangent Division","Chaotic Tangent","Alternating Chaos 1 [Legacy]","Alternating Chaos 2 [Legacy]","Alternating Chaos 3 [Legacy]","Alternating Chaos 4 [Legacy]","Alternating Chaos 1","Alternating Chaos 2","Alternating Chaos 3","Alternating Chaos 4")
 #@gui :Custom Formula=choice(0,"None","Custom Formula","Alternating Custom Formula Level 1","Alternating Custom Formula Level 2","Alternative Custom Formula Level 3","Alternating Custom Formula Level 4")
 #@gui :_=separator()
 #@gui :_=note("<b>Fractal Calculation Constraints</b>")
