@@ -477,7 +477,7 @@ _gcd_tone_enhance :
 #@gui Deinterlace2x: gcd_deinterlace2x, gcd_deinterlace2x_preview(0)
 #@gui : note = note("<i>Blend 2x frames for 4:2:0 YUV</i>"), sep = separator()
 #@gui : Balance = int(40,1,255)
-#@gui : 2x Type = choice("DCCI2x","Box2x","Fast Blend","Set Aspect Only")
+#@gui : 2x Type = choice("DCCI2x","Edge","Fast Blend","Set Aspect Only")
 #@gui : Aspect = choice("None","1:1","4:3","5:4","16:9","16:10","2.35:1","1.85:1")
 #@gui : Interp = choice(2,"linear","bicubic","lanczos")
 #@gui : Ignore Current Aspect = bool(0)
@@ -496,7 +496,7 @@ gcd_deinterlace2x : skip ${1=40},${2=0},${3=0},${4=2},${5=0},${6=1}
     l[-2,-1] r $w,2,$d,$hh,-1 +shift 0,0,0,-1 r $w,2,$d,50%,4 r $w,$hh,$d,1,-1 endl
     a[0,2,3] c a[^0] c yuv2rgb # frames are now separate
     if $2==0 scale_dcci2x ,,1 r 50%,100%,1,3,4
-    elif $2==1 gcd_scale_box2x , r 50%,100%,1,3,4
+    elif $2==1 gcd_upscale_edge 2 r 50%,100%,1,3,4
     else # 2xH scaling
       a={2/3} b={-1/12} ($b,$a,$b;$b,$a,$b;0,0,0) +convolve[^-1] . rm...
       r 100%,200%,1,3,4 shift[-2,-1] 0,1 +[-3,-1] +[-3,-1]
@@ -821,15 +821,16 @@ fx_gcd_cumul_math_preview :
 #@gui : Factor = choice(1,"custom","2","3","4","5","6","7","8")
 #@gui : Factor = float(1,1,8)_0
 #@gui : Values = choice(1,"unbounded","cut","normalize")
-#@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2021/01/09</i>.</small>")
-#@gui : note = note("\n<small>Vector smoothed upscale for high scale factors.</small>")
+#@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2021/01/10</i>.</small>")
+#@gui : note = note("\n<small>Variance smoothed upscale for high scale factors.</small>")
 #@gui : note = note("<small>Image dimensions are multiplied by specified factor.</small>")
 fx_gcd_upscale_edge : skip ${1=1},${2=1},${3=1}
   gcd_upscale_edge {$1==0?$2:$1+1},$3
   u "{$1}{$2}_"{2*($1==0)}"{$3}"
 
 fx_gcd_upscale_edge_preview :
-  z 25%,25%,75%,75% fx_gcd_upscale_edge $*
+  A,B={P=0.5/($1==0?$2:$1+1);[-P,P]*100+50}
+  z $A%,$A%,$B%,$B% fx_gcd_upscale_edge $*
 
 #@cli gcd_upscale_edge : factor>=1,_value_action={ 0=none | 1=cut | 2=normalize }
 #@cli : Upscale selected images with an edge-sharpening algorithm.
@@ -1132,32 +1133,6 @@ gcd_fgmask : skip ${1=0}
     max[-2,-1] *[0,1] *[0] -1
     watershed. .. rm..
     shrink_xy 20 - 1
-  endl done
-
-#@gui Upscale [Box]: gcd_upscale_box, gcd_upscale_box_preview(0)
-#@gui : note = note("<i>Box average upscale</i>"), sep = separator()
-#@gui : Upscale Factor = choice("2x","4x"), sep = separator()
-#@gui : CbCr Median = bool(0)
-#@gui : Sharpen = bool(0), sep = separator()
-#@gui : note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2016/09/27</i>.</small>")
-#@gui : note = note("\n<small>Soft upscale with sharpening, may cause edge artifacts.</small>")
-gcd_upscale_box : skip ${1=0},${2=0},${3=0}
-  if $2 ac "median 5,20",ycbcr_cbcr fi
-  gcd_scale_box2x $1,$3 c 0,255
-
-gcd_upscale_box_preview :
-  if $1 z 37.5%,37.5%,62.5%,62.5% else z 25%,25%,75%,75% fi
-  gcd_upscale_box $*
-
-gcd_scale_box2x : skip ${1=0},${2=0}
-  repeat $! l[$>]
-    if $1>0 (400,5,7,49,33) else (200,3,3,9,5) fi
-    +r.. {@0}%,{@0}% median. {1,@1} boxfilter. {1,@1}
-    +ri. [0],2 -[0,-1] ri[0] .
-    if $2
-      [0] boxfilter[0] {1,@2} *[0] {1,@3}
-      -[0,-1] /[0] {1,@4} rm.. +
-    else boxfilter[0] {1,@2} rm.. + fi
   endl done
 
 #@gui Depth Blur : gcd_depth_blur, gcd_depth_blur(1)
