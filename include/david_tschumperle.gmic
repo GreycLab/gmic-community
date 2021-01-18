@@ -1793,6 +1793,75 @@ dodoc :
   q
 
 
+
+#@gui Blur [Quad] : fx_blur_quad, fx_blur_quad_preview
+#@gui : note = note("<small><b>Blur parameters:</b></small>")
+#@gui : 1st Amplitude (%) = float(0,0,100)
+#@gui : 2nd Amplitude (%) = float(5,0,100)
+#@gui : Brightness (%) = float(0,-100,100)
+#@gui : Contrast (%) = float(0,-100,100)
+#@gui : Gamma (%) = float(0,-100,100)
+#@gui : Mode = choice{1,"Add","Alpha","And","Average","Blue","Burn","Darken","Difference",
+#@gui : "Divide","Dodge","Edges","Exclusion","Freeze","Grain Extract","Grain Merge","Green","Hard Light",
+#@gui : "Hard Mix","Hue","Interpolation","Lighten","Lightness","Linear Burn","Linear Light","Luminance",
+#@gui : "Multiply","Negation","Or","Overlay","Pin Light","Red","Reflect","Saturation",
+#@gui : "Soft Burn","Soft Dodge","Soft Light","Screen","Stamp","Subtract","Value","Vivid Light","Xor"}
+#@gui : Opacity (%) = float(100,0,100)
+#@gui : sep = separator()
+#@gui : note = note("<small><b>Quad coordinates:</b></small>")
+#@gui : P0 = point(40,25,0,1)
+#@gui : P1 = point(60,25,0,1)
+#@gui : P2 = point(95,90,0,1)
+#@gui : P3 = point(5,90,0,1)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2021/01/18</i>.</small>")
+fx_blur_quad :
+  mode=${"arg 1+$6,add,alpha,and,average,blue,burn,darken,difference,divide,dodge,edges,exclusion,freeze,grainextract,\
+              grainmerge,green,hardlight,hardmix,hue,interpolation,lighten,lightness,linearburn,linearlight,\
+              luminance,multiply,negation,or,overlay,pinlight,red,reflect,saturation,softburn,softdodge,softlight,\
+              screen,stamp,subtract,value,vividlight,xor"}
+  repeat $! l[$>]
+    100%,100%,1,3
+    100%,100%,1,[0],"
+      begin(
+        const interpolation = 1;
+        const boundary = 1;
+        const w1 = w - 1;
+        const h1 = h - 1;
+        x0 = $8*w1%; y0 = $9*h1%;
+        x1 = $10*w1%; y1 = $11*h1%;
+        x2 = $12*w1%; y2 = $13*h1%;
+        x3 = $14*w1%; y3 = $15*h1%;
+      );
+      xw1 = x/w1;
+      yh1 = y/h1;
+      xl = lerp(x0,x3,yh1);
+      yl = lerp(y0,y3,yh1);
+      xr = lerp(x1,x2,yh1);
+      yr = lerp(y1,y2,yh1);
+      xc = lerp(xl,xr,xw1);
+      yc = lerp(yl,yr,xw1);
+      I(#1,round(xc),round(yc))+=[ x,y,1 ];
+      I(#0,xc,yc)"
+
+    f.. "B?[ R,G,0 ]/B:[ -1,-1,0 ]" channels.. 0,1
+    blur_xy. $1%,$2%
+    adjust_colors. ${3-5},0,0,0,255
+
+    to_a.
+    100%,100%,1,1,1 a[-2,-1] c
+    warp. ..,0,1,0 rm..
+    sh. 100% mul[-2,-1] channels. 0,{s-2}
+    blend[-2,-1] $mode,$7%
+
+  endl done
+
+fx_blur_quad_preview :
+  fx_blur_quad $*
+  polygon 4,$8%,$9%,$10%,$11%,$12%,$13%,$14%,$15%,0.5,0xCCCCCCCC,0,0,0,255
+  polygon 4,$8%,$9%,$10%,$11%,$12%,$13%,$14%,$15%,0.5,0x33333333,255
+
+
 # Local Variables:
 # mode: sh
 # End:
