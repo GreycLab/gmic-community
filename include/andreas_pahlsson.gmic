@@ -20,117 +20,116 @@
 #@gui Descreen : fx_pahlsson_descreen, fx_pahlsson_descreen_preview(0)
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse")
 #@gui : sep = separator(), note = note("<small>Author: <i>Andreas P&#229;hlsson</i>.      Latest update: <i>2016/27/06</i>.</small>")
-fx_pahlsson_descreen : -skip $*
-  -pahlsson_descreen
+fx_pahlsson_descreen : skip $*
+  pahlsson_descreen
 
 fx_pahlsson_descreen_preview :
-  -gui_split_preview "-fx_pahlsson_descreen 0",$-1
+  gui_split_preview "fx_pahlsson_descreen 0",$-1
 
 pahlsson_descreen :
-  -repeat $! -l[$>] -split_opacity -l[0] -to_rgb
-    -rgb2cmyk
-    -split c
-    -name[-4] C
-    -pahlsson_descreen_channel[-4]
-    -name[-3] M
-    -pahlsson_descreen_channel[-3]
-    -name[-2] Y
-    -pahlsson_descreen_channel[-2]
-    -name[-1] K
-    -pahlsson_descreen_channel[-1]
-    -append c
-    -cmyk2rgb
-  -endl -a c -endl -done
+  repeat $! l[$>] split_opacity l[0] to_rgb
+    rgb2cmyk
+    split c
+    name[-4] C
+    pahlsson_descreen_channel[-4]
+    name... M
+    pahlsson_descreen_channel...
+    name.. Y
+    pahlsson_descreen_channel..
+    name. K
+    pahlsson_descreen_channel.
+    append c
+    cmyk2rgb
+  endl a c endl done
 
 pahlsson_descreen_channel :
  # Keep the basename around for debugging purposes
  basename={0,b}
- -name[0] original
+ name[0] original
  # Get original dimensions.
  crop1=0,0,{original,w-1},{original,h-1},0
  crop2=0,{original,h},100%,100%,0
- -float2fft8[original]
- -name[original] fft
+ float2fft8[original]
+ name[original] fft
  # Clone the image to split in real/imaginary parts for later recombination.
- -i [fft]
- -name[-2] real
- -name[-1] imaginary
- -crop[real] $crop1
- -crop[imaginary] $crop2
+ i [fft]
+ name.. real
+ name. imaginary
+ crop[real] $crop1
+ crop[imaginary] $crop2
  # Build a mask.
- -i [real]
- -name[-1] mask
+ i [real]
+ name. mask
  # Peak detection with DOG. Maybe not the best way. Does work though.
  # Factor of 1.6x, size relative to image. Not great for small images.
- -dog[mask] 0.5%,0.8%
- -normalize[mask] 0,255
- -threshold[mask] 64
- -normalize[mask] 0,255
- -negate[mask]
+ dog[mask] 0.5%,0.8%
+ normalize[mask] 0,255
+ threshold[mask] 64
+ normalize[mask] 0,255
+ negate[mask]
  # Make sure the center is not masked.
- -ellipse[mask] 50%,50%,7%,7%,255,255,255,255
+ ellipse[mask] 50%,50%,7%,7%,255,255,255,255
  # Make a blur mask. Not entirely sure why this is a good thing.
- -i [mask]
- -name[-1] blurmask
- -blur[blurmask] 1.6%
- -normalize[blurmask] 0,255
+ i [mask]
+ name. blurmask
+ blur[blurmask] 1.6%
+ normalize[blurmask] 0,255
  # Merge mask and blurmask
- -mul[mask,blurmask]
- -div[mask] 256
+ mul[mask,blurmask]
+ div[mask] 256
  # Apply the mask to the real part.
- -mul[mask,real]
- -div[real] 256 # Compensate for multiplication
+ mul[mask,real]
+ div[real] 256 # Compensate for multiplication
  # Recombine real with mask and imaginary part.
- -append[real] [imaginary],y
- -name[real] fft
- -remove[imaginary]
+ append[real] [imaginary],y
+ name[real] fft
+ remove[imaginary]
  # Inverse the FFT
- -fft82float[fft]
+ fft82float[fft]
 
 #@cli float2int8
 #@cli : Convert selected float-valued images to 8bits integer representations.
 float2int8 :
   e[^-1] "Convert float-valued image$? to 8bits integer representations."
-  v - repeat $! l[$>]
+  repeat $! l[$>]
     s c repeat $! l[$>]
       m={im} M={iM} quantize 16777216,0,1
       +>> 8 &. 255 +&.. 255 >>... 16
       ({'$m,$M'}) a y
     endl done a c
-  endl done v +
+  endl done
 
 #@cli int82float
 #@cli : Convert selected 8bits integer representations to float-valued images.
 int82float :
   e[^-1] "Convert 8bits integer representation$? to float-valued image$?."
-  v - repeat $! l[$>]
+  repeat $! l[$>]
     s c repeat $! l[$>]
       sh. {h-1},{h-1},0,0 m={t} rm.
       rows 0,{h-2} s y,3 *... 65536 *.. 256 -|
       skip ${n\ $m}
     endl done a c
-  endl done v +
+  endl done
 
 #@cli float2fft8
 #@cli : Convert selected float-valued images to 8bits fourier representations.
 float2fft8 :
   e[^-1] "Convert float-valued image$? to 8bits fourier representations."
-  v - repeat $! l[$>]
+  repeat $! l[$>]
     fftpolar +.. 1 log.. float2int8[-2,-1] a y
-  endl done v +
+  endl done
 
 #@cli fft82float
 #@cli : Convert selected 8bits fourier representations to float-valued images.
 fft82float :
   e[^-1] "Convert float-valued image$? to 8bits fourier representations."
-  v - repeat $! l[$>]
+  repeat $! l[$>]
     s y,2 int82float exp.. -.. 1 ifftpolar
-  endl done v +
-
-
+  endl done
 
 # Local Variables:
 # mode: sh
 # End:
 #
 # (End of G'MIC custom commands)
+

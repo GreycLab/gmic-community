@@ -3,7 +3,7 @@
 #  File        : afre.gmic
 #                ( G'MIC commands file )
 #
-#  Description : Personal G'MIC filters by afre.
+#  Description : G'MIC commands and filters by afre.
 #
 #  Copyright   : Alan Kwan
 #                ( https://discuss.pixls.us/u/afre )
@@ -39,42 +39,203 @@
 #
 
 #@gui _<b>Colors</b>
+#-------------------
+
+#@gui Brightness : afre_brightness, afre_brightness_preview(1)+
+#@gui : note = note("<strong>Enhance luminance brightness.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2020-2021 Jan8.</strong>\n\n")
+#@gui : Amount = int(50,-300,300)
+#@gui : Smooth = int(0,0,50)
+#@gui : note = note("\n\n<strong>Note</strong>\n\nG'MIC's preview is inaccurate. Apply the filter and review the results in your host editor.")
+#@cli afre_brightness : -300<=amount<=300,0<=smooth<=50
+#@cli : Enhance luminance brightness.
+#@cli : Default values: 'amount=50' and 'smooth=0'.
+afre_brightness : check "${1=50}>=-300 && ${2=0}>=0
+    && $1<=300 && $2<=50"
+  if !$1 return fi e[] "[afre]^_^) brightness: Enhance luminance brightness of image$? using amount=$1 and smooth=$2."
+  repeat $! l[$>] r={[im,iM]} . if $2>0 +afre_gui0_alt. 1,1e10
+      +>.. {100-$2}% blend_fade[1,2] . k[0,1] fi
+    ^.. {$1>0?0.5^($1/300):1} n.. $r afre_orien.. 1
+    +n. 0,1 f. "begin(const P=2^($1/100)); 1-(1-i)^P" n. $r
+    +n.. 0,1 f. "begin(const A=0.5; const P=0.05); if(i<=A,
+      A-A*(i/A)^P,-A+A*((1-i)/A)^P)" n. 0,1 blend_fade[1,2] . k[0,1]
+  afre_y50. 1 * c $r endl done
+
+afre_brightness_preview :
+  afre_brightness $*
+
+#@gui Contrast : afre_contrast, afre_contrast_preview(1)+
+#@gui : note = note("<strong>Enhance luminance contrast.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2020 Jan9.</strong>\n\n")
+#@gui : Amount = int(50,-200,200)
+#@gui : note = note("\n\n<strong>Note</strong>\n\nG'MIC's preview is inaccurate. Apply the filter and review the results in your host editor.")
+#@cli afre_contrast : -200<=amount<=200
+#@cli : Enhance luminance contrast.
+#@cli : Default value: 'amount=50'.
+afre_contrast : check "${1=50}>=-200 && $1<=200"
+  if !$1 return fi e[] "[afre]^_^) contrast: Enhance luminance contrast of image$? using amount=$1."
+  repeat $! l[$>] r={[im,iM]} . afre_orien.. 1
+    . +n. 0,1 f. "begin(const A=ia; const P=2^($1/100));
+      if(i<A,A*(i/A)^P,1-(1-A)*((1-i)/(1-A))^P)" n. $r
+    +n.. 0,1 f. gauss(i-0.5) n. 0,1 blend_fade[2,3] . k[0-2]
+    +n.. 0,1 f. "begin(const A=0.5; const P=0.05); if(i<=A,
+      A-A*(i/A)^P,-A+A*((1-i)/A)^P)" n. 0,1 blend_fade[1,2] . k[0,1]
+  afre_y50. 1 * n $r endl done
+
+afre_contrast_preview :
+  afre_contrast $*
+
+#@gui Local Contrast : afre_localcontrast, afre_localcontrast_preview(1)+
+#@gui : note = note("<strong>Enhance local contrast.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2020 Jul28-Sep5.</strong>\n\n")
+#@gui : Radius = int(1,1,10)
+#@gui : Amount = int(50,-100,100)
+#@gui : note = note("\n\n<strong>Note</strong>\n\nG'MIC's preview is inaccurate. Apply the filter and review the results in your host editor.")
+#@cli afre_localcontrast : 1<=radius<=10,-100<=_amount<=100
+#@cli : Enhance local contrast.
+#@cli : Default values: 'radius=1' and 'amount=50'.
+afre_localcontrast : check "${1=1}>=1 && ${2=50}>=-100 && $1<=10 && $2<=100"
+  if !$2 return fi rd={int($1)} e[] "[afre]^_^) localcontrast: Enhance local contrast of image$? using radius="$rd" and amount=$2."
+  repeat $! l[$>] r0={[im,iM]} n 0,255 rgb2jzazbz 0 sh 0 r1={[im,iM]}
+    . +afre_gui0. $1,1e0 n. 0,1 f. "begin(const boundary=1;
+      const D="$rd"*2+1; const P=4^($2/50));
+      ref(crop(x-"$rd",y-"$rd",0,c,D,D,1,1),N); A=avg(i,med(N));
+      if(i<A,A*(i/A)^P,1-(1-A)*((1-i)/(1-A))^P)" n. $r1
+    +n.. 0,1 f. gauss(i) n. 0,1 blend_fade[2,3] . k[0-2]
+    +n.. 0,1 f. "begin(const A=0.5; const P=0.05); if(i<=A,
+      A-A*(i/A)^P,-A+A*((1-i)/A)^P)" n. 0,1 blend_fade[1,2] . k[0]
+  jzazbz2rgb 0 n $r0 endl done
+
+afre_localcontrast_preview :
+  afre_localcontrast $*
+
+#@gui Softlight : afre_softlight, afre_softlight_preview(1)+
+#@gui : note = note("<strong>Blend image with itself or another image using softlight.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019-2020 Sept9.</strong>\n\n")
+#@gui : Amount = int(50,-100,100)
+#@gui : Reverse Order = bool(0)
+#@gui : note = note("\n\n<strong>Hint</strong>\n\nUse the &nbsp;<code>Input</code> <code>layers</code>&nbsp; menu to select the layer&#40;s&#41; you would like to blend.")
+#@gui : note = note("\n<strong>Note</strong>\n\nG'MIC's preview is inaccurate. Apply the filter and review the results in your host editor.")
+#@cli afre_softlight : -100<=amount<=100,_reverse_order={ 0 | 1 }
+#@cli : Blend image with itself or another image using softlight.
+#@cli : Default values: 'amount=50' and 'reverse_order=0'.
+afre_softlight : check "${1=50}>=-100 && isbool(${2=0}) && $1<=100"
+  if !$1 return fi
+  if $!>2 error[] "\n[afre]>_<) softlight: Select 1-2 images."
+    elif $!==2&&$2 rv e0=" in reverse order"
+    elif $!==1 . e1=" itself and"
+    elif w#0!=w||h#0!=h||s#0!=s error[] "\n[afre]>_<) softlight: Select images with the same dimensions." fi
+  if s#0!=1?s#0!=3 error[] "\n[afre]>_<) softlight: Select image(s) with 1 or 3 channels (I or RGB)." fi
+  if $1<0 negate. fi
+  e[] "[afre]^_^) softlight: Blend image$?"${e0}" using"${e1}" amount=$1."
+  iM={0,iM} / $iM f.. "begin(const A=0.5*abs($1)/100+0.5);
+    i#0^((A*2)^(A*(1-2*i#1)))" *.. $iM rm.
+
+afre_softlight_preview :
+  afre_softlight $*
+
+#@gui Dark Sky: afre_darksky, afre_darksky_preview(1)+
+#@gui : note = note("<strong>Enhance landscape by darkening the sky.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2017-2020 Sep9.</strong>\n\n")
+#@gui : Blend = choice("Softlight","Overlay")
+#@gui : Contrast = int(0,-100,100)
+#@gui : Smooth = choice(1,"Fast &#40;approx.&#41;","Slow &#40;accurate&#41;")
+#@gui : Radius = int(0,0,3)
+#@gui : note = note("\n\n<strong>Note</strong>\n\nG'MIC's preview is inaccurate. Apply the filter and review the results in your host editor.\n\nE.g. <code>Smooth&#40;fast&#41;</code> may appear to cause artifacts when in fact it does not.")
+#@cli afre_darksky : blend={ 0=softlight | 1=overlay },-100<=_contrast<=100,_smooth_method={ 0=fast_approx | 1=slow_accurate },0<=_smooth_radius<=3
+#@cli : Enhance landscape by darkening the sky.
+#@cli : Default values: 'blend=0', 'contrast=0', 'smooth_method=0' and 'smooth_radius=0'.
+afre_darksky : check "isbool(${1=0}) && ${2=0}>=-100 && isbool(${3=0}) && ${4=0}>=0 && $2<=100 && $4<=3"
+  b=${arg\ 1+$1,softlight,overlay} m=${arg\ 1+$3,fast,slow} rd={int($4)} e[] "[afre]^_^) darksky: Darken sky of image$? using blend="$b", contrast=$2, smooth_method="$m" and smooth_radius="$rd"."
+  repeat $! l[$>] if s<3||s>4 error[] "\n[afre]>_<) darksky: Select RGB images." fi endl done
+  repeat $! l[$>] r0={[im,iM]} n 0,255 +channels 1 +channels.. 2 -[^0]
+    if $rd&&$3 afre_gui0. $rd,1e0 elif $rd r1={[im,iM]}
+      median. {$rd*2+1} n. $r1 fi c. 0%,0 +. 127 afre_contrast. {$2}
+    +afre_y50.. 1 r1={[im,iM]} afre_orien[0] 1 if $1 blend. ..,$b rm..
+      else l[-2--1] rv afre_softlight 100 endl fi n. $r1 *
+  n $r0 endl done
+
+afre_darksky_preview :
+  afre_darksky $*
+
+
+#@gui _<b>Contours</b>
 #---------------------
 
-#@gui Darken Sky : fx_darken_sky, fx_darken_sky_preview(0)
-#@gui : Strength = float(.75,0,1)
-#@gui : Contrast = float(5,0,5)
-#@gui : Blend Mode = choice(0,"Overlay","Softlight")
-#@gui : sep = separator(), Normalize = bool(1)
-#@gui : Brighten = float(0,0,1)
-#@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse")
-#@gui : sep = separator(), note = note("Based on <a href="https://discuss.pixls.us/t/deep-blue-sky-effect/4506"><i>Carmelo_DrRaw</i>'s tutorial</a>")
-#@gui : sep = separator(), note = note("<small>Author: <i><a href="https://discuss.pixls.us/u/afre">afre</a></i>.      Latest update: <i>2017/01/07</i>.</small>")
-fx_darken_sky :
-  mode=${arg\ 1+$3,overlay,softlight}
-  repeat $! l[$>] split_opacity l[0]
-    if iM>255 -/ 257 bit=1 fi
-    +l
-      s c rm.. remove_hotpixels.. 5 guided.. .,1,{.01*255^2}
-      - - {im} min 128 - 128 * {(5+$2)/10} + 128
-    endl
-    blend $mode,$1
-    if $4 n 0,255 fi
-    apply_curve 1,0,0,{ia},{ia+(sqrt(iv)*$5/2)},255,255
-    if $bit * 257 fi
-  endl a c endl done
+#@gui Edge : afre_edge, afre_edge_preview(0)+
+#@gui : note = note("<strong>Compute edge.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019-2020 May3.</strong>\n\n")
+#@gui : Method = choice(0,"Gradient","Standard Deviation")
+#@gui : Thinning = int(1,1,10)
+#@gui : Recovery = float(1,0.5,4)
+#@gui : Brightness = float(1,0.5,4)
+#@gui : Details = float(1,0.5,4)
+#@cli afre_edge : method={ 0=gradient | 1=standard_deviation },1<=thinning<=10,0.5<=_recovery<=4,0.5<=_brightness<=4,0.5<=_details<=4
+#@cli : Compute edge of selected images.
+#@cli : Default values: 'method=0', 'thinning=1', 'recovery=1', 'brightness=1' and 'details=1'.
+afre_edge : check "${2=1}>=1 && ${3=1}>=0.5 && ${4=1}>=0.5 && ${5=1}>=0.5 &&
+    $2<=10 && $3<=4 && $4<=4 && $5<=4"
+  e[] "[afre]^_^) edge: Compute edge of image$? using method=$1, thinning=$2, recovery=$3, brightness=$4 and details=$5."
+  repeat $! l[$>] if $1 m "method : afre_sdpatch 1" else m "method : afre_gnorm" fi
+    method im,ic,iM={[im,ic,iM]} ^ {1/$5} n $im,$iM
+    repeat $2 +afre_box 1 method. r={[im,iM]} ^. $3 n. $r - done
+    c $ic,$iM ^ {1/$4} n 0,$iM
+  endl done um method
 
-fx_darken_sky_preview :
-  gui_split_preview "fx_darken_sky $*",$-1
+afre_edge_preview :
+  afre_edge $*
+
+
+#@gui _<b>Details</b>
+#--------------------
+
+#@gui Details : afre_details, afre_details_preview(2)+
+#@gui : note = note("<strong>Split image into detail scales.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2020 Aug10.</strong>\n\n")
+#@gui : Scales = int(2,2,6)
+#@gui : note = note("\n\n<strong>Instructions</strong>\n\nDrag preview image to examine different regions of interest.")
+#@gui : note = note("\n\n<strong>Note</strong>\n\nG'MIC's preview is inaccurate. Apply the filter and review the results in your host editor.")
+#@cli afre_details : n_scales>=2
+#@cli : Split image into detail scales.
+#@cli : Default value: 'n_scales=2'.
+afre_details : check ${1=2}>=2
+  e[] "[afre]^_^) details: Split image$? into $1 detail scales."
+  repeat $! l[$<]
+    repeat $1-1 +afre_gui0. 1,1e10 -.. . rv[-2,-1] done
+  endl done
+
+afre_details_preview :
+  afre_details $*
+  n 0,255 append_tiles 0
+
+#@gui Texture : afre_texture, afre_texture_preview(1)+
+#@gui : note = note("<strong>Enhance texture with detail scales.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2020 Aug10-18.</strong>\n\n")
+#@gui : note = note("<strong>Detail Scale</strong>")
+#@gui : Coarse = int(0,-100,100)
+#@gui : Medium = int(0,-100,100)
+#@gui : Fine = int(0,-100,100)
+#@gui : note = note("\n\n<strong>Note</strong>\n\nG'MIC's preview is inaccurate. Apply the filter and review the results in your host editor.")
+#@cli afre_texture : -100<=coarse<=100,-100<=_medium<=100,-100<=_fine<=100
+#@cli : Enhance texture with detail scales.
+#@cli : Default values: 'coarse=0', 'medium=0' and 'fine=0'.
+afre_texture : check "${1=0}>=-100 && ${2=0}>=-100 && ${3=0}>=-100
+    && $1<=100 && $2<=100 && $3<=100"
+  if !$1&&!$2&&!$3 return fi e[] "[afre]^_^) texture: Enhance texture of image$? using coarse=$1, medium=$2 and fine=$3 detail scales."
+  repeat $! l[$>] r={[im,iM]} +afre_orien 1 +afre_y50.. 1 to_rgb.
+    afre_details. 4 w1={20^($1/130)} w2={20^($2/100)} w3={20^($3/140)}
+    if $1>0 *[3] $w1 elif $1<0 f[3] 0 median[2] {abs($1)/100*5}  fi
+    if $2>0 *[4] $w2 elif $2<0 f[4] 0 median[2] {abs($2)/100*9}  fi
+    if $3>0 *[5] $w3 elif $3<0 f[5] 0 median[2] {abs($3)/100*13} fi
+    +[2--1] c. $r *[^0] c. $r
+    +n.. 0,1 f. "begin(const M=0.5; const G=0.05);
+      ref(if(i<=M,M-M*(i/M)^G,-M+M*((1-i)/M)^G),A)" n. 0,1
+    blend_fade[0,1] . k[0]
+  n $r endl done
+
+afre_texture_preview :
+  afre_texture $*
 
 
 #@gui _<b>Repair</b>
-#---------------------
+#-------------------
 
-#@gui Clean Text : afre_cleantext, afre_cleantext_preview(0)
-#@gui : note = note("<strong>Clean scanned text. &nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019-Jun8.</strong>\n\n")
+#@gui Clean Text : afre_cleantext, afre_cleantext_preview(0)+
+#@gui : note = note("<strong>Clean scanned text.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019 Jun8.</strong>\n\n")
 #@gui : Clean = int(8,0,10)
-#@gui : Range = float(1,.2,1)
+#@gui : Range = float(1,0.2,1)
 #@gui : Black = int(80,0,100)
 #@gui : White = int(95,0,100)
 #@cli afre_cleantext : 0<=clean<=10,0.2<=_range<=1,0<=_black<=100,0<=_white<=100
@@ -83,20 +244,62 @@ fx_darken_sky_preview :
 afre_cleantext : check "${1=8}>=0 && ${2=1}>=0.2 && ${3=80}>=0 && ${4=95}>=0 &&
     $1<=10 && $2<=1 && $3<=100 && $4<=100"
   e[] "[afre]^_^) cleantext: Clean scanned text using clean=$1, range=$2, black=$3 and white=$4."
-  v - c={(11-$1)*2+1} +dilate $c erode. $c - n 0,255
+  c={int(11-$1)*2+1} +dilate $c erode. $c - n 0,255
   retinex , norm n 0,1 f 1-gauss(i,$2)
-  if $3!=$4 c $3%,$4% else c $3%,{$4+.5}% fi n 0,255 round v +
+  if $3!=$4 c $3%,$4% else c $3%,{$4+0.5}% fi n 0,255 round
 
 afre_cleantext_preview :
   afre_cleantext $*
 
+#@gui Denoise Smooth : afre_denoisesmooth, afre_denoisesmooth_preview(1)+
+#@gui : note = note("<strong>Denoise noisy image, or smooth low noise image.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2020 Oct4.</strong>\n\n
+#@gui : Filter is slow when the <i>radius</i>&nbsp; and <i>amount</i>&nbsp; are high. Start small and increase as appropriate.\n\n")
+#@gui : Radius = int(3,1,10)
+#@gui : Amount = int(10,1,1000)
+#@gui : note = note("\n\n<strong>Note</strong>\n\nG'MIC's preview is inaccurate. Apply the filter and review the results in your host editor.")
+#@cli afre_denoisesmooth : radius>=1,_amount>=1
+#@cli : Denoise noisy image, or smooth low noise image.
+#@cli : \ \ Command is slow when the 'radius' and 'amount' are high.
+#@cli : \ \ Start small and increase as appropriate.\n
+#@cli : Default values: 'radius=3 and amount=25'.
+afre_denoisesmooth : check "${1=3}>=1 && ${2=25}>=1"
+  e[] "[afre]^_^) denoisesmooth: Denoise noisy image, or smooth low noise image$? using radius=$1 and amount=$2.\n\ * Command is slow when the 'radius' and 'amount' are high.\n\ \ \ Start small and increase as appropriate."
+  repeat $! l[$>] r={[im,iM]}
+    . repeat $1 +normp. 1 afre_gui1.. .,{$>+1} rm. done
+    repeat $2 afre_gui1.. . done rm.
+  c $r endl done
+
+afre_denoisesmooth_preview :
+  afre_denoisesmooth $*
+
+#@gui Denoise Smooth Alt: afre_denoisesmooth_alt, afre_denoisesmooth_alt_preview(1)+
+#@gui : note = note("<strong>Denoise noisy image, or smooth low noise image.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2020 Oct4-11.</strong>\n\n
+#@gui : Filter is slow when the <i>radius</i>&nbsp; and <i>amount</i>&nbsp; are high. Start small and increase as appropriate.\n\n")
+#@gui : Radius = int(3,1,10)
+#@gui : Amount = int(10,1,1000)
+#@gui : note = note("\n\n<strong>Note</strong>\n\nG'MIC's preview is inaccurate. Apply the filter and review the results in your host editor.")
+#@cli afre_denoisesmooth_alt : radius>=1,_amount>=1
+#@cli : Denoise noisy image, or smooth low noise image.
+#@cli : \ \ Command is slow when the 'radius' and 'amount' are high.
+#@cli : \ \ Start small and increase as appropriate.\n
+#@cli : Default values: 'radius=3 and amount=25'.
+afre_denoisesmooth_alt : check "${1=3}>=1 && ${2=25}>=1"
+  e[] "[afre]^_^) denoisesmooth_alt: Denoise noisy image, or smooth low noise image$? using radius=$1 and amount=$2.\n\ * Command is slow when the 'radius' and 'amount' are high.\n\ \ \ Start small and increase as appropriate."
+  repeat $! l[$>] r={[im,iM]}
+    . repeat $1 +normp. 1 afre_gui1_alt.. .,{$>+1},,0 rm. done
+    repeat $2 afre_gui1_alt.. .,,,0 done rm.
+  c $r endl done
+
+afre_denoisesmooth_alt_preview :
+  afre_denoisesmooth_alt $*
+
 
 #@gui _<b>Testing</b>
-#---------------------
+#--------------------
 #@gui afre
 
-#@gui Vigrect : afre_vigrect, afre_vigrect_preview(0)
-#@gui : note = note("<strong>Add rectangular vignette. &nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2017-2019.</strong>\n<hr />
+#@gui Vigrect : afre_vigrect, afre_vigrect_preview(0)+
+#@gui : note = note("<strong>Add rectangular vignette.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2017-2019.</strong>\n<hr />
 #@gui : <strong>Instructions:</strong>\n\n
 #@gui : * Negative strength brightens the periphery.\n\n")
 #@gui : Size = int(50,1,100)
@@ -110,17 +313,17 @@ afre_cleantext_preview :
 afre_vigrect : check "${1=50}>=1 && ${2=75}>=-500 && ${3=10}>=1 && ${4=50}>=0 && ${5=50}>=0 &&
     $1<=100 && $2<=500 && $3<=50 && $4<=100 && $5<=100"
   e[] "[afre]^_^) vigrect: Add rectangular vignette of image$? using size=$1, strength=$2, blur=$3, position_x=$4 and position_y=$5."
-  v - repeat $! l[$>] iM={iM} min={min(w,h)} s={$min/100*(50.5-$1/2)}
+  repeat $! l[$>] iM={iM} min={min(w,h)} s={$min/100*(50.5-$1/2)}
     tx={$min/100*($4-50)} ty={$min/100*($5-50)}
     +f x<$s+$tx||x>w-$s+$tx||y<$s+$ty||y>h-$s+$ty
     distance. 0 b. {$min/100*$3} -. {im} *. {$2/100} -
-  c 0,$iM endl done v +
+  c 0,$iM endl done
 
 afre_vigrect_preview :
   afre_vigrect $*
 
-#@gui Vigcirc : afre_vigcirc, afre_vigcirc_preview(0)
-#@gui : note = note("<strong>Add circular vignette. &nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019.</strong>\n<hr />
+#@gui Vigcirc : afre_vigcirc, afre_vigcirc_preview(0)+
+#@gui : note = note("<strong>Add circular vignette.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019.</strong>\n<hr />
 #@gui : <strong>Instructions:</strong>\n\n
 #@gui : * Negative strength brightens the periphery.\n\n")
 #@gui : Size = int(90,50,150)
@@ -133,49 +336,22 @@ afre_vigrect_preview :
 afre_vigcirc : check "${1=90}>=50 && ${2=75}>=-500 && ${3=50}>=0 && ${4=50}>=0 &&
     $1<=150 && $2<=500 && $3<=100 && $4<=100"
   e[] "[afre]^_^) vigcirc: Add circular vignette of image$? using size=$1, strength=$2, position_x=$3 and position_y=$4."
-  v - repeat $! l[$>] iM={iM} min={min(w,h)}
+  repeat $! l[$>] iM={iM} min={min(w,h)}
     +f 1 circle. $3%,$4%,{($min/2-2)/100*$1}
     distance. 0 b. 1 -. {im} *. {$2/100} -
-  c 0,$iM endl done v +
+  c 0,$iM endl done
 
 afre_vigcirc_preview :
   afre_vigcirc $*
 
-#@gui Softlight : afre_softlight, afre_softlight_preview(0)
-#@gui : note = note("<strong>Blend 1-2 images using softlight. &nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019-2020Jan21</strong>.\n<hr />
-#@gui : <strong>Instructions</strong>&nbsp; The layers must be the same size.\n\n
-#@gui : <strong>A. Self blend</strong>\n
-#@gui : In the image editor, the active layer will be the base layer. Set <strong><i>Input layers</i></strong>&nbsp; to <strong><i>Active &#40;default&#41;</i></strong>.\n\n
-#@gui : <strong>B. Two image blend</strong>\n
-#@gui : In the image editor, the active layer will be the base layer. The layer directly above will be the blending layer. Set <strong><i>Input layers</i></strong>&nbsp; to <strong><i>Active and above</i></strong>.\n\n
-#@gui : <strong>C. Optional</strong>\n
-#@gui : Set <strong><i>Output mode</i></strong>&nbsp; to <strong><i>New layer&#40;s&#41;</i></strong>. This will allow you to output to a new layer, allowing you to preserve the input layers in case you would like to undo and redo the filter.\n\n")
-#@gui : Amount = int(100,-150,150)
-#@gui : Reverse Order = bool(0)
-#@cli afre_softlight : -150<=amount<=150,_reverse_order={ 0 | 1 }
-#@cli : Blend 1-2 images using softlight.
-#@cli : Default values: 'amount=100' and 'reverse_order=0'.
-afre_softlight: check "${1=100}>=-150 && isbool(${2=0}) && $1<=150"
-  if $1<0 i=" inverse" fi
-  if $!>2 error[] "\n[afre]>_<) softlight: Please select 1 or 2 images."
-  elif $!>1 if w#0!=w#1||h#0!=h#1 error[] "\n[afre]>_<) softlight: Please select images with the same width and height." fi
-    if $2 rv=" in reverse order" fi e[] "[afre]^_^) softlight: Blend image$?"${rv}" using"${i}" softlight."
-  else e[] "[afre]^_^) softlight: Blend image$? with itself using"${i}" softlight." .
-  fi to_colormode 0 a={.5*abs($1)/100+.5}
-  if $2 rv fi nm={0,b} r={0,[im,iM]} n 0,1 if $1<0 negate. fi
-  *. -2 +. 1 *. $a f. i#0^((2*$a)^i#1) k. n $r nm $nm
-
-afre_softlight_preview :
-  afre_softlight $*
-
-#@gui Sharpen FFT : afre_sharpenfft, afre_sharpenfft_preview(0)
-#@gui : note = note("<strong>Sharpen with Fourier transform.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019-2020Jan18.</strong>\n\n")
+#@gui Sharpen FFT : afre_sharpenfft, afre_sharpenfft_preview(0)+
+#@gui : note = note("<strong>Sharpen with Fourier transform.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019-2020 Jan18.</strong>\n\n")
 #@gui : Strength = int(15,1,50)
 #@gui : Size = int(1,1,10)
 #@cli afre_sharpenfft : 1<=strength<=50,1<=_size<=10
 #@cli : Sharpen selected images with Fourier transform.
 #@cli : Default values: 'strength=15' and 'size=1'.
-afre_sharpenfft: check "${1=15}>=1 && ${2=1}>=1 && $1<=50 && $2<=10"
+afre_sharpenfft : check "${1=15}>=1 && ${2=1}>=1 && $1<=50 && $2<=10"
   e[] "[afre]^_^) sharpenfft: Sharpen image$? with Fourier transform using strength=$1 and size=$2."
   repeat $! l[$>] iM={iM} +periodize_poisson -.. . l. +l
     fftpolar +gaussian.. {100/$2}% negate. *[^1] ifftpolar * $1
@@ -184,25 +360,25 @@ afre_sharpenfft: check "${1=15}>=1 && ${2=1}>=1 && $1<=50 && $2<=10"
 afre_sharpenfft_preview :
   afre_sharpenfft $*
 
-#@gui Contrast FFT : afre_contrastfft, afre_contrastfft_preview(0)
+#@gui Contrast FFT : afre_contrastfft, afre_contrastfft_preview(0)+
 #@gui : note = note("<strong>Enhance contrast with Fourier transform.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019.</strong>\n\n")
 #@gui : Strength = int(75,1,100)
-#@gui : Amount = int(50,0,150)
+#@gui : Amount = int(50,0,100)
 #@gui : Iterations = int(1,1,10)
-#@cli afre_contrastfft : 1<=strength<=100,0<=_amount<=150,1<=_iterations<=10
+#@cli afre_contrastfft : 1<=strength<=100,0<=_amount<=100,1<=_iterations<=10
 #@cli : Enhance contrast for selected images with Fourier transform.
 #@cli : Default values: 'strength=75', 'amount=50' and 'iterations=1'.
 afre_contrastfft : check "${1=75}>=1 && ${2=50}>=0 && ${3=1}>=1 &&
-    $1<=100 && $2<=150 && $3<=10"
+    $1<=100 && $2<=100 && $3<=10"
   e[] "[afre]^_^) contrastfft: Enhance contrast for image$? with Fourier transform using strength=$1, amount=$2 and iterations=$3."
-  v - repeat $! l[$>] repeat $3
-    +fftpolar ^.. {($1-.5)/100} ifftpolar[^0] afre_softlight $2
-  done endl done v +
+  repeat $! l[$>] repeat $3
+    +fftpolar ^.. {($1-0.5)/100} ifftpolar[^0] afre_softlight $2
+  done endl done
 
 afre_contrastfft_preview :
   afre_contrastfft $*
 
-#@gui Gamify : fx_gamify, fx_gamify_preview(0)
+#@gui Gamify : fx_gamify, fx_gamify_preview(0)+
 #@gui : Lightness = int(50,50,60)
 #@gui : Chroma = float(2,1.1,5)
 #@gui : sep = separator(), Normalize = bool(1)
@@ -211,9 +387,9 @@ afre_contrastfft_preview :
 #@gui : sep = separator(), note = note("Filter by <i>afre</i>. Latest update: <i>2017-01-05</i>.")
 fx_gamify :
   if $3 n 0,255 fi
-  rgb2lab lab2lch
+  afre_jchz
   s c n... $1,100 *.. $2 a c
-  lch2lab lab2rgb
+  afre_ijchz
   split_details 2
   l.. adjust_colors 0,{-$4/1.5*20} endl
   *. $4
@@ -222,29 +398,8 @@ fx_gamify :
 fx_gamify_preview :
   gui_split_preview "fx_gamify $*",$-1
 
-#@gui Edge : afre_edge, afre_edge_preview(0)
-#@gui : note = note("<strong>Compute edge. &nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019.</strong>\n\n")
-#@gui : Thinning = int(1,1,10)
-#@gui : Recovery = float(1,.5,4)
-#@gui : Brightness = float(1,.5,4)
-#@gui : Details = float(1,.5,4)
-#@cli afre_edge : 1<=thinning<=10,0.5<=_recovery<=4,0.5<=_brightness<=4,0.5<=_details<=4
-#@cli : Compute edge of selected images.
-#@cli : Default values: 'thinning=1', 'recovery=1', 'brightness=1' and 'details=1'.
-afre_edge : check "${1=1}>=1 && ${2=1}>=0.5 && ${3=1}>=0.5 && ${4=1}>=0.5 &&
-    $1<=10 && $2<=4 && $3<=4 && $4<=4"
-  e[] "[afre]^_^) edge: Compute edge of image$? using thinning=$1, recovery=$2, brightness=$3 and details=$4."
-  v - repeat $! l[$>]
-    afre_gnorm im,ic,iM={[im,ic,iM]} ^ {1/$4} n $im,$iM
-    repeat $1 +afre_box 1 afre_gnorm. r={[im,iM]} ^. $2 n. $r - done
-    c $ic,$iM ^ {1/$3} n 0,$iM
-  endl done v +
-
-afre_edge_preview :
-  afre_edge $*
-
-#@gui Hessian Norm : fx_hnorm, fx_hnorm_preview(0)
-#@gui : Strength = float(1,.5,1.5)
+#@gui Hessian Norm : fx_hnorm, fx_hnorm_preview(0)+
+#@gui : Strength = float(1,0.5,1.5)
 #@gui : Contrast = int(50,1,99)
 #@gui : Invert = bool(0)
 #@gui : sep = separator(), note = note("Filter by <i><a href="https://discuss.pixls.us/u/afre">afre</a></i>. Latest update: <i>2018-05-09</i>.")
@@ -257,8 +412,8 @@ fx_hnorm :
 fx_hnorm_preview :
   fx_hnorm $*
 
-#@gui Gleam : afre_gleam, afre_gleam_preview(0)
-#@gui : note = note("<strong>Add gleam effect.</strong>&nbsp; Hint: Try different combinations of smooth and threshold. &nbsp; <strong>Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019.</strong>\n\n
+#@gui Gleam : afre_gleam, afre_gleam_preview(0)+
+#@gui : note = note("<strong>Add gleam effect.</strong>&nbsp; Hint: Try different combinations of smooth and threshold.&nbsp; <strong>Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2019.</strong>\n\n
 #@gui : * Experimental filter.\n\n")
 #@gui : Smooth = int(3,2,100)
 #@gui : Threshold = int(50,10,90)
@@ -274,120 +429,435 @@ afre_gleam : check "${1=3}>=2 && ${2=50}>=10 && $1<=100 && $2<=90"
 afre_gleam_preview :
   afre_gleam $*
 
+#@gui Half & half : afre_halfhalf, afre_halfhalf_preview(0)+
+#@gui : note = note("<strong>Stitch left and right halves of 2 images, respectively.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2020-Feb21.</strong>\n\n
+#@gui : * Remember to set <strong>Input layers</strong>.\n
+#@gui : * <strong>Match size</strong> doesn't work in Krita.\n\n")
+#@gui : Match size = bool(0)
+#@cli afre_halfhalf : match_size={ 0 | 1 }
+#@cli : Stitch left and right halves of 2 images, respectively.
+#@cli : Default value: 'match_size=0'.
+afre_halfhalf : check isbool(${1=0})
+  if $!!=2 error[] "\n[afre]>_<) halfhalf: Please select 2 images." fi
+  e[] "[afre]^_^) halfhalf: Stitch left and right halves of 2 images using match_size=$1."
+  +f[{w#0>w#1?0:1}] 0 mv. 0 s[1,2] x,2 rm[2,3]
+  if w#1<w#2&&$1 r2dx.. {w#2}
+    elif $1 r2dx. {w#1} elif w#1<w#2 r.. .,0,0,1,0.5 fi
+  j[0] [1],0,0.5~ j[0] [2],50%,0.5~ k[0]
 
-#@cli Core Commands
-#---------------------
+afre_halfhalf_preview :
+  afre_halfhalf $*
+
+#@gui Portrait Montage : afre_portraitmontage, afre_portraitmontage_preview(0)+
+#@gui : note = note("<strong>Generate portrait montage.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2020 Jun28.</strong>\n\n
+#@gui : - Set <strong>Input layers</strong> to <strong>All</strong>.\n
+#@gui : - Portraits should be centred and have the same dimensions.\n\n")
+#@gui : Spacing = int(5,0,10)
+#@gui : Colour = color(230,255,230)
+#@cli afre_portraitmontage : 0<=spacing<=10,0<=_colour={[R,G,B]}<=255
+#@cli : Generate portrait montage.
+#@cli : Default values: 'spacing=5' and 'colour=230,255,230'.\n
+#@cli : Portraits should be centred and have the same dimensions.
+afre_portraitmontage : check "${1=5}>=0 && ${2=230}>=0 && ${3=255}>=0 && ${4=230}>=0 && $1<=10"
+  repeat $! l[$>] +f. 1 +circle. 50%,50%,{min(w,h)*0.49} n[0,1] 0,255
+  -[1] 1 blend_fade[0,1] . k[0] frame {[$1,$1]*min(w,h)*0.01},-1 endl done
+  append_tiles 0 replace_color 0,0,-1,-1,-1,$2,$3,$4
+
+afre_portraitmontage_preview :
+  afre_portraitmontage $*
+
+
+#@cli ::Core Commands
+#--------------------
+
+#@cli afre_maxmin
+#@cli : Return the maximum of channel minimums.
+afre_maxmin :
+  sh 0 sh.. 1 sh... 2 u {max(im#1,im#2,im#3)} k[0]
+
+#@cli afre_minmax
+#@cli : Return the minimum of channel maximums.
+afre_minmax :
+  sh 0 sh.. 1 sh... 2 u {min(iM#1,iM#2,iM#3)} k[0]
+
+#@cli afre_jchz
+#@cli : Convert selected images from RGB to JzCzhz.
+afre_jchz :
+  e[] "[afre]^_^) jchz: Convert image$? from RGB to JzCzhz."
+  rgb2jzazbz 0 r 100%,100%,100%,3 repeat $! l[$>]
+    s c complex2polar[-2,-1] a c
+  endl done
+
+#@cli afre_ijchz
+#@cli : Convert selected images from JzCzhz to RGB.
+afre_ijchz :
+  e[] "[afre]^_^) ijchz: Convert image$? from JzCzhz to RGB."
+  r 100%,100%,100%,3 repeat $! l[$>]
+    s c polar2complex[-2,-1] a c
+  endl done jzazbz2rgb 0
 
 #@cli afre_gnorm
 #@cli : Compute custom gradient norm of selected images.
 afre_gnorm :
   e[] "[afre]^_^) gnorm: Compute custom gradient norm of image$?."
-  v - repeat $! l[$>] nm={b}
+  repeat $! l[$>] nm={b}
     +gradient_norm r={[im,iM]} +afre_hnorm[0] afre_gui1[2] [0] rm[0]
-    c. 20%,100% n 0,1 *. .75 max n $r
-  nm $nm endl done v +
+    c. 20%,100% n 0,1 *. 0.75 max n $r
+  nm $nm endl done
 
 #@cli afre_hnorm
 #@cli : Compute Hessian norm of selected images.
 afre_hnorm :
   e[] "[afre]^_^) hnorm: Compute Hessian norm of image$?."
-  v - repeat $! l[$>] hessian sqr s c + sqrt endl done v +
+  repeat $! l[$>] hessian sqr s c + sqrt endl done
+
+#@cli afre_sdpatch : radius>=1
+#@cli : Compute local standard deviation of selected images.
+#@cli : Default value: 'radius=1'.
+afre_sdpatch : skip ${1=1}
+  rd={int($1)} e[] "[afre]^_^) sdpatch: Compute local standard deviation of image$? using radius="$rd"."
+  repeat $! l[$>] +gradient_norm r={[im,iM]} rm.
+    +sqr afre_box $rd sqr.. rv - max 0 sqrt
+  n $r endl done
 
 #@cli afre_reorder : order,_order2,...
 #@cli : Reposition images according to a list of values of any length.
 afre_reorder :
   e[] "[afre]^_^) reorder: Reposition images according to list $*."
-  v - z 0,0,0,100%,100%,1 mirror z f z==0?1e6:i
-  l ($*) onfail use_vt100 v + e[] ${_gmic_r}"[afre]>_<) reorder: Parameter must be a list of numbers; e.g., 0,2,4,1,3."${_gmic_n} error[] "" endl
+  z 0,0,0,100%,100%,1 mirror z f z==0?1e6:i
+  l ($*) onfail error[] "\n[afre]>_<) reorder: Parameter must be a list of numbers; e.g. 0,2,4,1,3." endl
   repeat min(w,$!-1) f[$>] z==0?{i($>)}:i done
-  sort_list[0-{min(w,$!-1)-1}] + rm. z 0,0,1,100%,100%,1 v +
+  sort_list[0-{min(w,$!-1)-1}] + rm. z 0,0,1,100%,100%,1
+
+#@cli afre_section : 1<=xy_sections<=50
+#@cli : Section selected images into numbered regions.
+#@cli : Default value: 'xy_sections=20'.
+afre_section : check "${1=20}>=1 && $1<=50"
+  m=min(w,h) err=int($m/25) if $err<$1 error[] "\n[afre]>_<) section: Section image$? into no more than "{max(sqr($err),1)}" ("{max($err,1)}"x"{max($err,1)}") regions." fi
+  e[] "[afre]^_^) section: Section image$? into "{sqr($1)}" ($1x$1) numbered regions."
+  repeat $! l[$>]
+    im,iM={[im,iM]} s yx,$1 repeat $!
+      t[$>] {$>+1},0.5~,0.5~,{$m*0.55},0.9,$im t[$>] {$>+1},0.5~,0.5~,{$m*0.56},0.9,$iM
+    done append_tiles $1
+    grid {100/$1}%,{100/$1}%,,,0.2,$im
+    grid {100/$1}%,{100/$1}%,-1,-1,0.2,$iM
+  endl done
+
+#@cli afre_cleanphoto : 2<=size<=10,1<=_recovery<=100,-50<=_xy_sections<=50,_maskN>=1,...
+#@cli : Clean dust and scratches from photos.
+#@cli : Default values: 'size=3', 'recovery=10', 'xy_sections=1' and 'maskN=1'.\n
+#@cli : - 'xy_sections' sections image into MxM labeled regions.
+#@cli : \ \ \ For global processing, set 'xy_sections' to 1.
+#@cli : \ \ \ To visualize these regions with labels, use a negative number.
+#@cli : - 'maskN' is a comma separated list of regions to be processed.
+afre_cleanphoto : check "${1=3}>=2 && ${2=10}>=1 && ${3=1}>=-50 &&
+    $1<=10 && $2<=100 && $3<=50" skip ${4=1}
+  m=min(w,h) err=int($m/25) if $err<$3 error[] "\n[afre]>_<) cleanphoto: Section image$? into no more than "{max(sqr($err),1)}" ("{max($err,1)}"x"{max($err,1)}") regions." fi
+  m "ip : p=$1,,,{iM}
+    +erode_threshold $p dilate_threshold. $p afre_gui1. .. c. 0,100%
+    +afre_edge.. 1,1,4,4 afre_box. 1 c. 0,$2% n. 0,1 +blend_fade[0,1] . k[0,-1]
+    +gaussian. {[w,h]*0.3} c. 0,50% n. 0,1 blend_fade[0,1] . k[0]"
+  e[] "[afre]^_^) cleanphoto: Clean dust and scratches from image$? using size=$1, recovery=$2, xy_sections=$3 and masks=${4--1}."
+  repeat $! l[$>] if $3>1
+    iM={iM} w0,h0={[w,h]} w,h={[w,h]/$3} 100%,100%,1,3 l. (${4--1})
+      c. 1,{sqr($3)} round. sort. discard. unroll. x
+      repeat w v={i($>)} i={$v%$3?$v%$3:$3} j={($v+$3-$i)/$3}
+        r={[$w*$i-$w,$h*$j-$h,$w*$i-1,$h*$j-1]} rectangle[0] $r,1,$iM
+      done rm. label_fg 0 r {[$w0,$h0]+2},1,3,0,0,0.5,0.5
+      repeat iM +==[0] {$>+1} coord=${"
+        w={w} h={h} val={i(w-1,h-1)} +=. {1+$val},100%,100%,100%
+        autocrop. =. $val,100%,100%,100% x0={$w-w} y0={$h-h} rm.
+        +autocrop. x1={$x0+w-1} y1={$y0+h-1} rm. u $x0,$y0,$x1,$y1
+      "} rm. ($coord) done
+    a[^0] y endl r[0] {[$w0,$h0]+2},1,3,0,0,0.5,0.5
+    repeat h x0,y0,x1,y1={@{[0,1,2,3]+4*$>}} +z[0,1] $x0,$y0,$x1,$y1
+      +ip.. f. i#4?i#5:i#3 j[0] .,$x0,$y0 rm[-3--1]
+    done k[0] r {[$w0,$h0]},1,3,0,0,0.5,0.5
+  else ip
+  fi endl done um ip
+
+#@cli afre_cleanphoto1 : 1<=radius<=10,1<=_xy_sections<=50,_maskN>=1,...
+#@cli : Clean dust and scratches from photos.
+#@cli : Default values: 'radius=3', 'xy_sections=1' and 'maskN=1'.\n
+#@cli : - 'xy_sections' sections image into MxM labeled regions.
+#@cli : \ \ For global processing, set 'xy_sections' to 1.
+#@cli : - 'maskN' is a comma separated list of regions to be processed.
+#@cli : \ \ Use 'afre_section' to determine region labels.
+afre_cleanphoto1 : check "${1=3}>=1 && ${2=1}>=1 &&
+    $1<=10 && $2<=50" skip ${3=1}
+  rd={int($1)} m=min(w,h) err=int($m/25) if $err<$2 error[] "\n[afre]>_<) cleanphoto: Section image$? into no more than "{max(sqr($err),1)}" ("{max($err,1)}"x"{max($err,1)}") regions." fi
+  m "ip : s={"$rd"*2+1} +l +erode_oct $s dilate_oct. $s - c 0,100% ^ 2
+    c 5%,10% dilate_oct 3 n 0,1 endl +inpaint_pde.. . rm..
+    +gaussian. {[w,h]*0.3} c. 0,50% n. 0,1 blend_fade[0,1] . k[0]"
+  e[] "[afre]^_^) cleanphoto: Clean dust and scratches from image$? using radius="$rd", xy_sections=$2 and maskN=${3--1}."
+  repeat $! l[$>] if $2>1
+    iM={iM} w0,h0={[w,h]} w,h={[w,h]/$2} 100%,100%,1,3 l. (${3--1})
+      c. 1,{sqr($2)} round. sort. discard. unroll. x
+      repeat w v={i($>)} i={$v%$2?$v%$2:$2} j={($v+$2-$i)/$2}
+        r={[$w*$i-$w,$h*$j-$h,$w*$i-1,$h*$j-1]} rectangle[0] $r,1,$iM
+      done rm. label_fg 0 r {[$w0,$h0]+2},1,3,0,0,0.5,0.5
+      repeat iM +==[0] {$>+1} coord=${"
+        w={w} h={h} val={i(w-1,h-1)} +=. {1+$val},100%,100%,100%
+        autocrop. =. $val,100%,100%,100% x0={$w-w} y0={$h-h} rm.
+        +autocrop. x1={$x0+w-1} y1={$y0+h-1} rm. u $x0,$y0,$x1,$y1
+      "} rm. ($coord) done
+    a[^0] y endl r[0] {[$w0,$h0]+2},1,3,0,0,0.5,0.5
+    repeat h x0,y0,x1,y1={@{[0,1,2,3]+4*$>}} +z[0,1] $x0,$y0,$x1,$y1
+      +ip.. f. i#4?i#5:i#3 j[0] .,$x0,$y0 rm[-3--1]
+    done k[0] r {[$w0,$h0]},1,3,0,0,0.5,0.5
+  else ip
+  fi endl done um ip
+
+#@cli afre_compare : crop={ 1=once | 2=twice },_layout={ x | y | z | tile },_normalize={ 0 | 1 }
+#@cli : Crop then compare selected images interactively.
+#@cli : Default values: 'crop=1', 'layout=x' and 'normalize=1'.\n
+#@cli : 1. Interactive Crop
+#@cli : \ - Click and drag to select crop.
+#@cli : \ - Use scroll button to browse images.
+#@cli : \ * Click once or close window to exit command.\n
+#@cli : 2. Comparison Window
+#@cli : \ - Regular display behaviour.
+#@cli : \ - Close window to make another comparison.
+afre_compare : check "${1=1}>=1 && $1<=2 && (s='${2=x}';s=='x'||s=='y'||s=='z'||s=='tile') && "isbool(${3=1})
+  n={$!-1} if $n<1 error[] "\n[afre]>_<) compare: Please select 2 or more images." fi
+  repeat $!-1 if w#0!=w#{$>+1}||h#0!=h#{$>+1} error[] "\n[afre]>_<) compare: Please select images with the same width and height." fi done
+  repeat $! if d#$>!=1 e[] "[afre]>_<) compare: *Slices in image ["$>"] will be considered separate images." fi done
+  e[] "[afre]^_^) compare: Crop then compare image$? interactively."
+  e[] "\n 1. Interactive Crop\n
+    \ - Click and drag to select crop.\n
+    \ - Use scroll button to browse images.\n
+    \ * Click once or close window to exit command.\n\n
+    2. Comparison Window\n
+    \ - Regular display behaviour.\n
+    \ - Close window to make another comparison.\n"
+  to_colormode 0 if $3 n 0,255 fi
+  do +l nm[0] Compare
+    a z repeat $1 xz b={w} if $b==1 break fi done
+    b={w} if '$2'!='z' s z if '$2'!='tile' a $2 else append_tiles 0 fi fi
+    if $b==1 break else v - d v + fi
+  endl k[0-$n] while $b!=1 v - d[]
 
 #@cli afre_log2 : direction={ 0=inverse | 1=forward }
 #@cli : Transform selected images into or back from log2 space.
 #@cli : Default value: 'direction=1'.
-afre_log2 : skip ${1=1}
-  v - if !isbool($1) v + error[] "[afre]>_<) log2: Parameter must be '0' (inverse) or '1' (forward)." fi
+afre_log2 : check isbool(${1=1})
   if $1 d="into" else d="back from" fi
-  v + e[] "[afre]^_^) log2: Transform image$? "$d" log2 space." v -
-  if $1 + 1 log2 else f exp(i*log(2)) - 1 fi v +
+  e[] "[afre]^_^) log2: Transform image$? "$d" log2 space."
+  if $1 + 1 log2 else f exp(i*log(2)) - 1 fi
 
 #@cli afre_y50 : colour_space={ 0=Rec.709 | 1=Rec.2020 }
 #@cli : Compute luminance (D50) of selected images.
 #@cli : Default value: 'colour_space=1'.
-afre_y50 : skip ${1=1}
-  v - if !isbool($1) v + error[] "[afre]>_<) y50: Parameter must be '0' (Rec.709) or '1' (Rec.2020)." fi
+afre_y50 : check isbool(${1=1})
   if $1 Y="Rec.2020" else Y="Rec.709" fi
-  v + e[] "[afre]^_^) y50: Compute luminance (D50 "$Y") of image$?." v -
+  e[] "[afre]^_^) y50: Compute luminance (D50 "$Y") of image$?."
   repeat $! l[$>]
     if s==3 sh 0 sh[0] 1 sh[0] 2
-      if $1 *[1] 0.27904 *[2] 0.67535 *[3] 0.04561  # Rec.2020
+      if $1 *[1] 0.2790177 *[2] 0.6753402 *[3] 0.0456377   # Rec.2020
       else *[1] 0.22248840 *[2] 0.71690369 *[3] 0.06060791 # Rec.709
       fi +[1-3] rm[1] channels 0
     elif s!=1 r={[im,iM]} norm n $r fi
-  endl done v +
+  endl done
 
 #@cli afre_orien : colour_space={ 0=Rec.709 | 1=Rec.2020 }
 #@cli : Compute orientation of selected images using luminance (D50).
 #@cli : Default value: 'colour_space=1'.
-afre_orien : skip ${1=1}
-  v - if $1 Y="Rec.2020" else Y="Rec.709" fi v +
+afre_orien : check isbool(${1=1})
+  if $1 Y="Rec.2020" else Y="Rec.709" fi
   e[] "[afre]^_^) orien: Compute orientation of image$? using luminance (D50 "$Y")."
-  v - repeat $! +afre_y50[$>] $1 replace. 0,1 /[$>,-1] done v +
+  repeat $! +afre_y50[$>] $1 replace. 0,1 /[$>,-1] done
 
-#@cli afre_box : radius>=1,_gaussian={ 0 | 1 },_boundary_conditions={ 0=dirichlet | 1=neumann }
+#@cli afre_conv : [kernel]
+#@cli : Convolve selected images with a custom kernel.
+afre_conv : check ${is_image_arg\ $1}
+  repeat $! pass$1 0
+    e[] "[afre]^_^) conv: Convolve image$? using ["${"-pass$1 -1"}"]."
+    l[$>,-1] +f[0] 1 mv. 1
+    +rows. 50% columns.. 50% +convolve[1] [2] convolve[4] [3]
+    convolve[0] [2] convolve[0] [3] k[0,4] / endl
+  done
+
+#@cli afre_box : radius>=1,_gaussian={ 0 | 1 }
 #@cli : Blur selected images with a soft box filter.
-#@cli : Default values: 'radius=1', 'gaussian=1' and 'boundary_conditions=1'.
-afre_box : check "${1=1}>=1 && isbool(${2=1}) && isbool(${3=1})"
-  v - if $2 g="soft box" else g="box" fi w={$1*2+1} v +
+#@cli : Default values: 'radius=1' and 'gaussian=1'.
+afre_box : check "${1=1}>=1 && isbool(${2=1})"
+  rd={int($1)} if $2 g="soft box" else g="box" fi w={$rd*2+1}
   e[] "[afre]^_^) box: Blur image$? with a "${w}"x"${w}" "$g" filter."
-  v - repeat $! l[$>]
-    . $w,$w f[^0] 1 if $2 gaussian. {100/3}% fi
-    +convolve[1] [2],$3 convolve[0] [2],$3 k[0,3] /
-  endl done v +
+  repeat $! l[$>]
+    $w,$w f. 1 if $2 gaussian. {100/3}% fi afre_conv.. . rm.
+  endl done
 
-#@cli afre_gui0 : radius>=1,_smoothing>=0
-#@cli : Blur selected images with a custom self-guided filter. Use orders of magnitude for smoothing.
-#@cli : \ Based on "K He, J Sun, X Tang. Guided image filtering. TPAMI, 35(6):1397-1409, 2013".
-#@cli : Default values: 'radius=1' and 'smoothing=1e-2'.
-afre_gui0 : check "${1=1}>=1 && ${2=1e-2}>=0"
-  e[] "[afre]^_^) gui0: Blur image$? with a custom self-guided filter using radius=$1 and smoothing=$2."
-  v - repeat $! l[$>] nm={b} iM={iM} / $iM
-    . +sqr[^0] afre_box[^0] $1 nm I,mI,mII
+#@cli afre_gui0 : radius>=1,_smoothing>=0,0<=_structure<=10
+#@cli : Blur selected images with a custom self-guided filter.
+#@cli : Default values: 'radius=1', 'smoothing=1e-2' and 'structure=10'.\n
+#@cli : - Use orders of magnitude for 'smoothing'.
+#@cli : - Reduce 'structure' to soften edges and artifacts.
+#@cli : * Improvement of "K He, J Sun, X Tang. Guided image filtering. TPAMI, 35(6):1397-1409, 2013".
+afre_gui0 : check "${1=1}>=1 && ${2=1e-2}>=0 && ${3=10}>=0 && $3<=10"
+  rd={int($1)} kwh={sqr($rd*2+1)} str={1e{-$3+2}}
+  e[] "[afre]^_^) gui0: Blur image$? with a custom self-guided filter using radius="$rd", smoothing=$2 and structure=$3."
+  repeat $! l[$>] nm={b} iM={iM} / $iM
+    . +sqr. afre_box[^0] $rd nm I,mI,mII
     +sqr[mI] *. -1 +. [mII] rm[mII] nm. vI
-    ++[vI] {$2*ia+1e-6} /[vI] . rm. nm[vI] a
+    +l[vI] abs s c + endl *. $kwh +. $str ^. -1 *. $str nm. W
+    ++[vI] {vI,$2*ia+1e-6} /[vI] . rm. nm[vI] a
     +*[a] [mI] *. -1 +. [mI] rm[mI] nm. b
-    afre_box[^0] $1 nm[^0] ma,mb *[I] [ma] +[I] [mb] k[I]
-  * $iM nm $nm endl done v +
+    *[a,b] [W] afre_box[^0] $rd nm[^0] ma,mW,mb
+    *[I] [ma] +[I] [mb] /[I] [mW] k[I]
+  * $iM nm $nm endl done
 
-#@cli afre_gui1 : [guide],radius>=1,_smoothing>=0
-#@cli : Blur selected images with a custom guided filter. Use orders of magnitude for smoothing.
-#@cli : \ Based on "K He, J Sun, X Tang. Guided image filtering. TPAMI, 35(6):1397-1409, 2013".
-#@cli : Default values: 'radius=1' and 'smoothing=1e-2'.
-afre_gui1 : check ${is_image_arg\ $1} skip ${2=1},${3=1e-2}
-  e[] "[afre]^_^) gui1: Blur image$? with a custom guided filter using radius=$2 and smoothing=$3."
-  v - pass$1 0
+#@cli afre_gui1 : [guide],_radius>=1,_smoothing>=0,0<=_structure<=10
+#@cli : Blur selected images with a custom guided filter.
+#@cli : Default values: 'radius=1', 'smoothing=1e-2' and 'structure=5'.\n
+#@cli : - Use orders of magnitude for 'smoothing'.
+#@cli : - Reduce 'structure' to soften edges and artifacts.
+#@cli : * Improvement of "K He, J Sun, X Tang. Guided image filtering. TPAMI, 35(6):1397-1409, 2013".
+afre_gui1 : check ${is_image_arg\ $1}" && ${2=1}>=1 && ${3=1e-2}>=0 && ${4=5}>=0 && $4<=10"
+  rd={int($2)} kwh={sqr($rd*2+1)} str={1e{-$4+2}}
+  e[] "[afre]^_^) gui1: Blur image$? with a custom guided filter using guide=["${"-pass$1 -1"}"], radius="$rd", smoothing=$3 and structure=$4."
+  pass$1 0 to_colormode 0
   repeat $! if $>!=$! nm$>={$>,b} fi iM$>={$>,iM} /[$>] ${iM$>} done
-  repeat $!-1,n l[$>,-1]
-    if w#0!=w#1||h#0!=h#1||d#0!=d#1 v + error[] "[afre]>_<) gui1: The dimensions of image ["$n"] and guide $1 do not match.
-    \n[afre]>_<)\t\ Images must have the same width, height and depth." v - fi
-    . rv +*[1] [2] +sqr[1] afre_box[^0] $2 nm I,mI,mp,mIp,mII
+  repeat $!-1 l[$>,-1]
+    if w#0!=w#1||h#0!=h#1||d#0!=d#1 error[] "\n[afre]>_<) gui1: Image$? and guide ["${"-pass$1 -1"}"] must have the same width, height and depth." fi
+    . rv +*[1] [2] +sqr[1] afre_box[^0] $rd nm I,mI,mp,mIp,mII
     +*[mI] [mp] *. -1 +. [mIp] rm[mIp] nm. cIp
     +sqr[mI] *. -1 +. [mII] rm[mII] nm. vI
-    ++[vI] {$3*ia+1e-6} /[cIp] . rm[vI,-1] nm[cIp] a
+    +normp[vI] 1 *. $kwh +. $str ^. -1 *. $str nm. W
+    ++[vI] {vI,$3*ia+1e-6} /[cIp] . rm[vI,-1] nm[cIp] a
     +*[a] [mI] *. -1 +. [mp] rm[mI,mp] nm. b
-    afre_box[^0] $2 nm[^0] ma,mb *[ma] [I] +[ma] [mb] k[I,ma]
+    *[a,b] [W] afre_box[^0] $rd nm[^0] ma,mW,mb
+    *[ma] [I] +[ma] [mb] /[ma] [mW] k[I,ma]
     nm[ma] ${nm$>} rv
   endl done rm.
-  repeat $! *[$>] ${iM$>} done v +
+  repeat $! *[$>] ${iM$>} done
+
+#@cli afre_gui0c : [kernel],_smoothing>=0,0<=_structure<=10
+#@cli : Convolve selected images with a custom self-guided filter.
+#@cli : Default values: 'smoothing=1e-2' and 'structure=10'.\n
+#@cli : - Use orders of magnitude for 'smoothing'.
+#@cli : - Reduce 'structure' to soften edges and artifacts.
+#@cli : * Improvement of "K He, J Sun, X Tang. Guided image filtering. TPAMI, 35(6):1397-1409, 2013".
+afre_gui0c : check ${is_image_arg\ $1}" && ${2=1e-2}>=0 && ${3=10}>=0 && $3<=10"
+  e[] "[afre]^_^) gui0c: Convolve image$? with a custom self-guided filter using kernel=["${"-pass$1 -1"}"], smoothing=$2 and structure=$3."
+  str={1e{-$3+2}}
+  repeat $! pass$1 0 kwh={wh} l[$>,-1] nm={0,b} iM={0,iM} /[0] $iM
+    [0] +sqr. afre_conv[^0-1] [1] nm I,k,mI,mII
+    +sqr[mI] *. -1 +. [mII] rm[mII] nm. vI
+    +l[vI] abs s c + endl *. $kwh +. $str ^. -1 *. $str nm. W
+    ++[vI] {vI,$2*ia+1e-6} /[vI] . rm. nm[vI] a
+    +*[a] [mI] *. -1 +. [mI] rm[mI] nm. b
+    *[a,b] [W] afre_conv[^0-1] [k] nm[^0-1] ma,mW,mb
+    *[I] [ma] +[I] [mb] /[I] [mW] k[I]
+  * $iM nm $nm endl done
+
+#@cli afre_gui1c : [guide],[kernel],_smoothing>=0,0<=_structure<=10
+#@cli : Convolve selected images with a custom guided filter.
+#@cli : Default values: 'smoothing=1e-2' and 'structure=5'.\n
+#@cli : - Use orders of magnitude for 'smoothing'.
+#@cli : - Reduce 'structure' to soften edges and artifacts.
+#@cli : * Improvement of "K He, J Sun, X Tang. Guided image filtering. TPAMI, 35(6):1397-1409, 2013".
+afre_gui1c : check ${is_image_arg\ $1}" && "${is_image_arg\ $2}" && ${3=1e-2}>=0 && ${4=5}>=0 && $4<=10"
+  e[] "[afre]^_^) gui1c: Convolve image$? with a custom guided filter using guide=["${"-pass$1 -1"}"], kernel=["${"-pass$2 -1"}"], smoothing=$3 and structure=$4."
+  pass$1 0 to_colormode 0 str={1e{-$4+2}}
+  repeat $! if $>!=$! nm$>={$>,b} fi iM$>={$>,iM} /[$>] ${iM$>} done
+  repeat $!-1 pass$2 0 kwh={wh} l[$>,-2--1]
+    if w#0!=w#1||h#0!=h#1||d#0!=d#1 error[] "\n[afre]>_<) gui1c: Image$? and guide ["${"-pass$1 -1"}"] must have the same width, height and depth." fi
+    [1] rv +*[2] [3] +sqr[2] afre_conv[^0-1] [1] nm I,k,mI,mp,mIp,mII
+    +*[mI] [mp] *. -1 +. [mIp] rm[mIp] nm. cIp
+    +sqr[mI] *. -1 +. [mII] rm[mII] nm. vI
+    +normp[vI] 1 *. $kwh +. $str ^. -1 *. $str nm. W
+    ++[vI] {vI,$3*ia+1e-6} /[cIp] . rm[vI,-1] nm[cIp] a
+    +*[a] [mI] *. -1 +. [mp] rm[mI,mp] nm. b
+    *[a,b] [W] afre_conv[^0-1] [k] nm[^0-1] ma,mW,mb
+    *[ma] [I] +[ma] [mb] /[ma] [mW] k[I,ma]
+    nm[ma] ${nm$>} rv
+  endl done rm.
+  repeat $! *[$>] ${iM$>} done
+
+#@cli afre_gui0_alt : radius>=1,_smoothing>=0,0<=_structure<=10
+#@cli : Blur selected images with a custom self-guided filter. Test version of 'afre_gui0'.
+#@cli : Default values: 'radius=1', 'smoothing=1e-2' and 'structure=10'.\n
+#@cli : - Use orders of magnitude for 'smoothing'.
+#@cli : - Reduce 'structure' to soften edges and artifacts.
+#@cli : * Improvement of "K He, J Sun, X Tang. Guided image filtering. TPAMI, 35(6):1397-1409, 2013".
+afre_gui0_alt : check "${1=1}>=1 && ${2=1e-2}>=0 && ${3=10}>=0 && $3<=10"
+  rd={int($1)} b={($rd+1)*0.5},1,1 kwh={sqr($rd*2+1)} str={1e{-$3+2}}
+  e[] "[afre]^_^) gui0_alt: Blur image$? with a custom self-guided filter using radius="$rd", smoothing=$2 and structure=$3. Test version of 'afre_gui0'."
+  repeat $! l[$>] nm={b} iM={iM} / $iM
+    . +sqr. b[^0] $b nm I,mI,mII
+    +sqr[mI] *. -1 +. [mII] rm[mII] nm. vI
+    +l[vI] abs s c + endl *. $kwh +. $str ^. -1 *. $str nm. W
+    ++[vI] {vI,$2*ia+1e-6} /[vI] . rm. nm[vI] a
+    +*[a] [mI] *. -1 +. [mI] rm[mI] nm. b
+    *[a,b] [W] b[^0] $b nm[^0] ma,mW,mb
+    *[I] [ma] +[I] [mb] /[I] [mW] k[I]
+  * $iM nm $nm endl done
+
+#@cli afre_gui1_alt : [guide],_radius>=1,_smoothing>=0,0<=_structure<=10
+#@cli : Blur selected images with a custom guided filter. Test version of 'afre_gui1'.
+#@cli : Default values: 'radius=1', 'smoothing=1e-2' and 'structure=5'.\n
+#@cli : - Use orders of magnitude for 'smoothing'.
+#@cli : - Reduce 'structure' to soften edges and artifacts.
+#@cli : * Improvement of "K He, J Sun, X Tang. Guided image filtering. TPAMI, 35(6):1397-1409, 2013".
+afre_gui1_alt : check ${is_image_arg\ $1}" && ${2=1}>=1 && ${3=1e-2}>=0 && ${4=5}>=0 && $4<=10"
+  rd={int($2)} b={($rd+1)*0.5},1,1 kwh={sqr($rd*2+1)} str={1e{-$4+2}}
+  e[] "[afre]^_^) gui1_alt: Blur image$? with a custom guided filter using guide=["${"-pass$1 -1"}"], radius="$rd", smoothing=$3 and structure=$4. Test version of 'afre_gui1'."
+  pass$1 0 to_colormode 0
+  repeat $! if $>!=$! nm$>={$>,b} fi iM$>={$>,iM} /[$>] ${iM$>} done
+  repeat $!-1 l[$>,-1]
+    if w#0!=w#1||h#0!=h#1||d#0!=d#1 error[] "\n[afre]>_<) gui1_alt: Image$? and guide ["${"-pass$1 -1"}"] must have the same width, height and depth." fi
+    . rv +*[1] [2] +sqr[1] b[^0] $b nm I,mI,mp,mIp,mII
+    +*[mI] [mp] *. -1 +. [mIp] rm[mIp] nm. cIp
+    +sqr[mI] *. -1 +. [mII] rm[mII] nm. vI
+    +normp[vI] 1 *. $kwh +. $str ^. -1 *. $str nm. W
+    ++[vI] {vI,$3*ia+1e-6} /[cIp] . rm[vI,-1] nm[cIp] a
+    +*[a] [mI] *. -1 +. [mp] rm[mI,mp] nm. b
+    *[a,b] [W] b[^0] $b nm[^0] ma,mW,mb
+    *[ma] [I] +[ma] [mb] /[ma] [mW] k[I,ma]
+    nm[ma] ${nm$>} rv
+  endl done rm.
+  repeat $! *[$>] ${iM$>} done
 
 
-#------------------------------
+#@cli ::Support Commands
+#-----------------------
+
+#@cli search_dichotomic : "increasing_fn",target_y,_precision>0
+#@cli : Find parameter for function such that 'target_y' is met in image.
+#@cli : Default value: 'precision=1e-3'.\n
+#@cli : - Return 'nan' if search fails.
+#@cli : * Credit: David Tschumperle.
+search_dichotomic : check ${3=1e-3}>0
+  m "_sdc : $1" target_value,epsilon=$2,$3 mpos,nb_attempts=-1,20
+  do mvalue=${_sdc\ $mpos} if $mvalue<$target_value break fi mpos*=2
+  nb_attempts-=1 while $nb_attempts if !$nb_attempts u nan return fi
+  Mpos,nb_attempts=1,20
+  do Mvalue=${_sdc\ $Mpos} if $Mvalue>$target_value break fi Mpos*=2
+  nb_attempts-=1 while $nb_attempts if !$nb_attempts u nan return fi
+  nb_attempts=100
+  do
+    cpos={($mpos+$Mpos)/2} cvalue=${_sdc\ $cpos}
+    if abs($cvalue-$target_value)<$epsilon u $cpos return
+      elif $cvalue<$target_value mpos=$cpos else Mpos=$cpos fi
+    nb_attempts-=1
+  while $nb_attempts u {$nb_attempts?$cpos:nan}
+
+
 # List of Commands and Filters
-#------------------------------
-# GUI CLI : afre_vigrect afre_vigcirc afre_softlight afre_sharpenfft afre_contrastfft afre_edge afre_cleantext afre_gleam
-# CLI only: afre_gnorm afre_hnorm afre_y50 afre_reorder afre_log2 afre_orien afre_box afre_gui0 afre_gui1
-# GUI only: fx_darken_sky fx_gamify fx_hnorm
-# '*' = listed separately as afrx (GUI) and afre (CLI)
+#---------42-----------19-----
+# GUI CLI
+#   afre_brightness afre_contrast afre_localcontrast afre_softlight
+#   afre_darksky afre_edge afre_details afre_texture afre_cleantext
+#   afre_denoisesmooth afre_denoisesmooth_alt afre_vigrect
+#   afre_vigcirc afre_sharpenfft afre_contrastfft afre_gleam
+#   afre_halfhalf afre_portraitmontage
+# CLI only
+#   afre_maxmin afre_minmax afre_jchz afre_ijchz afre_gnorm afre_hnorm
+#   afre_sdpatch afre_reorder afre_section afre_cleanphoto
+#   afre_cleanphoto1 afre_compare afre_log2 afre_y50 afre_orien
+#   afre_conv afre_box afre_gui0 afre_gui1 afre_gui0c afre_gui1c
+#   afre_gui0_alt afre_gui1_alt search_dichotomic
+# GUI old : fx_gamify fx_hnorm
 
 
 # Local Variables:
