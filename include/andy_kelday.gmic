@@ -2086,30 +2086,30 @@ gcd_blur_masked :
   endl done
 
 #@cli gcd_boxfilter_local : [reference_image]
-#@cli : Blur selected images by a per-pixel box filter (separable SAT implementation).
+#@cli : Blur selected images by a per-pixel box filter (2D SAT implementation).
 #@cli : Local window sizes are specified by the reference image.
 #@cli : $ sample +gaussian 20%,20% n. 0,50 gcd_boxfilter_local.. .
 gcd_boxfilter_local : check ${"is_image_arg $1"}
   pass$1 0 max. 1
   repeat $!-1 l[$>,-1]
-    f.. ">i+j(-1)"
+    cumulate.. xy
     f.. "
     begin(
-      const boundary=1; const interpolation=1; const W=w-1;
-      L(X)=X>1?i(X-1):X*i(0);
-      R(X)=X<W?i(X):(1+X-W)*i(W)-(X-W)*i(W-1);
+      const interpolation=1;
+      const W=w-1; const H=h-1;
+      T(X,Y)=Y>1?i(X,Y-1):Y*i(X,0);
+      B(X,Y)=Y<H?i(X,Y):(1+Y-H)*i(X,H)-(Y-H)*i(X,H-1);
+      C(X,Y)=X<W?B(X,Y):(1+X-W)*B(W,Y)-(X-W)*B(W-1,Y);
+      D(X,Y)=X>1?T(X-1,Y):X*T(0,Y);
+      E(X,Y)=X<W?T(X,Y):(1+X-W)*T(W,Y)-(X-W)*T(W-1,Y);
+      F(X,Y)=X>1?B(X-1,Y):X*B(0,Y);
     );
-    S=i#1; K=(S-1)/2;
-    (R(x+K) - L(x-K))/S"
-    f.. ">i+j(0,-1)"
-    f.. "
-    begin(
-      const boundary=1; const interpolation=1; const H=h-1;
-      T(Y)=Y>1?i(x,Y-1):Y*i(x,0);
-      B(Y)=Y<H?i(x,Y):(1+Y-H)*i(x,H)-(Y-H)*i(x,H-1);
-    );
-    S=i#1; K=(S-1)/2;
-    (B(y+K) - T(y-K))/S"
+    R=i#1; S=R*R; K=(R-1)/2;
+    x0 = x - K;
+    y0 = y - K;
+    x1 = x + K;
+    y1 = y + K;
+    (C(x1,y1) + D(x0,y0) - E(x1,y0) - F(x0,y1))/S"
   endl done rm.
 
 #@gui _
