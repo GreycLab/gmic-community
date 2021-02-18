@@ -44,6 +44,149 @@
 #
 #-------------------------------
 
+#@cli rep_mode_color: _outmode={ 0=blend | 1=mode_per_layer },_color_position
+#@cli : Fill image with mode of colors.
+#@cli :
+#@cli : 'outmode' determines whether to blend images or fill images with mode of itself. If images are to be blended, then it is possible nan values will occur due to the absence of mode or more than one mode.
+#@cli : '_color_position' determines the mode to use if it is 0 or over
+#@cli :
+#@cli : Author: Reptorian.
+#@cli : Default values: '_outmode=0','_color_position=-1'
+rep_mode_color:
+skip ${1=0},${2=-1}
+if $!>2&&!$1
+ +a z colormap. 0
+ a[^-1] c
+ {w#0},{h#0},{d#0},{s#1},"begin(
+  const vs=w#1;
+  const ss=s#1;
+  const css=s#0/ss;
+  endnan=vectors(nan);
+ );
+ nmaxfreq=0;
+ vfreq=vectorvs(-1);
+ vp=I#0;
+ for(pos=0,pos<css,pos++,
+  curcol=vp[pos*ss,ss];
+  for(posfreq=0,posfreq<vs,posfreq++,
+   coltestpos=I(#1,posfreq,0,0);
+   if(curcol==coltestpos,vfreq[posfreq]++;);
+  );
+ );
+ maxfreqcount=max(vfreq);
+ if(maxfreqcount+1,
+  posmaxfreqcol=find(vfreq,maxfreqcount,0,1);
+  for(fs=0,fs<vs,fs++,if(vfreq[fs]==maxfreqcount,nmaxfreq++;););
+  if(nmaxfreq==1,I(#1,posmaxfreqcol,0,0);,endnan);
+ ,endnan;
+ );"
+ k.
+elif $!==2&&!$1
+ f. "begin(endnan=vectors(nan););I==I#0?I:endnan;" rm..
+else
+ repeat $! l[$>]
+  if s>4 error "Unsupported number of channels" fi
+
+  ls={s}
+
+  minv={im}
+  - $minv
+
+  if s<5
+   repeat s
+    sh. $>
+    bsize$>={iM+1}
+    rm.
+   done
+  else
+   repeat 3
+    sh. $>
+    bsize$>={iM+1}
+    rm.
+   done
+   sh. 3
+   sh.. 4
+   bsize3={iM#-2+1}
+   bsize4={iM#-1+1}
+   rm[-2--1]
+   tbsize={$bsize3+$bsize4}
+  fi
+
+  if s==1
+   $bsize0,1,1,1 eval.. ++i(#-1,i,0,0,0) {w},1,1,1,x 
+
+   u {"freq=0;
+    for(n=0,n<w#-2,n++,
+    if(i(#-2,n)==iM#-2,freq++;);
+    );
+    (freq)"}
+
+   maxfreq={${}}
+
+   echo $maxfreq
+
+   +.. $minv
+
+   pixelsort. -,x,[-2]
+    
+   if $1<0
+    if $maxfreq==1
+     f... i(#-1,0,0,0)
+    fi
+    k...
+   else
+    pos={$1%$maxfreq}
+    f... i(#-1,$pos,0,0)
+    k...
+   fi
+
+  else
+
+   if s==2 $bsize0,$bsize1,1,1 eval.. ++i(#-1,[I,0]) dins=[x,y]
+   elif s==3 $bsize0,$bsize1,$bsize2,1 eval.. ++i(#-1,I) dins=[x,y,z]
+   elif s==4 $bsize0,$bsize1,$bsize2,$bsize3 eval.. ++i(#-1,I) dins=[x,y,z,c]
+   fi
+
+   1,1,1,$ls 1,1,1,1
+   
+   eval... :${-math_lib}"begin(
+     const ls="$ls";
+    );
+    if(i,
+     dar_insert(#-2,"$dins");
+     dar_insert(#-1,i-1);
+    );
+    end(
+     resize(#-2,1,dar_size(#-2),1,s(#-2),0);
+     resize(#-1,1,dar_size(#-1),1,s(#-1),0);
+    );
+    "
+ 
+   +.. $minv
+
+   pixelsort.. -,y,[-1]
+   sort. -
+
+   u {"freq=0;
+    for(n=0,n<h#-1,n++,
+     if(i(#-1,0,n)==iM,freq++,break(););
+     );
+     (freq)"}
+ 
+   maxfreq={${}}
+
+   if $2<0
+    if $maxfreq==1
+     f[-4] I(#-2,0,0,0)
+    fi
+   else
+    pos={int($2)%$maxfreq}
+    f[-4] I(#-2,0,$posfreq,0)
+   fi
+   k[-4]
+  fi
+ endl done
+fi
 #@cli rep_dynamic_contrast: -64<=amount<=64,0<=_threshold<=255,0<=_intensity<=255
 #@cli : Apply dynamic contrast using formula found by Remake at forums.getpaint.net. Original source code - https://forums.getpaint.net/topic/117538-dynamic-contrast/?tab=comments#comment-578867 . It is similar to Photoshop's Dynamic Contrast.
 #@cli :
