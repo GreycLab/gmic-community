@@ -2113,6 +2113,64 @@ gcd_boxfilter_local : check ${"is_image_arg $1"}
     (C(x1,y1) + D(x0,y0) - E(x1,y0) - F(x0,y1))/S"
   endl done rm.
 
+#@cli gcd_boxfilter_local_hp : [reference_image]
+#@cli : Blur selected images by a per-pixel box filter (High precision 2D SAT implementation).
+#@cli : Local window sizes are specified by the reference image.
+#@cli : $ sample +gaussian 20%,20% n. 0,50 gcd_boxfilter_local_hp.. .
+gcd_boxfilter_local_hp : check ${"is_image_arg $1"}
+  pass$1 0 max. 1
+  repeat $!-1 l[$>,-1]
+    f.. "
+    begin(
+      const boundary=1;
+      ref(crop(#0),img); # 64bit buffer
+      const W=w-1; const H=h-1;
+      px(x,y) = (img[x + y*w#0 + c*wh#0]);
+
+      # Bilinear buffer interpolation
+      qx(x,y) = (
+        xA=floor(x);
+        xB=ceil(x);
+        yA=floor(y);
+        yB=ceil(y);
+        lx=x-xA;
+        lerp(
+          lerp(px(xA,yA),px(xB,yA),lx),
+          lerp(px(xA,yB),px(xB,yB),lx),
+          y-yA
+        )
+      );
+      
+      # Boundary handling of summed areas
+      T(X,Y)=Y>1?qx(X,Y-1):Y*qx(X,0);
+      B(X,Y)=Y<H?qx(X,Y):(1+Y-H)*qx(X,H)-(Y-H)*qx(X,H-1);
+      G(X,Y)=X<W?B(X,Y):(1+X-W)*B(W,Y)-(X-W)*B(W-1,Y);
+      D(X,Y)=X>1?T(X-1,Y):X*T(0,Y);
+      E(X,Y)=X<W?T(X,Y):(1+X-W)*T(W,Y)-(X-W)*T(W-1,Y);
+      F(X,Y)=X>1?B(X-1,Y):X*B(0,Y);
+
+      # 2D cumulate
+      for (C = 0; P = 0, C<s#0, ++C,
+        for (X = 0; S = 0, X<w#0, ++X; ++P,
+          S += img[P];
+          img[P] = S;
+        );
+        for (Y = 1, Y<h#0, ++Y,
+          for (X = 0; S = 0, X<w#0, ++X; ++P,
+            S += img[P];
+            img[P] = img[P-w#0]+S;
+          )
+        )
+      )
+    );
+    R=i#1; S=R*R; K=(R-1)/2;
+    x0 = x - K;
+    y0 = y - K;
+    x1 = x + K;
+    y1 = y + K;
+    (G(x1,y1) + D(x0,y0) - E(x1,y0) - F(x0,y1))/S"
+  endl done rm.
+
 #@cli gcd_decumulate : _size>=1
 #@cli : Compute the 2D cumulative inverse function of specified image data.
 #@cli : $ sample cumulate xy gcd_decumulate 1
