@@ -370,7 +370,7 @@ pink_new :
     done
   else np=" "
   fi
-  v + e[0] "Call pink package on image$? with execute cmd: \"$1 [img]"$np" [img]\"." v -
+  e[^-1] "Call pink package on image$? with execute cmd: \"$1 [img]"$np" [img]\"."
   _xpinks $1,$np
   if (isnum($GMIC_PINK_NO_RM)?0$GMIC_PINK_NO_RM:0)==0
     repeat $#-1
@@ -384,9 +384,9 @@ pink_new :
 #@cli : Default values: 'connectivity=4' and 'lambda=0' (actually only connex=4 implemented).
 #@cli : $ sp tiger +pink_grayskel , +pink_grayskel[0] ,10 +pink_grayskel[0] ,100 append_tiles 2
 pink_grayskel : skip ${1=4},${2=0}
-  e[0] "Call pink package on image$? with execute cmd: grayskel [img] $1 $2 [img]"
+  e[^-1] "Call pink package on image$? with execute cmd: grayskel [img] $1 $2 [img]"
   check "${1=4}==4"
-	pink grayskel,null,$1,$2
+	pink grayskel:if-uchar,null,$1,$2
 # #	repeat $! l[$>] round , pink grayskel,null,$1,$2 endl done
 
 #@cli pink_heightmaxima : _connectivity={ 4 | 8 | 6 | 26 },_height=1
@@ -395,8 +395,8 @@ pink_grayskel : skip ${1=4},${2=0}
 #@cli : Default values: 'connectivity=4' and 'height=1'.
 #@cli : $ sp tiger +blur 2 round +pink_heightminima ,15 round[0,1] +pink_heightmaxima[0,1] ,15 -[-3,-1] -[-3,-1] k[-1,-2]
 pink_heightmaxima : check "${1=4}==4 || $1==8 || $1==6 || $1==26" skip ${2=1}
-  e[0] "Call pink package on image$? with execute cmd: heightmaxima [img] $1 $2 [img]"
-	pink heightmaxima,$1,$2
+  e[^-1] "Call pink package on image$? with execute cmd: heightmaxima [img] $1 $2 [img]"
+	pink heightmaxima:if-uchar,$1,$2
 # #  repeat $! l[$>]
 # #    s={s} if $s>1 s. c fi
 # #    repeat $! l[$>] round , _xpink "heightmaxima","$1 $2" k. endl done
@@ -409,8 +409,8 @@ pink_heightmaxima : check "${1=4}==4 || $1==8 || $1==6 || $1==26" skip ${2=1}
 #@cli : Default values: 'connectivity=4' and 'height=1'.
 #@cli : $ sp tiger +blur 2 round +pink_heightminima ,15 round[0,1] +pink_heightmaxima[0,1] ,15 -[-3,-1] -[-3,-1] k[-1,-2]
 pink_heightminima : check "${1=4}==4 || $1==8 || $1==6 || $1==26" skip ${2=1}
-  e[0] "Call pink package on image$? with execute cmd: heightminima [img] $1 $2 [img]"
-	pink heightminima,$1,$2
+  e[^-1] "Call pink package on image$? with execute cmd: heightminima [img] $1 $2 [img]"
+	pink heightminima:if-uchar,$1,$2
 # #  repeat $! l[$>]
 # #    s={s} if $s>1 s. c fi
 # #    repeat $! l[$>] round , _xpink "heightminima","$1 $2" k. endl done
@@ -423,9 +423,9 @@ pink_heightminima : check "${1=4}==4 || $1==8 || $1==6 || $1==26" skip ${2=1}
 #@cli : Grayscale ultimate homotopic thinning/thickening without condition (requires the PINK library to be installed).
 #@cli : Default values: 'connectivity=4' and 'type=""'.
 #@cli : $ sp tiger +pink_htkern ,u +pink_htkern[0] , +-[-1,-2] remove[0]
-pink_htkern : skip ${1=4},${2=""} if {'$2'}!={'u'} p="" else p"u" fi
+pink_htkern : skip "${1=4} ${2=''}"
   e[0] "Call pink package on image$? with execute cmd: htkern$2 [img] null $1 [img]"
-	pink htkern$p,null,$1
+	pink htkern${2}:if-uchar,null,$1
 # #  repeat $! l[$>] round , _xpinks htkern$2,"null $1" endl done
 
 #@cli pink_lvkern : _connectivity={ 4 | 8 | 6 | 26 }, _type={"" | u}
@@ -435,9 +435,9 @@ pink_htkern : skip ${1=4},${2=""} if {'$2'}!={'u'} p="" else p"u" fi
 #@cli : Default values: 'connectivity=4' and 'type=""'.
 #@cli : $ sp tiger pink_lvkern ,u
 pink_lvkern : skip ${1=4},${2=""}
-  check "${1=4}==4 || $1==8 || $1==6 || $1==26" if {'$2'}!={'u'} p="" else p="u" fi
+  check "${1=4}==4 || $1==8 || $1==6 || $1==26" 
   e[0] "Call pink package on image$? with execute cmd: lvkern$2 [img] null $1 [img]"
-	pink lvkern$p,null,$1
+	pink lvkern${2}:if-uchar,null,$1
 # #  repeat $! l[$>] round , _xpinks lvkern${2},"null $1" endl done
 
 #@cli pink_reg_minima : _connectivity={ 0 | 4 | 8 | 6 | 18 | 26 | 14}
@@ -447,12 +447,10 @@ pink_lvkern : skip ${1=4},${2=""}
 #@cli : $ sp tiger +blur 2 round. pink_reg_minima ,
 pink_reg_minima : check "${1=4}==4 || $1==8 || $1==6 || $1==26 || $1==0 || $1==18 || $1==14"
   e[0] "Call pink package on image$? with execute cmd: minima [img] $1 [img]"
-	pink minima,$1
-# #  repeat $! l[$>]
-# #    s={s} if $s>1 s. c fi
-# #    repeat $! l[$>]  _xpink "minima","$1" k. endl done
-# #    if $s>1 a[-$s--1] c fi
-# #  endl done
+  repeat $! l[$>]
+	  if iM<256 tt=uchar else tt=uint fi
+	  pink minima:if-$tt,$1
+  endl done
 
 #@cli pink_skelcurv : _prio={prio image|0|1|2|3|4|8|6|26},_connectivity={ 4 | 8 | 6 | 26 },_inhibit={""|inhibit image}
 #@cli : (https://perso.esiee.fr/~coupriem/Pink/doc/html/skelcurv_8c.html)
@@ -463,7 +461,7 @@ pink_reg_minima : check "${1=4}==4 || $1==8 || $1==6 || $1==26 || $1==0 || $1==1
 #@cli : $ sp tiger threshold 50% +pink_skelcurv , +pink_skelcurv.. ,8
 pink_skelcurv : skip ${1=0},${2=4},${3=""}
   e[0] "Call pink package on image$? with execute cmd: skelcurv [img] $1 $2 $3 [img]"
-	pink skelcurv,$1,$2,$3
+	pink skelcurv:if-uchar,$1,$2,$3
 # #  repeat $! l[$>] _xpinks "skelcurv","$1 $2 $3" endl done
 
 #@cli pink_skelend : _connectivity={ 4 | 8 | 6 | 26 },_n=0
@@ -474,7 +472,7 @@ pink_skelcurv : skip ${1=0},${2=4},${3=""}
 #@cli : $ sp tiger threshold 50% +pink_skelend , +pink_skelend.. ,-1
 pink_skelend : skip ${1=4},${2=0}
   e[0] "Call pink package on image$? with execute cmd: skelend [img] $1 $2 [img]"
-	pink skelend,$1,$2
+	pink skelend:if-uchar,$1,$2
 # #  repeat $! l[$>] _xpinks "skelend","$1 $2" endl done
 
 #@cli pink_skeleton : _prio={0|1|2|3|4|8|6|26},_connectivity={ 4 | 8 | 6 | 26 }
@@ -483,8 +481,8 @@ pink_skelend : skip ${1=4},${2=0}
 #@cli : Default values: 'prio=0', 'connectivity=4'.
 #@cli : $ sp tiger threshold 50% +pink_skeleton. ,
  pink_skeleton : skip ${1=0},${2=4}
-  e[0] "Call pink package on image$? with execute cmd: skeleton [img] $1 $2 $3 [img]"
-	pink skeleton,$1,$2
+  e[0] "Call pink package on image$? with execute cmd: skeleton [img] $1 $2 [img]"
+	pink skeleton:if-uchar,$1,$2
 # #  repeat $! l[$>] _xpinks "skeleton","$1 $2 $3" endl done
 
 #@cli pink_skelpar : _algorithm={0...29},_nsteps=_1,_inhibit=""
@@ -494,14 +492,14 @@ pink_skelend : skip ${1=4},${2=0}
 #@cli : $ sp tiger threshold 50% +pink_skelpar. 0 +pink_skelpar. 2
 pink_skelpar : skip ${1=4},${2=-1},${3=""}
   e[0] "Call pink package on image$? with execute cmd: skelpar [img] $1 $2 $3 [img]"
-	_xframe pink skelpar,$1,$2,$3
+	_xframe pink skelpar:if-uchar,$1,$2,$3
 # #  repeat $! l[$>] _xframe _xpinks "skelpar","$1 $2 $3" endl done
 
 #@cli pink_wshed : _connectivity={ 4 | 8 | 6 | 26 },_inverse={ 0 | 1 },_height=0
 #@cli : (https://perso.esiee.fr/~coupriem/Pink/doc/html/wshedtopo_8c.html)
 #@cli : Watershed (requires the PINK library to be installed).
 #@cli : Default values: 'connectivity=4', 'inverse=0' and 'height=0'.
-#@cli : $ sp tiger round +pink_wshed ,1,5 round pink_wshed[0] ,,5
+#@cli : $ sp tiger +pink_wshed ,1,5 pink_wshed[0] ,,5
 pink_wshed : check "${1=4}==4 || $1==8 || $1==6 || $1==26" skip ${2=0},${3=0}
   e[^-1] "Call from Pink package heightminima $1 $3 ; wshedtop $1 and inversion if $2."
   repeat $! l[$>]
@@ -511,9 +509,9 @@ pink_wshed : check "${1=4}==4 || $1==8 || $1==6 || $1==26" skip ${2=0},${3=0}
       repeat $! l[$>]
         f max(min(i,255),0)
         if $2!=0 negate 255 fi
-        if $3>=0 pink heightminima,$1,$3 fi
+        if $3>=0 pink heightminima:if-uchar,$1,$3 fi
         round
-        pink wshedtopo,$1
+        pink wshedtopo:if-uchar,$1
         if $2!=0 negate 255 fi
       endl done
     else
@@ -521,9 +519,9 @@ pink_wshed : check "${1=4}==4 || $1==8 || $1==6 || $1==26" skip ${2=0},${3=0}
       repeat $! l[$>]
         f max(min(i,255),0)
         if $2!=0 negate 255 fi
-        if $3>=0 pink heightminima,$1,$3 fi
+        if $3>=0 pink heightminima:if-uchar,$1,$3 fi
         round
-        pink wshedtopo,$1
+        pink wshedtopo:if-uchar,$1
         if $2!=0 negate 255 fi
       endl done
     fi
@@ -2425,7 +2423,7 @@ karo_extinction : check "${1=100%}>0"
 #@cli : Argument '_feature' is a string that corresponds to the way the feature would
 #@cli : be requested for the entire image in math. processor syntax without {}.
 #@cli : $ 100,200 follic +threshold. 18.6% negate. label_fg. 0,1 \
-# repeat 10 region_feature.. .,{$>+1},\"ia,h\" text[0] {``${}},5,{$>*20},13,1,255 done
+# repeat 10 region_feature.. .,{$>+1},"ia,h" text[0] {``$>:${}},5,{$>*20},13,1,255 done
 region_feature : check ${-is_image_arg\ $1} skip "${2=1} ${3="wh"} ${4=0}"
   e[^-1] "Calculate region feature(s) \"$3\" for label==$2 in "$1" from data$?."
   pass$1 l[-2,-1]
