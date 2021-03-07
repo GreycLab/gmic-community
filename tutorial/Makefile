@@ -6,7 +6,7 @@ all :
 	$(foreach file, $(wildcard *.gmd), make $(basename $(file)).html;)
 
 %.html: %.gmd
-	gmic it $< gmd2html strvar d strvar "{b}" out=\$$\{\} ot \$$out.html
+	gmic it $< gmd2html 2 ot {n}
 
 clean:
 	rm -f *.html *~
