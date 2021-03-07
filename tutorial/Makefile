@@ -3,10 +3,7 @@
 #
 
 all :
-	$(foreach file, $(wildcard *.gmd), make $(basename $(file)).html;)
-
-%.html: %.gmd
-	gmic it $< gmd2html 2 ot {n}
+	@gmic batch_gmd html
 
 clean:
 	rm -f *.html *~
