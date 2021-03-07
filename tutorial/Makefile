@@ -6,4 +6,4 @@ all :
 	@gmic batch_gmd2html
 
 clean:
-	rm -f *.html *~
+	rm -rf img html *~
