@@ -82,28 +82,29 @@ _xpink :
   na={-1,n}
   filename=${-file_rand}
   x_filename={/$filename}
-  if {(isnum($GMIC_PINK_VERBOSE)?0$GMIC_PINK_VERBOSE:0)>0} verb=" 2>&1" else verb=" >/dev/null 2>&1" fi
+  if {(isnum($GMIC_PINK_VERBOSE)?0$GMIC_PINK_VERBOSE:0)>0} verb=" 2>&1" xverb=1
+	else verb=" >/dev/null 2>&1" xverb={$^>2?1,0} fi
   if {(isnum($GMIC_PINK_NO_RM)?0$GMIC_PINK_NO_RM:0)>0} no_rm=1 else no_rm=0 fi
   ('$1') replace_str. ":","," replace_str. "-","," pc={t} rm. pink_cmd=${arg\ 1,$pc}
   if ['${arg\ 2,$pc}']==['if'] ifo=,${arg\ 3,$pc} else ifo="" fi
   prefix=pink. suffix=""
   if !${-is_windows}
-    x "which "${prefix}${pink_cmd}$verb
+    x 0,"which "${prefix}${pink_cmd}	#$verb
     if ${}!=0 prefix=""
-      x "which "$pink_cmd$verb
+      x 0,"which "$pink_cmd		#$verb
       if ${}!=0 suffix=".exe"
-        x "which "$pink_cmd$suffix$verb
+        x 0,"which "$pink_cmd$suffix		#$verb
         if ${}!=0 error "Executable (pink.)"$pink_cmd" not found in PATH, status = "${}"!! Returning!!\n"  fi
       fi
     fi
-    if {(isnum($GMIC_PINK_VERBOSE)?0$GMIC_PINK_VERBOSE:0)>0}
+    if (isnum($GMIC_PINK_VERBOSE)?0$GMIC_PINK_VERBOSE:0)>0
       echo_stdout ${prefix}${pink_cmd}${suffix}" "${filename}".pnk $2 "${filename}"_o.pnk"$verb fi
-    o ${filename}.pnk$ifo x ${prefix}${pink_cmd}${suffix}" "${filename}".pnk ${2} "${filename}"_o.pnk"$verb
+    o ${filename}.pnk$ifo x $xverb,${prefix}${pink_cmd}${suffix}" "${filename}".pnk ${2} "${filename}"_o.pnk"$verb
     _status=${}
   else
     if {(isnum($GMIC_PINK_VERBOSE)?0$GMIC_PINK_VERBOSE:0)>0}
     echo_stdout $pink_cmd" "${x_filename}".pnk $2 "${x_filename}"_o.pnk" fi
-    o ${filename}.pnk$ifo x ${pink_cmd}" "${x_filename}".pnk ${2} "${x_filename}"_o.pnk"
+    o ${filename}.pnk$ifo x $xverb,${pink_cmd}" "${x_filename}".pnk ${2} "${x_filename}"_o.pnk"
     _status=${}
   fi
   if !$no_rm file_rm ${x_filename}.pnk fi
@@ -365,11 +366,9 @@ pink_new :
         filename$>=${-file_rand}
         o. ${filename$>}.pnk rm.
         np=${np}\ ${filename$>}.pnk
-      else np=${np}\ ${pp{$>+2}}
-      fi
+      else np=${np}\ ${pp{$>+2}} fi
     done
-  else np=" "
-  fi
+  else np=" " fi
   e[^-1] "Call pink package on image$? with execute cmd: \"$1 [img]"$np" [img]\"."
   _xpinks $1,$np
   if (isnum($GMIC_PINK_NO_RM)?0$GMIC_PINK_NO_RM:0)==0
@@ -501,7 +500,8 @@ pink_skelpar : skip ${1=4},${2=-1},${3=""}
 #@cli : Default values: 'connectivity=4', 'inverse=0' and 'height=0'.
 #@cli : $ sp tiger +pink_wshed ,1,5 pink_wshed[0] ,,5
 pink_wshed : check "${1=4}==4 || $1==8 || $1==6 || $1==26" skip ${2=0},${3=0}
-  e[^-1] "Call from Pink package heightminima $1 $3 ; wshedtop $1 and inversion if $2."
+  if $3==0 e[^-1] "Call from Pink package: wshedtopo $1 "${"arg 1+!$2,inverted.,."}
+  else e[^-1] "Call from Pink package: heightminima $1 $3 wshedtopo $1 "${"arg 1+!$2,inverted.,."} fi
   repeat $! l[$>]
     s={s} if $s>1 s. c fi
     if d==1
@@ -509,8 +509,7 @@ pink_wshed : check "${1=4}==4 || $1==8 || $1==6 || $1==26" skip ${2=0},${3=0}
       repeat $! l[$>]
         f max(min(i,255),0)
         if $2!=0 negate 255 fi
-        if $3>=0 pink heightminima:if-uchar,$1,$3 fi
-        round
+        if $3>0 pink heightminima:if-uchar,$1,$3 fi
         pink wshedtopo:if-uchar,$1
         if $2!=0 negate 255 fi
       endl done
@@ -519,8 +518,7 @@ pink_wshed : check "${1=4}==4 || $1==8 || $1==6 || $1==26" skip ${2=0},${3=0}
       repeat $! l[$>]
         f max(min(i,255),0)
         if $2!=0 negate 255 fi
-        if $3>=0 pink heightminima:if-uchar,$1,$3 fi
-        round
+        if $3>0 pink heightminima:if-uchar,$1,$3 fi
         pink wshedtopo:if-uchar,$1
         if $2!=0 negate 255 fi
       endl done
