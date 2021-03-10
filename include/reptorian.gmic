@@ -6681,6 +6681,7 @@ endl done
 #@cli : Creates a Nebulous texture inspired by its Paint.NET plugin equivalent made by MadJik.\n
 #@cli : '_main_surf_xy_factor' - Amount of waves by xy-axis.
 #@cli : '_main_surf_x_factor' - Amount of waves by x-axis.
+#@cli : '_main_surf_y_factor' - Amount of waves by y-axis.
 #@cli : '_x_center' - Placement of Nebulous texture relative to the center by x-axis.
 #@cli : '_y_center' - Placement of Nebulous texture relative to the center by y-axis.
 #@cli : '_fxyangle' - Function angle of Nebulous texture.
@@ -6702,55 +6703,72 @@ rep_nebulous:
 skip ${2=10},${3=10},${4=0},${5=0},${6=0},${7=1},${8=0},${9=0},${10=100},${11=100},${12=0},${13=0},${14=1},${15=0},${16=0},${17=1}
 if $1==0||$2==0||$3==0 v + error "Variable 1 to 3 cannot be zero!" v - fi
 if $9<0 v + error "Disturbance factor cannot be less than 0!" v - fi
-iw={w}
-ih={h}
-if !$14 channels 0
-else to_rgb fi
-if $15 r $iw,$ih,1,{s+1} fi
-if $16>1 r {$iw*($16+1)},{$ih*($16+1)},1,{s} fi
-f "
-begin(
-const sd=w/h;
-const shx=($4*w)/2;
-const shy=($5*h)/2;
-const ang=-pi*$6/180;
-const cos_ang=cos(ang);
-const sin_ang=sin(ang);
-const distlvl=$9*$1;
-const dist=pi/(distlvl/100);
-const disth=$10;
-const distv=$11;
-const dang=-pi*$12/180;
-const cos_dang=cos(dang);
-const sin_dang=sin(dang);
-const k=pi+((-pi+(pi*$7))*10)/10;
-const ld=-($8-$6)*pi/180;
-);
-ix=(((x+shx)/w-.5)*1.5*($1*10))/(h>w?1/sd:1);
-iy=(((y+shy)/h-.5)*1.5*($1*10))/(w>h?sd:1);
-IX=ix*cos_ang-iy*sin_ang;
-IY=ix*sin_ang+iy*cos_ang;
-IX*=$2*4;
-IY*=$3*4;
-dix=(x/w-.5)*2/(h>w?1/sd:1);
-diy=(y/h-.5)*2/(w>h?sd:1);
-DIX=dix*cos_dang-diy*sin_dang;
-DIY=dix*sin_dang+diy*cos_dang;
-cx=DIX*($13?$2:1);
-cy=DIY*($13?$3:1);
-IX+=distlvl>0?(disth*(sin(((cx+cy)/2)/dist)-cos(((cy-cx)/2)/dist)));
-IY+=distlvl>0?(-distv*(sin(((cx+cy)/2)/dist)+cos(((cy-cx)/2)/dist)));
-t=atan2(IY,IX);
-r=sqrt(IX*IX+IY*IY);
-r/=100;
-ti=sin(t)*cos(r)*k+r+ang+ld;
-g=(sin(ti)+sin(pi/2+ti)+sin(pi+ti));
-cg=[sin(pi+ti),sin(pi/2+ti),sin(ti)];
-ft=!$14?g:cg;
-alp=$15?($15>2?($15==3?g:g*-1):($15==2?(g*-1<0?-1:1):(g<0?-1:1)));
-$15?(!$14?[g,alp]:[sin(pi+ti),sin(pi/2+ti),sin(ti),alp]):ft;
-"
-if $16>1 r $iw,$ih,1,{s},{$17+2} fi
+use_sub={abs($16)}
+sublevel={$use_sub+1}
+spec_count={!14?0+($15?1:0):3+($15?1:0)}
+repeat $! l[$>]
+ iw={w}
+ ih={h}
+ {$use_sub?w*$sublevel:w},{$use_sub?h*$sublevel:h},1,$spec_count,"begin(
+   const sd=w/h;
+   const shx=($4*w)/2;
+   const shy=($5*h)/2;
+   const sx=w>h?1:1/sd;
+   const sy=w>h?sd:1;
+   const sx2=2/sx;
+   const sy2=2/sy;
+   const ang=-pi*$6/180;
+   const cos_ang=cos(ang);
+   const sin_ang=sin(ang);
+   const distlvl=$9*$1;
+   const dist=pi/(distlvl/100);
+   const disth=$10;
+   const distv=$11;
+   const dang=-pi*$12/180;
+   const cos_dang=cos(dang);
+   const sin_dang=sin(dang);
+   const k=pi+((-pi+(pi*$7))*10)/10;
+   const ld=-($8-$6)*pi/180;
+   const IX_mul=$2*4;
+   const IY_mul=$3*4;
+   const cx_mul=$13?$2:1;
+   const cy_mul=$13?$3:1;
+   const iml=1.5*($1*10);
+   const angld=ang+ld;
+   const hpi=pi/2;
+  );
+  ix=(((x+shx)/w-.5)*iml)/sx;
+  iy=(((y+shy)/h-.5)*iml)/sy;
+  IX=ix*cos_ang-iy*sin_ang;
+  IY=ix*sin_ang+iy*cos_ang;
+  IX*=IX_mul;
+  IY*=IY_mul;
+  dix=(x/w-.5)*sx2;
+  diy=(y/h-.5)*sy2;
+  DIX=dix*cos_dang-diy*sin_dang;
+  DIY=dix*sin_dang+diy*cos_dang;
+  cx=DIX*cx_mul;
+  cy=DIY*cy_mul;
+  if(distlvl,
+   fsd=sin(((cx+cy)/2)/dist);
+   fcd=cos(((cy-cx)/2)/dist);
+   IX+=disth*(fsd-fcd);
+   IY-=distv*(fsd+fcd);
+  );
+  t=atan2(IY,IX);
+  r=sqrt(IX*IX+IY*IY)/100;
+  ti=sin(t)*cos(r)*k+r+angld;
+  $15?(
+   cg=[sin(pi+ti),sin(hpi+ti),sin(ti)];
+   g=sum(cg);
+   alp=$15>2?($15==3?g:g*-1):($15==2?(g*-1<0?-1:1):(g<0?-1:1));
+   $14?[cg,alp]:[g,alp];
+  ):(
+   $14?[sin(pi+ti),sin(hpi+ti),sin(ti)]:sin(ti)+sin(hpi+ti)+sin(pi+ti);
+  );"
+ rm..
+ if $use_sub r $iw,$ih,1,{s},{$17+2} fi
+endl done
 #@cli rep_sptbwgp: eq. to 'rep_shift_pixel_to_boundary_with_group_pixels' : (+)
 rep_sptbwgp: rep_shift_pixel_to_boundary_with_group_pixels $*
 #@cli rep_shift_pixel_to_boundary_with_group_pixels: -1<=_position<=1,_axis={ 0=Horizontal | 1=Vertical },0<=_influence_factor<=1,_threshold>=0,_channel_mode
