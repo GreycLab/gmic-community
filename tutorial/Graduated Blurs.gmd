@@ -1,0 +1,15 @@
+![img](original/init-00.png) We want to blur an image gradually from bottom to top.
+
+The quick and cheesy way entails a pristine image, its blurred counterpart and a mask that splices the two together in a compositing operation. This is the kind of “graduated blur” that new Gimp or Photoshop users get when they use a heavily feathered (i.e., blurred) selection mask, with the hope that the mask will gradually “strengthen” the blur from the unselected to selected regions.
+
+Nothing of the sort happens. Instead, the paint program takes the fully blurred "A" and the pristine "B" and does the classic Porter and Duff A over B compositing operation through the selection. Examine the results and  find the sharp edges of the original somewhat masked by its fully blurred counterpart. There is no “graduated blur”, just A over B. Cheesy.
+
+[ImageMagick](http://www.imagemagick.org/) has a far better transitional blur in its compositing engine (`-compose blur ... -composite`). The channels of an RGB control mask dynamically shape a convolution kernel3. Ramp-like masks can “grow” the kernel dynamically, pixel-by-pixel, for very high quality transitions. It can make enchantingly beautiful effects but is slow, as is anything that reshapes convolution kernels on the fly.
+
+For G'MIC, ''-smooth'' furnishes a similar service. Here, a tensor field takes the role of ImageMagick's control mask. This facet of the -smooth command is often overlooked, given its strong association with anisotropic smoothing. One might be inclined to think that anisotropic smoothing is “all” that -smooth does. In fact it is a general purpose blurring engine which can shape a kernel on the fly, given the pixel-by-pixel instructions furnished by a tensor field. The key to this very general and very accommodating engine entails giving -smooth a separately prepared tensor field, which it accepts by way of a command line image selector.
+
+Our game, then, is to prepare a tensor field. That task boils down to using ''-eigen2tensor'', which converts pairs of two channel images into tensor fields. These associate a pair of vectors with each operand pixel; these vectors then direct the size, eccentricity and orientation of a blurring kernel in the locale of the operating pixel.
+
+The care and feeding of ''-eigen2tensor'' entails preparing four gray scale control images by various and sundry means. We call them EigenOne, EigenTwo, Cosine and Sine. Don't worry too much about these names. They're labels for now, nothing more. We pairwise -append these grayscale images together to make the input ''-eigen2tensor'' requires.
+
+Here's the nuts-and-bolts of a graduated blur using ''-smooth'' and tensor fields.
