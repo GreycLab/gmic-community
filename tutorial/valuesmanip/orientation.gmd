@@ -1,0 +1,120 @@
+---
+# orientation
+
+===
+![RGB sphere](image/usphere.png)
+**usphere.png**
+*The point on the unit sphere is pure hue. The volume in the sphere contain shaded hues. Tints live outside.*
+===
+''-orientation'' scales the color components of each pixel in an image so that the length of the color vector is one (see **usphere.png**):
+===
+ u=\frac{c}{|c|}
+===
+In the resulting image, pixel RGB components plot points on a unit sphere centered on the origin of the RGB color space. A line passing through the origin and the corresponding plot consists of points with the same hue, differing only in luminosity. Informally, the plot itself represents the "pure" hue, with colors tending toward the origin being shades of, and those tending away from the origin being tints of the pure hue.
+
+An image transformed by ''-orientation'' is an apt dataset for a number of color selection and identification algorithms. How dark or light a pixel may be has been put to one side and only chromatic data remains.
+
+## The RGB Color Space
+===
+![color cube](image/ccube.png)
+**ccube.png**
+*The point at (236,193,95) is in a kind of a yellow brown part of the color cube*
+===
+
+We can regard a color's red, green and blue components as a position vector in some three dimensional RGB color space (see ''-mix_rgb''), with the "tail" rooted at the origin and the "head" plotting the color itself.
+
+Vectors express both direction and length. The RGB color space which color vectors comprise has a [Euclidean metric](http://en.wikipedia.org/wiki/Euclidean_metric): a means to find "distance" between points comprising the space. We find the length of color vectors by taking the square root of the sum of squared color components: see [Pythagorean formula](http://en.wikipedia.org/wiki/Pythagorean_theorem).
+
+There are circumstances when we'd like to consider the length, or magnitude, of a color vector quite apart from the direction in which it points. In G'MIC, ''-norm'' extracts that information, producing a grayscale counterpart of a color image where the intensity of pixels reflect the RGB color space length of their counterparts.
+
+===
+%% sp cat,150 +norm. to_rgb. normalize. 0,{2^8-1} %%
+**normed_cat.png**
+===
+
+In contrast, ''-orientation'' extracts the RGB space orientation of a color vector quite apart from its length. This entails scaling each color component of a pixel by the length of the vector which those components define, producing a triplet of unitless numbers, also composing a vector, but one of unit length.
+
+===
+%% sp cat,150 +orientation. normalize. 0,{2^8-1} %%
+**oriented_cat.png**
+===
+
+These triplets describe the orientation of colors in RGB space. One can imagine an open-ended line starting at the the origin and passing through the plot on the unit sphere. The direction in which this line points is a shared characteristic of all the colors on that line. They share a common orientation – a common [hue](http://en.wikipedia.org/wiki/Hue) – but differ in their luminance. See **usphere.png**.
+
+Unsurprisingly, ''-orientation'' produces a flat version of its original, generally unappealing, with the shadows and highlights of the original no longer present; both transit to a midlevel gray.  The more saturated colors of the original generally become the prominent features of the processed image, which may or may not be appealing. Since the pixels in the resulting image are either zero or one, they are not directly suitable in paint programs and need to be normalized before use with such tools. See ''Images as Datasets''. 
+
+''-orientation'' almost always is a means to an end and rarely an end in itself. While it might not make pretty pictures, the catalog of unit vectors it creates underlies color search and manipulation schemes. In the following example, ''-orientation'' produces a chromatic dataset which helps us locate pixels matching a particular 'key color.' See the last example.
+
+# Examples
+
+===
+%% sp monkey,150 +norm. to_rgb. +orientation.. normalize[^0] 0,{2^8-1} %%
+**bluemonkey.png**
+ *The norm and orientation of a blue monkey*
+~~~
+gmic                    \
+   sample monkey,300    \
+   +norm[-1]            \
+   +orientation[-2]
+~~~
+===
+When you want to break down an RGB image, it is common to invoke `-rgb2hsl. -split. c` to get grayscale images of the hue, saturation and value channels, then proceed with analytical work on those. Taking the ''-norm'' and ''-orientation'' is an equivalent step: different data sets, but also a useful decomposition of an image. It is simple to recompose. Just follow with `mul[-2,-1]` and you are exactly back with an unaltered blue monkey.
+
+===
+%% sp monkey,150 +orientation +norm[-2] +normalize. 0,1 oneminus. normalize[^0] 0,255 to_rgb[^0] %%
+~~~
+gmic                                                       \
+   sample monkey,300                                       \
+  +orientation                                             \
+  +norm[-2]                                                \
+  +normalize. 0,1                                          \
+   oneminus.                                               \
+~~~
+===
+<Commentary>
+
+===
+%% srand 4 sp monkey,150 +orientation +norm[-2] +normalize. 0,1 oneminus. fill... 'ang=-40;cz=cos(pi*ang*i#-1/180);sz=sin(pi*ang*i#-1/180);[[cz,0.0,sz],[0.0,1.0,0.0],[-sz,0.0,cz]]*I#-3' normalize[^0] 0,255 to_rgb[^0] %%
+~~~
+   fill... "ang=-40.0;                                     \              
+            cz=cos(pi*ang*i#-1/180);                       \
+            sz=sin(pi*ang*i#-1/180);                       \
+            [[cz,0.0,sz],[0.0,1.0,0.0],[-sz,0.0,cz]]*I#-3" \
+~~~
+===
+<Commentary>
+
+===
+%% srand 5 sp monkey,150 +orientation +norm[-2] +normalize. 0,1 oneminus. fill... 'ang=-40;cz=cos(pi*ang*i#-1/180);sz=sin(pi*ang*i#-1/180);[[cz,0.0,sz],[0.0,1.0,0.0],[-sz,0.0,cz]]*I#-3' fill... 'ang=20.0;cz=cos(pi*ang*i#-1/180);sz=sin(pi*ang*i#-1/180);[[1.0,0.0,0.0],[0.0,cz,-sz],[0.0,sz,cz]]*I#-3' normalize[^0] 0,255 to_rgb[^0] %%
+~~~
+   fill... "ang=20.0;                                      \              
+            cz=cos(pi*ang*i#-1/180);                       \
+            sz=sin(pi*ang*i#-1/180);                       \
+            [[1.0,0.0,0.0],[0.0,cz,-sz],[0.0,sz,cz]]*I#-3" \
+~~~
+===
+<Commentary>
+
+===
+%% srand 56 sp monkey,300 +orientation +norm[-2] +normalize. 0,1 oneminus. fill... 'ang=-40;cz=cos(pi*ang*i#-1/180);sz=sin(pi*ang*i#-1/180);[[cz,0.0,sz],[0.0,1.0,0.0],[-sz,0.0,cz]]*I#-3' fill... 'ang=20.0;cz=cos(pi*ang*i#-1/180);sz=sin(pi*ang*i#-1/180);[[1.0,0.0,0.0],[0.0,cz,-sz],[0.0,sz,cz]]*I#-3' rm. mul[-2,-1] normalize 0,{2^8-1} %%
+~~~
+   rm.                                                     \
+   mul[-2,-1]                                              \
+   normalize. 0,'{2^8-1}'                                  \
+   output. bluer_monkey.png
+~~~
+===
+<Commentary>
+
+===
+
+
+
+# Command reference
+
+===
+"""
+gmic -h orientation
+"""
+===
+
