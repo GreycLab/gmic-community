@@ -19,7 +19,7 @@ Here's the nuts-and-bolts of a graduated blur using ''-smooth'' and tensor field
 ~~~
 $ gmic input images/Kleine_Houtstraat.png
 ~~~
-|+ %% input images/Kleine_Houtstraat.png %% | [Kleine Houtstraat](http://www.openstreetmap.org/way/7402230) in Haarlem, Netherlands by [Marek Ślusarczyk](http://commons.wikimedia.org/wiki/User:Tupungato), [Wikimedia Commons](http://commons.wikimedia.org/wiki/Main_Page). Nothing much in the opening bit. We used ''-input'' to grab a nice image out of Wikimedia Commons. This is our operand image.
+| %% input images/Kleine_Houtstraat.png %% | [Kleine Houtstraat](http://www.openstreetmap.org/way/7402230) in Haarlem, Netherlands by [Marek Ślusarczyk](http://commons.wikimedia.org/wiki/User:Tupungato), [Wikimedia Commons](http://commons.wikimedia.org/wiki/Main_Page). Nothing much in the opening bit. We used ''-input'' to grab a nice image out of Wikimedia Commons. This is our operand image.
 ~~~
 100%,100%,1,1,'h-y' \
 -normalize[-1] 0,1 \
@@ -27,3 +27,47 @@ $ gmic input images/Kleine_Houtstraat.png
 -resize[-1] [-3],[-3],[-1],[-1],1 \
 -split[-1] c \
 ~~~
+| ![img](images/dyid-01.png) | ![img](images/dyid-02.png)
+
+We conjure from the aether:
+
+| 1. | **EigenOne**, a ramp normalized to run from 1 to zero
+| 2. | **EigenTwo**, a constant value image, set to zero
+| 3. | **Cosine**, a constant value image, set to zero
+| 4. | **Sine**, a constant value image, set to one
+
+`(0^0^1)` may look mysterious to some of you. It conjures out of the aether a one pixel by one pixel image with three channels. We resize these to match the input image dimensions and then split them apart to make items 2.– 4. See "Image Streams", a part of the ''-input'' command.
+
+~~~
+-append[-4,-3] c \
+-append[-2,-1] c \
+~~~
+| ![img](images/dyid-04.png) | ![img](images/dyid-05.png)
+
+We append together **EigenOne** and EigenTwo along the channel dimension; ditto **Cosine** and **Sine**. This gives us two datasets, each with a pair of channels. The first dataset, which -display renders in red, contains vector lengths. The lengths are zero or nearly so at the bottom, but grow toward one at the top. The second dataset, which -display renders in green, contains normalized directions. The second data set associates a constant direction, pointing straight up, to each pixel, hence the uniform color.
+
+~~~
+-eigen2tensor[-2,-1] \
+~~~
+![img](images/dyid-06.png)
+
+With ''-eigen2tensor''. we make a tensor field from the magnitude and direction datasets. These tell ''-smooth'' how to blur pixel-by-pixel. Don't let the name 'tensor field' alarm you; it's just a name, same as any other. Nor ''eigen''. It's German. Google it.
+
+~~~
+-repeat 3 -smooth[-2] [-1],50 -done \
+-rm[-1]
+~~~
+![img](images/dyid-07.png)
+
+We kick off three passes of ''-smooth'' and delete the tensor field. We're done.
+Here's a bit what ''-smooth'' did. The tensor field instructs ''-smooth'' how to blur the input pixels on a pixel-by-pixel basis. For each pixel in the street image, there's a corresponding tensor telling ''-smooth'' how much to blur the pixel and in what direction. In this case, you can probably intuit the overall nature of these instructions. The ramp we started out with set up a tensor field so that pixels near the bottom got blurred vertically, but by only a little bit, while pixels on top got blurred a lot.
+
+OK. Graduated blur. Nothing special. But the important takeaway is this: We Decoupled Smooth From Anisotropic Smoothing. If you remember nothing else about this Recipe, let it be this:
+
+===
+___ ''-smooth'' is a general purpose, pixel-by-pixel smoothing tool.___
+===
+
+Sleep on that. Meditate. It's aim is similar to ImageMagick's blur compositor. Both custom smooth each and every pixel and you can vary that across the lot. That is very, very powerful. It is a *graduated* blur arising from a dynamically shaped convolution kernel. You can fake depth-of-field, Grow hair — go for weeks experimenting with it. Maybe even months. Or years. Lifetimes, even.
+
+The key to mastering G'MIC's version is learning how to set up four gray scale images: **EigenOne**, **EigenTwo**, **Cosine**, **Sine**. ''-eigen2tensor'' does the grunt work of making them into tensor fields. You can put almost anything you want in those gray scale images. Really. David says it's OK. Just keep **EigenOne**, **EigenTwo** and **Sine** normalized between zero and one, and **Cosine** between negative and positive one — the trig functions' ranges between $$[0,\dots\pi]$$. Otherwise ''-smooth'' runs all night and the better part of the next day. You don't want that.
