@@ -1,0 +1,49 @@
+===
+![G'MIC Pitfalls](images/gmicpitfall.png)
+**gmicpitfall.png**
+===
+
+Command shortcut: **n**
+
+For the poor, blighted souls who once pranced, care-free, through the flowered vales of Gimp-G'MIC, spreading Pixel Dust and making fine digital art, but who ― in moments of unguarded curiosity ― tried one or another of those mysterious “underlying commands” lurking in the “custom code” section of the Gimp-G'MIC plugin, fell into the G'MIC Rabbit Hole and from then on couldn't produce an image that was otherwise all black, or all white, or posterized, or inverted, or in Strange Colors, there are two commands which can lead them back to the Lands of Fairness and Light:
+|1. | ''-cut'' | which sounds dreadful, and is dealt with elsewhere.
+|2. | ''-normalize'' | which is probably the command you are looking for.
+
+## On a More Serious Note
+
+''-normalize'' performs **H-L Normalization**. Raw image data, `i`, ranging between a maximum value `iM` and a minimum value `im`, can be shifted and scaled to fall between a new maximum, H, and minimum L by the formula:
+
+===
+$$
+i^{\prime} = {(H-L)}\frac{i-i_m}{i_M-i_m} + L
+$$
+===
+
+Normalization is typically the penultimate G'MIC command before ''-output'', where it shifts the minimum and maximum boundaries of an image to the prescribed minimum and maximum values required by the output format, scaling intermediary values in the process. For example, the eight-bit [Portable Network Graphics](http://en.wikipedia.org/wiki/Portable_Network_Graphics) file format expects image data to fall within the range of 0 – 255, in terms of the normalization relation, this calls for H = 255 and L = 0.
+
+If one plans on using a paint program on images processed in a G'MIC pipeline, or – in the case of the Gimp-G'MIC custom coding – return the image to a Gimp layer, use of the ''-normalize'' 0,255 is almost mandatory, because the G'MIC layer stack can be in one of a variety of numeric formats and is not likely to be directly compatible with the paint program or the Gimp layer stack. See ''Images as Datasets'' for further details.
+
+# Normalize and cut
+
+Normalization generally affects the magnitude of difference between pixels, and if particular differences between pixels matter, then -normalize probably is not what you want. ''-cut'', in contrast to -normalize, leaves relative differences among pixel values undisturbed, simply setting out-of-bound values to that of the nearest boundary. One does have to ensure that the differences of interest fall within the boundaries given to ''-cut''.
+
+# Command reference
+
+===
+"""
+gmic -h normalize
+"""
+===
+
+|   **value0:** | Sets L, the lower boundary value of the new range. No pixel data will be less than value0 (L) after rescaling.
+|   **value1:** | Sets H, the higher boundary value of the new range. No pixel data will be greater than value1 (H) after rescaling.
+|   **image0:** | Sets L from the minimum value of image0.
+|   **image1:** | Sets H from the maximum value of image1.
+|   **image:**  | Sets L and H from the minimum and maximum values of image.
+|   **constant-case ratio:** | The 'constant-case' refers to images with pels that are all the same value. When this is the case, The H-L Normalization formula has no meaning because the image's minimum and maximum pel values are one and the same, leading to division by zero. In this case, the constant-case ratio parameter declares - by fiat - what the relative value of the constant image is.  In this case, ''-normalization'' evaluates the modified pel value this way:
+===
+$$
+i^{\prime} = {(H-L)R_{cc} + L}
+$$
+===
+where the constant case ratio **Rcc** is taken from the range [0, 1]. The constant case ratio scales the difference between the given values, H and L and offsets this intermediary by L.  For example, If the normalization limits are L=10, H=90 and the constant case ratio is set to 0.6875, then the image will assume the constant value of 65. The constant case ratio has no bearing when there are differences between an image's minimum and maximum values. Typical applications for this parameter can arise in animations, when, during the course of normalizing footage, a "fade to a constant gray" leads to a "pop" - a black frame at the end of the fade. By setting reasonable constant case ratios derived from the average intensity of preceding frames, one may avoid such a "pop".     
