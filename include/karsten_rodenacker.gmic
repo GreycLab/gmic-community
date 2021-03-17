@@ -1234,32 +1234,44 @@ connectivity and "${arg\ 1+!$3,sorted,unsorted}" by size"
   endl done
 
 #@cli karo_bin_fill :
-#@cli : Fill holes in binary pattern
+#@cli : Fill holes in binary pattern. A 1-bit border is deleted to ensure background detection.
 karo_bin_fill : repeat $! l[$>] if iM>0
     neq 0 f "x==0||x==(w-1)||y==0||y==(h-1)?0:i"
     +eq 0 label_fg. 0 +f. "x==0||x==(w-1)||y==0||y==(h-1)?i:0" histogram. {iM#-2},1,{iM#-2}
     repeat w if i($>)!=0 +neq.. {$>+1} *... . rm. fi done rm. neq. 0 or fi
   endl done
 
-#@cli karo_bin_rand_del : _thickness(=1)
-#@cli : Delete Border touching objects in binary pattern
-karo_bin_rand_del : skip ${1=1}
+#@cli karo_bin_rand_del : _thickness(=1) _typ={0=all | 1=top/right | 2=bottom/left}
+#@cli : Delete border (defined by _thickness) touching 4-connected objects/regions in binary pattern either around, \
+# at top/right or at bottom/left borders. \
+# The latter two serve for unbiased sampling/counting of object sets in limited test areas, \
+# the "forbidden line algorithm".
+#@cli : $ follic threshold 18.6% negate[-1] +karo_bin_rand_del[-1] , \
+# +karo_bin_rand_del[-2] ,1 +karo_bin_rand_del[-3] ,2 a[-1--3] c
+karo_bin_rand_del : skip "${1=1} ${2=0}" check "$1>0 && $2>=0 && $2<3"
   repeat $! l[$>] if iM>0
-    neq 0 +label_fg. 0 +f. "x<$1||x>=(w-$1)||y<$1||y>=(h-$1)?i:0" histogram. {iM#-2},1,{iM#-2}
-    repeat w if i($>)!=0 +neq.. {$>+1} *... . rm. fi done rm. neq. 0 and fi
-  endl done
+    neq 0 +label_fg. 0 
+		if $2==1 +f. "x>=(w-$1)||y<$1?i:0"
+		elif $2==2 +f. "x<$1||y>=(h-$1)?i:0" 
+		else +f. "x<$1||x>=(w-$1)||y<$1||y>=(h-$1)?i:0" fi
+		histogram. {iM#-2},1,{iM#-2}
+    repeat w 
+			if i($>)!=0 +neq.. {$>+1} *... . rm. fi 
+		done 
+		rm. neq. 0 and 
+  fi endl done
 
 #@cli karo_bin_max :
-#@cli : Select maximum connected region in binary
+#@cli : Select maximum 4-connected region in binary
 #@cli : $ follic_ k. +karo_bin_max a c
 karo_bin_max : repeat $! l[$>] if iM>0
     label_fg 0
     karo_label_sort
-    eq 1 fi
-  endl done
+    eq 1 
+  fi endl done
 
 #@cli karo_segmentarea : low
-#@cli : Get all 4-connected non-zero regions of area>=low
+#@cli : Get all 4-connected non-zero (foreground) regions of area>=low
 #@cli : Delete small regions
 #@cli : Number of remaining objects in status
 #@cli : $ 400,400 srand 12345 rand 0,1 b 3 ge 50% +karo_segmentarea 50 a c
@@ -2598,15 +2610,15 @@ kr_mean_lch :
 # Moments m00=sum, m10,m01 centroid, orientation=theta, mean, \
 # h1-h7 Hu's moment invariants, with length.
 #@cli : Result in status:
-#@cli : sum centroid_x,y theta eccenticity mean Hu_moments_1-7 main_axis_lengths
-#@cli : m00 m10 m01 theta excent mean h1 h2 h3 h4 h5 h6 h7 width length
+#@cli :       sum centroid_x,y theta eccenticity mean Hu_moments_1-7 main_axis_lengths
+#@cli :  0-14 m00 m10 m01 theta excent mean h1 h2 h3 h4 h5 h6 h7 width length
 #@cli : Result in global variable _karo_shape_moments: \
 # moments, centered and normalized moments m, my, eta, \
 # Hu's moment invariants h1-h7, orientation, eigenvalues, eccentricity and extension:
-#@cli : [[$m00,$m01,$my02,$my03],[$m10,$my11,$my12,0],[$my20,$my21,0,0],[$my30,0,0,0]],
-#@cli :  [[$eta00,$eta01,$eta02,$eta03],[$eta10,$eta11,$eta12,0],[$eta20,$eta21,0,0],[$eta30,0,0,0]],
-#@cli :  [$h1,$h2,$h3,$h4,$h5,$h6,$h7,0],
-#@cli :  [$theta,$lambda1,$lambda2,$excent,0,0,0,0]
+#@cli :  0-15 [[$m00,$m01,$my02,$my03],[$m10,$my11,$my12,0],[$my20,$my21,0,0],[$my30,0,0,0]],
+#@cli : 16-31 [[$eta00,$eta01,$eta02,$eta03],[$eta10,$eta11,$eta12,0],[$eta20,$eta21,0,0],[$eta30,0,0,0]],
+#@cli : 32-39 [$h1,$h2,$h3,$h4,$h5,$h6,$h7,0],
+#@cli : 40-47 [$theta,$lambda1,$lambda2,$excent,0,0,0,0]
 #@cli : $ osteo_ k. +karo_shape_moments _sm=${} to_rgb n 0,255 circle ${arg\ 2,$_sm},${arg\ 3,$_sm},1%,1,255,0,0
 #@cli : $ osteo_ * +karo_shape_moments _sm=${} to_rgb n 0,255 circle ${arg\ 2,$_sm},${arg\ 3,$_sm},1%,1,255,0,0
 karo_shape_moments : +l.
