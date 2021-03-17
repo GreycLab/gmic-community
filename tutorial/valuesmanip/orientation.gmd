@@ -7,7 +7,7 @@ _The point on the unit sphere is pure hue. The volume in the sphere contain shad
 ''-orientation'' scales the color components of each pixel in an image so that the length of the color vector is one (see **usphere.png**):
 
 ===
- $$ u=\frac{c}{|c|} $$
+$$ u=\frac{c}{|c|} $$
 ===
 %% x "mkdir -p img" %%
 In the resulting image, pixel RGB components plot points on a unit sphere centered on the origin of the RGB color space. A line passing through the origin and the corresponding plot consists of points with the same hue, differing only in luminosity. Informally, the plot itself represents the "pure" hue, with colors tending toward the origin being shades of, and those tending away from the origin being tints of the pure hue.
@@ -61,12 +61,10 @@ gmic                    \
 It is common to invoke a color space converter like `-rgb2hsl. -split. c` splitting the results into channels and proceeding further with some sort of analytic work. Taking the ''-norm'' and ''-orientation'' of an image is an equivalent step: different data sets, but also a useful image decomposition. It is simple to recompose the image; just follow the orientation and normed parts with `mul[-2,-1]` and you are exactly back with an unaltered blue monkey. But while they are separated, lets do some exploration.
 
 [Euler angles](https://en.wikipedia.org/wiki/Euler_angles) provide the means to do rigid body rotations in the RGB color space. We may twist the "R", "G", or "B" axes with the aim of doing color adjustments. In the following example, we do just that: alter the orientation of the color vectors. In the course of doing that, we shift the hues of the image. As an added twist, we will use the norm part of the decomposition to restrict the adjustment mainly to the shadows, somewhat in the mid tones, but hardly affect the orientation of the highlights at all.
-
 %% sp monkey,300 +r2dy. 50%,3 output. img/m_alpha.png rm. +orientation. +normalize. 0,255 r2dy. 50%,3 output. img/m_cpv.png rm. +norm[-2] +normalize. 0,1 +normalize. 0,255 to_rgb. r2dy. 50%,3 output. img/m_nrm.png rm. oneminus. +normalize. 0,255 to_rgb. r2dy. 50%,3 output. img/m_fac.png rm. output img/m1.cimg rm 0 %%
-
 ===
-|| __Original__ | __Color Vectors__ | __Vector Lengths__ | __Factors__
-|  ![orig](img/m_alpha.png) | ![colorvecs](img/m_cpv.png) | ![vectorlen](img/m_nrm.png) | ![factors](img/m_fac.png)
+||__Original__|__Color Vectors__|__Vector Lengths__|__Factors__
+|![orig](img/m_alpha.png)|![colorvecs](img/m_cpv.png)|![vectorlen](img/m_nrm.png)|![factors](img/m_fac.png)
 
 ~~~
 gmic                                                       \
@@ -76,13 +74,13 @@ gmic                                                       \
   +normalize. 0,1                                          \
   -oneminus.                                               \
 ~~~
+
 ===
 To begin, we decompose the blue monkey into color vector and vector length parts, using ''-orientation'' and ''-norm'' respectively. We don't work with the vector lengths directly. Instead, we scale them to fit in the interval \[0..1\], using ''-normalize'' and replace their lengths, "L", with their inverted counterparts, "1 - L", using ''-oneminus''. This furnishes a set of multiplication factors that scale inversely according to whether the pixel is dark or light. We use these multiplication factors to regulate how much we change the orientation of the color vectors. Our aim is to shift them a great deal in the shadows, but not so much in the highlights.
-
 %% img/m1.cimg f... 'ang=-40;cz=cos(pi*ang*i#-1/180);sz=sin(pi*ang*i#-1/180);[[cz,0.0,sz],[0.0,1.0,0.0],[-sz,0.0,cz]]*I#-3' +n... 0,255 r2dy. 50%,3 o. img/m_cpvg.png rm. o img/m2.cimg rm 0 %%
 ===
-|| __Original__ | __"G" rotation__ | __Vector Lengths__ | __Factors__
-|  ![orig](img/m_alpha.png) | ![colorvecs](img/m_cpvg.png) | ![vectorlen](img/m_nrm.png) | ![factors](img/m_fac.png)
+||__Original__|__"G" rotation__|__Vector Lengths__|__Factors__
+|![orig](img/m_alpha.png)|![colorvecs](img/m_cpvg.png)|![vectorlen](img/m_nrm.png)|![factors](img/m_fac.png)
 
 ~~~
    fill... "ang=-40.0;                                     \
@@ -91,6 +89,7 @@ To begin, we decompose the blue monkey into color vector and vector length parts
             [[cz,0.0,sz],[0.0,1.0,0.0],[-sz,0.0,cz]]*I#-3" \
 ~~~
 ===
+
 What is going on here? Broadly, we are using a G'MIC math expression to apply an Euler angle to twist an axis - here the "G" axis - that connects green and its complement magenta. It is the "middle" axis of the RGB color space and could be thought of as the "Y" axis. We harness ''-fill'' to apply the math expression to every pixel in the target image. That is, ''-fill'' "marches over" the target image first by columns, then by rows, until it has visited each pixel in the target image. At each visit, it sets the value of a number of standard variables pertaining to the pixel, then performs the computation of the math expression. We'll discuss some of those standard variables in the breakdown of this expression, which follows.
 
 And what is the target image? That is what the three "..." dots do following the ''-fill'' command. They are a convenient alias for the `[-3]` image selection decorator. Counting from the end of the image list, the three dots take us past the multiplication factors (.), past the normed vector lengths (..) and selects the Color vectors (...), the target image, which the math expression operates on.
@@ -101,7 +100,6 @@ The math expression itself may seem imposing, but lets break it down.
 | 3. | The third line has been composed nearly identically to the second, and what was written about that line applies to this one as well. The only difference is that it computes the sine of the actual rotation angle. How these two factors, `sz` and `cz`, give rise to a rotation takes place in the next line, where we rotate a Color vector by its corresponding 'rotator', one of the standard Euler [Rotation Matrices](https://en.wikipedia.org/wiki/Rotation_matrix); `sz` and `cz` are incorporated into this rotator.
 | 4. | The fourth line realizes a matrix multiplication between the rotator and the color vector in the target image. Rearrange the notation in the square brackets, and see that they form a 3X3 block of numbers: a __matrix__. Without going into too much detail, matrices have the property of moving vectors from one to another place: Broadly, matrices can translate, rotate, scale - generally _transform_ - objects like vectors into new positions, orientations and sizes.
 |  | In our application, we want to rotate the color vectors so that they occupy, or point to, more blue-like regions on the surface of the color sphere (recall **usphere.png** at the start of this article). The Euler rotation matrices are so patterned to produce _only_ rotations about specific axes. They don't scale. They don't translate. In this case, we plug in `sz` and `cz` into the appropriate places for "G" axis rotation. For reference, here are the "R" "G" and "B" rotators:
-
 $$
 R_{red}(\theta) &= \begin{bmatrix}
 1 & 0 & 0 \\
@@ -121,7 +119,6 @@ R_{blue}(\theta) &= \begin{bmatrix}
 0 & 0 & 1\\
 \end{bmatrix}
 $$
-
 You probably can see that these are none other than the rotators for __X__ ("R red"), __Y__ ("R green") and __Z__ ("R blue"), lightly relabeled.
 
 We employ these rotators to turn color vectors. The notation `I#-3` is the vector (or 'pixel') form of what we have already encountered with `i`. The hashtag-number form selects a vector in the __Color vector__ image. We could have omitted this decoration - the target image already _is_ the Color vector image - but sometimes extra redundancy reminds us of the role a variable is playing.
@@ -129,11 +126,10 @@ We employ these rotators to turn color vectors. The notation `I#-3` is the vecto
 When the math processor encounters this fourth line and rotates the color vector it has finished. What happens next? By math processor conventions, the last value computed in the expression becomes the results that are passed back to the target image. Here, `I#-3` has its component RGB values changed in such a way that the overall color vector has now been rotated on the "G" axis by as much as -40.0°, but probably less, given the "dialing back" value of `i#-1`. That rotated vector becomes the new pixel. Now ''-fill'' continues on, "filling" the target image with a computed stream of pixels.
 
 If the math expression here still seems incomprehensible, see the ''-fill'' command itself, where a gentler introduction to math expressions may be found.
-
 %% img/m2.cimg f... 'ang=20;cz=cos(pi*ang*i#-1/180);sz=sin(pi*ang*i#-1/180);[[1.0,0.0,0.0],[0.0,cz,-sz],[0.0,sz,cz]]*I#-3' +n... 0,255 r2dy. 50%,3 o. img/m_cpvgr.png rm. o img/m3.cimg rm 0 %%
 ===
-|| __Original__ | __"G+R" rotation__ | __Vector Lengths__ | __Factors__
-|  ![orig](img/m_alpha.png) | ![colorvecs](img/m_cpvgr.png) | ![vectorlen](img/m_nrm.png) | ![factors](img/m_fac.png)
+||__Original__|__"G+R" rotation__|__Vector Lengths__|__Factors__
+|![orig](img/m_alpha.png)|![colorvecs](img/m_cpvgr.png)|![vectorlen](img/m_nrm.png)|![factors](img/m_fac.png)
 
 ~~~
   -fill... "ang=20.0;                                      \
@@ -142,6 +138,7 @@ If the math expression here still seems incomprehensible, see the ''-fill'' comm
             [[1.0,0.0,0.0],[0.0,cz,-sz],[0.0,sz,cz]]*I#-3" \
 ~~~
 ===
+
 And then we twist again -- but, wait! There are differences here. For one, the angle has changed. We are rotating _at most_ 20.0° in the _counterclockwise_ (positive) direction - and the rotator has changed. `cz` and `sz` are arranged in a different pattern. This pattern is for rotations along the "R" axis, running from red to its complement cyan. Apart from that, the mechanics of this ''-fill'' command is very much the same as the previous one.
 
 ===
