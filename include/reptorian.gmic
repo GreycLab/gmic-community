@@ -4618,7 +4618,8 @@ fi
 rep_gv: rep_glass_vignette $*
 #@cli rep_glass_vignette: refraction,_refraction_power,_len_size=1,_chromatic_aberration,-100%<=_preliminary_shift_x<=100%,-100%<=_preliminary_shift_y<=100%,_image_additional_zoom>0,-360<=_image_angle<=360,_distortion_scale_x,_distortion_scale_y,_distortion_scale_xy>0,-360<=_distortion_angle<=360,_distortion_offset_x,_distortion_offset_y,0<=_colorspace<=1,_boundary={ 0=none | 1=neumann | 2=periodic | 3=mirror },_interpolation={ 0=nearest | 1=average | 2=linear | 3=grid | 4=bicubic | 5=lanczos },_subpixel>0
 #@cli : Distorts images as if it is based from the view of a bulged car mirror or camera len. This G'MIC filter is a heavily extended version of TR's Glass Vignette plugin made for Paint.NET by TechnoRobbo. It can also be used for generating abstract art as well.
-#@cli : (eq. to 'rep_gv').\n
+#@cli : (eq. to 'rep_gv').
+#@cli :
 #@cli : 'refraction' defines the strength of distortion. The farther the values from 0, the greater the distortion is. It is recommended to use percentage alongside a number.
 #@cli : '_refraction_power' defines the distortion factor within the refraction. The farther the values from 0, the greater the distortion is. It is recommended to use percentage alongside a number.
 #@cli : '_len_size' is the size of distortion accordingly to the terminal ends of the lens distortion.
@@ -4637,122 +4638,136 @@ rep_gv: rep_glass_vignette $*
 #@cli : '_boundary' defines how the out-of-bound areas is to be behave.
 #@cli : '_interpolation' defines the interpolation within distortion.
 #@cli : '_subpixel' is the level of subpixel sampling to be used.
-#@cli : Default values: '_refraction_power=0','_lensize=1','_chromatic_aberration=0','_preliminary_shift_x=0','_preliminary_shift_y=0','_image_zoom=0','_image_angle=0','_distortion_scale_x=1','_distortion_scale_y=1','_distortion_scale_xy=1','_distortion_angle=0','_distortion_offset_x=0','_distortion_offset_y=0','_colorspace=0','_boundary=3','_interpolation=5','_subpixel=1'\n
+#@cli : Default values: '_refraction_power=0','_lensize=1','_chromatic_aberration=0','_preliminary_shift_x=0','_preliminary_shift_y=0','_image_zoom=0','_image_angle=0','_distortion_scale_x=1','_distortion_scale_y=1','_distortion_scale_xy=1','_distortion_angle=0','_distortion_offset_x=0','_distortion_offset_y=0','_colorspace=0','_boundary=3','_interpolation=5','_subpixel=1'
+#@cli :
 #@cli : Author: Reptorian.
 rep_glass_vignette:
-skip ${2=0},${3=0},${4=1},${5=0},${6=0},${7=0},${8=0},${9=1},${10=1},${11=1},${12=0},${13=0},${14=0},${15=0},${16=3},${17=5},${18=1}
-convert_colors_fwd=${arg\ 1+$15,,rgb2srgb,rgb2ryb,rgb2cmy,,rgb2hcy,rgb2hsi,rgb2hsl,rgb2hsv,rgb2lab,rgb2lch,rgb2yiq,rgb2yuv,rgb2ycbcr,rgb2ycbcrglic,rgb2xyz,rgb2yes,rgb2k1}
-convert_colors_bwd=${arg\ 1+$15,,srgb2rgb,ryb2rgb,cmy2rgb,,hcy2rgb,hsi2rgb,hsl2rgb,hsv2rgb,lab2rgb,lch2rgb,yiq2rgb,yuv2rgb,ycbcr2rgb,ycbcrglic2rgb,xyz2rgb,yes2rgb,k12rgb}
-v -
+skip ${1=100%},${2=0%},${3=100%},${4=0%},${5=0},${6=0},${7=0},${8=0},${9=100%},${10=100%},${11=100%},${12=0},${13=100%},${14=100%},,${15=1}${16=0},${17=3},${18=2}
+
+convert_colors_fwd=${arg\ 1+$16,,rgb2srgb,rgb2ryb,rgb2cmy,,rgb2hcy,rgb2hsi,rgb2hsl,rgb2hsv,rgb2lab,rgb2lch,rgb2yiq,rgb2yuv,rgb2ycbcr,rgb2ycbcrglic,rgb2xyz,rgb2yes,rgb2k1}
+convert_colors_bwd=${arg\ 1+$16,,srgb2rgb,ryb2rgb,cmy2rgb,,hcy2rgb,hsi2rgb,hsl2rgb,hsv2rgb,lab2rgb,lch2rgb,yiq2rgb,yuv2rgb,ycbcr2rgb,ycbcrglic2rgb,xyz2rgb,yes2rgb,k12rgb}
+
 convert_back=0
-sub={1+abs($18)}
-v +
-v +
+
+sub={1+abs($15)}
+
 repeat $! l[$>]
-    e[^-1] "Distorts image at angle of $12 with refraction factor of $1, chromatic aberration of $4, zoom factor of $7, preliminary shift of $5, preliminary shift of $6, scale x-axis distortion by $9 multiplied by $11, scale y-axis distortion by $10 multiplied by $11, refraction index by power of $2 placed at $13,$14 at angle of $8."
-    if (s==3||s==4)&&$15
-        convert_back=1
-        if $15!=4
-            sh 0,2
-            $convert_colors_fwd.
-            rm.
-        else
-            if s==3 rgb2cmyk
-            elif s==4 s c,-3 rgb2cmyk.. a c
-            fi
-        fi
-    fi
-    shift $5,$6,0,0,$16,{(abs($17)-1)?1}
-    r2dx {$sub*100}%,{abs($17)+1}
-    f "begin(
-        const abr=((1-$1)-.001)/.999;
-        const aberate=sqr(1*abr+(1-$4)*(1-abr));
-        const offset_x=w/2*(1-$13);
-        const offset_y=h/2*(1-$14);
-        if($9&&$10,
-            const mx=1/($9*(1/$11));
-            const my=1/($10*(1/$11));
-        ,
-            if(w>h,
-                const mx=1/(1*(1/$11));
-                const my=1/((h/w)*(1/$11));
-            ,
-                const mx=1/((w/h)*(1/$11));
-                const my=1/(1*(1/$11));
-            );
-        );
-        const ang=pi*($8/180);
-        const dang=pi*($12/180);
-        const distrad=1*10^($2/10);
-        const cos_ang=cos(ang);
-        const sin_ang=sin(ang);
-        const cos_dang=cos(dang);
-        const sin_dang=sin(dang);
-        rot_x(a,b)=a*cos_ang-b*sin_ang;
-        rot_y(a,b)=a*sin_ang+b*cos_ang;
-        dist_rot_x(a,b)=a*cos_dang-b*sin_dang;
-        dist_rot_y(a,b)=a*sin_dang+b*cos_dang;
-        sq2(a,b)=sqrt(a^2+b^2);
-        const sd=max(w,h)/min(w,h);
-        const sx=w>h?sd:1;
-        const sy=w>h?1:sd;
-        rx(a)=((a/2+.5*sx)/sx)*w;
-        ry(a)=((a/2+.5*sy)/sy)*h;
-        const cv=(sq2(rot_x(sx,sy)/2,rot_y(sx,sy)/2))*(pi/2)*(max(w,h)/min(w,h))*$3;
-        off_x_primary(a,b)=cos(a)*b*(abs($7)+1);
-        off_y_primary(a,b)=sin(a)*b*(abs($7)+1);
-        off_secondary(a,b,c)=a*(1-c)+b*c;
+
+ v +
+  e[^-1] "Distorts image at angle of $12 with refraction factor of $1, chromatic aberration of $4, zoom factor of $7, preliminary shift of $5, preliminary shift of $6, scale x-axis distortion by $9 multiplied by $11, scale y-axis distortion by $10 multiplied by $11, refraction index by power of $2 placed at $13,$14 at angle of $8."
+ v -
+ 
+ if (s==3||s==4)&&$16
+  convert_back=1
+  if $16!=4
+   sh 0,2
+   $convert_colors_fwd.
+   rm.
+  else
+   if s==3 rgb2cmyk
+   elif s==4 s c,-3 rgb2cmyk.. a c
+   fi
+  fi
+ fi
+ 
+ shift $5,$6,0,0,$17
+ 
+ r2dx {$sub*100}%,1
+ 
+ f "*begin(
+   const abr=((1-$1)-.001)/.999;
+   const aberate=sqr(1*abr+(1-$4)*(1-abr));
+   const offset_x=w/2*(1-$13);
+   const offset_y=h/2*(1-$14);
+   $9&&$10?(
+    const mx=1/($9*(1/$11));
+    const my=1/($10*(1/$11));
+   ):(
+    w>h?(
+     const mx=1/(1*(1/$11));
+     const my=1/((h/w)*(1/$11));
+    ):(
+     const mx=1/((w/h)*(1/$11));
+     const my=1/(1*(1/$11));
     );
-    XX=((x+offset_x)/w-.5)*2;
-    YY=((y+offset_y)/h-.5)*2;
-    xx=dist_rot_x(XX,YY);
-    yy=dist_rot_y(XX,YY);
-    xx*=mx;
-    yy*=my;
-    xx*=sx;
-    yy*=sy;
-    XX=rot_x(xx,yy);
-    YY=rot_y(xx,yy);
-    far=sq2(XX,YY);
-    rad=atan2(YY*distrad,XX+.0001);
-    eff=far/cv;
-    RB=far^(1-$1);
-    RA=RB*aberate;
-    off_xS=off_x_primary(rad,far);
-    off_xA=off_x_primary(rad,RA);
-    off_xB=off_x_primary(rad,RB);
-    off_yS=off_y_primary(rad,far);
-    off_yA=off_y_primary(rad,RA);
-    off_yB=off_y_primary(rad,RB);
-    offxA=off_secondary(off_xS,off_xA,eff);
-    offyA=off_secondary(off_yS,off_yA,eff);
-    offxB=off_secondary(off_xS,off_xB,eff);
-    offyB=off_secondary(off_yS,off_yB,eff);
-    fax=rx(offxA);
-    fay=ry(offyA);
-    fbx=rx(offxB);
-    fby=ry(offyB);
-    if(s==1,result=[i((fax+fbx)/2,(fay+fby)/2,z,1,(abs($17)-1)?1,$16)]);
-    if(s==2,result=[i(fbx,fby,z,0,(abs($17)-1)?1,$16),i((fax+fbx)/2,(fay+fby)/2,z,1,(abs($17)-1)?1,$16)]);
-    if(s==3,result=[i(fbx,fby,z,0,(abs($17)-1)?1,$16),i((fax+fbx)/2,(fay+fby)/2,z,1,(abs($17)-1)?1,$16),i(fax,fay,0,2,(abs($17)-1)?1,$16)]);
-    if(s==4,result=[i(fbx,fby,z,0,(abs($17)-1)?1,$16),i((fax+fbx)/2,(fay+fby)/2,z,1,(abs($17)-1)?1,$16),i(fax,fay,0,2,(abs($17)-1)?1,$16),i((fax+fbx)/2,(fay+fby)/2,z,3,(abs($17)-1)?1,$16)]);
-    if(s==5,result=[i(fbx,fby,z,0,(abs($17)-1)?1,$16),i((fax+fbx)/2,(fay+fby)/2,z,1,(abs($17)-1)?1,$16),i(fax,fay,0,2,(abs($17)-1)?1,$16),i((fax+fbx)/2,(fay+fby)/2,z,3,(abs($17)-1)?1,$16),i((fax+fbx)/2,(fay+fby)/2,z,4,(abs($17)-1)?1,$16)]);
-    result;
-    "
-    r2dx {(1/$sub)*100}%,{abs($17)+1}
-    if $convert_back
-        if $15!=4
-            sh 0,2
-            $convert_colors_bwd.
-            rm.
-        else
-            if s==4 cmyk2rgb
-            elif s==5 s c,-4 cmyk2rgb.. a c
-            fi
-        fi
-    fi
+   );
+   const ang=pi*($8/180);
+   const dang=pi*($12/180);
+   const distrad=1*10^($2/10);
+   const cos_ang=cos(ang);
+   const sin_ang=sin(ang);
+   const cos_dang=cos(dang);
+   const sin_dang=sin(dang);
+   rot_x(a,b)=a*cos_ang-b*sin_ang;
+   rot_y(a,b)=a*sin_ang+b*cos_ang;
+   dist_rot_x(a,b)=a*cos_dang-b*sin_dang;
+   dist_rot_y(a,b)=a*sin_dang+b*cos_dang;
+   sq2(a,b)=sqrt(a^2+b^2);
+   const sd=max(w,h)/min(w,h);
+   const sx=w>h?sd:1;
+   const sy=w>h?1:sd;
+   rx(a)=((a/2+.5*sx)/sx)*w;
+   ry(a)=((a/2+.5*sy)/sy)*h;
+   const cv=(sq2(rot_x(sx,sy)/2,rot_y(sx,sy)/2))*(pi/2)*(max(w,h)/min(w,h))*$3;
+   off_x_primary(a,b)=cos(a)*b*(abs($7)+1);
+   off_y_primary(a,b)=sin(a)*b*(abs($7)+1);
+   off_secondary(a,b,c)=a*(1-c)+b*c;
+   const interpolation=min(abs($18),2);
+   const mxsx=mx*sx;
+   const mysy=my*sy;
+   const expf=1-$1;
+   s==1?result()=vectors(i(avg_fax_fbx,avg_fay_fby,z,1,interpolation,$17)):
+   s==2?result()=vectors(i(fbx,fby,z,0,interpolation,$17),i(avg_fax_fbx,avg_fay_fby,z,1,interpolation,$17)):
+   s==3?result()=vectors(i(fbx,fby,z,0,interpolation,$17),i(avg_fax_fbx,avg_fay_fby,z,1,interpolation,$17),i(fax,fay,0,2,interpolation,$17)):
+   s==4?result()=vectors(i(fbx,fby,z,0,interpolation,$17),i(avg_fax_fbx,avg_fay_fby,z,1,interpolation,$17),i(fax,fay,0,2,interpolation,$17),i(avg_fax_fbx,avg_fay_fby,z,3,interpolation,$17)):
+        result()=vectors(i(fbx,fby,z,0,interpolation,$17),i(avg_fax_fbx,avg_fay_fby,z,1,interpolation,$17),i(fax,fay,0,2,interpolation,$17),i(avg_fax_fbx,avg_fay_fby,z,3,interpolation,$17),i(avg_fax_fbx,avg_fay_fby,z,4,interpolation,$17));
+  );
+  XX=((x+offset_x)/w-.5)*2;
+  YY=((y+offset_y)/h-.5)*2;
+  xx=dist_rot_x(XX,YY);
+  yy=dist_rot_y(XX,YY);
+  xx*=mxsx;
+  yy*=mysy;
+  XX=rot_x(xx,yy);
+  YY=rot_y(xx,yy);
+  far=sq2(XX,YY);
+  rad=atan2(YY*distrad,XX);
+  eff=far/cv;
+  RB=far^expf;
+  RA=RB*aberate;
+  off_xS=off_x_primary(rad,far);
+  off_xA=off_x_primary(rad,RA);
+  off_xB=off_x_primary(rad,RB);
+  off_yS=off_y_primary(rad,far);
+  off_yA=off_y_primary(rad,RA);
+  off_yB=off_y_primary(rad,RB);
+  offxA=off_secondary(off_xS,off_xA,eff);
+  offyA=off_secondary(off_yS,off_yA,eff);
+  offxB=off_secondary(off_xS,off_xB,eff);
+  offyB=off_secondary(off_yS,off_yB,eff);
+  fax=rx(offxA);
+  fay=ry(offyA);
+  fbx=rx(offxB);
+  fby=ry(offyB);
+  avg_fax_fbx=avg(fax,fbx);
+  avg_fay_fby=avg(fay,fby);
+  result();"
+   
+ r2dx {(1/$sub)*100}%,{abs($18%6)+1}
+  
+ if $convert_back
+  if $16!=4
+   sh 0,2
+   $convert_colors_bwd.
+   rm.
+  else
+   if s==4 cmyk2rgb
+   elif s==5 s c,-4 cmyk2rgb.. a c
+   fi
+  fi
+ fi
+ 
 endl done
-v -
 #@cli rep_cube2equi: eq. to 'rep_cube_map_to_equirectangular_panorama'. : (+)
 rep_cube2equi: rep_cube_map_to_equirectangular_panorama $*
 #@cli rep_cube_map_to_equirectangular_panorama: 0<=_top_face_placement<=3,0<=_bottom_face_placement<=3
@@ -10025,8 +10040,8 @@ u "{$1}"\
 #@gui :Interpolation=choice(5,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
 #@gui :Subpixel=float(1,1,2)
 #@gui :_=separator(),_=note("<b>Preview Settings</b>"), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2019/11/7</i>.</small>")
-gui_rep_gv: rep_gv $1%,$2%,$3%,$4%,{$5-50}%,{$6-50}%,$7%,$8,$9%,$10%,$11%,$12,{$13+50}%,{$14+50}%,${15-18}
+#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2021/03/11</i>.</small>")
+gui_rep_gv: rep_gv $1%,$2%,$3%,$4%,{$5-50}%,{$6-50}%,$7%,$8,$9%,$10%,$11%,$12,{$13+50}%,{$14+50}%,$18,${15-17}
 gui_rep_gv_preview: gui_split_preview "gui_rep_gv ${1-18}",${-3--1}
 #@gui Fibonacci Texture:gui_rep_fibo,gui_rep_fibo_preview
 #@gui :_=note("Generates texture based on the <b>Fibonacci Sequence</b>\n\nFor <b>GIMP</b> or <b>Krita</b> users - The first option for <b>Output Mode</b> will generate a new layer that can exceed boundary of current canvas.")
