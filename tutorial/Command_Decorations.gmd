@@ -1,6 +1,6 @@
 # Command Decorations
 
-%% images/select.png r2dy 300 %% By default, commands operate on all images in the stack. Often that is not what we want.
+%% images/select.png r2dy 300 %% By default, commands operate on all images in the image list. Often that is not what we want.
 
 The image list can, and often will, contain many items. As we ''-input'' or otherwise conjure images, the interpreter places them in sequence, assigning indices to them starting from zero as it goes along.
 
@@ -18,7 +18,7 @@ applies noise only to just the first image on the stack, then blurs just the thi
 
 This illustration notwithstanding, selection notation is extensive. Selection syntax has expressions for selecting single or multiple images, ranges of images, every other, every third, or, generally, every n-th image, relative to the beginning or end of the stack, relative to the size of the overall stack, through named collections, and all images except the ones designated by a selection. It is easy (and probably inevitable) to select images which are not on the stack, an error.
 
-Here are the ways to restrict to selected images the action of some fictive command called 'foo':
+Here are the ways to restrict to selected images the action of some fictive command called `-foo`:
 
 |+ __Type__ | __Template__ | __Description__
 | **Everything** | `foo` | Operates on every image on the stack.
@@ -32,9 +32,9 @@ Here are the ways to restrict to selected images the action of some fictive comm
 | **Names** | `foo[<label>]` | Operates on images selected by the name '<label>', an alphanumeric string which begins with a letter. Raises an error if '<label>' has not been defined. Use `name[<selection>] <label>` to establish an equivalence between `<label>` and some specific `<selection>`. Example: `name[0,-1] firstlast` equates `firstlast` with a selection that picks the first and last images on a stack; `foo[firstlast]` will then operate on the first and last items on the image stack.
 | **Enumerated Names** | `foo[<label-1>,...]` | Operate on images selected through a series of labels, which must already be defined. The overall selection is the union of the individual selections.
 
-It is possible to mix types in selections, thus -foo[1,3,5--1], mixing an enumeration and range, selects the second, fourth, and sixth through the last image.
+It is possible to mix types in selections, thus `-foo[1,3,5--1]`, mixing an enumeration and range, selects the second, fourth, and sixth through the last image.
 
-It is also possible that images may be designated more than once, as in -foo[0 - -1:2, 2, 4, 6], which selects all the images with even indices on the stack, then explicity selects the images corresponding to indices 2, 4 and 6.  G'MIC regards the collection of indices in selections as sets of distinct, unordered elements, so images are not selected twice, nor is there any relevance to the order of indices. -foo[0,1,2], -foo[2,1,0], -foo[2-0], -foo[0,1,0,2,1,2] all select the first three images on the stack.
+It is also possible that images may be designated more than once, as in `-foo[0 - -1:2, 2, 4, 6]`, which selects all the images with even indices on the stack, then explicity selects the images corresponding to indices 2, 4 and 6.  G'MIC regards the collection of indices in selections as sets of distinct elements, so images are not selected twice, nor is there any relevance to the order of indices. `-foo[0,1,2]`, `-foo[2,1,0]`, `-foo[2-0]`, `-foo[0,1,0,2,1,2]` all select the first three images on the stack.
 
 Here are some common examples:
 
@@ -46,27 +46,31 @@ Here are some common examples:
 
 ## Isolated Selections: Implied Copy Command
 
-Selections in isolation, apparently not modifying any command, imply '-copy'. The images designated by the selector are duplicated and the interpreter places the copies at the end of the pipeline, in the same relative order as their antecedents. Thus [0,3,5] by itself copies the first, fourth and sixth images; the copy of the first image becomes -3, the copy of the fourth becomes -2 and the copy of the sixth becomes -1. The implicit presence of the ''input'' command.
+Selections in isolation, apparently not modifying any command, imply '-copy'. The images designated by the selector are duplicated and the interpreter places the copies at the end of the image list, in the same relative order as their antecedents. Thus `[0,3,5]` by itself copies the first, fourth and sixth images; the copy of the first image becomes `-3`, the copy of the fourth becomes `-2` and the copy of the sixth becomes `-1`. The implicit presence of the ''-input'' command operates with this notation.
 
 ## Lefthand Decorations: Replace or Append
 
-Items may be decorated on the lefthand side, which we have already seen: hyphens distinguish commands from other items. Apart from identifying commands, hyphens also have a copy/replace meaning.This matters with transformation commands, those that take selected images as inputs and then produce output images. Commands may be decorated on the left hand side with one or two hyphens, expressing replace or preserve semantics.
+Items may be decorated on the lefthand side. Hyphens optionally distinguish commands from other items. Omit them for brevity; include them for clarity. In addition to identifying commands, hyphens also have copy/replace semantics. This matters with transformation commands: those that take selected images as inputs and then produce output.
 
-  1. Single hypen or no hyphen commands will replace the selected images with the output images.
-  2. Double hyphen commands will preserve the selected images, placing the output at the end of the pipeline.
+| 1. |Commands without hyphens or with single hyphens will replace the images they select with their outputs.
+| 2. |Commands decorated with `+` on the lefthand side create new images with their outputs; these new images go on the end of the image list.
 
-Non-transformative commands are those which implement aspects of G'MIC program flow or management of the environment. We have seen one example already. '-name' labels a selection but does not otherwise operate on the images in the selection's collection. Thus:
+Non-transformative commands are those which implement aspects of G'MIC program flow or management of the environment. We have seen one example already. ''-name'' labels a selection but does not otherwise operate on the images in the selection's collection.
+
+## Command Line Anatomy
+
+Consider how this command line builds an image list:
 
 ~~~
-$ gmic 256,256,1,3 -noise[-1] 0.05,2 +bandpass[-1] 0.0005,0.001 +threshold[-1] 30% +negate[-1] thinning[-1] -normalize[^0] 0,255
+$ gmic 256,256,1,3 noise[-1] 0.05,2 +bandpass[-1] 0.0005,0.001 +threshold[-1] 30% +negate[-1] thinning[-1] -normalize[^0] 0,255
 ~~~
 
-| 1. | `256,256,1,3` conjures up a 256x256x1 pixel image with three channels, initially solid black establishing a stack with one image.
-| 2. | The `noise[-1]` command, no hyphen, replaces this black image with a sparse, random scattering of red green and blue pixels, so the stack remains with one image.
-| 3. | The `+bandpass[-1]` command, double hyphen, appends a new image at the end of the stack, the low-frequency components of the previous last image, leaving two images on the stack.
-| 4. | Similarly, `+threshold[-1]` appends a new image at the end of the pipeline, with each channel a bilevel reduction of the channels of the previous last image on the stack. This leaves three images on the stack.
-| 5. | `+thinning[-1]` creates a morphologically thinned version of the last image, the 'spines' of contiguous, non-black regions residing in the various channels of the last image, appending the thinned version to the end of the stack. Four images are on the stack.
-| 6. | `normalize[^0]`, no hyphen, replaces all images in the stack except the first with corresponding versions where the intensity range of each channel is remapped to the range 0 – 255. The stack still has four images. Had we decorated this command with two hyphens, the stack would have had seven images, the second, third and fourth images followed by their normalized versions in positions five, six and seven.
+| 1. | `256,256,1,3` conjures up a 256x256x1x3 pixel image with three channels, initially solid black establishing a stack with one image.
+| 2. | The `noise[-1]` command, no hyphen, two parameters, replaces this black image with a sparse, random scattering of red green and blue pixels, so the stack remains with one image.
+| 3. | The `+bandpass[-1]` command, with `+`, appends a new image at the end of the image list: the low-frequency components of the previous last image. This leaves two images on the stack.
+| 4. | Similarly, `+threshold[-1]` appends a new image at the end of the image list, with each channel undergoing a bilevel reduction of the channels of the previous last image on the stack. This leaves three images on the stack.
+| 5. | `+thinning[-1]` creates a morphologically thinned version of the last image, the 'spines' of contiguous, non-black regions residing in the various channels of the last image, appending the thinned version to the end of the stack. Four images are now on the stack.
+| 6. | `normalize[^0]`, with an optional hyphen, replaces all images on the list, except the first one, with corresponding versions where the intensity range of each channel is remapped to the range 0 – 255. The image list still has four images. Had we decorated this command with '+', the stack would have had seven images, the second, third and fourth images followed by their normalized versions in positions five, six and seven.
 
 The four images on the stack look like this:
 
