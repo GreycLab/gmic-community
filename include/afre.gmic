@@ -468,34 +468,61 @@ afre_portraitmontage_preview :
   afre_portraitmontage $*
 
 
-#@cli ::Core Commands
-#--------------------
+#@cli ::Features
+#---------------
+#
+#@cli afre_norm : _keep_channels={ 0 | 1 }
+#@cli : Compute normalized norms of selected images.
+#@cli : Default value: 'keep_channels=1'.
+afre_norm : skip ${1=1}
+  l[] if isnum("$1") k={$1?1} elif ["'$1'"]!=',' noarg k=1 fi endl
+  s1="s" e[] "[afre]^_^) norm: Compute normalized norm"${s{$!>1}}" of image$? using keep_channels="$k"."
+  repeat $! l[$>] s={s} if $s>1
+    sqr s c + sqrt / {sqrt($s)} if $k r. 100%,100%,100%,$s fi
+  fi endl done
 
-#@cli afre_maxmin
-#@cli : Return the maximum of channel minimums.
-afre_maxmin :
-  sh 0 sh.. 1 sh... 2 u {max(im#1,im#2,im#3)} k[0]
-
-#@cli afre_minmax
-#@cli : Return the minimum of channel maximums.
-afre_minmax :
-  sh 0 sh.. 1 sh... 2 u {min(iM#1,iM#2,iM#3)} k[0]
-
-#@cli afre_jchz
-#@cli : Convert selected images from RGB to JzCzhz.
-afre_jchz :
-  e[] "[afre]^_^) jchz: Convert image$? from RGB to JzCzhz."
-  rgb2jzazbz 0 r 100%,100%,100%,3 repeat $! l[$>]
-    s c complex2polar[-2,-1] a c
+#@cli afre_y50 : colour_space={ 0=Rec.709 | 1=Rec.2020 }
+#@cli : Compute luminance (D50) of selected images.
+#@cli : Default value: 'colour_space=1'.
+afre_y50 : check isbool(${1=1})
+  if $1 Y="Rec.2020" else Y="Rec.709" fi
+  e[] "[afre]^_^) y50: Compute luminance (D50 "$Y") of image$?."
+  repeat $! l[$>]
+    if s==3 sh 0 sh[0] 1 sh[0] 2
+      if $1 *[1] 0.2790177 *[2] 0.6753402 *[3] 0.0456377   # Rec.2020
+      else *[1] 0.22248840 *[2] 0.71690369 *[3] 0.06060791 # Rec.709
+      fi +[1-3] rm[1] channels 0
+    elif s!=1 r={[im,iM]} norm n $r fi
   endl done
-
-#@cli afre_ijchz
-#@cli : Convert selected images from JzCzhz to RGB.
-afre_ijchz :
-  e[] "[afre]^_^) ijchz: Convert image$? from JzCzhz to RGB."
-  r 100%,100%,100%,3 repeat $! l[$>]
-    s c polar2complex[-2,-1] a c
-  endl done jzazbz2rgb 0
+#
+#@cli afre_orien : _mode={ 0=norm | 1=Rec.709 | 2=Rec.2020 }
+#@cli : Compute orientation of selected images.
+#@cli : Default value: 'mode=0'.
+afre_orien : skip ${1=0}
+  l[] if isnum("$1") m={inrange($1,0,2)?int($1):0} elif ["'$1'"]!=',' noarg m=0 fi endl
+  s0,s$m="norm" s1="luminance Rec.709 D50" s2="luminance Rec.2020 D50" e[] "[afre]^_^) orien: Compute orientation of image$? using "${s$m}"."
+  repeat $! if $m +afre_y50[$>] {$m-1} else +afre_norm[$>] fi
+    replace. 0,1 /[$>,-1] done
+#
+#@cli afre_gradientnorm : _keep_channels={ 0 | 1 },_keep_range={ 0 | 1 }
+#@cli : Compute normalized gradient norms of selected images.
+#@cli : Default values: 'keep_channels=1' and 'keep_range=0'.
+afre_gradientnorm : skip ${1=1},${2=0}
+  l[] if isnum("$1")&&isnum("$2") k={$1?1} r={$2?1} elif ["'$1'"]!=',' noarg k,r=1,0 fi endl
+  s1="s" e[] "[afre]^_^) gradientnorm: Compute normalized gradient norm"${s{$!>1}}" of image$? using keep_channels="$k" and keep_range="$r"."
+  repeat $! l[$>] iM,s={[iM,s]}
+    g sqr s c + sqrt / {iM/($r?$iM:1)} if $k r. 100%,100%,100%,$s fi
+  endl done
+#
+#@cli afre_hessiannorm : _keep_channels={ 0 | 1 },_keep_range={ 0 | 1 }
+#@cli : Compute normalized hessian norms of selected images.
+#@cli : Default values: 'keep_channels=1' and 'keep_range=0'.
+afre_hessiannorm : skip ${1=1},${2=0}
+  l[] if isnum("$1")&&isnum("$2") k={$1?1} r={$2?1} elif ["'$1'"]!=',' noarg k,r=1,0 fi endl
+  s1="s" e[] "[afre]^_^) hessiannorm: Compute normalized hessian norm"${s{$!>1}}" of image$? using keep_channels="$k" and keep_range="$r"."
+  repeat $! l[$>] iM,s={[iM,s]}
+    hessian sqr s c + sqrt / {iM/($r?$iM:1)} if $k r. 100%,100%,100%,$s fi
+  endl done
 
 #@cli afre_gnorm
 #@cli : Compute custom gradient norm of selected images.
@@ -521,182 +548,25 @@ afre_sdpatch : skip ${1=1}
     +sqr afre_box_fast $rd sqr.. rv - max 0 sqrt
   n $r endl done
 
-#@cli afre_reorder : order,_order2,...
-#@cli : Reposition images according to a list of values of any length.
-afre_reorder :
-  e[] "[afre]^_^) reorder: Reposition images according to list $*."
-  z 0,0,0,100%,100%,1 mirror z f z==0?1e6:i
-  l ($*) onfail error[] "\n[afre]>_<) reorder: Parameter must be a list of numbers; e.g. 0,2,4,1,3." endl
-  repeat min(w,$!-1) f[$>] z==0?{i($>)}:i done
-  sort_list[0-{min(w,$!-1)-1}] + rm. z 0,0,1,100%,100%,1
-
-#@cli afre_section : 1<=xy_sections<=50
-#@cli : Section selected images into numbered regions.
-#@cli : Default value: 'xy_sections=20'.
-afre_section : check "${1=20}>=1 && $1<=50"
-  m=min(w,h) err=int($m/25) if $err<$1 error[] "\n[afre]>_<) section: Section image$? into no more than "{max(sqr($err),1)}" ("{max($err,1)}"x"{max($err,1)}") regions." fi
-  e[] "[afre]^_^) section: Section image$? into "{sqr($1)}" ($1x$1) numbered regions."
-  repeat $! l[$>]
-    im,iM={[im,iM]} s yx,$1 repeat $!
-      t[$>] {$>+1},0.5~,0.5~,{$m*0.55},0.9,$im t[$>] {$>+1},0.5~,0.5~,{$m*0.56},0.9,$iM
-    done append_tiles $1
-    grid {100/$1}%,{100/$1}%,,,0.2,$im
-    grid {100/$1}%,{100/$1}%,-1,-1,0.2,$iM
+#@cli afre_jchz
+#@cli : Convert selected images from RGB to JzCzhz.
+afre_jchz :
+  e[] "[afre]^_^) jchz: Convert image$? from RGB to JzCzhz."
+  rgb2jzazbz 0 r 100%,100%,100%,3 repeat $! l[$>]
+    s c complex2polar[-2,-1] a c
   endl done
 
-#@cli afre_cleanphoto : 2<=size<=10,1<=_recovery<=100,-50<=_xy_sections<=50,_maskN>=1,...
-#@cli : Clean dust and scratches from photos.
-#@cli : Default values: 'size=3', 'recovery=10', 'xy_sections=1' and 'maskN=1'.\n
-#@cli : - 'xy_sections' sections image into MxM labeled regions.
-#@cli : \ \ \ For global processing, set 'xy_sections' to 1.
-#@cli : \ \ \ To visualize these regions with labels, use a negative number.
-#@cli : - 'maskN' is a comma separated list of regions to be processed.
-afre_cleanphoto : check "${1=3}>=2 && ${2=10}>=1 && ${3=1}>=-50 &&
-    $1<=10 && $2<=100 && $3<=50" skip ${4=1}
-  m=min(w,h) err=int($m/25) if $err<$3 error[] "\n[afre]>_<) cleanphoto: Section image$? into no more than "{max(sqr($err),1)}" ("{max($err,1)}"x"{max($err,1)}") regions." fi
-  m "ip : p=$1,,,{iM}
-    +erode_threshold $p dilate_threshold. $p afre_gui1_fast. .. c. 0,100%
-    +afre_edge.. 1,1,4,4 afre_box. 1 c. 0,$2% n. 0,1 +blend_fade[0,1] . k[0,-1]
-    +gaussian. {[w,h]*0.3} c. 0,50% n. 0,1 blend_fade[0,1] . k[0]"
-  e[] "[afre]^_^) cleanphoto: Clean dust and scratches from image$? using size=$1, recovery=$2, xy_sections=$3 and masks=${4--1}."
-  repeat $! l[$>] if $3>1
-    iM={iM} w0,h0={[w,h]} w,h={[w,h]/$3} 100%,100%,1,3 l. (${4--1})
-      c. 1,{sqr($3)} round. sort. discard. unroll. x
-      repeat w v={i($>)} i={$v%$3?$v%$3:$3} j={($v+$3-$i)/$3}
-        r={[$w*$i-$w,$h*$j-$h,$w*$i-1,$h*$j-1]} rectangle[0] $r,1,$iM
-      done rm. label_fg 0 r {[$w0,$h0]+2},1,3,0,0,0.5,0.5
-      repeat iM +==[0] {$>+1} coord=${"
-        w={w} h={h} val={i(w-1,h-1)} +=. {1+$val},100%,100%,100%
-        autocrop. =. $val,100%,100%,100% x0={$w-w} y0={$h-h} rm.
-        +autocrop. x1={$x0+w-1} y1={$y0+h-1} rm. u $x0,$y0,$x1,$y1
-      "} rm. ($coord) done
-    a[^0] y endl r[0] {[$w0,$h0]+2},1,3,0,0,0.5,0.5
-    repeat h x0,y0,x1,y1={@{[0,1,2,3]+4*$>}} +z[0,1] $x0,$y0,$x1,$y1
-      +ip.. f. i#4?i#5:i#3 j[0] .,$x0,$y0 rm[-3--1]
-    done k[0] r {[$w0,$h0]},1,3,0,0,0.5,0.5
-  else ip
-  fi endl done um ip
+#@cli afre_ijchz
+#@cli : Convert selected images from JzCzhz to RGB.
+afre_ijchz :
+  e[] "[afre]^_^) ijchz: Convert image$? from JzCzhz to RGB."
+  r 100%,100%,100%,3 repeat $! l[$>]
+    s c polar2complex[-2,-1] a c
+  endl done jzazbz2rgb 0
 
-#@cli afre_cleanphoto1 : 1<=radius<=10,1<=_xy_sections<=50,_maskN>=1,...
-#@cli : Clean dust and scratches from photos.
-#@cli : Default values: 'radius=3', 'xy_sections=1' and 'maskN=1'.\n
-#@cli : - 'xy_sections' sections image into MxM labeled regions.
-#@cli : \ \ For global processing, set 'xy_sections' to 1.
-#@cli : - 'maskN' is a comma separated list of regions to be processed.
-#@cli : \ \ Use 'afre_section' to determine region labels.
-afre_cleanphoto1 : check "${1=3}>=1 && ${2=1}>=1 &&
-    $1<=10 && $2<=50" skip ${3=1}
-  rd={int($1)} m=min(w,h) err=int($m/25) if $err<$2 error[] "\n[afre]>_<) cleanphoto: Section image$? into no more than "{max(sqr($err),1)}" ("{max($err,1)}"x"{max($err,1)}") regions." fi
-  m "ip : s={"$rd"*2+1} +l +erode_oct $s dilate_oct. $s - c 0,100% ^ 2
-    c 5%,10% dilate_oct 3 n 0,1 endl +inpaint_pde.. . rm..
-    +gaussian. {[w,h]*0.3} c. 0,50% n. 0,1 blend_fade[0,1] . k[0]"
-  e[] "[afre]^_^) cleanphoto: Clean dust and scratches from image$? using radius="$rd", xy_sections=$2 and maskN=${3--1}."
-  repeat $! l[$>] if $2>1
-    iM={iM} w0,h0={[w,h]} w,h={[w,h]/$2} 100%,100%,1,3 l. (${3--1})
-      c. 1,{sqr($2)} round. sort. discard. unroll. x
-      repeat w v={i($>)} i={$v%$2?$v%$2:$2} j={($v+$2-$i)/$2}
-        r={[$w*$i-$w,$h*$j-$h,$w*$i-1,$h*$j-1]} rectangle[0] $r,1,$iM
-      done rm. label_fg 0 r {[$w0,$h0]+2},1,3,0,0,0.5,0.5
-      repeat iM +==[0] {$>+1} coord=${"
-        w={w} h={h} val={i(w-1,h-1)} +=. {1+$val},100%,100%,100%
-        autocrop. =. $val,100%,100%,100% x0={$w-w} y0={$h-h} rm.
-        +autocrop. x1={$x0+w-1} y1={$y0+h-1} rm. u $x0,$y0,$x1,$y1
-      "} rm. ($coord) done
-    a[^0] y endl r[0] {[$w0,$h0]+2},1,3,0,0,0.5,0.5
-    repeat h x0,y0,x1,y1={@{[0,1,2,3]+4*$>}} +z[0,1] $x0,$y0,$x1,$y1
-      +ip.. f. i#4?i#5:i#3 j[0] .,$x0,$y0 rm[-3--1]
-    done k[0] r {[$w0,$h0]},1,3,0,0,0.5,0.5
-  else ip
-  fi endl done um ip
 
-#@cli afre_compare : crop={ 1=once | 2=twice },_layout={ x | y | z | tile },_normalize={ 0 | 1 }
-#@cli : Crop then compare selected images interactively.
-#@cli : Default values: 'crop=1', 'layout=x' and 'normalize=1'.\n
-#@cli : 1. Interactive Crop
-#@cli : \ - Click and drag to select crop.
-#@cli : \ - Use scroll button to browse images.
-#@cli : \ * Click once or close window to exit command.\n
-#@cli : 2. Comparison Window
-#@cli : \ - Regular display behaviour.
-#@cli : \ - Close window to make another comparison.
-afre_compare : check "${1=1}>=1 && $1<=2 && (s='${2=x}';s=='x'||s=='y'||s=='z'||s=='tile') && "isbool(${3=1})
-  n={$!-1} if $n<1 error[] "\n[afre]>_<) compare: Please select 2 or more images." fi
-  repeat $!-1 if w#0!=w#{$>+1}||h#0!=h#{$>+1} error[] "\n[afre]>_<) compare: Please select images with the same width and height." fi done
-  repeat $! if d#$>!=1 e[] "[afre]>_<) compare: *Slices in image ["$>"] will be considered separate images." fi done
-  e[] "[afre]^_^) compare: Crop then compare image$? interactively."
-  e[] "\n 1. Interactive Crop\n
-    \ - Click and drag to select crop.\n
-    \ - Use scroll button to browse images.\n
-    \ * Click once or close window to exit command.\n\n
-    2. Comparison Window\n
-    \ - Regular display behaviour.\n
-    \ - Close window to make another comparison.\n"
-  to_colormode 0 if $3 n 0,255 fi
-  do +l nm[0] Compare
-    a z repeat $1 xz b={w} if $b==1 break fi done
-    b={w} if '$2'!='z' s z if '$2'!='tile' a $2 else append_tiles 0 fi fi
-    if $b==1 break else v - d v + fi
-  endl k[0-$n] while $b!=1 v - d[]
-
-#@cli afre_log2 : direction={ 0=inverse | 1=forward }
-#@cli : Transform selected images into or back from log2 space.
-#@cli : Default value: 'direction=1'.
-afre_log2 : check isbool(${1=1})
-  if $1 d="into" else d="back from" fi
-  e[] "[afre]^_^) log2: Transform image$? "$d" log2 space."
-  if $1 + 1 log2 else f exp(i*log(2)) - 1 fi
-#
-#@cli afre_norm : _keep_channels={ 0 | 1 }
-#@cli : Compute normalized norms of selected images.
-#@cli : Default value: 'keep_channels=1'.
-afre_norm : skip ${1=1}
-  l[] if isnum("$1") k={$1?1} elif ["'$1'"]!=',' noarg k=1 fi endl
-  s1="s" e[] "[afre]^_^) norm: Compute normalized norm"${s{$!>1}}" of image$? using keep_channels="$k"."
-  repeat $! l[$>] s={s} if $s>1
-    sqr s c + sqrt / {sqrt($s)} if $k r. 100%,100%,100%,$s fi
-  fi endl done
-#
-#@cli afre_gradientnorm : _keep_channels={ 0 | 1 },_keep_range={ 0 | 1 }
-#@cli : Compute normalized gradient norms of selected images.
-#@cli : Default values: 'keep_channels=1' and 'keep_range=0'.
-afre_gradientnorm : skip ${1=1},${2=0}
-  l[] if isnum("$1")&&isnum("$2") k={$1?1} r={$2?1} elif ["'$1'"]!=',' noarg k,r=1,0 fi endl
-  s1="s" e[] "[afre]^_^) gradientnorm: Compute normalized gradient norm"${s{$!>1}}" of image$? using keep_channels="$k" and keep_range="$r"."
-  repeat $! l[$>] iM,s={[iM,s]}
-    g sqr s c + sqrt / {iM/($r?$iM:1)} if $k r. 100%,100%,100%,$s fi
-  endl done
-#
-#@cli afre_hessiannorm : _keep_channels={ 0 | 1 },_keep_range={ 0 | 1 }
-#@cli : Compute normalized hessian norms of selected images.
-#@cli : Default values: 'keep_channels=1' and 'keep_range=0'.
-afre_hessiannorm : skip ${1=1},${2=0}
-  l[] if isnum("$1")&&isnum("$2") k={$1?1} r={$2?1} elif ["'$1'"]!=',' noarg k,r=1,0 fi endl
-  s1="s" e[] "[afre]^_^) hessiannorm: Compute normalized hessian norm"${s{$!>1}}" of image$? using keep_channels="$k" and keep_range="$r"."
-  repeat $! l[$>] iM,s={[iM,s]}
-    hessian sqr s c + sqrt / {iM/($r?$iM:1)} if $k r. 100%,100%,100%,$s fi
-  endl done
-
-#@cli afre_y50 : colour_space={ 0=Rec.709 | 1=Rec.2020 }
-#@cli : Compute luminance (D50) of selected images.
-#@cli : Default value: 'colour_space=1'.
-afre_y50 : check isbool(${1=1})
-  if $1 Y="Rec.2020" else Y="Rec.709" fi
-  e[] "[afre]^_^) y50: Compute luminance (D50 "$Y") of image$?."
-  repeat $! l[$>]
-    if s==3 sh 0 sh[0] 1 sh[0] 2
-      if $1 *[1] 0.2790177 *[2] 0.6753402 *[3] 0.0456377   # Rec.2020
-      else *[1] 0.22248840 *[2] 0.71690369 *[3] 0.06060791 # Rec.709
-      fi +[1-3] rm[1] channels 0
-    elif s!=1 r={[im,iM]} norm n $r fi
-  endl done
-
-#@cli afre_orien : colour_space={ 0=Rec.709 | 1=Rec.2020 }
-#@cli : Compute orientation of selected images using luminance (D50).
-#@cli : Default value: 'colour_space=1'.
-afre_orien : check isbool(${1=1})
-  if $1 Y="Rec.2020" else Y="Rec.709" fi
-  e[] "[afre]^_^) orien: Compute orientation of image$? using luminance (D50 "$Y")."
-  repeat $! +afre_y50[$>] $1 replace. 0,1 /[$>,-1] done
+#@cli ::Filtering
+#----------------
 
 #@cli afre_conv : [kernel]
 #@cli : Convolve selected images with a custom kernel.
@@ -857,10 +727,181 @@ afre_gui1_fast : check ${is_image_arg\ $1}" && ${2=1}>=1 && ${3=0}>=0 && ${4=5}>
     nm[ma] ${nm$>} rv
   endl done rm.
   repeat $! *[$>] ${iM$>} done
+#
+#@cli afre_dilateg : [mask],size>=0
+#@cli : Compute geodesic dilation of selected images.
+#@cli : Default value: 'size=3'.
+afre_dilateg : check ${is_image_arg\ $1}" && ${2=3}>=1"
+  e[] "[afre]^_^) dilateg: Compute geodesic dilation of image$? using mask=["${"pass$1\ -1"}"] and size=$2."
+  pass$1 0 repeat $!-1 l[$>,-1] repeat 1000
+    ia={ia} +dilate. $2 +min[0,-1] rm[2--2] if $ia==ia break fi
+  done rm[0] rv endl done rm.
+#
+#@cli afre_erodeg : [mask],size>=0
+#@cli : Compute geodesic erosion of selected images.
+#@cli : Default value: 'size=3'.
+afre_erodeg : check ${is_image_arg\ $1}" && ${2=3}>=1"
+  e[] "[afre]^_^) erodeg: Compute geodesic erosion of image$? using mask=["${"pass$1\ -1"}"] and size=$2."
+  pass$1 0 repeat $!-1 l[$>,-1] repeat 1000
+    ia={ia} +erode. $2 +max[0,-1] rm[2--2] if $ia==ia break fi
+  done rm[0] rv endl done rm.
+#
+#@cli afre_openg : size>=0
+#@cli : Compute geodesic opening of selected images.
+#@cli : Default value: 'size=3'.
+afre_openg : check ${1=3}>=1
+  e[] "[afre]^_^) openg: Compute geodesic opening of image$? using size=$1."
+  +erode $1 repeat 1000
+    ia={ia} dilate. $1 +min rm.. if $ia==ia break fi
+  done k.
+#
+#@cli afre_closeg : size>=0
+#@cli : Compute geodesic closing of selected images.
+#@cli : Default value: 'size=3'.
+afre_closeg : check ${1=3}>=1
+  e[] "[afre]^_^) closeg: Compute geodesic closing of image$? using size=$1."
+  +dilate $1 repeat 1000
+    ia={ia} erode. $1 +max rm.. if $ia==ia break fi
+  done k.
 
 
-#@cli ::Support Commands
-#-----------------------
+#@cli ::Utilities
+#----------------
+
+#@cli afre_maxmin
+#@cli : Return the maximum of channel minimums.
+afre_maxmin :
+  sh 0 sh.. 1 sh... 2 u {max(im#1,im#2,im#3)} k[0]
+
+#@cli afre_minmax
+#@cli : Return the minimum of channel maximums.
+afre_minmax :
+  sh 0 sh.. 1 sh... 2 u {min(iM#1,iM#2,iM#3)} k[0]
+
+#@cli afre_compare : crop={ 1=once | 2=twice },_layout={ x | y | z | tile },_normalize={ 0 | 1 }
+#@cli : Crop then compare selected images interactively.
+#@cli : Default values: 'crop=1', 'layout=x' and 'normalize=1'.\n
+#@cli : 1. Interactive Crop
+#@cli : \ - Click and drag to select crop.
+#@cli : \ - Use scroll button to browse images.
+#@cli : \ * Click once or close window to exit command.\n
+#@cli : 2. Comparison Window
+#@cli : \ - Regular display behaviour.
+#@cli : \ - Close window to make another comparison.
+afre_compare : check "${1=1}>=1 && $1<=2 && (s='${2=x}';s=='x'||s=='y'||s=='z'||s=='tile') && "isbool(${3=1})
+  n={$!-1} if $n<1 error[] "\n[afre]>_<) compare: Please select 2 or more images." fi
+  repeat $!-1 if w#0!=w#{$>+1}||h#0!=h#{$>+1} error[] "\n[afre]>_<) compare: Please select images with the same width and height." fi done
+  repeat $! if d#$>!=1 e[] "[afre]>_<) compare: *Slices in image ["$>"] will be considered separate images." fi done
+  e[] "[afre]^_^) compare: Crop then compare image$? interactively."
+  e[] "\n 1. Interactive Crop\n
+    \ - Click and drag to select crop.\n
+    \ - Use scroll button to browse images.\n
+    \ * Click once or close window to exit command.\n\n
+    2. Comparison Window\n
+    \ - Regular display behaviour.\n
+    \ - Close window to make another comparison.\n"
+  to_colormode 0 if $3 n 0,255 fi
+  do +l nm[0] Compare
+    a z repeat $1 xz b={w} if $b==1 break fi done
+    b={w} if '$2'!='z' s z if '$2'!='tile' a $2 else append_tiles 0 fi fi
+    if $b==1 break else v - d v + fi
+  endl k[0-$n] while $b!=1 v - d[]
+
+#@cli afre_reorder : order,_order2,...
+#@cli : Reposition images according to a list of values of any length.
+afre_reorder :
+  e[] "[afre]^_^) reorder: Reposition images according to list $*."
+  z 0,0,0,100%,100%,1 mirror z f z==0?1e6:i
+  l ($*) onfail error[] "\n[afre]>_<) reorder: Parameter must be a list of numbers; e.g. 0,2,4,1,3." endl
+  repeat min(w,$!-1) f[$>] z==0?{i($>)}:i done
+  sort_list[0-{min(w,$!-1)-1}] + rm. z 0,0,1,100%,100%,1
+
+#@cli afre_log2 : direction={ 0=inverse | 1=forward }
+#@cli : Transform selected images into or back from log2 space.
+#@cli : Default value: 'direction=1'.
+afre_log2 : check isbool(${1=1})
+  if $1 d="into" else d="back from" fi
+  e[] "[afre]^_^) log2: Transform image$? "$d" log2 space."
+  if $1 + 1 log2 else f exp(i*log(2)) - 1 fi
+
+#@cli afre_section : 1<=xy_sections<=50
+#@cli : Section selected images into numbered regions.
+#@cli : Default value: 'xy_sections=20'.
+afre_section : check "${1=20}>=1 && $1<=50"
+  m=min(w,h) err=int($m/25) if $err<$1 error[] "\n[afre]>_<) section: Section image$? into no more than "{max(sqr($err),1)}" ("{max($err,1)}"x"{max($err,1)}") regions." fi
+  e[] "[afre]^_^) section: Section image$? into "{sqr($1)}" ($1x$1) numbered regions."
+  repeat $! l[$>]
+    im,iM={[im,iM]} s yx,$1 repeat $!
+      t[$>] {$>+1},0.5~,0.5~,{$m*0.55},0.9,$im t[$>] {$>+1},0.5~,0.5~,{$m*0.56},0.9,$iM
+    done append_tiles $1
+    grid {100/$1}%,{100/$1}%,,,0.2,$im
+    grid {100/$1}%,{100/$1}%,-1,-1,0.2,$iM
+  endl done
+
+#@cli afre_cleanphoto : 2<=size<=10,1<=_recovery<=100,-50<=_xy_sections<=50,_maskN>=1,...
+#@cli : Clean dust and scratches from photos.
+#@cli : Default values: 'size=3', 'recovery=10', 'xy_sections=1' and 'maskN=1'.\n
+#@cli : - 'xy_sections' sections image into MxM labeled regions.
+#@cli : \ \ \ For global processing, set 'xy_sections' to 1.
+#@cli : \ \ \ To visualize these regions with labels, use a negative number.
+#@cli : - 'maskN' is a comma separated list of regions to be processed.
+afre_cleanphoto : check "${1=3}>=2 && ${2=10}>=1 && ${3=1}>=-50 &&
+    $1<=10 && $2<=100 && $3<=50" skip ${4=1}
+  m=min(w,h) err=int($m/25) if $err<$3 error[] "\n[afre]>_<) cleanphoto: Section image$? into no more than "{max(sqr($err),1)}" ("{max($err,1)}"x"{max($err,1)}") regions." fi
+  m "ip : p=$1,,,{iM}
+    +erode_threshold $p dilate_threshold. $p afre_gui1_fast. .. c. 0,100%
+    +afre_edge.. 1,1,4,4 afre_box. 1 c. 0,$2% n. 0,1 +blend_fade[0,1] . k[0,-1]
+    +gaussian. {[w,h]*0.3} c. 0,50% n. 0,1 blend_fade[0,1] . k[0]"
+  e[] "[afre]^_^) cleanphoto: Clean dust and scratches from image$? using size=$1, recovery=$2, xy_sections=$3 and masks=${4--1}."
+  repeat $! l[$>] if $3>1
+    iM={iM} w0,h0={[w,h]} w,h={[w,h]/$3} 100%,100%,1,3 l. (${4--1})
+      c. 1,{sqr($3)} round. sort. discard. unroll. x
+      repeat w v={i($>)} i={$v%$3?$v%$3:$3} j={($v+$3-$i)/$3}
+        r={[$w*$i-$w,$h*$j-$h,$w*$i-1,$h*$j-1]} rectangle[0] $r,1,$iM
+      done rm. label_fg 0 r {[$w0,$h0]+2},1,3,0,0,0.5,0.5
+      repeat iM +==[0] {$>+1} coord=${"
+        w={w} h={h} val={i(w-1,h-1)} +=. {1+$val},100%,100%,100%
+        autocrop. =. $val,100%,100%,100% x0={$w-w} y0={$h-h} rm.
+        +autocrop. x1={$x0+w-1} y1={$y0+h-1} rm. u $x0,$y0,$x1,$y1
+      "} rm. ($coord) done
+    a[^0] y endl r[0] {[$w0,$h0]+2},1,3,0,0,0.5,0.5
+    repeat h x0,y0,x1,y1={@{[0,1,2,3]+4*$>}} +z[0,1] $x0,$y0,$x1,$y1
+      +ip.. f. i#4?i#5:i#3 j[0] .,$x0,$y0 rm[-3--1]
+    done k[0] r {[$w0,$h0]},1,3,0,0,0.5,0.5
+  else ip
+  fi endl done um ip
+
+#@cli afre_cleanphoto1 : 1<=radius<=10,1<=_xy_sections<=50,_maskN>=1,...
+#@cli : Clean dust and scratches from photos.
+#@cli : Default values: 'radius=3', 'xy_sections=1' and 'maskN=1'.\n
+#@cli : - 'xy_sections' sections image into MxM labeled regions.
+#@cli : \ \ For global processing, set 'xy_sections' to 1.
+#@cli : - 'maskN' is a comma separated list of regions to be processed.
+#@cli : \ \ Use 'afre_section' to determine region labels.
+afre_cleanphoto1 : check "${1=3}>=1 && ${2=1}>=1 &&
+    $1<=10 && $2<=50" skip ${3=1}
+  rd={int($1)} m=min(w,h) err=int($m/25) if $err<$2 error[] "\n[afre]>_<) cleanphoto: Section image$? into no more than "{max(sqr($err),1)}" ("{max($err,1)}"x"{max($err,1)}") regions." fi
+  m "ip : s={"$rd"*2+1} +l +erode_oct $s dilate_oct. $s - c 0,100% ^ 2
+    c 5%,10% dilate_oct 3 n 0,1 endl +inpaint_pde.. . rm..
+    +gaussian. {[w,h]*0.3} c. 0,50% n. 0,1 blend_fade[0,1] . k[0]"
+  e[] "[afre]^_^) cleanphoto: Clean dust and scratches from image$? using radius="$rd", xy_sections=$2 and maskN=${3--1}."
+  repeat $! l[$>] if $2>1
+    iM={iM} w0,h0={[w,h]} w,h={[w,h]/$2} 100%,100%,1,3 l. (${3--1})
+      c. 1,{sqr($2)} round. sort. discard. unroll. x
+      repeat w v={i($>)} i={$v%$2?$v%$2:$2} j={($v+$2-$i)/$2}
+        r={[$w*$i-$w,$h*$j-$h,$w*$i-1,$h*$j-1]} rectangle[0] $r,1,$iM
+      done rm. label_fg 0 r {[$w0,$h0]+2},1,3,0,0,0.5,0.5
+      repeat iM +==[0] {$>+1} coord=${"
+        w={w} h={h} val={i(w-1,h-1)} +=. {1+$val},100%,100%,100%
+        autocrop. =. $val,100%,100%,100% x0={$w-w} y0={$h-h} rm.
+        +autocrop. x1={$x0+w-1} y1={$y0+h-1} rm. u $x0,$y0,$x1,$y1
+      "} rm. ($coord) done
+    a[^0] y endl r[0] {[$w0,$h0]+2},1,3,0,0,0.5,0.5
+    repeat h x0,y0,x1,y1={@{[0,1,2,3]+4*$>}} +z[0,1] $x0,$y0,$x1,$y1
+      +ip.. f. i#4?i#5:i#3 j[0] .,$x0,$y0 rm[-3--1]
+    done k[0] r {[$w0,$h0]},1,3,0,0,0.5,0.5
+  else ip
+  fi endl done um ip
 
 #@cli search_dichotomic : "increasing_fn",target_y,_precision>0
 #@cli : Find parameter for function such that 'target_y' is met in image.
@@ -884,21 +925,25 @@ search_dichotomic : check ${3=1e-3}>0
 
 
 # List of Commands and Filters
-#---------47-----------20-----
-# GUI CLI
+#---------50-----------20-----
+# GUI CLI 18
 #   afre_brightness afre_contrast afre_localcontrast afre_softlight
 #   afre_darksky afre_edge afre_details afre_texture afre_cleantext
 #   afre_denoisesmooth afre_denoisesmooth_alt afre_vigrect
 #   afre_vigcirc afre_sharpenfft afre_contrastfft afre_gleam
 #   afre_halfhalf afre_portraitmontage
-# CLI only
-#   afre_maxmin afre_minmax afre_jchz afre_ijchz afre_gnorm afre_hnorm
-#   afre_sdpatch afre_reorder afre_section afre_cleanphoto
-#   afre_cleanphoto1 afre_compare afre_log2 afre_norm
-#   afre_gradientnorm afre_hessiannorm afre_y50 afre_orien afre_conv
-#   afre_box afre_box_fast afre_gui0 afre_gui1 afre_gui0c afre_gui1c
-#   afre_gui0_fast afre_gui1_fast search_dichotomic
-# GUI old : fx_gamify fx_hnorm
+# CLI only 32
+#   Features
+#     afre_norm afre_y50 afre_orien afre_gradientnorm afre_hessiannorm
+#     afre_gnorm afre_hnorm afre_sdpatch afre_jchz afre_ijchz
+#   Filtering
+#     afre_conv afre_box afre_box_fast afre_gui0 afre_gui1 afre_gui0c
+#     afre_gui1c afre_gui0_fast afre_gui1_fast afre_dilateg
+#     afre_erodeg afre_openg afre_closeg
+#   Utilities
+#     afre_maxmin afre_minmax afre_compare afre_reorder afre_log2
+#     afre_section afre_cleanphoto afre_cleanphoto1 search_dichotomic
+# GUI old 2 : fx_gamify fx_hnorm
 
 
 # Local Variables:
