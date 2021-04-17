@@ -2,22 +2,103 @@
 
 %% x "mkdir -p img" %%
 
-|![name](images/hello.png)|''-name'' labels selections for reference during execution of G'MIC scripts and for managing layer properties of host applications like Gimp or Krita. Naming conventions differ between these two contexts. See [The Host Application Use Case](https://G'MIC.eu/oldtutorial/_name.html#HostApplicationUseCase) for how ''-name'' interacts with host applications which support image layers.
-|                |Since this command is frequently used to label selections containing one image, it is easy to misconstrue its purpose to just that of labeling images. As misconstructions go, it is mostly harmless, but its malfeasance lies mainly with the mental blocks erected in the minds of G'MIC script writers who forget the benefits of classifying any number of related images under one meaningful name.
+|![name](images/hello.png)|''-name'' associates a collection of images selected by the command's [right hand decorator](https://G'MIC.eu/tutorial/command_decorations.html) with a _named selection_, identified by the string argument given to ``-name``. The command labels selections for reference during execution of G'MIC scripts and for managing layer properties of host applications like Gimp or Krita. Naming conventions differ between these two contexts. See [The Host Application Use Case](https://G'MIC.eu/oldtutorial/_name.html#HostApplicationUseCase). Since this command is frequently used to label selections containing one image, it is easy to misconstrue its purpose to just that of labeling single images. As misconstructions go, it is mostly harmless, but malfeasance lies mainly with the mental blocks erected in the minds of G'MIC script writers who forget the benefits of classifying any number of related images under one meaningful name.
 
 Formally, the label _<name>_ may be written with any characters supported by the host computer, but if the intent is to use labels as named selections in [command decorators](https://G'MIC.eu/tutorial/command_decorations.html) or image parameters, contexts where __\[__ and __\]__ selection operators apply, then G'MIC further restricts character usage to the class __\[a-zA-Z0-9\_\]__ and such names cannot begin with a numeric.
 
-G'MIC scripts operating within the context of the host application plug-in may use ''-name'' to communicate with the host for setting layer properties, including setting the layer's name in the host application. This host layer name is not the same as the label that ''-name'' sets; In fact, the G'MIC script writer uses ''-name'' to label the image with a string composed according to a simple syntax that resembles calling functions. The host application retrieves this G'MIC-produced label and executes internal functions to set position, layer modes, opacity and the host application layer name, which can be, and usually are, quite different than the G'MIC label. See The [Host Application Use Case](https://G'MIC.eu/oldtutorial/_name.html#HostApplicationUseCase) for details.
+G'MIC scripts operating within the context of a host application plug-in may use ''-name'' to communicate with the host for setting layer properties, including setting the layer's name in the host application. This host layer name is not the same as the label that ''-name'' sets; In fact, the G'MIC script writer uses ''-name'' to label the image with a string composed according to a simple syntax that resembles calling functions. The host application retrieves this G'MIC-produced "script-like label" and executes internal functions to set position, layer modes, opacity and the host application layer name, which can be, and usually are, quite different than the G'MIC label. See The [Host Application Use Case](https://G'MIC.eu/oldtutorial/_name.html#HostApplicationUseCase) for details.
 
+## Selection Label
+The sample image, rose, becomes an image in the named selection BlurMe. At some subsequent point in the pipeline, all members of the BlurMe named selection are selected for blurring. It so happens that there is only one member of the named selection which is affected by this operation.
+===
+%%  -sp rose,300 nm. BlurMe -b[BlurMe] 4 %%
+~~~
+gmic                                \
+    -sample rose                    \
+    -name BlurMe                    \
+    -blur[BlurMe] 4                 \
+    -output[BlurMe] blurredrose.png \
+~~~
+===
+## Position Tracking
+Once an image is a member of a named selection it retains that association even though it changes its position on the image list. For the following example, the first item on the image list becomes associated with the named selection "AmpersandMe." The image is then is displaced to the second slot on the list but remains in the named selection "AmpersandMe" regardless of this displacement; references to "AmpersandMe" continue to select the image further down the pipeline. 
+===
+%% 300,250,1,3 nm. AmpersandMe i[0] images/ampersand.svg nm[0] TheAmpStamp r2dx[TheAmpStamp] 64,5 n[TheAmpStamp] 0,1 oneminus[TheAmpStamp] l[AmpersandMe,TheAmpStamp] noise[AmpersandMe] 0.03,2 shift[AmpersandMe] 0,0,0,1.375,2,1 convolve[AmpersandMe] [TheAmpStamp],1,1 endl n 0,255 rm[TheAmpStamp] %% 
+~~~
+gmic                                            \
+   -input 300,250,1,3                           \
+   -name[0] AmpersandMe                         \
+   -input[0] images/ampersand.svg               \
+   -name[0] TheAmpStamp                         \
+   -r2dx[TheAmpStamp] 64,5                      \
+   -normalize[TheAmpStamp] 0,1                  \
+   -oneminus[TheAmpStamp]                       \
+   -local[AmpersandMe,TheAmpStamp]              \
+       -noise[AmpersandMe] 0.03,2               \
+       -shift[AmpersandMe] 0,0,0,1.375,2,1      \
+       -convolve[AmpersandMe] [TheAmpStamp],1,1 \
+   -endlocal                                    \
+   -normalize 0,{2^8-1}                         \
+   -remove[TheAmpStamp]                         \
+   -output[AmpersandMe] amped.png
+~~~
+===
+## One Association at a Time
+An image cannot be associated with more than one named selection at a time. If an image is subsequently enrolled in a different named selection, it loses its association with the previous one.
+
+===
+~~~
+gmic                                   \
+   -sample rose                        \
+   -name[0] BlurMe                     \
+   -input[0] [-1],[-1],[-1],[-1],255*u \
+   -name[0-–1] Granfalloon             \
+   -blur[BlurMe] 4                     \
+   -output[BlurMe] rose.png
+~~~
+===
+With the inclusion of all images on the list within the named selection __Granfalloon__, the rose image ceases its association with __BlurMe__. Since the rose image is the only member of that named selection, the named selection __BlurMe__ ceases to exist and subsequent references to it raise an exception. Had there been other members of BlurMe, the named selection would have persisted but the rose image would not have been blurred or saved.
+
+## Named Selections in Script Documentation
+While it may not materially add anything to image processing, naming selections can ease the grouping of images subject to identical processing. Once such related images have been isolated to a named selection, there is little need for clock arithmetic to figure out what images are going to be subject to a particular set of commands and where they might be on the image list. The following script groups identical Goudy 1911 ampersands into separate selections named after colors, so that the ampersands may be colored in the manner of the selection name to which they belong. With the selections named, it is straightforward to introduce correct group of ampersands to the corresponding coloring routine. It is far easier to identify the purpose of a named selection than the underlying numeric form of the selction, which aids in documenting code. `threshold[TheAmp] 0.5` quickly conveys what is being operated on – `threshold[-1] 0.5`, not so much.      
+
+%% (32,215,130,90,215^51,64,210,125,180^100,90,37,220,63) nm. Colormap images/ampersand.svg nm. TheAmp r2dx. 256,1 n. 0,1 oneminus. -threshold. 0.5 [TheAmp]x12 nm[1--1:4] Red nm[2--1:4] Green nm[3--1:4] Blue nm[4--1:4] Yellow l[Colormap,Red] map[Red] [Colormap] endl l[Colormap,Blue] mul[Blue] 3 -map[Blue] [Colormap] -endl l[Colormap,Green] mul[Green] 2 -map[Green] [Colormap] -endl l[Colormap,Yellow] mul[Yellow] 4 -map[Yellow] [Colormap] -endl rm[Colormap] a x n 0,255 r2dx. 25%,5 %%
+===
+~~~
+gmic                                                                        \
+   -input '(32,215,130,90,215^51,64,210,125,180^100,90,37,220,63)'          \
+   -name[0] Colormap                                                        \
+   -input images/ampersand.svg                                              \
+   -name[-1] TheAmp                                                         \
+   -r2dx[TheAmp] 256,1                                                      \
+   -normalize[TheAmp] 0,1                                                   \
+   -oneminus[TheAmp]                                                        \
+   -threshold[TheAmp] 0.5                                                   \
+   [TheAmp]x12                                                              \
+   -name[1--1:4] Red                                                        \
+   -name[2--1:4] Green                                                      \
+   -name[3--1:4] Blue                                                       \
+   -name[4--1:4] Yellow                                                     \
+   -local[Colormap,Red] -map[Red] [Colormap] -endlocal                      \
+   -local[Colormap,Blue] -mul[Blue] 3 -map[Blue] [Colormap] -endlocal       \
+   -local[Colormap,Green] -mul[Green] 2 -map[Green] [Colormap] -endlocal    \
+   -local[Colormap,Yellow] -mul[Yellow] 4 -map[Yellow] [Colormap] -endlocal \
+   -remove[Colormap]                                                        \
+   -append x                                                                \
+   -normalize. 0,255                                                        \
+   -r2dx. 25%,5                                                             \
+   -output. img/multicoloramp.png
+~~~
+===
 
 # Command reference
-
 ===
 """
 gmic -h name
 """
 ===
 
+   
 |1.  |The command associates the collection of images referenced by _<selection>_ with the label _<name>_.
 |2.  |The images become members of a named selection that _<name>_ identifies. Its shortcut is ''-nm''.
 
