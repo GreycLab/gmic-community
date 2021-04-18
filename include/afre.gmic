@@ -447,25 +447,28 @@ afre_halfhalf : check isbool(${1=0})
 
 afre_halfhalf_preview :
   afre_halfhalf $*
-
+#
 #@gui Portrait Montage : afre_portraitmontage, afre_portraitmontage_preview(1)+
-#@gui : note = note("<strong>Generate portrait montage with resizing.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2020-2021 Apr16.</strong>\n\n
+#@gui : note = note("<strong>Generate portrait montage with resizing.&nbsp; Filter by <a href="https://discuss.pixls.us/u/afre">afre</a> 2020-2021 Apr18.</strong>\n\n
 #@gui : - Set <strong>Input layers</strong> to <strong>All</strong>.\n
 #@gui : - Centre subjects for best results.\n\n")
-#@gui : Spacing = int(1,0,10)
-#@gui : Circle Matte = bool(1)
+#@gui : Size = choice(1,"Small","Large")
+#@gui : Spacing = int(1,1,20)
+#@gui : Matte Shape = choice("None","Circle","Polygon","Star")
 #@gui : Matte Colour = color(230,255,230)
-#@cli afre_portraitmontage : spacing>=0,circle_matte={ 0 | 1 },0<=_matte_colour={[R,G,B]}<=255
+#@cli afre_portraitmontage : size={ 0=small | 1=large },_spacing>=1,_matte_shape={ 0=none | 1=circle | 2=polygon | 3=star },0<=_matte_colour={[R,G,B]}<=255
 #@cli : Generate portrait montage with resizing.
-#@cli : Default values: 'spacing=1', 'circle_matte=1', 'matte_colour=230,255,230'.\n
+#@cli : Default values: 'size=1','spacing=1', 'matte_shape=0', 'matte_colour=230,255,230'.\n
 #@cli : \- Centre subjects for best results.
-afre_portraitmontage : check "${1=1}>=0 && isbool(${2=1}) && inrange(${3=230},0,255) && inrange(${4=255},0,255) && inrange(${5=230},0,255)"
-  e[] "[afre]^_^) portraitmontage: Generate portrait montage with resizing of image$? using spacing=$1, 'circle_matte=$2' and matte_colour=(${3-5})."
-  to_colormode 0 repeat $! l[$>]
-    if $2 +f. 1 +circle. 50%,50%,{min(w,h)*0.49} -.. 2
-      blend_fade[0,1] . k[0] autocrop fi
-    + 1 frame {[$1,$1]*min(${-max_w},${-max_h})*0.01},0
-  endl done append_tiles 0 - 1 replace_color 0,0,-1,-1,-1,$3,$4,$5
+afre_portraitmontage : check "isbool(${1=1}) && ${2=1}>=1 && inrange(${3=0},0,3) && inrange(${4=230},0,255) && inrange(${5=255},0,255) && inrange(${6=230},0,255)"
+  if $3==0 s=none elif $3<2 s=circle elif $3<3 s=polygon t=8
+    elif $3<4 s=star t=24,0.9 fi
+  e[] "[afre]^_^) portraitmontage: Generate portrait montage of resized image$? using size=$1, spacing=$2, matte_shape="$s" and matte_colour=(${4-6})."
+  rr2d {`$1?'${-max_w},${-max_h},':'${-min_w},${-min_h},1'`},2 to_rgb repeat $! l[$>]
+    if $3 +f. -1 shape_$s {min(w,h)},$t to_rgb. ri. ..,0,0,0.5,0.5
+      negate. j... ..,0,0,0,0,1,. k... autocrop fi + 1
+  endl done f=min(${-max_w},${-max_h}) frame {[$2,$2]*$f*0.01},0
+  append_tiles 0 frame {[$2,$2]*$f*0.01},0 - 1 replace_color 0,0,-1,-1,-1,$4,$5,$6
 
 afre_portraitmontage_preview :
   afre_portraitmontage $*
