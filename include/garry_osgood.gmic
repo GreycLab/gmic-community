@@ -1,5 +1,5 @@
 #@gmic
-### === Version 14 April 06 17:34 EDT 2021  ==================== ###
+### === Version 15 May 08 10:35 EDT 2021  ==================== ###
 #@gui <b>Testing</b>
 #@gui <i>Gmic Tutorials</i>
 #@gui Blur by Color : gtutor_blur_img, gtutor_blur_img_preview
@@ -286,6 +286,223 @@ tiletex : check "${1=8}>0 && isnum(${2=-1.0}) && ${3=0}>=0 && ${3}<3"
     endl
   done
 
+#@cli gtutor_tileit : 0<=_disrupt<=10,0<_th,0.5<=_spread,0<=_soft,_fillholes,0<=_lightangle<=180,_basec,_offsc
+#@cli : Generate a mosaic from a binary black & white image.
+#@cli : disrupt=5      Twists and offsets tiles. Suggest 0-10.
+#@cli : th=16          Tile height, absolute pixels. Fixme: Effect changes with image size. 
+#@cli : spread=1.5     Size of gaps between tiles at corners, junctions and runs. Suggest 0-3.
+#@cli : soft=0.5       Soften and dull shadows and highlights. Suggest 0-10.
+#@cli : fillholes=1    True:  Fill gaps. No alpha channel.
+#@cli :                False: Leave gaps transparent; image has alpha channel.
+#@cli : lightangle=45  Degrees: 0-180. Azimuth from where light streams.
+#@cli :                45° renders upper left lighting.
+#@cli :	               Provisional coloring. FIXME: sample from input image instead.
+#@cli : basec=-60      Provisional: base color, degrees. 0° = green
+#@cli : offsc=90       Provisional: offset color, degrees ± angle from basec 0°: no figure-
+#@cli :                ground distinction.
+gtutor_tileit : -check "${1=5}>=0 && $1<=10 && ${2=16}>0 && ${3=1.5}>=0.5 && ${4=0.5}>=0 && isbool(${5=1}) && ${6=45}>=0 && $6<=180" -skip ${7=0},${8=90}
+
+# Selected: black/white binary value shapes. To do: simple color field input images instead
+# Parameters
+
+-verbose -
+disrupt=$1
+th=$2
+spread=$3
+soft=$4
+fillholes=$5   
+lightangle=$6	               
+basec=$7
+offsc=$8
+
+# Outline shapes
++deriche. 1,1,x
++deriche.. 1,1,y
+-sqr[^0]
+-add[^0]
+-fill. 'i>3?1:0'
+-channels. 0
+-name. outline
+
+# Cost: perturbs distance to outline measure, a basis of tile irregularity
+[-1],[-1],1,1
+-name. cost
+-noise_perlin[cost] {10*$disrupt}
+-normalize[cost] 0,{$disrupt/4.0}
+
+# Distance to outline + distance perturbation
++distance[outline] 1,[cost],1
+-name. distvar
++distance[outline] 1
++add[-1,-2]
+-remove[distvar]
+
+# True distance: basis for marking off distance by tile height
+-name. truedistance
+
+# Orient: source of tile rotation
+-name.. orienter
+-channels[^1] 0
+
+# Make Warper: distorts tile shapes
+-gradient[cost] xy
+-append[-4,-3] c
+-normalize... {-1.5*$disrupt},{1.5*$disrupt}
+-name... warper
+
+#  Measure out and scribe tile center-to-center lines
+-round[truedistance] {$spread*$th}
++deriche. 1,1,x
+-deriche.. 1,1,y
+-sqr[-2,-1]
+-add[-2,-1]
+-fill. 'i>0.5?1:0'
+-channels[truedistance] 0
+ 
+# Compute structure tensors
+# Make an inpaint patch to
+# fill in uncertain ridge values
+-structuretensors[orienter] 0
++norm[orienter]
+-name. patcher
+-fill[patcher] 'i<=2?1:0'
+
+# Patch structure tensors
+-inpaint[orienter] [patcher],0,1
+-remove[patcher]
+
+# Extract orientation angles
+# from structure tensors
+-eigen[orienter]
+
+# Plotting field:
+[-1],[-1],1,2,'[-1,0]'    
+-name. plottingfield
+
+# Draw tiles on a plotting field:
+# (1) xfrm: encodes tile translations and rotations
+# for tile corner points. (2) tl, tr, bl, br:
+# tile corners, expressed in homogeneous
+# coordinates.
+
+-fill[plottingfield] ">if(
+                           0<i#-2 && I#-1==[-1,0],
+                           xfrm=eye(3);
+                           xfrm[0]=I#-3[1];
+                           xfrm[1]=I#-3[0];
+                           xfrm[2]=x;
+                           xfrm[3]=-I#-3[0];
+                           xfrm[4]=I#-3[1];
+                           xfrm[5]=y;
+                           tl=mul(xfrm,[-"$th",-"$th"/2.0,1],1);
+                           tr=mul(xfrm,[ "$th",-"$th"/2.0,1],1);
+                           bl=mul(xfrm,[-"$th", "$th"/2.0,1],1);
+                           br=mul(xfrm,[ "$th", "$th"/2.0,1],1);
+                           polygon(#-1,5,
+                                   [tl[0],tl[1]],
+                                   [tr[0],tr[1]],
+                                   [br[0],br[1]],
+                                   [bl[0],bl[1]],
+                                   [tl[0],tl[1]],
+                                   1,[0,1]);
+                           polygon(#-1,-5,
+                                   [tl[0],tl[1]],
+                                   [tr[0],tr[1]],
+                                   [br[0],br[1]],
+                                   [bl[0],bl[1]],
+                                   [tl[0],tl[1]],
+                                   1,0xffffffff,[1,1])
+                         );I"
+# Distort artwork
+-warp[0,outline,plottingfield] [warper],1,2,2
+-if {$fillholes==0}
+   -shared. 0
+   -round. 1
+   -rm.
+-else
+   -remove_opacity.
+   -round. 1
+-fi
+-dilate_oct. 2
+
+# Clean up z-axis data shifts
+-cut[0] 0,255
+-threshold[outline] 50%
+-shared[plottingfield] 0
+-fill. 'i#1>0?1:i#-1'
+
+# Make height map for lighting. 
+# Distance from edges: proxy for
+# tile height. Shape height with
+# power function
+-distance. 1
+-normalize. 0,1
+-pow. 0.25
+-rm.
+
+# Drop used data sets,
+# Normalize for lighting
+-remove[^0,-1]
+-normalize[0,-1] 0,255
+-if {s#-1>1}
+   -split_opacity[-1]
+   -fill. '[i<127?0:255]'
+   -move. 0
+-fi
+ 
+# Cheap Fingerpaint Lighting
+# Derive shadow, hightlight, color
+# Fixme: provisional coloring. Ought to
+# be sampled from input image.
+-blur. {$soft},1,1
++gradient. xy
+-append[-2,-1] c
+({cos(45*pi/180)}^{sin(45*pi/180)})
+-resize. [-2],[-2],[-1],[-1],1
++mul[-2,-1]
+-compose_channels. add
+
+# Shadow 
+-cut. {ia},{iM}
+-normalize. 0,1
+-pow. 0.5
+-blur. {$soft},1,1
+-mul.. -1 
+-mul[-3,-2]
+
+# Highlight
+-compose_channels.. add
+-cut.. {ia#-2},{iM#-2}
+-normalize.. 0,1
+-oneminus..
+-pow.. 2
+
+# Colorize. To do: sample color
+# from input. For now, just mapping
+# and colorspace twisting.
+-blur.. {$soft},1,1
+-normalize[-3] 0,1
+-oneminus[-3]
+-normalize[-3] 127,255
+-map[-3] algae
+
+# Provisional coloring
+# Translate black/white of input into base° ± offset°
+# colorspace rotations
+-fill[-3] "begin(wv=vector3(1/sqrt(3)));
+          if(i(#-4,x,y,0,0),ang="$basec"+"$offsc",ang="$basec"-"$offsc");
+          rot(wv,ang)*I#-3"
+
+# Composite 
+-mul[-3,-2]
+-normalize. 0,255
+-add[-2,-1]
+-normalize. 0,255
+-if {$fillholes==0}
+   -move[0] {$!}
+   -append[-2,-1] c
+-fi
+
 #@gui __
 #@gui <b>Artistic</b>
 #@gui Finger Paint : gtutor_fpaint, gtutor_fpaint_preview(0)
@@ -299,7 +516,7 @@ tiletex : check "${1=8}>0 && isnum(${2=-1.0}) && ${3=0}>=0 && ${3}<3"
 #@gui : Light Direction = float(45.0,0,360.0)
 #@gui : Shadow = float(0.5,0,1)
 #@gui : Highlight = float(0.5,0,1)
-#@gui : Specular = float(0.5,0,1)
+	 #@gui : Specular= float(0.5,0,1)
 #@gui : sep = separator(), Preview type = choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse")
 #@gui : sep = separator(), note = note("<small>Author: <i>Garry R. Osgood</i>. Latest update: <i>2015/02/26</i>.</small>")
 #@gui : note = link("Finger paint instructions and tutorial.","https://gmic.eu/oldtutorial/the-fingerpainting-filter.shtml")
