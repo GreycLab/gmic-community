@@ -1,32 +1,127 @@
 # input (i)
 %% x "mkdir -p img" %%
-|![hollerith](images/hollerith.png) *A [Hollerith Tabulating Machine](https://www.census.gov/history/www/innovations/technology/the_hollerith_tabulator.html) of the kind used in the 1890 United States Census. Example at [Computer History Museum](https://en.wikipedia.org/wiki/Computer_History_Museum), Mountain View, CA, United States of America. Image by Jennifer, Wikimedia Commons*|''-input''## Examples
+|![hollerith](images/hollerith.png) *A [Hollerith Tabulating Machine](https://www.census.gov/history/www/innovations/technology/the_hollerith_tabulator.html) of the kind used in the 1890 United States Census. Example at [Computer History Museum](https://en.wikipedia.org/wiki/Computer_History_Museum), Mountain View, CA, United States of America. Image by Jennifer, Wikimedia Commons*|''-input'' is the least written, most frequently used command in the G'MIC scripting language.  It places images from some source to one or more positions on the image list, creating the list if necessary, and duplicating as necessary. The command's [image selection decorator](https://gmic.eu/tutorial/command_decorations.html) designates the positions where the incoming image goes in the image list; the incoming image goes _before_ the images enumerated in the selection decorator and is copied as necessary.
+
+It is unique among G'MIC commands in that ''-input'' has an implied (invisible) shortcut. If the G'MIC command parser cannot associate an item with a command or a parameter then it infers that the ''-input'' command precedes the item, classifying the item itself as a parameter to the ''-input'' command. The parser then passes the (presumed) image to this command for processing.
+
+To make best use of the ''-input'' command, become familar with the five variations that the input argument can take and how the command interprets its right hand selector decoration. Very broadly, the input argument, in one of four forms, specifies the source images. The right hand selecton decorator, if present, specifies their destination. The ''-input'' command must have a source specification. The destination is optional and if omitted implies an insertion point to the right of the last position on the list.
+
+## Source Specifications
+= input_specifications
+[Input Data Items](https://gmic.eu/reference/input_data_items.html#top) furnishes a terse, but complete list of methods which ''-input'' employs to sort out images from other command line riff-raff. There are six broad approaches, many with variants.
 ===
-%%  %%
+
+%% -input https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Lullwater_south_from_Binnen-Bridge_Prospect_Park.jpg/640px-Lullwater_south_from_Binnen-Bridge_Prospect_Park.jpg %%
+*The Lullwater, Prospect Park, Brooklyn NY, c. 5 June, 2005. From Wikimedia Commons*
 ===
-|1.  | .
+= 
+|1.  | __File and File-like Sources__: ''-input'' always works with local file system sources. It can also work with hypertext resource locators so long as the underlying operating system offers [wget-](https://man7.org/linux/man-pages/man1/wget.1.html) or [curl-](https://man7.org/linux/man-pages/man1/curl.1.html) like capabilities. The item either identifies a local file, with, possibly, a path preceding the filename, the entire construct written according to the operating system's rules for identifying files, or – with `wget` or `curl` present – a Uniform Resource Locator (URL) identifying an image somewhere on the Internet. In this case, ''-input'' will initiate an HTTP request to retrieve the image via the Hypertext Transfer Protocol, such as the Wikimedia Commons image above. __Selections and Multipliers:__ As with other commands, ''-input'' may take a right hand selection decorator, but in this case, the selector indicates positions where the incoming image may be inserted, creating as many copies as necessary. Multiplier notation `x<_N_>` for a positive integer `N` places N copies of the incoming image in each selector position. __Image Type Overrides:__ One may override file extensions, which imply certain image types, with explicit left hand type declarations   
+
+* Put an image of Prospect Park's Lullwater somewhere on the image list, creating the image list, if necessary.
 ===
 ~~~
-gmic
+gmic -input https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Lullwater_south_from_Binnen-Bridge_Prospect_Park.jpg/640px-Lullwater_south_from_Binnen-Bridge_Prospect_Park.jpg 
+~~~
+===
+* Put two copies of `hollerith.png` from the `images` directory before the first image on the image list.
+===
+~~~
+gmic -input[0]x2 images/hollerith.png
+~~~
+===
+* Declare an incoming image to be of a specific type, without regard to the filename or its extension. If the type specification is wrong, G'MIC will attempt to fall back to its own determination of an image type. If the fallback fails, G'MIC will post an error.   
+===
+~~~
+gmic -input jpg:images/hollerith.png
+~~~
+===
+* Use `-`, with an optional trailing type specifier, to load an image from the shell's input stream. Here is an overly obtuse way in a bash shell to input an image from a file:  
+===
+~~~
+cat images/hollerith.png | gmic -.png
+~~~
+
+ *§§§*
+
+%% -input 128,128,1,3,'c==0?x%17:c==1?x%7:x%11' -normalize. 0,255 -name stripes %%
+*Stripes, any way you want them.*
+===
+= 
+|2.  | __Image Dimensions, With and Without Math Expressions__: The command line item is an image specification, a set of up to five parameters, separated by commas that collectively specify a new image and, possibly, its content through a mathematical expression. __Absolute Sizing:__ The first four parameters are literal numerals that list the new image's width, height, depth (number of slices), and spectrum (number of channels). Except for the first, the second through fourth parameters are optional and may be omitted; omitted dimensions default to one pixel. The fifth parameter is also optional and may express a [Mathematical Expression](https://gmic.eu/reference/mathematical_expressions.html#top) which computes content on the fly. __Relative Sizing:__ Percentages may be employed to cite dimensions relative to the preceding image on the list. If there is no previous image on the list, dimensions default to one.
+
+* Input an image through specified image dimensions and fill with a math expression. See the image above. 
+===
+~~~
+gmic -input 128,128,1,3,'c==0?x%17:c==1?x%7:x%11' -normalize. 0,255 -name stripes
+~~~
+===
+* Input a one pixel image. This form implicitly invokes the ''-input'' command and the remaining three dimensions default to 1.
+===
+~~~
+gmic 1
+~~~
+%% -input 128,128,1,3,'[255,0,63]' -input 60%,80%,100%,100%,[63,0,255]  %%
+ *Red and blue*
+===
+* Input a reddish image with absolute dimensions; a math expression denoting a single reddish pixel fills the entire image. Input a second bluish image with dimensions relative to the first.
+~~~
+gmic -input 128,128,1,3,'[255,0,63]' -input 60%,80%,100%,100%,[63,0,255]
+~~~
+===
+
+*§§§*
+
+===
+= 
+|3.  | __Selectors__: A selector designation occuring in isolation functions as an implicit copy command. __Dimensions from Decorators:__ Selectors may also be used to specify particular dimensions taken from other images. In the latter case, copying of image content does not take place. Use commas between decorators.
+===
+
+%% -input images/fish.jpg -r2dx. 50%,5 [-1] -r2dx. 50%,5 %%
+ * New Orleans fish, by whole and by half. c. 1995 *
+===
+* Input an image. Shrink it by half. Make a copy. Shrink that by half again.
+~~~
+gmic -input images/fish.jpg -r2dx. 50%,5 [-1] -r2dx. 50%,5
+~~~
+===
+
+%%  -input images/usdoj_1892.jpg -r2dx. 50%,5 [-1] -r2dx. 50%,5 [-2],[-1],[-2],[-1],'[255,220,75]' %%
+ *  Paperwork with yellow *
+===
+* Input an image. Shrink it by half (twice). Make a yellowish image with mixed dimensions from the preceding images.
+~~~
+gmic -input images/usdoj_1892.jpg -r2dx. 50%,5 [-1] -r2dx. 50%,5 [-2],[-1],[-2],[-1],'[255,220,75]'
+~~~
+===
+
+ *§§§*
+
+===
+= 
+|4.  | __Prescribed Values__: foorg.
+===
+~~~
+gmic                           \
 
 ~~~
 ===
-
-===
-%%  %%
-===
-|2.  | .
+= 
+|5.  | __Strings__: Bleeble.
 ===
 ~~~
-gmic                     \
+gmic                           \
 
 ~~~
 ===
+= 
+|6.  | __Stored Images__: Fargly.
+===
+~~~
+gmic                           \
 
+~~~
 ===
-%%  %%
-===
-|3.  | .  
+|7.  | __Empty Images__: Kybly.
 ===
 ~~~
 gmic                           \
@@ -34,20 +129,11 @@ gmic                           \
 ~~~
 ===
 
-|4.  | .  
-===
-~~~
-gmic                           \
+## Image List Variables
 
-~~~
-===
-
-## Bar
-
-.
 
 ===
-%%  %%
+
 
 ~~~
 gmic                                       \
@@ -58,7 +144,7 @@ gmic                                       \
 |1.  | .
 
 ===
-%%  %%
+
 ~~~
 gmic                                          \
 ~~~
