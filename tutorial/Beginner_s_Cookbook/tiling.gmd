@@ -2,7 +2,7 @@
 # Tiled Art
 %% x "mkdir -p img" %%
 %% -input https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Mosaic_of_Justinianus_I_-_Basilica_San_Vitale_%28Ravenna%29.jpg/173px-Mosaic_of_Justinianus_I_-_Basilica_San_Vitale_%28Ravenna%29.jpg -o. img/justinianus.jpg rm 0 %%
-|![justinianus](img/justinianus.jpg)|Mosaics are an ancient medium. Examples date back to the third century B.C, but the form is still acitve, employing materials from [seashells](https://commons.wikimedia.org/wiki/Category:Shell_mosaics#/media/File:KO_Arenberg_St_Nikolaus_detail.JPG) to [bottle caps](https://commons.wikimedia.org/wiki/File:Bottlecap_mosaic.jpg). Orientation itself is recruited to its services. Artists turn tiles to align with an image's dominant edges, giving them greater clarity. Other ranks of tiles follow. From the dominant edges wavefronts ripple outward and – inevitably – collide. Work is cut out for the mosaic artist here, who must carefully chip compromises all along the collision fronts. Interesting work if you can get it. *Image: Mosaic of Justinianus I - Basilica San Vitale (Ravenna) Wikimedia Commons: Petar Milošević*
+|![justinianus](img/justinianus.jpg)|Mosaics are an ancient medium. Examples date back to the third century B.C., but the form is still active, employing materials from [seashells](https://commons.wikimedia.org/wiki/Category:Shell_mosaics#/media/File:KO_Arenberg_St_Nikolaus_detail.JPG) to [bottle caps](https://commons.wikimedia.org/wiki/File:Bottlecap_mosaic.jpg). It recruits orientation itself to its services. Artists align tiles with dominant edges, lending these greater clarity. Other ranks follow, and from dominant edges wavefronts ripple outward and – inevitably – collide. Work is cut out for the mosaic artist here, who must carefully chip compromises all along the collision fronts. Interesting work if you can get it. *Image: Mosaic of Justinianus I - Basilica San Vitale (Ravenna) Wikimedia Commons: Petar Milošević*
 
 %% input images/stroke.png r2dx. 75%,5 -o. img/stroke_small.png gtutor_tileit. 0.5,0.75,0.75,0,1,45,16,1 -n. 0,255 -o. img/stroke_tiled.png rm 0 %%
 ===
@@ -11,9 +11,10 @@
 ===
 
 ## Introduction
+= introduction
+Orienting tiles along dominant edges is but one kind of surface [tessellation](https://en.wikipedia.org/wiki/Tessellation). Strictly speaking, the technique outlined here does not tesselate, as coverage is rarely complete. Collision fronts and rank mismatches almost always give rise to gaps. Mosaic artists keep various kinds of workarounds in their kits, from breaking regular tiles into irregular shapes and daubing extra plaster in the less significant holes.
 
-Orienting tiles along dominant edges is one of many kinds of surface [tessellations](https://en.wikipedia.org/wiki/Tessellation). Strictly speaking, the technique outlined here is not a tesselation as coverage is not guaranteed to be complete. Collision fronts and rank mismatches almost always give rise to gaps. Mosaic artists keep various kinds of workarounds in their kits, from breaking regular tiles into irregular shapes and daubing extra plaster in less significant holes.  
-That said, the technique outlined here is not without its mathematical interest. Edge detection and orientation have long been parts of G'MIC's repertoire, as edge-preserving anisotropic smoothing is one of the oldest parts of its kit.
+That said, the technique here is not without mathematical interest. Edge detection and orientation have been in G'MIC's repertoire for a long time, part and parcel with edge-preserving anisotropic smoothing.
 
 The game is straightforward:
 1. Harness ''-distance'' to establish measures from arbitrary points to edges.
@@ -22,36 +23,143 @@ The game is straightforward:
 4. Render the placed tiles.
 5. Probably there will be missed spots. We punt.
 
-Here is our play.
+Here's our play.
+## Edges
+The heart of play lies in step 3: moving, scaling and rotating tiles according to the orientation of nearby edges. First – we have to get edges. To that end, the technique uses a very simple forward differencing scheme to elucidate "important" edges – that is, the ones we notice. Faint edges necessarily escape attention. That is fine, as mosaics with too many dominant edges appear ill-conceived.
 
-## Walkthrough
-The heart of the matter is step 3: moving, scaling and rotating tiles according to the nature of proximate edges. Garnering information about those edges stem from long-standing G'MIC commands [-distance](https://gmic.eu/oldtutorial/_distance.shtml) and [-gradient](https://gmic.eu/oldtutorial/_gradient.shtml) which have tutorials, so only need summary treatments here.     
+With dominant edges established, [-distance](https://gmic.eu/oldtutorial/_distance.shtml) and [-gradient](https://gmic.eu/oldtutorial/_gradient.shtml) determine how far an image point is from an edge and how a tile laid on top should orient. These commands have tutorials elsewhere; summary treatments reside here.     
 ===
-%% input 256,256,1,1 gaussian. 20%,15%,40 round. 0.333 +n. 0,255 o. img/oval.png rm. f. ">abs(i-j(1,1,0,0,0,1))>iv?1:abs(i-j(1,0,0,0,0,1))>iv?1:0" +n. 0,255 -o. img/ovalout.png rm 0 %%
+%% input 256,256,1,1 gaussian. 20%,15%,40 round. 0.333 +n. 0,255 o. img/oval.png rm. f. ">abs(i-j(1,1,0,0,0,1))>iv?1:abs(i-j(1,0,0,0,0,1))>iv?1:0" +n. 0,255 -o. img/ovalout.png rm. -o. img/tile_01.cimg rm 0 %%
 |![oval](img/oval.png)|![ovalout](img/ovalout.png)|
 |**flat color**|**edges of same**|
 ===
-|1.  | __Locate edges__ \n\nFor illustration, we stick to single channel images which can convey the essential ideas. We take the [-luminance]() of images in a colorspace. \n\n A contour detector due to Jerome Boulanger forward differs the leading and lower diagonal pixels with respect to the center of a five by five grid. A forward differencing scheme, one need not pay heed to the rear quadrants. Of the forward quadrants, one need only assess the southeast and due east pixels. What of the northeast? That direction was the due east in the previous row scan, so is among the accounted. Thus, two differences suffice:| 
+= edges
+|1.  | __Locate edges__ \n\nFor illustration, single channel images convey the essential ideas. The [-luminance](https://gmic.eu/tutorial/luminance.html) command furnishes a similar starting point for multispectral images. Edge, distance and orientation data stem from this.\n\nA straightforward contour detector due to Jerome Boulanger forward differs the leading and lower diagonal pixels with respect to the center of a 3 × 3 grid. A forward differencing scheme, one need not pay heed to the rear and right angle quadrants. Of the forward quadrants, one need only assess the southeast and due east pixels. But what of the northeast? That pixel is on the due east span of the next most northerly row and, in a left-to-right, top-to-bottom in-place fill, is already set. Thus, two differences suffice:| 
 ~~~
   -fill. ">abs(                      \
-                i-j(1,1,0,0,0,1)     \
+                i-j(1,1,0,0,0,1)     \ # Southeast edge?
               )>iv?                  \
-              1:                     \
+              1:                     \ # Yes, otherwise...
               abs(                   \
-                    i-j(1,0,0,0,0,1) \
+                    i-j(1,0,0,0,0,1) \ # East edge?
                  )>iv?               \
-                 1:0"                \
- -name[-1] outline                   \
+                 1:0"                \ # Yes, otherwise no edge.
+ -name[-1] outline                   \ # Outline: basis of distance calculation
 ~~~
-|    |The comparison thresholds against the overall image variance; a forward difference less than this fails to be an edge for tiling purposes. 
+|    |The comparison thresholds against overall image variance, a heuristic choice. A forward difference less than this fails to be "interesting enough" for orienting tiles along it. 
+??? ''-fill,'' ''-eval'' and ''-input'' and Math Expressions
+``-fill,`` ``-eval`` and ``-input`` all may take __[Math expressions as parameters](https://gmic.eu/tutorial/fill.html#math_expressions); such parameters procedurally define all pixels in the images selected by the command — or, for ''-input'' — the inserted images.
 
-|2.  | __Step title__ \n\n Step Text
+The parameter is a complete Pixel Processor. It is invoked once for every pixel in the target image and its remit is to produce a pixel – or a single-channel pixel component called a _pel_ – that replaces the old value residing at the current [`x`,`y`] position. The pixel processor can do whatever it wants to produce that value - accessing in any manner the current or neighboring pels, pels in other images, or values entirely uncoupled from any image, such as the special random number generating value `u`:
+
+   `-input 128,128,1,3,u -normalize. 0,255 # A noisy image.`
+
+The final computation of the math expression, whatever that may be, becomes the new value of the pel or pixel, an implicit assignment.
+
+### Traversal Styles
+= traversalstyles
+Initial character notation sets a traversal style for pixel processors. Here, the leading `>` character sets a left-to-right, top-to-bottom traversal; `<` sets a right-to-left, bottom-to-top traversal. Both traversal styles operate _in place_, so that as the processor proceeds, it overwrites old values with new and both styles use only only one thread, which may disappoint those with multi-core CPU's. To engage other cores, omit `>` and `<`. G'MIC then analyzes the pixel processor and, if it can, parallelize the code across cores. In this case, it is not possible to depend on any particular  traversal order. If the pixel processor depends on such, then explicitly set the style with either `>` or `<`. One may force parallelization by using `:` – multithreaded and in place or `*` – multithread on an image copy and transfer the result to the image. Demanding multithreaded operation may not actually speed up the pixel processor. Experiment and prepare for disappointment.
+
+### ternary operator __\<condition\>__ **?** __\<expr_then\>__ **:** __\<expr_else\>__
+
+### Querying pixels
+
+???
+
+## Distance and Orientation
+Edges begat distances and orientations, the direct antecedents to placing oriented tiles. 
+%% i img/tile_01.cimg -nm. outline -distance[outline] 1 nm. truedistance +pow. 0.375 -n. 0,255 o. img/ovaldist.png rm. +g[truedistance] xy -a[-2,-1] c -orientation. +n. 0,255 100%,100%,1,1 a[-2,-1] c o. img/ovalorient.png rm. o img/tile_02.cimg rm 0 %%
+===
+|![distance](img/ovaldist.png)|![orientation](img/ovalorient.png)|
+|**distance**|**orientation**|
+===
+|2.  | __Distance and Orientation__ \n\nFrom edges, distance to edges and orientation to edges follow directly from ''-distance'' and ''-gradient''. The target isovalue, `1` for distance measuring is just the boolean output value of the edge detector. Pixels with this value necessarily map to zero distance values as an isovalue is alway at a distance measure of zero from itself. All other pixels map to their Euclidean distances to the nearest edge.\n\nOrientation follows readily from distance by pairwise differencing from pixel to pixel along both `x` and `y` axes, which estimates the gain or loss of height at the pixel of measure. The normalization of these data obtains vectors, magnitude one, which point along the steepest gradients. This we take to be pointing toward the nearby edges.
 ~~~
-                                     \
-                                     \
-                                     \
+  -distance[outline] 1      \ # Make Euclidean metric to edges
+  -name[distance]           \
+  -gradient[distance] xy    \ 
+  -orientation[distance]    \ # Alignment vectors with respect to edges
+  -name[orientation]        \
 ~~~
 
+## Culling
+In principle, enough is known now for tile-laying, but practical considerations intrude. We are not contemplating laying down a tile at every point in the image, are we? Seems excessive, so a culling scheme is in order.
+%% i img/tile_02.cimg nm.. distance nm. orientation round[distance] {(iM#-2-im#-2)/10} f[distance] ">abs(i#-2-j(#-2,1,1,0,0,0,1))>10?1:abs(i#-2-j(#-2,1,0,0,0,0,1))>10?1:0" +n[distance] 0,255 o. img/ovalcenters.png rm. o img/tile_03.cimg rm 0 %%
+===
+|![centerline](img/ovalcenters.png)|![orientation](img/ovalorient.png)|
+|**centerlines**|**orientation**|
+===
 
+|3.  | __Culling__ \n\nOf the ways to write image-filling expressions, the single-threaded, fill-in-place variant suggests itself, set through an initial `>` character. "fill-in-place" means that the results of a mathematical expression operating in context of ''-fill'', ''-input'' or ''-eval'' replaces pixels in the same image that the math expression traverses: left-to-right, top-to-bottom (its next-of-kin, `<` traverses from right-to-left, bottom-to-top: also single-threaded).\n\nWith this behavior, and with a candidate plot point in hand, we determine if the pixel at that point has already been tiled; we do not plot other tiles in such places. Thus, so long as we fill-in-place, the act of plotting tiles itself culls: no plotting of tiles until the traversal reaches a candidate that has not already been tiled. This scheme supposes that the "plotting field" is preset with "sentry pixels", so-called because the pixel vector cannot possibly be a product of tile rendering. We might create a plotting field filled with `[-1]`, perhaps, and tile only with positive values.\n\nBut by what means do we identify "candidate plot points"? From the ideas that tiles have common heights and centerlines stems a notion of periodic markings radiating from identified edges. Apart from other considerations, we plot only when we have a candidate point on a "centerline". Employing ''-round'', we convert distance measure to a staircase, with the width of the step corresponding to tile height and step-to-step changes corresponding to centerlines. Edge detecting the value changes gives centerlines: a `[1]` marker in a field that is otherwise `[0]`.
+~~~
+  -round[truedistance] {$tsz}
+  -fill[truedistance] ">
+                      abs(i-j(1,1,0,0,0,1))>"{0.5*$tsz}"?
+                      1:
+                        abs(i-j(1,0,0,0,0,1))>"{0.5*$tsz}"?
+                        1:0
+                      "
+~~~
 
-## Topic - Some next topic
+## Plotting
+The gist of control logic comes to this: plot tiles on centerlines where no tile has yet been plotted – the candidate is on a centerline `[1]` pixel, and on a never-been-rendered pixel `[-1]`.
+
+Some could be troubled by control logic depending on a pixel having, simultaneously, two values. G'MIC won't do quantum entanglements until 3.x, perhaps.
+
+The quandry resolves itself in the present release through math expression logic that spans images. At this juncture, we have two of the necessary images on the list: one depicting the __centerlines__ and the other __orientations__. The third, __plottingfields__, may be made from scratch. [-input](https://gmic.eu/tutorial/input.html#imagedimensions) an image through dimension specifications and fill it with the sentry value. Since the three images have the same dimensions, [`x`, `y`] coordinates reference analogous pixels in all three. The math expression `#` indicator notation distinguishes which among the three analogous pixels is of interest. Pixel indicators follow the same conventions as [image selection decorators](https://gmic.eu/tutorial/command_decorations.html): negative indicators index images from the end of the list, zero and positive from the start. Thus, iterating over any one image effectively iterates over all three; 
+
+Pseudocodingly, let us traverse __plottingfields__ from left-to-right, top-to-bottom, and for each position [`x`, `y`]:
+
+#1 reference __centerlines__. **if** the current pixel is on a center line, and
+#2 reference __plottingfields__. **if** the current pixel has not already been tiled
+#3 **then**
+##a transform tile corner points from reference to plotting positions using the __orientation__
+##b plot the tile using the math expression function ``polygon()``
+
+Perhaps there are a few more details which matter.
+%% i img/tile_03.cimg nm.. centerlines nm. orientation i 100%,100%,1,1,-1 nm. plottingfield  f[plottingfield] ">tsz=10;if(0<i#-3&&i#-1==-1,xfrm=eye(3);xfrm[0]=I#-2[1];xfrm[1]=I#-2[0];xfrm[2]=x;xfrm[3]=-I#-2[0];xfrm[3]=-I#-2[0];xfrm[4]=I#-2[1];xfrm[5]=y;tl=mul(xfrm,[-tsz,-tsz/2,1],1);tr=mul(xfrm,[tsz,-tsz/2,1],1);bl=mul(xfrm,[-tsz,tsz/2,1],1);br=mul(xfrm,[tsz,tsz/2,1],1);polygon(#-1,5,[tl[0],tl[1]],[tr[0],tr[1]],[br[0],br[1]],[bl[0],bl[1]],[tl[0],tl[1]],1,[127]);polygon(#-1,-5,[tl[0],tl[1]],[tr[0],tr[1]],[br[0],br[1]],[bl[0],bl[1]],[tl[0],tl[1]],1,0xffffffff,[255]);i,i)" +f[plottingfield] 'i==-1?63:i' to_rgb. o. img/ovalplotfield.png rm. o img/tile_04.cimg rm 0 %%
+
+===
+|![centerline](img/ovalcenters.png)|![orientation](img/ovalorient.png)|![ovalplotfield](img/ovalplotfield.png)
+|**centerlines**|**orientation**|**plottingfield**
+===
+|4.  | __Plotting__ \n\n Some text.\n\n Some text.\n\n Some text
+
+~~~
+-fill[plottingfield] ">if(                                         \
+                           0<i#-2 && I#-1==[-1],                   \ Plot tile?
+                           xfrm=eye(3);                            \ Compose H Matrix
+                           xfrm[0]=I#-3[1];                        \
+                           xfrm[1]=I#-3[0];                        \
+                           xfrm[2]=x;                              \
+                           xfrm[3]=-I#-3[0];                       \
+                           xfrm[4]=I#-3[1];                        \
+                           xfrm[5]=y;                              \
+                           tl=mul(xfrm,[-"$tsz",-"$tsz"/2.0,1],1); \ Apply H Matrix
+                           tr=mul(xfrm,[ "$tsz",-"$tsz"/2.0,1],1); \ to tile corners
+                           bl=mul(xfrm,[-"$tsz", "$tsz"/2.0,1],1); \
+                           br=mul(xfrm,[ "$tsz", "$tsz"/2.0,1],1); \
+                           polygon(#-1,5,                          \ Tile fill
+                                   [tl[0],tl[1]],                  \
+                                   [tr[0],tr[1]],                  \
+                                   [br[0],br[1]],                  \
+                                   [bl[0],bl[1]],                  \
+                                   [tl[0],tl[1]],                  \
+                                   1,[255]);                       \
+                           polygon(#-1,-5,                         \ Tile outline
+                                   [tl[0],tl[1]],                  \
+                                   [tr[0],tr[1]],                  \
+                                   [br[0],br[1]],                  \
+                                   [bl[0],bl[1]],                  \
+                                   [tl[0],tl[1]],                  \
+                                   1,0xffffffff,[0])               \
+                         );I"                                      \
+
+~~~
+
+%% i img/tile_04.cimg nm... centerlines nm.. orientation nm. plottingfield [centerlines] *. 255 i 100%,100%,1,1  f. 'if(i#-3==-1,255,0)' a[-3,-2,-1] c f. 'I==[-1,0,255]?[0,63,255]:I' f. 'wv=vector3(1/sqrt(3));rot(wv,75)*I' n. 0,255 o. img/ovaldiagnostics.png rm 0 %%
+
+===
+|![ovalplotfield](img/ovalplotfield.png)|![diagnostics](img/ovaldiagnostics.png)|
+|**plottingfield**|**diagnostics**|
+===
