@@ -43,7 +43,205 @@
 #@cli :: Reptorian's CLI Commands
 #
 #-------------------------------
+#@cli rep_randgradbar : eq. to 'rep_random_gradient_bars' : (+)
+rep_randgradbar:rep_random_gradient_bars $*
+#@cli rep_random_gradient_bars: width>0,spacing>0,-360<=_angle<=360,-90<_skew_angle<90,-1<=_pos_x<=1,-1<=_pos_y<=1,_sublevel>=0,_gradient_shift,_gradient_mul_a,gradient_mul_b,_bar_modulo={ -1=random | 0=cut | 1=periodic | 2=continuous },_random_modulo_out={ 0=cut_and_periodic | 1=cut_and_continuous | 2=periodic_and_continuous },_gradient_color={ 0=B&W | 1=Duotone | 2=Rand-RGB | 3=Rand-HSV },_space_color={ 0=Alpha | 1=Binary Duotone | 2=Gradient Duotone },_symmetry_mode={ 0=none | 1=sym_a | 2=sym_b },_use_inverse={ 0=n/a | 1=random-inverse },_bar_color_a=[,,],_bar_color_b
+#@cli : Create image filled with random bars.
+#@cli :
+#@cli : (eq. to 'rep_randgradbar')
+rep_random_gradient_bars:
+skip ${3=0},${4=0},${5=0},${6=0},${7=1},${8=0},${9=1},${10=100},${11=-1},${12=},${13=0},${14=0},${15=0},${16=0},${17="[0,0,0]"},${18="[255,255,255]"}
+check "($1>0&&$2>=0&&abs($4)<90)"
+#$1=Width#
+#$2=Spacing#
+#$3=Angle#
+#$4=Skew_Angle#
+#$5,$6=Position#
+#$7=Subpixel Sampling#
+#$8=Gradient Shift#
+#$9,$10=Gradient Min/Max Multiplier#
+#$11=Output Modulo#
+#$12=Random Modulo Mode#
+#$13=Out Color Mode#
+#$14=Outspace Color Mode#
+#$15=Symmetry Mode#
+#$16=Use Invert?#
+#$17=Bar Color A#
+#$18=Bar Color B#
 
+sub={abs($7)+1}
+
+repeat $! l[$>]
+ ow={w}
+ oh={h}
+ {w*$sub},{h*$sub},1,{$13?4:2},"begin(
+   const ww=w-1;
+   const hh=h-1;
+   const sd=max(ww,hh)/min(ww,hh);
+   const sx=ww>hh?sd:1;
+   const sy=ww>hh?1:sd;
+   const wwsx=ww*sx;
+   const hhsy=hh*sy;
+   const pyth_img=sqrt(ww^2+hh^2);
+   const ww_div_sx=ww/sx;
+   const hh_div_sy=hh/sy;
+   const cx=ww/2;
+   const cy=hh/2;
+   const ox=cx-(ww*-$5);
+   const oy=cy-(hh*$6);
+   const skew_ang=-($4/180)*pi;
+   const mdist=tan(skew_ang)*pyth_img;
+   const ang=-($3/180)*pi;
+   const cos_ang=cos(ang);
+   const sin_ang=sin(ang);
+   const cut_ang=atan2(cy,cy);
+   const cut_ang2=pi-cut_ang;
+   const bar_width=$1*"$sub";
+   const space_width=$2*"$sub";
+   const total_width=bar_width+space_width;
+   const half_total_width=total_width/2;
+   const symmetry_mode=$15%3;
+  
+   ($1==1&&$2<2)?(
+    const spacing=$2>0?.5:0;
+    abs($2)?(calc_spacing()=int(point_x)%2?1;):(calc_spacing()=1;);
+   ):(
+    const spacing=1-(space_width/(total_width-1));
+    calc_spacing()=abs(1-fmod(point_x,total_width)/total_width-.5)*2<=spacing;
+   );
+  
+   rot_x(a,b)=a*cos_ang-b*sin_ang;
+   rot_y(a,b)=a*sin_ang+b*cos_ang;
+   fmod(a,b)=a-b*floor(a/b);
+   fmod_cont(a,b)=floor(a/b)%2?b-fmod(a,b):fmod(a,b);
+   fcut(a,b)=(cut(a,-b,b)+b)/2;
+ 
+   const trimmed_ang=fmod(ang,pi);
+   const number_of_bars=((trimmed_ang>=cut_ang)&&(trimmed_ang<cut_ang2))?ceil((abs(1/sin(ang))*ww)/total_width):ceil((abs(1/cos(ang))*hh)/total_width);
+   const shift_bars=int(number_of_bars/2);
+  
+   symmetry_mode==1?(calc_bar()=(-1*abs(floor(point_x/total_width))+shift_bars)%number_of_bars;):
+   symmetry_mode==2?(calc_bar()=(abs(floor(point_x/total_width))+shift_bars)%number_of_bars;):
+                    (calc_bar()=(floor(point_x/total_width)+shift_bars)%number_of_bars;);
+  
+   v_base=vectornumber_of_bars(0);
+   v_shift=v_base;
+   v_mult=v_base;
+   v_use_invert=v_base;
+  
+   $8!=0?fill(v_shift,u(-$8,$8));
+   fill(v_mult,u($9,$10));
+   $16?fill(v_use_invert,round(u(0,1))==1?1:0);
+  
+   const use_only_one_mode=$11>=0;
+  
+   use_only_one_mode?(
+    const modulo_out=$11%3;
+    modulo_out==2?v_modulo_mode=vectornumber_of_bars(2):
+    modulo_out==1?v_modulo_mode=vectornumber_of_bars(1):
+                  v_modulo_mode=vectornumber_of_bars(0); 
+   ):(
+    narg($12)?(
+     v_modulo_mode=v_base;
+     const modulo_out=$12%3;
+     modulo_out==0?fill(v_modulo_mode,round(u(0,1))):
+     modulo_out==1?fill(v_modulo_mode,round(u(0,1))*2):
+                   fill(v_modulo_mode,round(u(0,1))+1);
+    ):(
+     v_modulo_mode=v_base;
+     fill(v_modulo_mode,round(u(0,2))););
+   );
+   
+   rgb2hsv(a)=(
+    R=a[0];
+    G=a[1];
+    B=a[2];
+    M = max(R,G,B);
+    C = M - min(R,G,B);
+    H = 60*(C==0?0:M==R?((G - B)/C)%6:M==G?(B - R)/C + 2:(R - G)/C + 4);
+    S = M<=0?0:C/M;
+    [H,S,M/255];
+   );
+   
+   ($14||$13==1)?(
+    color_a=$17;
+    color_b=$18;
+    $13==3?(
+     color_a=rgb2hsv(color_a);
+     color_b=rgb2hsv(color_b);
+    );
+   ); 
+   
+   const bc=$13%4; #bc==bar color mode#
+   const sc=$14%3; #sc==space color mode#
+
+   bc==3?(
+    v_hue=v_base;
+    fill(v_hue,u(0,360));
+    sc==2?(
+     calc_gradient()=spaces?[v_hue[bar],1,final_gradient,255]:[lerp(color_b,color_a,cut(gradient*2+.5,0,1)),255];
+    ):
+    sc==1?(
+     calc_gradient()=spaces?[v_hue[bar],1,final_gradient,255]:[gradient>=0?color_a:color_b,255];
+    ):(
+     calc_gradient()=[v_hue[bar],1,final_gradient,255*spaces];
+    );
+   ):
+   bc==2?(
+    v_rgb_r=v_base;
+    v_rgb_g=v_base;
+    v_rgb_b=v_base;
+    fill(v_rgb_r,u(0,255));
+    fill(v_rgb_g,u(0,255));
+    fill(v_rgb_b,u(0,255));
+    sc==2?(
+     calc_gradient()=spaces?[final_gradient*v_rgb_r[bar],final_gradient*v_rgb_g[bar],final_gradient*v_rgb_b[bar],255]:[lerp(color_b,color_a,cut(gradient*2+.5,0,1)),255];
+    ):
+    sc==1?(
+     calc_gradient()=spaces?[final_gradient*v_rgb_r[bar],final_gradient*v_rgb_g[bar],final_gradient*v_rgb_b[bar],255]:[gradient>=0?color_a:color_b,255];
+    ):(
+     calc_gradient()=[final_gradient*v_rgb_r[bar],final_gradient*v_rgb_g[bar],final_gradient*v_rgb_b[bar],255*spaces];
+    );
+   ):
+   bc==1?(
+    sc==2?(
+     calc_gradient()=spaces?[lerp(color_a,color_b,final_gradient),255]:[lerp(color_b,color_a,cut(gradient*2+.5,0,1)),255];
+    ):
+    sc==1?(
+     calc_gradient()=spaces?[lerp(color_a,color_b,final_gradient),255]:[gradient>=0?color_a:color_b,255];
+    ):(
+     calc_gradient()=[lerp(color_a,color_b,final_gradient),255*spaces];
+    );
+   ):(
+    sc==2?(
+     calc_gradient()=spaces?[final_gradient,255]:[cut(gradient*2+.5,0,1),255];
+    ):
+    sc==1?(
+     calc_gradient()=spaces?[final_gradient,255]:[gradient>=0,255]
+    ):(
+     calc_gradient()=[final_gradient,255*spaces];
+    );
+   );
+  
+  );
+ 
+  initial_x=(x-ox)/ww*sx;
+  initial_y=(y-oy)/hh*sy;
+  gradient=-rot_y(initial_x,initial_y)*hh_div_sy/pyth_img;
+  point_x=rot_x(initial_x,initial_y)*ww_div_sx+gradient*mdist+half_total_width;
+  bar=calc_bar();
+  spaces=calc_spacing();
+  new_gradient=gradient*v_mult[bar]+v_shift[bar];
+  use_modulo_out=v_modulo_mode[bar];
+  use_modulo_out==2?(final_gradient=v_use_invert[bar]?1-fmod_cont(new_gradient,1):fmod_cont(new_gradient,1);):
+  use_modulo_out==1?(final_gradient=v_use_invert[bar]?1-fmod(new_gradient,1):fmod(new_gradient,1);):
+                    (final_gradient=v_use_invert[bar]?1-fcut(new_gradient,1):fcut(new_gradient,1););
+  calc_gradient();
+  "
+  rm..
+  if $13==3 hsv2rgb. fi
+  if $sub!=1 r. $ow,$oh,100%,100%,5 fi
+endl done
 #@cli rep_skew: angle,-100%<=_position_skew[%]<=100%,_axis={x|y|z},_boundary={0= 0=dirichlet | 1=neummann | 2=periodic | 3=mirror},_interpolation={ 0=nearest | 1=linear | 2=cubic },_enlarged_mode={ 0=preserve | 1=enlarge }
 #@cli : Skew Image Based on angle. Note that axis==z condition has not been tested!
 #@cli : Default values: _position_skew[%]=0%,_axis=0
@@ -11553,6 +11751,71 @@ fx_rep_skew:
 rep_skew $1,$2%,${3-6}
 rep_skew_preview:
 gui_split_preview "fx_rep_skew ${1-6}",${-3--1}
+#@gui Random Gradient Bars: fx_rep_randgradbar,fx_rep_randgradbar_preview
+#@gui :_=note("Create Random Gradient Bar.\n\n<b>Note -</b> Preview is only for giving a idea.")
+#@gui :_=separator(),_=note("<b>Main</b>")
+#@gui :Seed=int(0,0,100000)
+#@gui :Bar Size - Half-Hypotenuse(%)=float(2,0,100)
+#@gui :Space Size - Half-Hypotenuse(%)=float(0,0,100)
+#@gui :Angle=float(0,-180,180)
+#@gui :Skew Angle=float(0,-89,89)
+#@gui :Origin=point(50,50,0,1,255,255,255,255)
+#@gui :Subsampling=float(1,0,3)
+#@gui :_=separator(),_=note("<b>Gradient Transformation</b>")
+#@gui :Shift=float(0,-5,5)
+#@gui :Multiplier A=float(1,.1,250)
+#@gui :Multiplier B=float(100,.1,250)
+#@gui :_=separator(),_=note("<b>Gradient Modulo</b>")
+#@gui :Repetition=choice(0,"Random","Cut","Periodic","Continuous")
+#@gui :Random Bar Repetition=choice(0,"All","Cut and Periodic","Cut and Continuous","Periodic and Continuous")
+#@gui :Space Mode=choice(0,"Alpha","Cut","Gradient")
+#@gui :Symmetry Mode=choice(0,"None","Symmetry A","Symmetry B")
+#@gui :Use Inversion?=bool(0)
+#@gui :_=separator(),_=note("<b>Color</b>")
+#@gui :Output Color=choice(0,"Grayscale","Duotone","RGB - Random Bars","HSV - Random Bars")
+#@gui :Bar Color A=color(255,0,127)
+#@gui :Bar Color B=color(249,215,45)
+#@gui :_=separator(),_=note("<b>Animation</b>")
+#@gui :Shift=float(0,-5,5)_0
+#@gui :Multiplier A=float(1,.1,250)_0
+#@gui :Multiplier B=float(100,.1,250)_0
+#@gui :_=note("Under Development!")
+#@gui :_=separator(),_=note("<small>Author: <i>Reptorian</i> Latest update: <i>2021/5/24</i>.</small>")
+fx_rep_randgradbar:
+srand $1
+half_pyth_img={sqrt(w^2+h^2)/2}
+bar_size={max(1,ceil($2%*$half_pyth_img))}
+space_size={ceil($3%*$half_pyth_img)}
+repeat $! l[$>]
+ if $12==0&&$13==0 rep_random_gradient_bars $bar_size,$space_size,$4,$5,{$6/100-.5},{(100-$7)/100-.5},${8-11},-1,,$17,$14,${15-16},"[$18,$19,$20]","[$21,$22,$23]"
+ else rep_random_gradient_bars $bar_size,$space_size,$4,$5,{$6/100-.5},{(100-$7)/100-.5},${8-11},{$12-1},{$13-1},$17,$14,${15-16},"[$18,$19,$20]","[$21,$22,$23]"
+ fi
+ if $17==0 sh. 0 *. 255 fi
+endl done
+fx_rep_randgradbar_preview:
+fx_rep_randgradbar ${1-23}
+use_color={$17==0?1:($17==1?2:(($3>0&&$14)?2:1))}
+u "{$1}"\
+"{$2}"\
+"{$3}"\
+"{$4}"\
+"{$5}"\
+"{$6}"\
+"{$7,$8}"\
+"{$9}"\
+"{$10}"\
+"{$11}"\
+"{$12}"\
+"{$13}_"{!$12?2:1}\
+"{$14}"\
+"{$15}"\
+"{$16}"\
+"{$17}"\
+"{$18,$19,$20}_"$use_color\
+"{$21,$22,$23}_"$use_color\
+"{$24}"\
+"{$25}"\
+"{$26}"
 ######################
 
 # Local Variables:
