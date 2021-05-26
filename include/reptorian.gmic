@@ -43,6 +43,7 @@
 #@cli :: Reptorian's CLI Commands
 #
 #-------------------------------
+
 #@cli rep_randgradbar : eq. to 'rep_random_gradient_bars' : (+)
 rep_randgradbar:rep_random_gradient_bars $*
 #@cli rep_random_gradient_bars: width>0,spacing>0,-360<=_angle<=360,-90<_skew_angle<90,-1<=_pos_x<=1,-1<=_pos_y<=1,_sublevel>=0,_gradient_shift,_gradient_mul_a,gradient_mul_b,_bar_modulo={ -1=random | 0=cut | 1=periodic | 2=continuous },_random_modulo_out={ 0=cut_and_periodic | 1=cut_and_continuous | 2=periodic_and_continuous },_gradient_color={ 0=B&W | 1=Duotone | 2=Rand-RGB | 3=Rand-HSV },_space_color={ 0=Alpha | 1=Binary Duotone | 2=Gradient Duotone },_symmetry_mode={ 0=none | 1=sym_a | 2=sym_b },_use_inverse={ 0=n/a | 1=random-inverse },_bar_color_a=[,,],_bar_color_b
@@ -52,22 +53,6 @@ rep_randgradbar:rep_random_gradient_bars $*
 rep_random_gradient_bars:
 skip ${3=0},${4=0},${5=0},${6=0},${7=1},${8=0},${9=1},${10=100},${11=-1},${12=},${13=0},${14=0},${15=0},${16=0},${17="[0,0,0]"},${18="[255,255,255]"}
 check "($1>0&&$2>=0&&abs($4)<90)"
-#$1=Width#
-#$2=Spacing#
-#$3=Angle#
-#$4=Skew_Angle#
-#$5,$6=Position#
-#$7=Subpixel Sampling#
-#$8=Gradient Shift#
-#$9,$10=Gradient Min/Max Multiplier#
-#$11=Output Modulo#
-#$12=Random Modulo Mode#
-#$13=Out Color Mode#
-#$14=Outspace Color Mode#
-#$15=Symmetry Mode#
-#$16=Use Invert?#
-#$17=Bar Color A#
-#$18=Bar Color B#
 
 sub={abs($7)+1}
 
@@ -94,14 +79,14 @@ repeat $! l[$>]
    const ang=-($3/180)*pi;
    const cos_ang=cos(ang);
    const sin_ang=sin(ang);
-   const cut_ang=atan2(cy,cy);
+   const cut_ang=atan2(cy,cx);
    const cut_ang2=pi-cut_ang;
    const bar_width=$1*"$sub";
    const space_width=$2*"$sub";
    const total_width=bar_width+space_width;
-   const half_total_width=total_width/2;
+   const half_total_width=total_width>1?total_width/2;
    const symmetry_mode=$15%3;
-  
+
    ($1==1&&$2<2)?(
     const spacing=$2>0?.5:0;
     abs($2)?(calc_spacing()=int(point_x)%2?1;):(calc_spacing()=1;);
@@ -109,13 +94,13 @@ repeat $! l[$>]
     const spacing=1-(space_width/(total_width-1));
     calc_spacing()=abs(1-fmod(point_x,total_width)/total_width-.5)*2<=spacing;
    );
-  
+
    rot_x(a,b)=a*cos_ang-b*sin_ang;
    rot_y(a,b)=a*sin_ang+b*cos_ang;
    fmod(a,b)=a-b*floor(a/b);
    fmod_cont(a,b)=floor(a/b)%2?b-fmod(a,b):fmod(a,b);
    fcut(a,b)=(cut(a,-b,b)+b)/2;
- 
+
    const trimmed_ang=fmod(ang,pi);
    const number_of_bars=((trimmed_ang>=cut_ang)&&(trimmed_ang<cut_ang2))?ceil((abs(1/sin(ang))*ww)/total_width):ceil((abs(1/cos(ang))*hh)/total_width);
    const shift_bars=int(number_of_bars/2);
@@ -128,13 +113,13 @@ repeat $! l[$>]
    v_shift=v_base;
    v_mult=v_base;
    v_use_invert=v_base;
-  
+
    $8!=0?fill(v_shift,u(-$8,$8));
    fill(v_mult,u($9,$10));
    $16?fill(v_use_invert,round(u(0,1))==1?1:0);
   
    const use_only_one_mode=$11>=0;
-  
+
    use_only_one_mode?(
     const modulo_out=$11%3;
     modulo_out==2?v_modulo_mode=vectornumber_of_bars(2):
@@ -151,7 +136,7 @@ repeat $! l[$>]
      v_modulo_mode=v_base;
      fill(v_modulo_mode,round(u(0,2))););
    );
-   
+
    rgb2hsv(a)=(
     R=a[0];
     G=a[1];
@@ -162,7 +147,7 @@ repeat $! l[$>]
     S = M<=0?0:C/M;
     [H,S,M/255];
    );
-   
+
    ($14||$13==1)?(
     color_a=$17;
     color_b=$18;
@@ -222,9 +207,8 @@ repeat $! l[$>]
      calc_gradient()=[final_gradient,255*spaces];
     );
    );
-  
   );
- 
+
   initial_x=(x-ox)/ww*sx;
   initial_y=(y-oy)/hh*sy;
   gradient=-rot_y(initial_x,initial_y)*hh_div_sy/pyth_img;
@@ -11790,7 +11774,7 @@ repeat $! l[$>]
  if $12==0&&$13==0 rep_random_gradient_bars $bar_size,$space_size,$4,$5,{$6/100-.5},{(100-$7)/100-.5},${8-11},-1,,$17,$14,${15-16},"[$18,$19,$20]","[$21,$22,$23]"
  else rep_random_gradient_bars $bar_size,$space_size,$4,$5,{$6/100-.5},{(100-$7)/100-.5},${8-11},{$12-1},{$13-1},$17,$14,${15-16},"[$18,$19,$20]","[$21,$22,$23]"
  fi
- if $17==0 sh. 0 *. 255 fi
+ if $17==0 sh. 0 n. 0,255 rm. fi
 endl done
 fx_rep_randgradbar_preview:
 fx_rep_randgradbar ${1-23}
@@ -11807,7 +11791,7 @@ u "{$1}"\
 "{$11}"\
 "{$12}"\
 "{$13}_"{!$12?2:1}\
-"{$14}"\
+"{$14}_"{$3?2:1}\
 "{$15}"\
 "{$16}"\
 "{$17}"\
