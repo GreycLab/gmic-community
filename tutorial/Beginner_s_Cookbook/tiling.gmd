@@ -12,21 +12,26 @@
 
 = introduction
 ## Introduction
+The demonstration command `gtutor_tileit` illustrates a technique of G'MIC vector drawing whose behavior is conditional on the features found in a bitmap "guide image". Given dominant edges detected in the bitmap, orient vector-drawn tiles to those edges, in a manner similar to traditional mosaic tiling techniques. This walkthrough is based on a simplifed version of `gtutor_tileit`. [Postscript](#postscript) goes into the differences.
+
 Orienting tiles along dominant edges is but one kind of surface [tessellation](https://en.wikipedia.org/wiki/Tessellation). Strictly speaking, the technique outlined here does not tesselate, as coverage is rarely complete. Collision fronts and rank mismatches almost always give rise to gaps. Mosaic artists keep various kinds of workarounds in their kits, from breaking regular tiles into irregular shapes and daubing extra plaster in the less significant holes.
 
-That said, the technique here is not without mathematical interest. Edge detection and orientation have been in G'MIC's repertoire for a long time, part and parcel with edge-preserving anisotropic smoothing.
+That said, the technique here is not without mathematical interest. Edge detection and orientation have been in G'MIC's kit for a long time, part and parcel with edge-preserving smoothing.
 
 The game is straightforward:
-1. Harness ''-distance'' to establish measures from arbitrary points to edges.
-2. Harness ''-gradient'' to establish their two-dimensional orientations.
-3. From these data, derive homogeneous matrices to translate, scale and rotate the corners of a reference tile, situated at the origin, to placements situated in the mosaic.
-4. Render the placed tiles.
-5. Probably there will be missed spots. We punt.
+|1.  |First, [find some edges](#edges).|
+|2.  |Harness ''-distance'' to establish measures from arbitrary points to edges.|
+|3.  |Harness ''-gradient'' to establish their two-dimensional orientations.|
+|4.  |Try not to [plot too much](#culling).|
+|5.  |But also try to [plot where we should](#plotting) with centerlines and orientaton angles to tell us how.|
+|6.  |From these data, [derive affine transformation matrices](#affinetransform) to translate, scale and rotate the corners of a reference tile, situated at the origin, to placements situated in the mosaic.|
+|7.  |Render the placed tiles.|
+|8.  |Probably there will be missed spots [We punt](#punting).|
 
 Here's our play.
 = edges
 ## Edges
-The heart of play lies in step 3: moving, scaling and rotating tiles according to the orientation of nearby edges. First – we have to find edges. To that end, the technique uses a very simple forward differencing scheme to elucidate "important" edges – that is, the ones we notice. Faint edges necessarily escape attention, as mosaics with too many dominant edges appear jumbled.
+Step 3 embodies the heart of it: moving, scaling and rotating tiles according to the orientation of nearby edges. First – we have to find edges. To that end, the technique uses a very simple forward differencing scheme to elucidate "important" edges – that is, the ones we notice. Faint edges thankfully escape attention as mosaics orienting toward too many edges appear jumbled.
 
 With dominant edges located, [-distance](https://gmic.eu/oldtutorial/_distance.shtml) and [-gradient](https://gmic.eu/oldtutorial/_gradient.shtml) determine how far image points are from edges and how tiles laid on top of them should align. These commands have tutorials elsewhere; only summary treatments reside here.
 ===
@@ -37,15 +42,15 @@ With dominant edges located, [-distance](https://gmic.eu/oldtutorial/_distance.s
 = edgesone
 |1.  | __Locate edges__ \n\nEdge, distance and orientation data stem from image [-luminance](https://gmic.eu/tutorial/luminance.html), so single channel images convey the essential ideas. A straightforward contour detector from Jerome Boulanger locates the important edges. It forward differs the leading and lower diagonal pixels of a 3 × 3 grid against a candidate situated at grid center. As a forward differencing scheme, no heed need be paid to top, bottom and rear quadrants. Of the forward quadrants, only southeast and due east differences matter. No heed need be paid to the northeast pixel as it is also on the due east span of the next most northerly row. Accordingly, in a left-to-right, top-to-bottom in-place fill, it has already been set and only a two stage test suffices:|
 ~~~
-  -fill. ">abs(                      \
-                i-j(1,1,0,0,0,1)     \ # Southeast edge?
-              )>iv?                  \
-              1:                     \ # Yes, otherwise...
-              abs(                   \
-                    i-j(1,0,0,0,0,1) \ # East edge?
-                 )>iv?               \
-                 1:0"                \ # Yes, otherwise no edge.
- -name[-1] outline                   \ # Outline: basis of distance calculation
+  -fill. ">abs(                     
+                i-j(1,1,0,0,0,1)     # Southeast edge?
+              )>iv?                 
+              1:                     # Yes, otherwise...
+              abs(                  
+                    i-j(1,0,0,0,0,1) # East edge?
+                 )>iv?              
+                 1:0"                # Yes, otherwise no edge.
+ -name[-1] outline                   # Outline: basis of distance calculation
 ~~~
 |    |The test thresholds against overall image variance, a heuristic choice. A forward difference less than this fails to be "interesting enough" for orienting tiles along it.
 ??? What Is That Mess after the -fill Command?
@@ -72,7 +77,7 @@ For the edge detector, `expression-else` is a second __conditional ternary opera
 
 = examiningtheneighborhood
 ### Examining the Neighborhood
-We have left much out of the picture. For example, the `j()` function is intended to sample the neighborhood around the current pixel upon which the processor operates (a pixel at position \[`x`, `y`\] with the value `i` ). For generality, `j()`'s first four parameters are \['dx', 'dy', 'dz', 'dc'\], _relative coordinates_ with respect to the current pixel. These can be fractional, pemitting _subpixel sampling_ of the neighborhood around the current pixel. With sub pixel sampling, one may also choose the kind of interpolation through the fifth parameter: `0` for _nearest pixel_, `1` for _linear interpolation_ or `2` for _cubic interpolation_. The sixth and last parameter chooses a _boundary policy_. See [ Images Have Edges: Now What? ](https://gmic.eu/tutorial/images_have_edges_now_what.html) for the necessity of choosing what to do when close to image edges. Here, `0` asserts the policy that "imaginary" pixels beyond actual image edges are to be regarded as black (Dirichlet policy). `1` asserts that such "imaginary" pixels just continue the values of their nearest "real" edge pixel along the column or row (Neumann policy).  `2` asserts a Periodic policy: "imaginary" pixel values arise from joining the near edges with far, as if the flat image is rolled into a doughnut shape. `3` asserts Mirror policy. "imaginary" pixels beyond the edge by a delta distance have the same value as that of a "real" pixel just the same delta from the edge.
+We have left much out of the picture. For example, the `j()` function is intended to sample the neighborhood around the current pixel upon which the processor operates (a pixel at position \[ `x`, `y` ] with the value `i` ). For generality, `j()`'s first four parameters are \[ 'dx', 'dy', 'dz', 'dc' ], _relative coordinates_ with respect to the current pixel. These can be fractional, pemitting _subpixel sampling_ of the neighborhood around the current pixel. With sub pixel sampling, one may also choose the kind of interpolation through the fifth parameter: `0` for _nearest pixel_, `1` for _linear interpolation_ or `2` for _cubic interpolation_. The sixth and last parameter chooses a _boundary policy_. See [ Images Have Edges: Now What? ](https://gmic.eu/tutorial/images_have_edges_now_what.html) for the necessity of choosing what to do when close to image edges. Here, `0` asserts the policy that "imaginary" pixels beyond actual image edges are to be regarded as black (Dirichlet policy). `1` asserts that such "imaginary" pixels just continue the values of their nearest "real" edge pixel along the column or row (Neumann policy).  `2` asserts a Periodic policy: "imaginary" pixel values arise from joining the near edges with far, as if the flat image is rolled into a doughnut shape. `3` asserts Mirror policy. "imaginary" pixels beyond the edge by a delta distance have the same value as that of a "real" pixel just the same delta from the edge.
 
 = traversalorder
 ### Traversal Order
@@ -98,13 +103,14 @@ Edges begat distances and orientations, the direct antecedents to placing orient
 |**distance**|**orientation**|
 ===
 = distanceandorientationtwo
-|2.  | __Distance and Orientation__ \n\nFrom edges, distance and orientation follow directly from ''-distance'' and ''-gradient'' commands. The target isovalue, `1` for distance measuring, is just the boolean output value of the edge detector. Pixels with this value necessarily map to zero, as an isovalue is always at measure zero from itself. All other pixels map to their Euclidean distances to the nearest edge.\n\nOrientation follows readily from distance by pairwise differencing from pixel to pixel along both `x` and `y` axes, estimating a gain or loss of "height" at the pixel of measure – the remit of the ''-gradient'' command.\n\nThe normalization of these data obtains vectors of magnitude one which point along the steepest gradients toward edges. The two channels of the _orientaton_ image contain the sines and cosines of these directions, directly indicating how much to rotate the tile in a reference direction.
+|2.  | __Distance and Orientation__ \n\nFrom edges, distance and orientation follow directly via the ''-distance'' and ''-gradient'' commands. The target isovalue, `1` for distance measuring, is just the boolean output value of the edge detector. Pixels with this value necessarily map to zero, as an isovalue is always at measure zero from itself. All other pixels map to their Euclidean distances to the nearest edge.\n\nOrientation follows readily from distance by pairwise differencing from pixel to pixel along both `x` and `y` axes, estimating a gain or loss of "height" at the pixel of measure – the remit of the ''-gradient'' command.\n\nThe normalization of these data obtains vectors of magnitude one which span the lines of steepest gradients toward edges. The two channels of the _orientaton_ image contain the sines and cosines of these directions, directly indicating how much to rotate the tile to align with the gradient.
 ~~~
-  -distance[outline] 1      \ # Make Euclidean metric to edges
-  -name[distance]           \
-  -gradient[distance] xy    \
-  -orientation[distance]    \ # Alignment vectors with respect to edges
-  -name[orientation]        \
+  -distance[outline] 1    # Make Euclidean metric to edges
+  -name. distance
+  +gradient[distance] xy
+  -append[-2,-1] c
+  -orientation[-1]        # Alignment vectors with respect to edges
+  -name. orientation     
 ~~~
 = culling
 ## Culling
@@ -117,20 +123,28 @@ In principle, enough is known now for tile-laying, but practical considerations 
 = cullingthree
 |3.  | __Culling__ \n\nOf the ways to write image-filling expressions, the single-threaded, fill-in-place variant suggests itself, set through an initial `>` [math expression character](#traversalorder). _Fill-in-place_ means that the results of a mathematical expression replace pixels as they go along. With this behavior, and with a candidate plot point in hand, we determine if the candidate pixel has already been tiled; we do not plot again in such a case. Thus, so long as we fill-in-place, the act of plotting tiles itself culls: no plotting of tiles until the traversal reaches a candidate that has not already been tiled.\n\nThis scheme supposes that the "plotting field" is preset with "sentry pixels", so-called because the pixel vector cannot possibly be a product of tile rendering. We might create a plotting field filled with `[-1]`, perhaps, and tile only with positive values.\n\nBut by what means do we identify "candidate plot points"? From the ideas that tiles have common heights and centerlines stems a notion of periodic markings radiating from identified edges. Apart from other considerations, we plot only when we have a candidate point on a tile "centerline".\n\nWhere do centerlines come from? Employing ''-round'', we convert distance measure to a staircase, with the width of the step corresponding to tile height and step-to-step changes corresponding to centerlines. Edge detecting the value changes gives centerlines: a `[1]` marker in a field that is otherwise `[0]`.
 ~~~
-  -round[truedistance] {$tsz}
-  -fill[truedistance] ">
+  # Centerlines from distance
+  -round[distance] {$tsz}
+  -fill[distance] ">
                       abs(i-j(1,1,0,0,0,1))>"{0.5*$tsz}"?
                       1:
                         abs(i-j(1,0,0,0,0,1))>"{0.5*$tsz}"?
                         1:0
                       "
+  -name. centerlines
 ~~~
 Here `$tsz` is an command line [input variable](https://gmic.eu/reference/input_data_items.html#top) that represents "tile size"; it has been derived from a command line parameter or is a default tile size; we need not worry too much about which is which. For purposes here, it sets the height of the tile, which, through rounding, has been equated to change of pixel intensity. Apart from the different test value, this centerline detector is virtually the same as the edge detector used before. When the fill completes, the old distance image converts to a centerline chart.
 = plotting
 ## Plotting
-At this juncture, we have two of the necessary images already enlisted: one depicting the __centerlines__ and the other __orientations__. We initialize the third, __plottingfields__, by way of [-input through dimension specifications](https://gmic.eu/tutorial/input.html#imagedimensions) and fill it with the sentry value: `[-1]`.
+At this juncture, we have two of the necessary images already enlisted: one depicting the __centerlines__ and the other __orientations__. We initialize the third, __plottingfield__, by way of [-input through dimension specifications](https://gmic.eu/tutorial/input.html#imagedimensions) and fill it with the sentry value: `[-1]`.
 
-The gist of conditional logic comes down to this: plot tiles on centerlines where no tile has yet been plotted – the candidate is on a centerline `[1]` pixel in the __centerlines__ image and on a "never-been-tiled" pixel `[-1]` in the __plottingfields__ image. As these pixels reside in different images, our conditional logic has to "span" those images — that is, reference pixels in both __centerlines__ and __plottingfields__. In addition to that, we need to reference __orientations__ to learn how to position a tile once we settle on the path to lay down a tile.
+~~~
+ # Plotting field:
+ -input [-1],[-1],1,1,'[-1]'
+ -name. plottingfield
+~~~
+
+The gist of conditional logic comes down to this: plot tiles on centerlines where no tile has yet been plotted – the candidate is on a centerline `[1]` pixel in the __centerlines__ image and on a "never-been-tiled" pixel `[-1]` in the __plottingfield__ image. As these pixels reside in different images, our conditional logic has to "span" those images — that is, reference pixels in both __centerlines__ and __plottingfield__. In addition to that, we need to reference __orientations__ to learn how to position a tile once we settle on the path to lay down a tile.
 
 ??? Referencing Various images in Math Expressions
 
@@ -139,15 +153,15 @@ Math expressions would be quite inflexible if their scopes were limited to just 
 The notation extends to the image neighborhood sampling functions: `i(x,y,0,0)` reports the value of a pel at the current position, slice zero, channel zero. `i(#0,x,y,0,0)` reports the same value specifically from the first image on the list. If, in a pixel processor, we read some `<condition>` as `0<i#-3 && i#-1==-1` then a `True` evaluation arises if the current pixel value in the third image from the end of the list is greater than zero, AND to current pixel value in the last image on the list is negative one, a condition we test for in the following pseudocode.
 ???
 
-Pseudocodingly, let us traverse __plottingfields__ from left-to-right, top-to-bottom, and for each position \[`x`, `y`\]:
+Pseudocodingly, let us traverse __plottingfield__ from left-to-right, top-to-bottom, and for each position \[ `x`, `y` ]:
 
 |1. |reference __centerlines__. **if** the current pixel is on a center line, and|
-|2. |reference __plottingfields__. **if** the current pixel has not already been tiled|
+|2. |reference __plottingfield__. **if** the current pixel has not already been tiled|
 |3. |**then**|
 |   a. |transform tile corner points from reference to plotting positions using the sine and cosine values from the __orientation__ image
 |   b. |plot the tile using the math expression function `polygon()`.|
 
-%% i img/tile_03.cimg nm.. centerlines nm. orientation i 100%,100%,1,1,-1 nm. plottingfield  f[plottingfield] ">tsz=10;if(0<i#-3&&i#-1==-1,xfrm=eye(3);xfrm[0]=I#-2[1];xfrm[1]=I#-2[0];xfrm[2]=x;xfrm[3]=-I#-2[0];xfrm[4]=I#-2[1];xfrm[5]=y;tl=mul(xfrm,[-tsz,tsz/2,1],1);tr=mul(xfrm,[tsz,tsz/2,1],1);bl=mul(xfrm,[-tsz,-tsz/2,1],1);br=mul(xfrm,[tsz,-tsz/2,1],1);polygon(#-1,5,[tl[0],tl[1]],[tr[0],tr[1]],[br[0],br[1]],[bl[0],bl[1]],[tl[0],tl[1]],1,[127]);polygon(#-1,-5,[tl[0],tl[1]],[tr[0],tr[1]],[br[0],br[1]],[bl[0],bl[1]],[tl[0],tl[1]],1,0xffffffff,[255]);i,i)" +f[plottingfield] 'i==-1?63:i' to_rgb. o. img/ovalplotfield.png rm. o img/tile_04.cimg rm 0 %%
+%% i img/tile_03.cimg nm.. centerlines nm. orientation i 100%,100%,1,1,-1 nm. plottingfield  f[plottingfield] ">tsz=10;if(0<i#-3&&i#-1==-1,xfrm=eye(3);xfrm[0]=I#-2[1];xfrm[1]=I#-2[0];xfrm[2]=x;xfrm[3]=-I#-2[0];xfrm[4]=I#-2[1];xfrm[5]=y;tl=xfrm*[-tsz,tsz/2,1];tr=xfrm*[tsz,tsz/2,1];bl=xfrm*[-tsz,-tsz/2,1];br=xfrm*[tsz,-tsz/2,1];polygon(#-1,5,[tl[0],tl[1]],[tr[0],tr[1]],[br[0],br[1]],[bl[0],bl[1]],[tl[0],tl[1]],1,[127]);polygon(#-1,-5,[tl[0],tl[1]],[tr[0],tr[1]],[br[0],br[1]],[bl[0],bl[1]],[tl[0],tl[1]],1,0xffffffff,[255]);i,i)" +f[plottingfield] 'i==-1?63:i' to_rgb. o. img/ovalplotfield.png rm. o img/tile_04.cimg rm 0 %%
 
 ===
 |![centerline](img/ovalcenters.png)|![orientation](img/ovalorient.png)|![ovalplotfield](img/ovalplotfield.png)
@@ -155,50 +169,59 @@ Pseudocodingly, let us traverse __plottingfields__ from left-to-right, top-to-bo
 ===
 
 ~~~
--fill[plottingfield] ">if(                                         \
-                           0<i#-3 && i#-1==-1,                     \ Plot tile?
-                           xfrm=eye(3);                            \ Compose H Matrix
-                           xfrm[0]=I#-2[1];                        \
-                           xfrm[1]=I#-2[0];                        \
-                           xfrm[2]=x;                              \
-                           xfrm[3]=-I#-2[0];                       \
-                           xfrm[4]=I#-2[1];                        \
-                           xfrm[5]=y;                              \
-                           tl=mul(xfrm,[-"$tsz", "$tsz"/2.0,1],1); \ Apply H Matrix
-                           tr=mul(xfrm,[ "$tsz", "$tsz"/2.0,1],1); \ to tile corners
-                           bl=mul(xfrm,[-"$tsz",-"$tsz"/2.0,1],1); \
-                           br=mul(xfrm,[ "$tsz",-"$tsz"/2.0,1],1); \
-                           polygon(#-1,5,                          \ Tile fill
-                                   [tl[0],tl[1]],                  \
-                                   [tr[0],tr[1]],                  \
-                                   [br[0],br[1]],                  \
-                                   [bl[0],bl[1]],                  \
-                                   [tl[0],tl[1]],                  \
-                                   1,[127]);                       \
-                           polygon(#-1,-5,                         \ Tile outline
-                                   [tl[0],tl[1]],                  \
-                                   [tr[0],tr[1]],                  \
-                                   [br[0],br[1]],                  \
-                                   [bl[0],bl[1]],                  \
-                                   [tl[0],tl[1]],                  \
-                                   1,0xffffffff,[255])             \
-                         );i,i"                                    \ If the condition
-                                                                   \ doesn't hold, let
-                                                                   \ the current pixel
-                                                                   \ stand
+-fill[plottingfield] ">if(                                 
+                           0<i#-3 && i#-1==-1,              # Plot tile?
+                           xfrm=eye(3);                     # Compose Affine Matrix
+                           xfrm[0]=I#-2[1];                
+                           xfrm[1]=I#-2[0];                
+                           xfrm[2]=x;                      
+                           xfrm[3]=-I#-2[0];               
+                           xfrm[4]=I#-2[1];                
+                           xfrm[5]=y;                      
+                           tl=xfrm*[-"$tsz", "$tsz"/2.0,1]; # Apply Affine Matrix
+                           tr=xfrm*[ "$tsz", "$tsz"/2.0,1]; # to tile corners
+                           bl=xfrm*[-"$tsz",-"$tsz"/2.0,1];
+                           br=xfrm*[ "$tsz",-"$tsz"/2.0,1];
+                           polygon(#-1,5,                   # Tile fill
+                                   [tl[0],tl[1]],          
+                                   [tr[0],tr[1]],          
+                                   [br[0],br[1]],          
+                                   [bl[0],bl[1]],          
+                                   [tl[0],tl[1]],          
+                                   1,[127]);               
+                           polygon(#-1,-5,                  # Tile outline
+                                   [tl[0],tl[1]],          
+                                   [tr[0],tr[1]],          
+                                   [br[0],br[1]],          
+                                   [bl[0],bl[1]],          
+                                   [tl[0],tl[1]],          
+                                   1,0xffffffff,[255]);     
+                         i,i)"                             # Double 'i'? See Postscript
 ~~~
-|4.  | __Plotting__ \n\n This `-fill` command, selecting __pottingfield__, takes a math expression pixel processor that consists of one `if(<condition>,<expression-then>,<expression-else>)` statement. Here is how it plays out:|
-|  a.  |The `<condition>` embodies pseudocode steps **1.** and **2.** The first test, `0<i#-3` reflects step **1.** It tests if the current pixel in __centerlines__, image `[-3]` from the end of the image list, is greater than zero. If this holds, the pixel is on a centerline, all which consist of pixels with value `[1]`.|
-|  b.  |If the first test holds, then the second test, `i#-1==-1` plays, reflecting step **2.** This tests if the current pixel in __plottingfields__ still retains the sentry value, `[-1]`.|
-|  c.  |Should either test fail, then `<expression-else>` executes at the end of the expression; it simply reasserts the current value of the pixel.|
+|4.  | __Plotting__ \n\n The `-fill` command, selects __pottingfield__ and conditionally renders tiles to that image. The command takes a math expression pixel processor that consists of one `if(<condition>,<expression-then>,<expression-else>)` statement. Here is how it plays out:|
+|  a.  |The `<condition>` embodies pseudocode steps **1.** and **2.** The first test, `0<i#-3` reflects step **1.** It tests if the current pixel in __centerlines__ is greater than zero. Should that hold, the current pixel is on a centerline.|
+|  b.  |If the first test holds, then the second test, `i#-1==-1` plays, reflecting step **2.** This tests if the current pixel in __plottingfield__ still retains the sentry value, `[-1]`. that is, it tests if a tile isn't already covering the location.|
+|  c.  |Should either test fail, then `<expression-else>` executes at the end of the expression; it simply reasserts the current value of the pel, `i`.|
 |  d.  |Should both tests succeed, then the bulk of the expression, the embodiment of `<expression-then>`, executes. `<expression-then>` does four things:|
-|    i.   |create a _homogeneous transformation matrix, `xfrm,` to tranform tile corner points,| 
-|    ii.  |translates those points.|
+|    i.   |create an _affine transformation matrix_, `xfrm,` to tranform tile corner points,| 
+|    ii.  |translates those points. from reference positions to corner plotting points in __plottingfield__.|
 |    iii. |uses those points to fill a tile rectangle, via the math expression `polygon()`|
 |    iv.  |uses those same points to draw the tile rectangle outline, again using `polygon().`|
+|  e.  |An _affine transformation matrix_ allows the encoding of two dimensional rotations, scalings and translations in one 3 × 3 matrix. To pull this trick off, we hold that two-dimensional points and lines on a surface are _projections_ of analogous three-dimensional objects: A surface point at [ `x`, `y` ] has an analogous space point situated at [ `x`, `y`, `1` ]. To use the affine transformation matrix, we operate on the three dimensional space points and their two dimensional shadows follow along.|
 
-|5.  | __Compose a Homogeneous Matrix__ \n\n A 2 × 2 matrix can embody scalings and rotations — or compositions of both, but not translations. Translation calls for a separate addition operation.\n\nThere's another annoyance — ambiguity. That thing with two coordinates: is it a location [`x`, `y`] denoting a position with respect to some origin? Or is it a vector, denoting a direction pointing so many units forward and so many units transverse?\n\nSuch is the motivation for looking at points and lines as projections of three dimensional things. With this point of view, a two dimensional point [`x`, `y`] shadows an analogous object situated at [`x`, `y`, `1`]. The game is: do the transformations in three dimensions and the two dimensional shadows follow along.\n\nSuddenly, useful bookkeeping happens: subtracting two homogeneous points, [`a`, `b`, `1`] and [`k`, `j`, `1`] yields the vector that points from the second to the first: [`a – k`, `b - j`, `0`]. In this extended notation, the third coordinate distinguishes vectors. As a consequence of the differencing operaton, it is zero. for points: one; the ambiguity between vectors and points falls away.\n\nAdding points is meaningless; the third coordinate is two. Is that such a terrible thing? If the motivation of adding two points is to model a displacement from one point to another, then the operation that reflects this best is the addition of a displacement vector to a point: the result is the second point displaced from the first by a vector: the third coordinate is one, reflecting that the results of this point-vector sum is the displaced point. This set of operations between points and vectors constitutes an _affine space_, one defined on a set of points _and_ the set of vectors representing the displacements among points. It is a space in which we can perform operations on points and vectors and obtain clear results.\n\nFor our puposes, by working in three dimensions, we can have one 3 × 3 matrix that models scalings, rotations and translations with one matrix multiplication: an _affine transformation_.|
+= affinetransform
+??? Affine Spaces and Transforms
 
+When it comes to rendering, a strictly two-dimensional point of view is limiting. A 2 × 2 transformation matrix embodies scalings and rotations — or compositions of both. The matrix cannot directly accommodate translations; in a strictly two-dimensional setting, we translate by adding displacement vectors, \[ `dx`, `dy` ] to locations, a separate operation.
+
+The notion of a _displacement vector_ also suffers from a certain ambiguity with respect to points. Does a thing with two coordinates, \[ `x`, `y` ], denote a position at the given coordinates? Or is it a vector oriented by the coordinates? Such ambiguity, and the limited purview of two-dimensional matrices, gives rise to an idea regarding two dimensional points and vectors as projections of three dimensional analogs.
+
+With this point of view, a two dimensional point [`x`, `y` ] shadows an analogous object situated at \[ `x`, `y`, `1` ]. The game is: do the transformations in three dimensions and the two dimensional shadows follow along.
+
+With this approach, useful bookkeeping happens: subtracting two _homogeneous points_, \[ `a`, `b`, `1` ] and \[ `k`, `j`, `1` ] yields the vector that points from the second to the first: \[ `a – k`, `b - j`, `0` ]. As a consequence of the differencing operaton the results has a third coordinate equal to zero and, in this extended notation, can be taken as a distinguishing characteristic of vectors. On the other hand, a third coordinate of one distinguishes points. In this fashion, the ambiguity between vectors and points falls away.
+
+In this approach, adding points is meaningless; the third coordinate becomes two. What, after all, is the aim of adding two points? If one's aim is to model a displacement, then that may be best accomplished through the addition of a displacement vector to a point: the result of such an operation is the second point displaced from the first by a vector. In this operation the third coordinate of the result is one, reflecting that the results of this point-vector sum is the displaced point. Broadly, this point of view provides - and enforces - certain systematic operations between points and vectors, constituting an _affine space_. Such a space is defined on a set of points _and_ the vectors reflecting possible displacements among those points. It is a space in which we can perform operations on points and vectors and obtain clear results.
+???
 ===
 $$
 \begin{bmatrix} j \\ k \\ 1 \end{bmatrix} =
@@ -210,7 +233,7 @@ $$
 \begin{bmatrix} a \\ b \\ 1 \end{bmatrix}
 $$
 ===
-|    |The first part of the `<expression-then>` section assembles an affine transformation from the pixel at [`x`, `y`] in __orientation__. The channel values of this pixel, you recall, are the sine and cosine values that permit us to orient the tile along the gradient and the nearby edge. The `x` `y` coordinates themselves furnish the translation portion. Overall, the transformation matrix translates and aligns "template points," `[a, b, 1]`, composing an origin-centered reference image of a tile, over to `[j, k, 1]` representing points that draw the tile in __plottingfield__. `xfrm` represents the affine transformation matrix in the math expression. We transcribe the current position and the sine and cosine trigonometrics from __orientation__ to this matrix, compute the plotting locations of tile corners using `mul()`, then plot the image twice: first to fill, and then the tile edges. And so forth. And so on. Until we have traversed the image.
+| 5.  |The first part of the `<expression-then>` assembles an affine transformation from the pixel in __orientation__ at [`x`, `y`]. The channel values of this pixel, you recall, are the sine and cosine values that permit us to orient the tile along the gradient and the nearby edge. The `x` `y` coordinates themselves furnish the translation portion. Overall, the transformation matrix translates and aligns "template points," `[a, b, 1]`, composing an origin-centered reference image of a tile, over to `[j, k, 1]` representing points that draw the tile in __plottingfield__. `xfrm` represents the affine transformation matrix in the math expression. We transcribe the current position and the sine and cosine trigonometrics from __orientation__ to this matrix, compute the plotting locations of tile corners, then plot the image twice: first to fill, and then to delineate tile edges. And so we go onto the next [`x`, `y`] position and evaluate again. And so forth. And so on. Until we have traversed the image.
 
 %% i img/tile_04.cimg nm... centerlines nm.. orientation nm. plottingfield [centerlines] *. 255 i 100%,100%,1,1  f. 'if(i#-3==-1,255,0)' a[-3,-2,-1] c f. 'I==[-1,0,255]?[0,63,255]:I' f. 'wv=vector3(1/sqrt(3));rot(wv,75)*I' n. 0,255 o. img/ovaldiagnostics.png rm 0 %%
 
@@ -218,11 +241,26 @@ $$
 |![ovalplotfield](img/ovalplotfield.png)|![diagnostics](img/ovaldiagnostics.png)|
 |**plottingfield**|**diagnostics**|
 ===
+= punting
+## Punting
+Of course we miss spots. And this is by intention. We didn't want an ideal tesselator; we wanted a tesselation that imitates a mosaic artist's (lack of) diligence. So when we test if a spot is "free and clear" to place a tile, we simply look for a center point, without regard to determining whether other tiles are in the bounding box. Such leads to overlap.
+
+Alternatively, we detect a tile — just barely! — and fail to make a placement in a space that is almost big enough. __diagnostics__ shows holes with a purple shade. In `gtutor_tileit`, we furnish the user with a __fillholes__ switch to establish the final disposition of holes: treat them as tiles, or furnish an alpha channel and poke a hole in it; the user does some post-processing compositing, perhaps to show an underlying wall. 
+
 = postscript
 ## Postscript
+#### gtutor_tileit
+This walkthrough is a simplification of the demonstration command `gtutor_tileit.` Much was dropped in the simplification in the interest of staying with the key idea: demonstrate some G'MIC vector drawing that is conditional on features found in a bitmap image.
+Differences are:
+| 1.  | __Disruption__: We obtain that by introducing noise to __distance__, which shows up in __orientation__, imparting additional twists to tiles.|
+| 2.  | __Spread__: This is a tile height multiplier that directly contracts or spreads centerlines. One may spread or, alternately, overlap, tiles. 
+| 3.  | __Lighting__: Same as that used in [Fingerpaint](https://gmic.eu/tutorial/fingerpainting.html#lighting). `gtutor_tileit` switch __fcolor__ ('flat color') disables fingerpaint lighting.
 
-1. This walkthrough is a simplification of the demonstration command `gtutor_tileit.` Differences are:
+#### Double `i's` in `-fill[plottingfield]`? How Come?
+3. Math expression functions constitutes G'MIC's foray into structured vector drawing, akin to Inkscape. That said, the command processor still expects math expressions to return some kind of value for the current pixel (vector mode) or pel (scalar mode). Accordingly, the last statement in `<expression-then>` is simply `i`, returning the current pixel value.
 
-2. Math expression functions constitutes G'MIC's foray into structured vector drawing, akin to Inkscape.
+Astute readers may recall that one of the triggers in `<condition>` is `i#-1==-1;` that is, the drawing of the tile is a consequence of `i` being  `-1` in __plottingfield__. So doesn't this final statement in `<expression-then>` disrupt tile drawing? Won't it plot a `-1` pel in the center of the tile? That is the value of `i`, no?
 
+By a kind of G'MIC sleigh-of-hand, no; a subtle consequence of in-place rendering. With the initial evaluation of `<condition>`, the value of the current pel can indeed be `-1` triggering tile drawing as a constituent operation of `<condition-then>`; subsequent tile-drawing by calls to `polygon()` alters `i` in place, its former value of `-1` overridden. With the last statement of `<condition-then>` `i` has assumed its new value.
 
+One may easily imagine other circumstances where `i` should retain an atomic persistence; that it shouldn't change _in medias res_. That is not the providence of an in-place traversal scheme. If persistence of original pixel and pel values matter to `<condition>` testing, then a traversal scheme other than in-place is in order. In this case, our [culling strategy](#culling) depends on an in-place change of the sentry value, `-1` by the wholesale rendering of tiles with positive pel values. This chameleon-like behavior of `i` is a feature for us, not a bug. Other times, other cases, and we should keep in our kits that conditional testing like `if(<condition>,<expression-then>,<expression-else>)` should not heedlessly be taken as atomic operations.
