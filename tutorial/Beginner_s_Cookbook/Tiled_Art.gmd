@@ -26,12 +26,12 @@ The game is straightforward:
 |5.  |But also try to [plot where we should](#plotting) with centerlines and orientaton angles to tell us how.|
 |6.  |From these data, [derive affine transformation matrices](#affinetransform) to translate, scale and rotate the corners of a reference tile, situated at the origin, to placements situated in the mosaic.|
 |7.  |Render the placed tiles.|
-|8.  |Probably there will be missed spots [We punt](#punting).|
+|8.  |Probably there will be missed spots. [We punt](#punting).|
 
 Here's our play.
 = edges
 ## Edges
-Step 3 embodies the heart of it: moving, scaling and rotating tiles according to the orientation of nearby edges. First – we have to find edges. To that end, the technique uses a very simple forward differencing scheme to elucidate "important" edges – that is, the ones we notice. Faint edges thankfully escape attention as mosaics orienting toward too many edges appear jumbled.
+Step 6 embodies the heart of it: translating, scaling and rotating tiles according to the orientation of nearby edges. First – we have to find edges. To that end, the technique uses a very simple forward differencing scheme to elucidate "important" edges – that is, the ones we notice. Faint edges thankfully escape attention as mosaics orienting toward too many edges appear jumbled.
 
 With dominant edges located, [-distance](https://gmic.eu/oldtutorial/_distance.shtml) and [-gradient](https://gmic.eu/oldtutorial/_gradient.shtml) determine how far image points are from edges and how tiles laid on top of them should align. These commands have tutorials elsewhere; only summary treatments reside here.
 ===
@@ -40,7 +40,7 @@ With dominant edges located, [-distance](https://gmic.eu/oldtutorial/_distance.s
 |**flat color**|**edges of same**|
 ===
 = edgesone
-|1.  | __Locate edges__ \n\nEdge, distance and orientation data stem from image [-luminance](https://gmic.eu/tutorial/luminance.html), so single channel images convey the essential ideas. A straightforward contour detector from Jerome Boulanger locates the important edges. It forward differs the leading and lower diagonal pixels of a 3 × 3 grid against a candidate situated at grid center. As a forward differencing scheme, no heed need be paid to top, bottom and rear quadrants. Of the forward quadrants, only southeast and due east differences matter. No heed need be paid to the northeast pixel as it is also on the due east span of the next most northerly row. Accordingly, in a left-to-right, top-to-bottom in-place fill, it has already been set and only a two stage test suffices:|
+|1.  | __Locate edges__ \n\nEdge, distance and orientation data stem from image [-luminance](https://gmic.eu/tutorial/luminance.html), so single channel images convey the essential ideas. A straightforward contour detector from Jerome Boulanger locates the important edges. It forward differs the leading and lower diagonal pixels of a 3 × 3 grid against a candidate situated at grid center. As a forward differencing scheme, no heed need be paid to top, bottom and rear quadrants. Of the forward quadrants, only southeast and due east differences matter. The northeast pixel is taken care of, as it is also the due east pixel in the next most northerly pass. That is, in a left-to-right, top-to-bottom in-place fill, it has already been set. Two tests suffice:|
 ~~~
   -fill. ">abs(                     
                 i-j(1,1,0,0,0,1)     # Southeast edge?
@@ -222,6 +222,7 @@ With this approach, useful bookkeeping happens: subtracting two _homogeneous poi
 
 In this approach, adding points is meaningless; the third coordinate becomes two. What, after all, is the aim of adding two points? If one's aim is to model a displacement, then that may be best accomplished through the addition of a displacement vector to a point: the result of such an operation is the second point displaced from the first by a vector. In this operation the third coordinate of the result is one, reflecting that the results of this point-vector sum is the displaced point. Broadly, this point of view provides - and enforces - certain systematic operations between points and vectors, constituting an _affine space_. Such a space is defined on a set of points _and_ the vectors reflecting possible displacements among those points. It is a space in which we can perform operations on points and vectors and obtain clear results.
 ???
+
 ===
 $$
 \begin{bmatrix} j \\ k \\ 1 \end{bmatrix} =
@@ -233,6 +234,7 @@ $$
 \begin{bmatrix} a \\ b \\ 1 \end{bmatrix}
 $$
 ===
+
 | 5.  |The first part of the `<expression-then>` assembles an affine transformation from the pixel in __orientation__ at [`x`, `y`]. The channel values of this pixel, you recall, are the sine and cosine values that permit us to orient the tile along the gradient and the nearby edge. The `x` `y` coordinates themselves furnish the translation portion. Overall, the transformation matrix translates and aligns "template points," `[a, b, 1]`, composing an origin-centered reference image of a tile, over to `[j, k, 1]` representing points that draw the tile in __plottingfield__. `xfrm` represents the affine transformation matrix in the math expression. We transcribe the current position and the sine and cosine trigonometrics from __orientation__ to this matrix, compute the plotting locations of tile corners, then plot the image twice: first to fill, and then to delineate tile edges. And so we go onto the next [`x`, `y`] position and evaluate again. And so forth. And so on. Until we have traversed the image.
 
 %% i img/tile_04.cimg nm... centerlines nm.. orientation nm. plottingfield [centerlines] *. 255 i 100%,100%,1,1  f. 'if(i#-3==-1,255,0)' a[-3,-2,-1] c f. 'I==[-1,0,255]?[0,63,255]:I' f. 'wv=vector3(1/sqrt(3));rot(wv,75)*I' n. 0,255 o. img/ovaldiagnostics.png rm 0 %%
