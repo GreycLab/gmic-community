@@ -1,0 +1,82 @@
+# local(l) … endlocal(endl)
+%% x "mkdir -p img" %%
+|![localart](images/local.png)|The `-local` _<local environment>_ `-endlocal` commands form a syntactical unit that defines a _local environment_. Frequently, such a local environment constitutes the _<repeating block>_ of a `-repeat` … `-done` pair and together the two constructs form an [image list iterator](https://gmic.eu/tutorial/repeat.html#listiteration)
+
+The local … -endlocal pair establishes a _local_ (or inner) image list consisting of the selected images in the command's [right hand decoration](https://gmic.eu/tutorial/command_decorations.html). These images then form a subset of the _global_ (or outer) list. The command takes no arguments. -l and -endl are shorthand forms.
+
+The -local command often insulates images of the outer list from a series of operations that are intended for a particular subset. The -local command can also rearrange disparately placed images to form simpler contiguous sequences so that they may be referenced more easily. For example, one can put every fourth image from an outer list onto an inner list of contiguous elements through -local[0--1:4]... -endlocal and then be able to address elements of the inner list without having to account for the stride distance that separates these images on the outer list.
+
+In a sense, the -local command preselects a set of images for extended operations and forms a local scope while that command is in effect, so that subsequent pipeline operations only affect images in that scope. At the same time, the -local command masks images not in -local's right hand decorator. These masked images and their indices effectively disappear, leaving only the selected images composing the local list.
+
+When it is first constituted, the selected images on the local list are in the same relative order as their placement on the global list. Their enumeration changes, however, and are counted with respect to the beginning of the local list, the outer list enumeration has no bearing while a -local command is in effect and using it to address local images is unpredictable.
+
+While the -local command is in effect, images on the local list may be altered, reordered and removed and new images may appear. These circumstances persists until an -endlocal command executes. After such, the local list (but not its contents!) ceases to exist, and the masked images on the global list reappear, undisturbed by any operation that had executed while the -local command was active. As much as possible, -endlocal preserves the final ordering of items on the local list. Pairs of images that occupied disjoint positions prior to the execution of a -local command again become separated by the same intervening images. After -endlocal executes, images created on the local list retain as neighbors their immediate predecessors, as there were no intervening images separating them from their predecessors.
+
+-local[>$] ... -endlocal pairs may nest to an arbitrary depth. It is a common coding error to have unbalanced pairings of the two commands. One usually borrows the practice from shell scripting to place these commands on their own lines and indent intermediary lines by a constant amount.
+List Iteration
+
+The idiom:
+
+... -verbose - -repeat $! -local[>$]... -endlocal -done -verbose +...
+
+constructs an image list iterator and is probably the single most common use of the -local command. Most G'MIC commands which are implemented outside of the Cimg.h C++ template (that is to say, a majority of G'MIC commands) employ this idiom as a template, with the implementation nestled within the -local[>$] ... -endlocal pair.
+
+With this idiom, a designer generally can work out the details of a G'MIC command acting on one image. The corresponding multiple image implementation follows effortlessly by placing the single image implementation within the -local[>$] ... -endlocal pair.
+
+In the G'MIC language, the interpreter replaces instances of the substitution sequence '$!' with the number of images on the list, setting up the iterator to cycle as many times as there are images on the list. In kind, the interpreter replaces instances of the substitution sequence '$>' with the current loop count of the next outermost -repeat ... -done pair. Consequently, on each loop, -local[>$] creates a one image local list consisting of the image indexed by the current loop count. The bulk of the implementation can then be designed to operate on just that item; it need not be aware that a larger list exists.
+Image Creation and List Iteration
+
+G'MIC does not disallow image creation in the inner -local … -endlocal block of a list iterator. However, neither the state of the list nor the images on the list are indexed in any particular way when -repeat n executes. The n argument sets the number of iterations at the outset; that value does not change. If circumstances occuring within the loop add or remove images on the list, then some images on the list will be excluded (or included!) in the span of the iteration during the course of its run. This can lead to some bemusing circumstances. Consider the following:
+
+$ gmic -input pick_a_color_one.png -input pick_a_color_two.png -input pick_a_color_three.png \
+-repeat $! \
+   -local[$>] \
+      --select_color[-1] 20%,255,128,0 \
+   -endlocal \
+-done \
+
+Perhaps it was the programmer's intent to create one selection mask for any orange-red like colors that might be within each of the three initial images on the list, while preserving the originals for other purposes. Indeed, that is exactly what happens in the first iteration. However, on the second loop ($>==1) the operand that winds up on the local list is not pick_a_color_two.png, but the mask created from pick_a_color_one.png during the previous iteration. This calamity arises because when -endlocal executes at the conclusion of the first iteration, the mask created from pick_a_color_one.png becomes the new successor image of pick_a_color_one.png, displacing pick_a_color_two.png. As a consequence, masks are never made of the second or subsequent input images. Masks, masks of masks, and masks of masks of masks, and so on, are made instead. Probably this is not what the programmer had in mind.
+
+In this particular case, a remedy may be obtained by modifying the right hand decoration of the -local command so as to account for the stride created by the insertion of new images.
+
+…-local[2*$>]…
+
+The fix succeeds because the programmer knows that only one image is being created within the -local block per iteration and that image will become the immediate successor of the operand. Given this, he or she can stride over it, anticipating that indices of the initial images will double as new images appear. By selecting every even-indexed image, the -local command essentially skips over the newly created images.
+
+General cases may be more complicated, however. In any case, when a G'MIC programmer creates images within the inner block of a list iterator, he or she will have to account for how many, and where, the new images will be merged and adjust the stride computations in the right hand decorator of the -local command to accommodate.
+Exception Processing with -onfail
+
+Inserting -onfail within the block formed by -local … -endlocal creates an exception handler. The -onfail command splits the local block into normal and exception processing components.
+
+The exception processor has three features:
+
+    Commands between -local and -onfail always execute. These constitute the normal processing component.
+    Script errors or failures occuring in the normal processing component are caught by the -onfail command. The G'MIC interpreter does not exit with an error message. Instead, the interpreter begins executing the commands making up the exception processor, if any exist. These consist of the commands between -onfail and -endlocal.
+    The status substitution sequence, ${}, resolves to the error message that the G'MIC prints to the error stream. The interpreter still prints this message, but does not exit.
+
+One is not obligated to write commands for the exception handler. -onfail itself catches the exception, and if there are no commands within the exception block, the G'MIC interpreter continues processing the commands following the -local … -endlocal block.
+-onfail Example
+
+-local[]
+ -input nosuchimage.png
+ -echo[] "Have 'No Such Image'."
+ -onfail
+ -echo[] ${}
+-endlocal
+-echo[] "The script is executing here!"
+
+If there is no such image as nosuchimage.png, the G'MIC interpreter throws an exception, which, in the absence of a -nofail command, terminates the script. In this example, -onfail catches the the exception. Observe that when the exception is thrown, the first -echo command, and any commands following, will not execute. For all practical purposes, the exception causes the interpreter to skip ahead to the first command following -onfail, here the second -echo command, which executes. This second -echo command illustrates a simple, but redundant, use of the status substitution sequence, which the interpreter replaces with the error message associated with the exception. It's illustrative, but redundant, as the G'MIC interpreter echoes the error message in any case. We trust the reader can conceive of more interesting behavior.
+
+When exception processing is complete, the G'MIC interpreter exits the local scope and executes the third -echo command following. This -echo command executes almost in any case, unless a second, uncaught, exception occurs in the exception processor itself.
+
+Though it is probably clear to the reader, it is worth noting that a second exception occuring in the exception processor will not be caught unless the programmer writes another -local … -onfail … -endlocal block, nested within the exception processor itself. Such an elaboration is permissible, and, in principle, there no limits to how elaborate an exception processor may be. Practice, custom and programmer sanity usually dictate simple exception processors, however, the kind including no commands whatsoever being quite common. 
+
+It is also probably clear to the reader that the scope of a particular exception processor is limited to the immediate enclosing -local … -onfail … -endlocal block. Errors in an enclosing block are uncaught unless the enclosing block itself is a -local … -onfail … -endlocal block.
+
+# Command Reference
+
+===
+"""
+gmic -h local
+"""
+===
