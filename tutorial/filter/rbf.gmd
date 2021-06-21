@@ -1,0 +1,69 @@
+# rbf
+%% x "mkdir -p img" %%
+
+|![frontimage](images/amp.mp4)|Given a sparse sampling, ''-rbf'' reconstructs a approximation of an image from a weighted set of [radial basis functions](https://en.wikipedia.org/wiki/Radial_basis_function), $$ \mathit{w}\varphi(\|\mathbf{r}\|) $$, each scaling an associated sample. `-rbf` finds the weights from a [least squares](https://en.wikipedia.org/wiki/Least_squares) fitting of the samples; the solution interpolates the samples and then fits estimates for the remainder of the image. `-rbf` can reconstruct approximations from 0.1% — 0.5% sampling rates, or about 1,000 pixels for a 1000 × 1000 image.\n\nG'MIC uses `-rbf` to compress color look up tables (CLUTs) where a sparse sampling of the original provides a compact representation. The behavior of the reconstructed CLUT from the compact representation is often difficult to distinguish from the original.
+
+Being told of two values, 3 and 7, one could guess that an in-between value is 5. On what basis does that sit? Well — none, really. Most of us are possessed by some heuristic notion that, knowing nothing else about a pair of extremes, the means is some kind of average. Such is the art of reconstruction: given (a very few) hints, guess the whole as so many averages. The technique here entails using _basis functions_, a kind of simple-to-compute template that we scale, slide around and apply to the very few samples that we have to develop a picture of what goes on in between them.
+
+Radial basis functions (RBFs) are one such kind of simple-to-compute template. They are named as such because these functions, $$ \varphi(\|\mathbf{r}\|) $$ take only a radius _r_ and return a "relative contribution" factor. That factor reflects what a known sample contributes to an approximation we are constructing at an assay location. This radius is itself a proxy for a difference that we take between two locations: the place where we are making our assessment, __x__, and the place where the sample has been "observed" __c__. A suitably scaled set of RBFs $$ \mathit{w_i}\varphi(\|\mathbf{x_i} - \mathbf{c_i}\|) $$ can approximate an entire image through a small set of samples, so long as some loss is acceptable.
+
+Broadly, we present ''-rbf'' with a set of samples and it returns an approximation in a _range_ image. The samples may be drawn from one, two or three dimensional spaces and the return image resides in a range with a like number of dimensions. In the practial realm, we can take an inconveniently large data set, such as a color look-up table (CLUT), and save a select set of samples, these hardly consuming any storage resources at all. Later on, we could reconstruct the CLUT from the samples and have something that _almost_ matches the original. Is it the original? No. Does it work like the original? It could be a pretty fair dinkum. Much depends on the adroitness of sampling and an apt choices of RBFs, a deep topic upon the edge of which we teeter. For safety's sake, let's assume our sampling is fair and our chosen RBF's exhibits desirable properties when it comes to guessing values in the middle. This brings us to the particulars of `-rbf`.
+
+|1.  |We obtain samples — "spot-checks" — for an otherwise unknown image.
+|2.  |`-rbf` plots approximations into one, two or three dimensional images: the _range_.
+|3.  |Arguments to `-rbf` quantify the range for `·`: `x, y` or `z`. `d·` specifies range dimensions and lengths; these are required. `·0` specifies origin offsets; their absences imply zero offsets. `·1` specifies the dimensions and lengths of the sample space; their absences imply that the sample and range spaces have equal dimensional lengths and that scaling is 1:1. A final, optional string is taken to be a math expression and defines a custom RBF. Its absence implies the default RBF, the _thin plate spline_, described further on.
+|4.  |The images referenced in `-rbf`'s selection decorator are one dimensional vectors encoding samples. Each pixel encodes samples in spatial coordinate-sample value order; two coordinates and three values codify the position and color of an RGB sample, for example. Each datum occupies separate channels. `-rbf` partitions coordinate from value channels by determining the number of dimensions of the output range. This arises from particular argument signatures:
+|      a.|one, three or four arguments: one dimensional ranges. Signatures may be 1 argument: Only the length of the range: `dx`. 3 arguments: Range length with origin offset `x0` and the sample space dimensional length `x1`; `dx:x1` sets scaling from range to sample space. 4 arguments: Those of 3: plus a custom RBF, written as a math expression.
+|      b.|two, six and seven arguments: two dimensional ranges. Signatures may be 2 arguments: Only the length of the range in `dx` and `dy`. 6 arguments: Range length in `dx` and `dy`, origin offsets, `x0` and `y0` and the sample space dimensional lengths `x1` and `y1`, 7 arguments: Those of 6: plus a custom RBF, a math expression. 
+|      c.|nine and ten arguments: three dimensional ranges. Signatures may be 9 arguments: The length of the range in  `dx`, `dy` and `dz`, origin offsets `x0`, `y0` and `z0` and the sample space dimensional lengths `x1`, `y1` and `z1`. 10 arguments: Those of 9: plus a custom RBF, a math expression.
+|5.  |"Decompressing" a sparse set of samples into an approximation range entail finding weights for each of the RBF's, so that associated samples may be appropriately scaled. This is taken as a least squares problem; G'MIC composes a design matrix ___D___ by taking pairwise differences among the given samples; evaluating these with the chosen RBF produces the design matrix's coefficients. Solving this matrix for weights:  
+
+===
+$$
+\mathbf(D) = 
+\begin{bmatrix}
+\varphi(\|\mathbf{x}_1 - \mathbf{x}_1\|) & \varphi(\|\mathbf{x}_2 - \mathbf{x}_1\|) & \dots & \varphi(\|\mathbf{x}_n - \mathbf{x}_1\|) \\
+\varphi(\|\mathbf{x}_1 - \mathbf{x}_2\|) & \varphi(\|\mathbf{x}_2 - \mathbf{x}_2\|) & \dots & \varphi(\|\mathbf{x}_n - \mathbf{x}_2\|) \\
+\vdots & \vdots & \ddots & \vdots \\
+\varphi(\|\mathbf{x}_1 - \mathbf{x}_n\|) & \varphi(\|\mathbf{x}_2 - \mathbf{x}_n\|) & \dots & \varphi(\|\mathbf{x}_n - \mathbf{x}_n\|) \\
+\end{bmatrix}
+\begin{bmatrix}
+\mathbf{w}_1 \\ \mathbf{w}_2 \\ \vdots \\ \mathbf{w}_n
+\end{bmatrix} = 
+\begin{bmatrix}
+\mathbf{s}_1 \\ \mathbf{s}_2 \\ \vdots \\ \mathbf{s}_n
+\end{bmatrix}
+$$
+===
+Following this least-squares solution, `-rbf` performs its reconstruction, visiting every pixel in the range and summing the contributions of each RBF-scaled sample. For large radii — and distant samples — the contributions are negligible. Small radii imply tiny distances between a pixel's position __x__ and a contributing sample's "center", __c__. Large contributions come from such nearby samples. The exact manner of of how this goes can be influenced by a choice of RBFs; the kit includes a number of regulars.
+
+= radialbasisfunctions
+## Radial Basis Functions
+%% (3,25,100,190,240,252^3,30,75,120,255,4) nm. points +rbf. 256,0,255 nm. data 2068,532,1,3,[255,255,255] nm. canvas +graph[canvas] [data],2,0,389,-71,255,0xffffffff,230,100,0 erode_circ. 3 rm[data] blend[-2] [-1],multiply f. [255,255,255] +rbf[points] 256,0,255,"r" nm. data graph[-2] [data],2,0,389,-71,255,0xffffffff,200,30,240 erode_circ[-2] 3 rm[data] blend[-2] [-1],multiply f. [255,255,255] +rbf[points] 256,0,255,"exp(-r^2)" nm. data graph[-2] [data],2,0,389,-71,255,0xffffffff,40,100,0 erode_circ[-2] 3 rm[data] blend[-2] [-1],multiply f. [255,255,255] +rbf[points] 256,0,255,"exp(-(0.04*r)^2)" nm. data graph[-2] [data],2,0,389,-71,255,0xffffffff,120,220,0 erode_circ[-2] 3 rm[data] blend[-2] [-1],multiply rm[-1] eval ">begin(dv=crop(#0,0,0,w#0,h#0));for(kz=0,kz<w#0,kz=kz+1,px=8.12*dv[kz];py=145+0.575*((h#-1)-2*dv[w#0+kz]);ellipse(#-1,px,py,7,7,0,127,[0,120,240]);ellipse(#-1,px,py,-7,-7,0,255,0xffffffff,[0,0,0]))" -grid[-1] 16.67%,8.32%,5,5,255,0xcccccccc,[100,100,100] rm[0] r2dx. 50%,5 o. img/graph.png rm 0 %%
+===
+ ![basisfunctions](img/graph.png)
+  *Various Radial Basis Functions recreate 1-D estimated functions from six sample points.* 
+===
+|-1.  |Blue dots|  | Six sample points
+|2.  |Purple| $$ r $$ | [Lerps](https://en.wikipedia.org/wiki/Linear_interpolation) the samples.
+|3.  |Olive | $$ e^{-r^2} $$ | Unscaled Gaussians.
+|4.  |Light Green|$$ e^{-{\epsilon}r^2} $$ | Scaled Gaussians. The frontpiece animation illustrates a progression of ε from 1.0 → 0.01.
+|5.  |Orange| $$ {r^2}\ln(1\times{10^{-5}}+r) $$ | Thin plate spline, the default radial basis function. Its behavior between samples is reminiscent of spring steel strips.
+
+= examples
+## Examples
+
+
+# Command Reference
+
+===
+"""
+gmic -h rbf
+"""
+===
+= notes
+## Notes
+|-`dx`,`dy`,`dz`|Sets the output range, in pixels. `dx`, in isolation, implies a one dimensional output range. `dx`,`dy` implies a two dimensional output range. `dx`,`dy`,`dz` implis a three dimensional output range. Must be specified (no defaults).
+|-`x0`,`y0`,`z0`|__Origin__: Sets what output coordinate, `·0`, corresponds to input origin `0`. Provide as many origin coordinates `·0` as there are output ranges `d·`. Defaults to 0.
+|-`x1`,`y1`,`z1`|__Scaling__: `d·:·1`. Sets what input range, `·1`, corresponds to output range `d·`  Provide as many input ranges `·1` as there are output ranges `d·`. Set ·1 = d· for 1:1 scaling from input to output. Set ·1 = 2*d· for 50% downscaling from input to output. Defaults to `d· – 1`.
+| `phi(r)`\n(_math expression_) | Set the radial basis function. The default, `r^2*log(1e-5+r)` provides the [thin plate spline](https://en.wikipedia.org/wiki/Thin_plate_spline). The math expression recognizes the symbol `r` (radius) as representing the Euclidean distance  __xy__ — __c__ between image points __xy__ and samples __c__. During evaluation of the basis function, G'MIC's math parser substitutes for `r`, wherever it may appear in the expression, the Euclidean distance. Other expressions may be provided, over-riding the default. Ensure that the math expression is written in terms of just one variable, `r`.
