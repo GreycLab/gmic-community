@@ -44,6 +44,113 @@
 #
 #-------------------------------
 
+#@cli rep_w_rgb82gray: eq. to 'rep_weighted_rgb82gray' : (+)
+rep_w_rgb82gray: rep_weighted_rgb82gray $*
+#@cli rep_weighted_rgb82gray: 0%<=red_weight<=100%,0%<=green_weight<=100%,0%<=blue_weight<=100%,_use_weighted_ratio={ 0=no | 1= yes },0<=_minval_weight[%]<=100%,,0<=_maxval_weight[%]<=100%,,0<=_balance_minmax<=1,0<=_endvaladj<=255,-1<=_midgrayadj<=1
+#@cli : Convert images to grayscale image based on different weights, the usage of min/max val, and post-process value adjustment.
+#@cli : Default values: '_use_weighted_ratio=1','_minval_weight=0%','_maxval_weight=0%','_balance_minmax=50%','_endvaladj=0','_midgrayadj=0'
+#@cli : Author: Reptorian.
+#@cli : $ sp car rep_weighted_rgb82gray 10%,50%,70%,,,,,,-.25
+rep_weighted_rgb82gray:
+skip ${4=1},${5=0%},${6=0%},${7=50%},${8=0},${9=0}
+use_merge_back=0 
+
+single_channel_mode=0
+
+repeat $! l[$>]
+
+ if s==4
+  split_opacity
+  store. alpha_image
+  use_merge_back=1
+ elif s==2 
+  split_opacity
+  store. alpha_image
+  use_merge_back=1
+ elif s>4 continue
+ fi
+ 
+ if s==1 
+  m "calc_gray_image : fill. \"$""1\""
+  single_channel_mode=1
+ else
+  m "calc_gray_image : {w},{h},100%,1,\"$""1\""
+ fi
+ 
+ calc_gray_image "begin(
+  const red_weight_init=$1;
+  const green_weight_init=$2;
+  const blue_weight_init=$3;
+  const total_weight=red_weight_init+green_weight_init+blue_weight_init;
+  if($4,
+   const red_weight=red_weight_init/total_weight;
+   const green_weight=green_weight_init/total_weight;
+   const blue_weight=blue_weight_init/total_weight;
+  ,
+   const red_weight=red_weight_init;
+   const green_weight=green_weight_init;
+   const blue_weight=blue_weight_init;
+  );
+  rescale_color=[red_weight,green_weight,blue_weight];
+  (!$5&&!$6)?(
+   calc_gray()=sum(I#-1*rescale_color);
+  ):
+  $5&&$6?(
+   calc_gray()=(
+    col_ref=I#-1;
+    start_col_ref=col_ref*rescale_color;
+    minval=cut(lerp(sum(start_col_ref),min(col_ref),$5),0,255);
+    maxval=cut(lerp(sum(start_col_ref),max(col_ref),$6),0,255);
+    balval=lerp(minval,maxval,$7);
+   );
+  ):(
+   $6?(
+    calc_gray()=(
+     col_ref=I#-1;
+     start_col_ref=col_ref*rescale_color;
+     maxval=cut(lerp(sum(start_col_ref),max(col_ref),$6),0,255);
+    );
+   ):(
+    calc_gray()=(
+     col_ref=I#-1;
+     start_col_ref=I#-1*rescale_color;
+     minval=cut(lerp(sum(start_col_ref),min(col_ref),$5),0,255);
+    );
+   );
+  );
+  abs($9)?(
+   calc_gray_output()=cut(calc_gray(),0,255);
+  ):(
+   calc_gray_output()=cut(calc_gray()+$8,0,255);
+  );
+ );
+ calc_gray_output();"
+ 
+ if abs($9)
+  if $9>0
+   f. "begin(
+    const expf=cut(1-abs($9),0,1);
+   );
+   cut(((i/255)^expf)*255+$8,0,255)"
+  else
+   f. "begin(
+    const expf=cut(1-abs($9),0,1);
+   );
+   cut(255-(((255-i)/255)^expf)*255+$8,0,255)"
+  fi
+ fi
+ 
+ if !$single_channel_mode
+  k.
+  if $use_merge_back
+   $alpha_image a c
+  fi
+ fi
+ 
+ use_merge_back=0
+ 
+ um calc_gray_image
+endl done
 #@cli rep_hex2int8: hexadecimal_string
 #@cli : Convert a hexadecimal argument into 8-bit representation, and then return the converted value.
 #@cli :
@@ -2928,7 +3035,6 @@ rep_trsa: rep_technorobbo_strange_attractor $*
 #@cli : Default values: '_density=7','_scalefactor=1','_attractor_var_1=u(0,1)','_attractor_var_2=u(0,1)','_attractor_var_3=u(0,1)','_attractor_var_4=u(0,1)','_attractor_var_5=u(0,1)','_attractor_var_6=u(0,1)','_attractor_var_7=u(0,1)','_attractor_var_8=u(0,1)','_attractor_var_9=u(0,1)'
 rep_technorobbo_strange_attractor:
 skip ${2=7},${3=1},${4=},${5=},${6=},${7=},${8=},${9=},${10=},${11=},${12=},${13=0}
-
 if '$_host'=='cli' if narg($*)>12 error narg(\$"13")<13==F fi fi
 
 max_width=${-max_w}
@@ -2944,6 +3050,7 @@ cv_5={narg($9)?$9:u(0,1)}
 cv_6={narg($10)?$10:u(0,1)}
 cv_7={narg($11)?$11:u(0,1)}
 cv_8={narg($12)?$12:u(0,1)}
+
 
 1,1,1,1
 
@@ -11922,6 +12029,37 @@ repeat $! l[$>]
 
  rm[-3,-2]
 endl done
+#@gui Weighted RGB To Grayscale: fx_rep_w_rgb82gray,fx_rep_w_rgb82gray_preview(0)
+#@gui :_=note("Weigh the R-G-B Channel, and then output based on their weight")
+#@gui :_=separator(),_=note("<b>Main RGB to Grayscale</b>")
+#@gui :Red Weight(%)=float(33.33,0,100)
+#@gui :Green Weight(%)=float(33.33,0,100)
+#@gui :Blue Weight(%)=float(33.33,0,100)
+#@gui :Use Weighted Ratio?=bool(1)
+#@gui :_=separator(),_=note("<b>Min-Max Value</b>")
+#@gui :Min Value Weight(%)=float(0,0,100)
+#@gui :Max Value Weight(%)=float(0,0,100)
+#@gui :Min-Max Interpolation=float(0,0,1)
+#@gui :_=separator(),_=note("<b>Post-Process Adjustment</b>")
+#@gui :Value Shift=float(0,-128,128)
+#@gui :Midgray Shift=float(0,-1,1)
+#@gui :_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui :_=separator(), _=note("<small>Author: Reptorian. Latest Update: <i>2021/6/25</i>.</small>")
+fx_rep_w_rgb82gray:
+rep_weighted_rgb82gray $1%,$2%,$3%,$4,$5%,$6%,$7,$8,$9
+fx_rep_w_rgb82gray_preview:
+gui_split_preview "fx_rep_w_rgb82gray ${1-9}",${-3--1}
+u "{$1}"\
+"{$2}"\
+"{$3}"\
+"{$4}"\
+"{$5}"\
+"{$6}"\
+"{$7}_"{$5&&$6?2:1}\
+"{$8}"\
+"{$9}"\
+"{$10}"\
+"{$11,$12}"
 ######################
 
 # Local Variables:
