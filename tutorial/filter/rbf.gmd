@@ -1,17 +1,21 @@
 # rbf
 %% x "mkdir -p img" %%
 
-|![frontimage](images/amp.mp4)|Given a sparse set of keypoints, ''-rbf'' reconstructs an approximation from a weighted set of [radial basis functions](https://en.wikipedia.org/wiki/Radial_basis_function), $$ \mathit{w}\varphi( \| \mathbf{r} \|) $$, (RBFs), each taking a keypoint as a radial parameter. `-rbf` finds the weights for the RBFs from a [least squares](https://en.wikipedia.org/wiki/Least_squares) fitting; the solution interpolates the keypoints and for the remainder fits estimates. `-rbf` can reconstruct an approximation from about 1,000 keypoints taken from a 1000 × 1000 image.\n\nAmong other uses, G'MIC employs `-rbf` to compress color look up tables (CLUTs), where a sparse sampling of the original provides a compact representation. The behavior of the reconstructed CLUT is difficult to distinguish from that of the original. Another congenial setting for RBFs may be found in simulated neural networks where RBF meshes integrate stimuli and respond to particular patterns by "firing" an output pulse.
+|![frontimage](images/amp.mp4)|Given a sparse set of keypoints, ''-rbf'' reconstructs an approximation from a weighted set of [radial basis functions](https://en.wikipedia.org/wiki/Radial_basis_function), (RBFs), each taking an observed _keypoint_ as a parameter. `-rbf` finds weights from a [least squares](https://en.wikipedia.org/wiki/Least_squares) fitting; the solution interpolates keypoints and estimates fits for locations in between these. `-rbf` can reconstruct approximations from about 1,000 keypoints taken from 1000 × 1000 images, the results dependent on both the sampling pattern and the particular kind of RBF used.\n\nAmong other uses, G'MIC employs `-rbf` to compress color look up tables (CLUTs), where a sparse sampling of the original provides a compact representation. The behavior of the reconstructed CLUT differs little from the original. Another congenial setting for RBFs may be found in simulated neural networks. Here, RBF meshes integrate stimuli and respond to particular patterns by "firing" an output pulse.
 
-Given two numerals, 3 and 7, one could guess at an in-between value of 5. On what basis does that guess sit? Well — none, really. It stems from some heuristic that, knowing nothing else about extremes then in-betweens are as likely as anything else. Thus the art of reconstruction: given (a very few) hints, project the whole as so many averages. The technique here entails _basis functions_, a kind of simple-to-compute template function that scales, slides around and from a very few keypoints estimates what goes on in between them.
+Given two numerals, 3 and 7, one could guess at an in-between value of 5. On what basis does that guess sit? Well — none, really. It stems from some heuristic that, knowing nothing else about extremes then in-betweens are as likely as anything else. Thus the art of reconstruction: given (a very few) hints, interpolate the whole as so many averages. The technique here entails _basis functions_, a kind of simple-to-compute template function that scales, slides around and from a very few keypoints estimates what goes on in between them.
 
-Radial basis functions (RBFs) are one such type of basis function, so-called because these functions, $$ \varphi(\|\mathbf{r}\|) $$ take only a radius _r_ and return a "relative contribution". That reflects what a known keypoint contributes to an approximation at a radial distance _r_. This radius is itself a proxy for a difference that we take between two locations: the place where we are making our assessment, __x__, and the place where the sample has been "observed" __c__. A suitably weighted set of RBFs $$ \mathit{w_i}\varphi(\|\mathbf{x_i} - \mathbf{c_i}\|) $$ can approximate an entire image through a small set of keypoints so flong as some loss is acceptable.
+Radial basis functions (RBFs) are one such type of basis function, so-called because these functions, $$ \varphi(\|\mathbf{r}\|) $$ take only a radius __r__ and return a "relative contribution". That reflects what a known keypoint contributes to an approximation at a radial distance _r_. This radius is itself a proxy for a difference that we take between two locations: the place where we are making our assessment, __x__, and the place where the sample has been "observed" __c__. A suitably weighted set of RBFs $$ \mathit{w_i}\varphi(\|\mathbf{x_i} - \mathbf{c_i}\|) $$ can approximate an entire image through a small set of keypoints so long as some loss is acceptable.
 
 ''-rbf'', given a set of keypoints, returns a _range_ image computed from the keypoints, as processed by the set of weighted RBF's. The keypoints may be drawn from one, two or three dimensional spaces and the range has a like number. We can take an inconveniently large data set — a color look-up table (CLUT) — and save selected keypoints, these consuming just a fraction of the storage of the original. Later on, we could reconstruct the CLUT from the keypoints and obtain something that _almost_ matches the original. _Is_ it the original? No. Does it work _like_ the original? It could work in a pretty fair dinkum sort of way, with an adroitness to the sampling and an apt choice of RBFs; that is a deep topic upon the edge of which we teeter. For safety's sake, let's assume a sampling fair and RBFs robust. This brings us to particulars:
 
 |1.  |We obtain keypoints — "spot-checks" — for an otherwise unknown image.
 |2.  |`-rbf` plots approximations into one, two or three dimensional images: the _range_.
-|3.  |Arguments to `-rbf` quantify the range for `·`: `x, y` or `z`. `d·` arguments specify range dimensions and lengths; these are required. `·0` arguments specify origin offsets; their absences imply zero offsets. `·1` arguments specifies the dimensions and lengths of the sample space; their absences imply that the sample and range spaces have equal dimensions and that scaling is 1:1. A final, optional string is taken to be a math expression and defines a custom RBF. Its absence implies the default RBF, the _thin plate spline_, described further on.
+|3.  |Arguments to `-rbf` quantify the range for `·`: `x, y` or `z`.
+|      a.|`d·` arguments specify range dimensions and lengths; these are required.
+|      b.|`·0` arguments specify origin offsets; their absences imply zero offsets.
+|      c.|`·1` arguments specifies the dimensional lengths of the sample space; their absences imply that the sample and range spaces have equally sized dimensions and that scaling is 1:1.
+|      d.|A final, optional string is taken to be a math expression and defines a custom RBF. Its absence implies the default RBF, the _thin plate spline_, described further on.
 |4.  |The images referenced in `-rbf`'s selection decorator are one dimensional vectors encoding keypoints. Each pixel encodes keypoints in spatial coordinate-sample value order; two coordinates and three values codify the position and color of an RGB sample, for example. Each datum occupies separate channels. `-rbf` separates coordinate from value channels by determining the number of dimensions of the output range. This arises from particular argument signatures:
 |      a.|one, three or four arguments: one dimensional ranges. Signatures may consist of 1 argument: Only the length of the range: `dx`. They may consist of 3 arguments: Range length with origin offset `x0` and the sample space dimensional length `x1`; `dx:x1` sets scaling from range to sample space. They may consist of 4 arguments: Those before plus a custom RBF, written as a math expression.
 |      b.|two, six and seven arguments: two dimensional ranges. Signatures may consist of 2 arguments: Only the length of the range in `dx` and `dy`. They may consist of 6 arguments: Range length in `dx` and `dy`, origin offsets, `x0` and `y0` and the sample space dimensional lengths `x1` and `y1`. They may consist of 7 arguments: Those before plus a custom RBF, a math expression.
@@ -49,10 +53,122 @@ With weights found, `-rbf` performs its reconstruction, visiting every pixel in 
 
 = examples
 ## Examples
+Reconstruct an image twice from 16 random samples, using the inverse multiquadric RBF, then the thin plate spline. 
+%% srand 1234 16,1,1,5,u([255,255,255,255,255]) +rbf. 256,256 rbf.. 256,256,0,0,255,255,sqrt(1/(1+0.01*r^2)) n 0,255 o.. img/stars.png o. img/softstars.png rm 0 %%
+===
+|1.  |__Inverse Multiquadric Stars__|__Thin Plate Spline Stars__
+|    |![starfield](img/stars.png)|![softstars](img/softstars.png)
+|    |$$ \dfrac{1}{\sqrt{1 + (\varepsilon r)^2}} $$|$$ {r^2}\ln(1\times{10^{-5}}+r) $$
+===
+~~~
+starfield:
+    -srand 1234                          # Choose the start point of
+                                         # a random sampling
+    -16,1,1,5,'u([256,256,255,255,255])' # Get sixteen random samples
+                                         # as a 1-D × 5 channel vector
+    +rbf.  256,256                       # Reconstruct from thin plate
+                                         # spline RBF (default)
+    -rbf.. 256,256,0,0,255,255,'sqrt(1/(1+0.01*r^2))' # Reconstruct
+                                         # from inverse multiquadric
+    -normalize 0,255                     # Normalize to 2^8
+~~~
+===
 
-%% (253,255,253,255,253,255^253,253,255,255,257,257,257^235,28,235,28,235,28^184,41,184,41,184,41^28,239,28,239,28,239) rbf. 512,512 cut. {-2^15},{2^15} -n. 0,255
+ *§§§*
 
 
+===
+Reconstruct an image, first sampling it with a regular grid pattern, then reconstructing it with two different RBFs
+%% shape_cupid 128 to_rgb. f. lerp([0,1,0],[1,0,1],i) adjust_colors. 0,0,0,53,100 n. 0,255 name. cupid o. img/cupid.png 100%,100%,1,1 fill. x%8==0&&y%8==0 name. keypoints slen={is} -mul[-2,-1] o. img/cupid_samples.png $slen,1,1,5 eval[cupid] begin(p=0);norm(I#-2)>0?I[#-1,p++]=[x,y,I#-2] +rbf. 128,128 n. 0,255 o. img/cupid_recon_tps.png rm. rbf. 128,128,0,0,127,127,exp(-0.035*r^2) n. 0,255 o. img/cupid_recon_gau.png rm 0 %%
+===
+|2.  |__Colorful Cupid__|__Colorful Cupid Sampled__|__Thin Plate Reconstruction__|__Scaled Gaussian Reconstruction__
+|    |![cupid](img/cupid.png)|![cupid_samples](img/cupid_samples.png)|![cupid_recon_tps](img/cupid_recon_tps.png)|![cupid_recon_gau](img/cupid_recon_gau.png)
+===
+~~~
+reconstruct_cupid:
+    -shape_cupid 256                # Make a colorful cupid
+    -to_rgb.                        # from the [0,1] binary
+    -fill. lerp([0,1,0],[1,0,1],i)  # Lerp between green and
+                                    # magenta
+    -adjust_colors. 0,0,0,53,100    # Twist it toward orangish
+                                    # and bluish
+    -normalize. 0,255               # Normalize to 2^8
+    -name. cupid                    # Call image 'cupid'
+    -input 100%,100%,1,1            # Sample cupid at every
+                                    # 8th pixel left-to-right,
+    -fill. x%8==0&&y%8==0           # top-to-bottom
+    -name. keypoints                # Keypoints for reconstruction
+    slen={is}                       # Image sum = sample count because 
+                                    # template has zero or one booleans
+    -mul[-2,-1]                     # Fetch samples: image × template
+    -input $slen,1,1,5              # Package samples into a 1-D,
+    -eval[cupid] ">begin(p=0);      # 5-channel vector
+                   norm(I#-2)>0?
+                       I[#-1,p++]=[x,y,I#-2]
+                       "
+    -name. samplevector             # Keypoint vector for rbf 
+
+    +rbf[samplevector] 256,256      # Thin plate spline
+    -rbf[samplevector] 256,256,0,0,255,255,exp(-0.035*r^2)
+    -normalize 0,255                # Scaled Gaussian
+~~~
+===
+
+ *§§§*
+
+
+===
+Generate an orientation field from six random keypoints; reconstruct with the thin plate spline RBF. Use the field to draw some oriented ellipses. See [Tiled Art](https://gmic.eu/tutorial/tiled_art.html#distanceandorientation)
+%% srand 5823619 6,1,1,4,{[u(2047),u(2047),u(2047),u(2047),u(2047),u(2047),u(2047),u(2047),u(2047),u(2047),u(2047),u(2047),u(-1,1),u(-1,1),u(-1,1),u(-1,1),u(-1,1),u(-1,1),u(-1,1),u(-1,1),u(-1,1),u(-1,1),u(-1,1),u(-1,1)]} rbf. 2048,2048 orientation. +n. 0,255 100%,100%,1,1 a[-2,-1] c -r2dx. 12.5%,5 o. img/ellipse_orient.png rm. nm. orient 100%,100%,1,1 noise_poissondisk. 20 +n. 0,1 dilate_oct. 5 to_rgb. n. 0,255 r2dx. 12.5%,5 o. img/ellipse_mark.png rm. nm. markers 100%,100%,1,3,[90,30,40] nm. plottingfield f[plottingfield] ">begin(wv=vector3(1/sqrt(3)));rot(wv,atan2(i(#-3,x,y,0,1),i(#-3,x,y,0,0)))*I" f[plottingfield] ">if(i#-2>0,ellipse(#-1,x,y,12,18,atan2(i(#-3,x,y,0,1),i(#-3,x,y,0,0)),0.5,[63,127,255]);ellipse(#-1,x,y,-12,-18,atan2(i(#-3,x,y,0,1),i(#-3,x,y,0,0)),1,0xffffffff,[255,255,0]);I,I)" k. r2dx. 50%,5 -n. 0,255 o. img/ellipses.png r2dx. 25%,5 o. img/ellipses_small.png rm 0 %%
+===
+|3.  |__Orientation__|__Markers__|__Plotted Ellipses__
+|    |![orientation](img/ellipse_orient.png)|![markers](img/ellipse_mark.png)|![plotted](img/ellipses_small.png)
+===
+~~~
+orientedellipses:
+    -srand 5823619
+
+    # Make a field of orientation angles through RBF interpolation
+    6,1,1,4,{[u(2047),u(2047),u(2047),u(2047),u(2047),u(2047),\
+              u(2047),u(2047),u(2047),u(2047),u(2047),u(2047),\
+              u(-1,1),u(-1,1),u(-1,1),u(-1,1),u(-1,1),u(-1,1),\
+              u(-1,1),u(-1,1),u(-1,1),u(-1,1),u(-1,1),u(-1,1)]}
+    -rbf. 2048,2048 
+    -orientation
+    -name. orient
+
+    # Markers to place ellipses
+    -input 100%,100%,1,1
+    -noise_poissondisk. 20
+    -name. markers
+
+    # Plotting field. Give it a shadow
+    # of the orientation field
+    -input 100%,100%,1,3,'[90,30,40]'
+    -name. plottingfield
+    -fill[plottingfield]
+       ">begin(wv=vector3(1/sqrt(3))); 
+        rot(wv,atan2(i(#-3,x,y,0,1),i(#-3,x,y,0,0)))*I"
+    
+    # Plot the ellipses themselves, aligned
+    # with the orientation field.
+    -fill[plottingfield]
+    ">if(
+       i#-2>0,
+       ellipse(#-1,x,y,12,18,atan2(i(#-3,x,y,0,1),i(#-3,x,y,0,0)),0.5,[63,127,255]);
+       ellipse(#-1,x,y,-12,-18,atan2(i(#-3,x,y,0,1),i(#-3,x,y,0,0)),1,0xffffffff,[255,255,0]);
+       I,I
+        )
+    "
+    -keep.
+    -r2dx. 50%,5
+    -normalize. 0,255
+~~~
+
+===
+![ellipses_large](img/ellipses.png)
+__oriented ellipses__
+===
 
 # Command Reference
 
