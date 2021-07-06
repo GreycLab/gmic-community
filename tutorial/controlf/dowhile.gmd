@@ -1,0 +1,132 @@
+# do…while (+)
+%% x "mkdir -p img" %%
+|![frontimage](images/do_elecamp.png)*Caution: Electrified 1911 Goudy Bookletter Ampersand. Please do not stand in any water puddles or other conductive liquids while following this tutorial. Thank you.*|The `-do` _<dowhile scope>_ `-while` block repeatly executes commands in the scope until the mathematical expression given as an argument to `-while` resolves to `False`. Execution then continues with the commands following `-while`. `-do`…`-while` follows a "perform, then test" course. With the conditional test at the bottom of the loop, the in-scope commands execute once even if the mathematical expression is initially `False`. For the test, then perform course, consider ''-for'' … ''-done.''\n\nThe _<do while>_ scope need not be populated; it can serve as a placeholder for partially developed scripts.\n\nPrior to 2.6, `-while` would test file system references; that is no longer supported. Use the file system mathematical expressions `isfile()` or `isdir()` instead, which take file system paths as arguments and return `True` if the path identifies an existing file system object.
+= examples
+## Examples
+|-`dowright:` \n   `-do` \n    `  -echo "You'll never take \` \n    `         me alive, Dudley  \` \n    `         Do-right!!!" ` \n   `-while bool(1)` |Snidely Whiplash won't shut up until `Ctrl-C` intervenes.\n\nCommands in the the _<do while>_ scope execute forever if the argument to `-while` remains `True`. In anticipation of this, build an 'escape hatch' with the ''-break'' command, usually in the scope of an ''-if'' … ''-fi'' block. Similarly, ''-continue'' terminates the current iteration and forces an immediate re-evaluation of `-while`'s conditional argument.
+%% 300,300,1,1 cnt=5000 k,j={[w/2,h/2]} -do dk,dj={[0.05*(2*u-1)*w,0.05*(2*u-1)*h]} -eval ">begin(polygon(-2,"$k","$j","$k"+"$dk","$j"+"$dj",0.5,0xffffffff,255))" k,j={[$k+$dk,$j+$dj]} -if $k<0 k={$k+w} -elif $k>=w k={$k-w} -fi -if $j<0 j={$j+h} -elif $j>=h j={$j-h} -fi cnt={$cnt-1} -while $cnt n. 0,255 o. img/wander.png rm 0 %%
+|![wanderaround](img/wander.png)*5000 steps of [Brownian motion](https://en.wikipedia.org/wiki/Brownian_motion) *|Usually, the commands constituting the body of the _<do while>_ scope have some direct or indirect effect on the condition given as an argument to `-while`. `-wanderaround` draws specific counts of random-length, randomly oriented segments, end-to-end, on the currently selected image. It checks for boundary overshoot, wrapping on image-edge crossings, then decrements the current count. `-while` takes non-zero counts to be `True` and zero to be `False`. The body of the _<do while>_ scope decrements the count which `-while` tests and exits when the count goes to zero. 
+===
+~~~
+wanderaround: -check "${1=50}>=0"
+   k,j={[w/2,h/2]}
+   cnt=$1
+   -do
+      # Draw one random segment
+      dk,dj={[0.05*(2*u-1)*w,0.05*(2*u-1)*h]}
+      -eval ">begin(
+             polygon(-2,"$k","$j",
+                     "$k"+"$dk",
+                     "$j"+"$dj",
+                     0.5,0xffffffff,255
+                    )
+                   )
+            "
+      # Step & do boundary check
+      k,j={[$k+$dk,$j+$dj]}
+      -if   $k<0   k={$k+w}
+      -elif $k>=w  k={$k-w}
+      -fi
+      -if   $j<0   j={$j+h}
+      -elif $j>=h  j={$j-h}
+      -fi
+      # Decrement count and test
+      cnt={$cnt-1}
+   -while $cnt
+~~~
+===
+= lightningormayberivers
+## Lightning Bolts, or Maybe Rivers
+Two points which are distant "as the crow flies" may be effectively close at hand when connected by a smooth-surface, graded road. On the other hand, a point "nearby" in terms of flying crows is, as a practical matter, distant when there are large mountains or oceans, or implacibly fierce Corgis inhabiting the intervening regions. When factors other than spatial separation alter the effective distances between points, the ''-distance'' command can take a _cost map_ as an argument, which accounts for such factors and which alters how the -distance command records the separation between points and isovalues.
+
+This map assigns a cost to each pixel and when such a map is in place, the distance between any two points becomes the sum of costs of intervening points. This gives rise to a _minimal path_, that collection of intervening points which sum to the smallest cost, the effective "shortest distance" connecting two points. The minimal path need not be a straight line; it may even look like a river or a lightning bolt.
+
+= potentialmap
+### Potential Map
+The ''-distance'' command produces a _potental_ or _return map_ as an additional output when given a cost map and mode arguments of three or four (low- or high-connectivity Dijkstra metric functions, respectively. See ''-label'' for further remarks on connectivity). The potential map produces minimal paths connecting arbitrary points to isovalues — that particular value establishing reference points from which one measures distances.
+
+For each pixel in the selected image, the potential map contains a routing directive, an unsigned eight bit integer encoding the direction that some imagined cursor should go when taking one step on a minimal path. Every pixel in the potential map is a routing directive on at least one minimal path. When we place our imagined cursor anywhere in the potential map, it reads the routing directive from the pixel it is sitting on to determine the next step it should take to follow some minimal path to the nearest isovalue. We generally read pixels from a potential map and chart our course on a separate image.
+
+The routing directives which populate potential maps look like this:
+===
+= routingdirectschematic
+![routingformat](images/routedir.svg)*Routing Directive Schematic
+===
+A routing directive consists of three, two bit nibbles preceded by an unused nibble containing two unset (zero) bits. From the most significant bit to the least, the nibbles dictate z (depth), y (vertical), or x (horizontal) movement. In each nibble, the most significant bit flags forward (positive) movement; the least significant bit flags reverse (negative) movement.
+|1. |Both nibbles may be unset. That indicates no movement in the given direction.
+|2. |If the most significant nibble is set, forward (positive) movement takes place.
+|3. |If the least significant nibble is set, reverse (negative) movement takes place.
+|4. |Both nibbles cannot be set, as that conveys simultaneous forward and reverse movement.
+Commencing from an arbitrary pixel with a non-zero routing directive, the imagined cursor steps once to the neighboring pixel that may or may not be closer to the nearest isovalue "as the crow flies", but is on the cheapest path to that point, according to the -distance command with cost map that computed the routing directive. The cursor then assesses the routing directive of the neighboring pixel and if that too is non-zero, steps furher on, repeating the cycle until encountering a routing directives equal to zero. That is, all three nibbles have unset forward and reverse directives; the cursor has arrived at a point corresponding to an isovalue in the original image. This permanently stops the imagined cursor. Without a direction in which to move, it can no longer obtain new routing directives. The course it has traced from its given arbitrary starting pixel to the isovalue corresponds to the minimal cost path between the initial pixel and the isovalue. In a properly composed potential map, zero-valued routing directives correspond to isovalues in the selected image and all other pixels have non-zero routing directives so composed as to steer an imagined cursor toward the nearest isovalue.
+= makingriverslightningbolts
+### Making Lightning Bolts, Perhaps, or Maybe Rivers
+The lightning bold crackling fiercely in the frontpiece stems from some 180 arbitrarily chosen points, from which minimal paths were traced to a single isovalue. For the cost map, we rendered a mode 0 ''-turbulence'' pattern, further sharpened through inverse diffusion. We then set an isovalue of one in an otherwise black image at a location coincident to the minimal value of the turbulence image.
+
+Astute readers will, no doubt, recognize that we are playing the Watershed Game, tracing the paths of so many droplets dribbling their ways downslope to the basin containing the minimum point. This behavior follows readily from the turbulence-generated cost map. This particular turbulence forms discontinuous rilles which tend to snake in river-like ways. They are also local minima, cheap pixels over which one may traverse when the turbulence is used as a cost map. Our game for river or lightning bolt emulation is straightforward: harness -distance to generate a potential map corresponding to a turbulence image. Then, for a supply of a few hundred arbitrarily chosen pixels, trace the minimal paths of each to the isovalue. If we render these paths in dark gray and then composite them through an additive operator, the more heavily traveled paths will tend to whites and light greys; less traveled paths will be darker. Particulars follow.
+%% m scripts/lightning.gmic -srand 56712 i 1024,1024,1,1 -turbulence. {round(0.65*w)},12,3,0,0 +r2dx. 300,5 sharpen. 50 n. 0,255 o. img/lght_00.png rm. i ../listmanip/images/ampersand.svg r. [-2],[-2],[-2],[-2],5,0 +store. ampersand -b. 11,1,0 -n. 0.3,1 *[-2,-1] sharpen. 50 +r2dx. 300,5 sharpen. 50 n. 0,255 o. img/lght_01.png rm. sqr. 100%,100%,100%,100% =. 1,400,430 -distance. 1,[-2],4 r2dx.. 300,5 sharpen.. 5 n.. 0,255 o.. img/lght_02.png rm.. +r2dx. 300,5 sharpen. 50 n. 0,255 o. img/lght_03.png rm. paintbolts. {round(0.0025*wh,1,0)} +. 1 log. /. {log(iM)} r2dx. 300,5 sharpen. 2 n. 0,255 -k. -input 100%,100%,1,1 i $ampersand r2dx. 300,5 n. 0,1 f. lerp(1,0,i(x,y)) n. 0,216 a[-3,-2,-1] c -shift. 0,0,0,-50%,2,1 f. begin(wv=vector3(1/sqrt(3)));rot(wv,-75°)*I n. 0,255 o. img/lght_04.png rm 0 %%
+= heightcost
+#### Height, Cost and Potential Maps
+~~~
+maketurbulence :
+   -srand 56712
+   -input 1024,1024,1,1
+   -turbulence. {round(0.65*w)},12,3,0,0
+~~~
+= turbulence
+|-![lightning_00](img/lght_00.png)*Turbulence*|The genesis of the frontpiece illustration is mode 0 [-turbulence](https://gmic.eu/oldtutorial/_turbulence.shtml). We base the height, cost and potential map on this underlying rendering.\n\nAs noted in the [-plasma tutorial](https://gmic.eu/oldtutorial/_plasma.shtml), it is our wont to set a particular seed in G'MIC's random number generator (via ''-srand'') so that we can reproduce a particular pattern; what we have here may as well be called "Turbulence Pattern 56712".\n\nMode 0 turbulence employs the ''-abs'' command as a mixer; at each stage of its development, any zero-crossings are folded back into the positive region, generating numerous discontinuities — creases — both large and small. These emulate rilles and waterways. Being local minima, the rilles have low intensities; when we derive a cost map from this turbulence, rivers or lightning bolts will tend to follow these rilles. We revisit this idea downstream from here.\n\nWe render the turbulence so that it exhibits large-scale features, develop the pattern through 12 octaves and set a modest decay factor of three between each octave. While large-scale features are present, low-magnitude, small-scale features persist.
+~~~
+stampguide :
+   -input images/ampersand.svg
+   -resize [-2],[-2],[-2],[-2],5,0
+   +store. ampersand
+   -blur. 11,1,0
+   -normalize. 0.3,1
+   -mul[-2,-1]
+   -sharpen. 50
+~~~
+= turbulencewithdepression
+|-![lightning_01](img/lght_01.png)*Turbulence with Depression*|From this point forward, we modify the turbulence patterns in various ways to make our height, cost and potential maps.\n\nThe first modification is impressing a Goudy 1911 Bookletter ampersand on the turbulence field, mainly because we are obsessed with this ampersand (but you knew that), and secondarily, we'd like to steer our lightning bolts so that they roughly trace parts of the ampersand's shape. Since we will trace the lightning bolts by the Watershed Game, we go about making a general depression in the turbulence in the shape of the ampersand; we blur the ampersand slightly to avoid abrupt drops into the basin.\n\nWe anticipate that as lightning bolts trace along minimal paths, those will thread through the lower elevation ampersand on the way to the isovalue. Once we have blurred and scaled the ampersand, we multiply it with the original turbulence, giving us the final form of our height map. Our cost map follows directly from sharpening and squaring operations. Sharpening tends to magnify fine detail, alternately, increasing or decreasing the values of out-of-bound pixels, driving them from the mean value of the image and towards its extremes. Squaring makes expensive (light colored) pixels even more expensive. In the larger scheme of things, we are making a cost map where minimal paths will meander a great deal, as we are creating pits and rises and other obstacles that mitigate against the straightforward progression of minimal paths to the isovalue.
+~~~
+routingdirectives :
+   -input 100%,100%,100%,100%
+   -set. 1,400,430
+   -distance. 1,[-2],4
+   -remove..
+~~~
+= distancetoreference
+|-![lightning_02](img/lght_02.png)*Distance to Reference*|We harness the ''-distance'' command to make a map of routing directives.\n\nTo create such a map, we require an image in which we can measure distances to a reference point, a measure affected by the cost map. To this end we conjure a black image from the aether and set a single reference point, a pixel with isovalue one. When `-distance` runs its course, this conjured image will be remade into a distance dataset where each pixel in the dataset holds the computed distance from that pixel to the reference point.\n\nWe situate this reference point in the e-loop of the ampersand. That is an arbitrary choice, selected because it is almost in the center of the graphic and has a few distinct approach directions. After `-distance` runs its course, this reference point necessarily will have a computed distance of zero, for that is the distance of the reference point to itself. All other pixels in the distance dataset will reflect their respective distances to the reference point. Put another way, the reference point is at the bottom of the watershed, a marker to which all lightning bolts flow.\n\nFor our purposes, this distance dataset is only a means to an end. We harness a special form of the ''-distance'' command to generate a routing directive map from this distance dataset. With this routing directive map, we can select any pixel as a starting point and plot the least expensive path to the reference point, our nascent lightning bolt. Since the `-distance` command was given a cost map — our turbulence image — then the routing directive map has "baked in" the _traversal price_ for every pixel. From any pixel, excepting the reference point, there is always at least one "cheapest" direction, provided by the neighboring pixel with the lowest traversal price.
+= routingdirectives
+|-![lightning_03](img/lght_03.png)*Routing Directives at Six Kilometers — Too Small To See!*|The least expensive path from any pixel to the reference point arises from a "step-and-check" procedure. Starting from an initial pixel, survey the immediate neighbors and choose the cheapest, or any one from a set of equivalently cheap pixels, and step to it. Repeat the step. Because of turbulence in the cost map, the least expensive path will be locally jagged, but it will converge on the reference pixel on a larger scale. Repeat with other initial pixels, and many such paths will converge on the cheapest approach directions to the reference point. In aggregate, these paths will look like lightning bolts striking a common point. Spend some time with the [-distance](https://gmic.eu/oldtutorial/_distance.shtml) tutorial, which provides further details on how cost maps give rise to the "price" of distances.\n\nTo get these datasets, we invoke the `-distance[-1] 1,[-2],4` command in a particular way, first, to establish the turbulence image as the cost map, and second, to obtain a routing directive map.\n\nThe selected image is the space in which `-distance` measures to the reference point, storing results in the pixels themselves and converting the conjured image into the distance dataset. The first argument given to the `-distance` command designates the isovalue: 1. Pixels in the conjured image with the isovalue become reference markers. All other pixels contain their distances to the nearest isovalue. Recall that we have designated just one pixel with an isovalue: the reference point on the e-loop. All other pixels in the distance dataset will contain measures to this single reference point.\n\nThe second argument, `[-2],` designates the cost map: our modified turbulence image. Pixels in this cost map are in a 1:1 correspondence with pixels in the distance dataset and each pixel in the cost map indicates how expensive it is to traverse the analogous pixel in the distance dataset. The whiter the pixel in the cost map, the more expensive is the traversal in the distance dataset.\n\nThe last argument to `-distance`, 4, requests that `-distance` should produce the routing directive map, which will be based on a high connectivity Dijkstra metric function.
+
+= routingdetail
+|-![lightning_04](images/do_routing.png)*Routing Directive Detail*|The conventional output from `-distance` is a [distance dataset](#distancetoreference) which furnishes point-wise distances of each pixel in the original image to the reference point. For the Great Watershed Game, we use the [routing directive map](#routingdirectives) instead and throw away the distance dataset; it is not used to make lightning bolts.\n\nThe routing directive map is a point-wise collection of control words, detailed [in the schematic](#routingdirectschematic), one corresponding to each pixel in the distance dataset. Given a pixel, the associated routing directive conveys to an imagined cursor the least expensive direction it needs to step in order to move "closer" to the isovalue, in quotes because the routing directive may shift the imagined cursor away from the isovalue, at least in terms of Euclidean distance. However, when `-distance` is furnished with a point-wise cost map, as we have done here, the "shortest distance" is the minimal path with the lowest cost sums, which likely is not the shortest distance by Euclidean measure.\n\n[On the left](#routingdetail), we have schematically reproduced the 9×9 pixel neighborhood around the reference point's image in the [routing directive map](#routingdirectives). The numerals reprsent routing directives, each with three two-bit directional fields that collectively move an imagined cursor away from, or toward the isovalue, along each cardinal direction. Numerals 1, 5, 4, 6, 2, 10, 8 and 9 direct an imagined cursor, respectively, west, northwest, north, northeast, east, southeast, south or sourthwest. The special routing directive 0 tells the cursor not to move; once a cursor is given such a directive it necessarily stops; it has been told to go nowhere so can never acquire another directive.\n\nThe `-distance` command computes these point-wise routing directives based on the cost map; in aggregate, these routing directives put an imagined cursor at a given point on a minimal path toward the nearest isovalue, one that accumulates the least cost along its length.
+~~~
+paintbolts: -check "isint(${1=200})>0"
+   # Expect selected to be a routing map
+   # generated by distance
+   pcnt=$1
+   -input 100%,100%,100%,100%
+   -name. canvas
+   -input $pcnt,2,1,1,(w*y+x)>=wh/2?round(u(h#-2-1),1):round(u(w#-2-1),1)
+   -repeat $pcnt
+      rdir=0
+      kx={i(#-1,$>,0,0,0,0)}
+      ky={i(#-1,$>,1,0,0,0)}
+      -do
+         -set[canvas] {i(#-2,$kx,$ky,0,0,0)+1},$kx,$ky,0,0
+         rdir={i(#-3,$kx,$ky,0,0,0)}
+         -if   {$rdir&1}
+             kx={$kx-1}
+         -elif {$rdir&2}
+             kx={$kx+1}
+         -fi
+         -if   {$rdir&4}
+             ky={$ky-1}
+         -elif {$rdir&8}
+             ky={$ky+1}
+         -fi
+      -while {$rdir>0}
+   -done
+   -keep[canvas]
+~~~
+|-![lightning_03](img/lght_04.png)*Lightning Rendered from Cheap Paths*|This brings us to the Watershed Game. Both rivers and lightning bolts, among other phenomena, attempt to minimize a cost of travelling from an initial to a destination point. Armed with a potential map such as the one on the left, we can emulate droplets of water streaming from arbitrary locations towards some minimum point. Our "path walker is shown above, `-paintbolts`, built around a `-do … -while` block. While routing directives are non-zero, step in the direction it gives us, then read a new directive. Repeat until we read a zero-valued routing directive. When that happens, we have arrived at the reference point path just followed respresents the smallest cost possible from our starting point, whatever that may be. In doing this, of course, we trust that `-distance` has computed all of the routing directives correctly.
