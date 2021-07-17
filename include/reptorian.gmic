@@ -184,10 +184,368 @@ rep_int82hex:
  );"
 
 u {t} rm.
+#@cli rep_mlfrac_anim: eq. to 'rep_markus_lyapunov_fractal_animation : (+)
+rep_mlfrac_anim: rep_markus_lyapunov_fractal_animation $*
+#@cli rep_markus_lyapunov_fractal_animation: abc_string,abc_string_repeats,_sublevel>=0,0%<_view_size[%]<=100%,0%<=_pos_x[%]<=100%,0%<=_pos_y[%]<=100%,0%<=_pos_z_a[%]<=100%,0%<=_pos_z_b[%]<=100%,additional_arguments(see below)
+#@cli : Generate an animation of Markus-Lyapunov Fractal or in other words, creates an animation demonstrating mapping of Lyapunov exponent within three values. Each frame represent a cross-section of a 3D Markus-Lyapunov Fractal.
+#@cli :
+#@cli : [1] http://charles.vassallo.pagesperso-orange.fr/en/lyap_art/lyapdoc.html
+#@cli :
+#@cli : (eq. to 'rep_mlfrac_anim')
+#@cli : Note: Input for abc_string is case-insensitive. Only valid characters are A,a,B,b,C,c.
+#@cli : Additional note: Depth of target image defines number of frames.
+#@cli :
+#@cli : --- Information on 'additional_arguments' ---
+#@cli : The following set of arguments are accepted as additional arguments for the command:
+#@cli : 
+#@cli : 1 - use_inversion={ 0=do_not_use_inversion | 1=use_inversion }
+#@cli : 2* - hex_color_a,hex_color_b
+#@cli : 3** - 'u',color_count>0,color_space={ 0=hsl | 1=lab | 2=lch }
+#@cli : 4** - 'u','u',n_colors_a>0,n_colors_b>0,cs={ 0=hsl | 1=lab | 2=lch }
+#@cli : 5*** - [image],order={ 0=default | 1=random | 2=mirrored },color_count
+#@cli : 6*** - [image],[image],order_a={ 0=default | 1=random | 2=mirrored },use_randomize_b={ 0=default | 1=random | 2=mirrored },color_count_a,color_count_b
+#@cli :
+#@cli : * = No special characters or space! Only 0-9 and a-f case-insensitive.
+#@cli : ** = 'u' means that the input you assigned is exactly 'u'.
+#@cli : *** = If you assign a image with width and height both larger than 1, then you need to assign color_count in the respective place. use_randomize is used to randomize the colors in palette.
+#@cli :
+#@cli : Notes: See examples for usage of these additional variables.
+#@cli :
+#@cli : --- End of Information on 'additional_arguments' ---
+#@cli : Default values: '_sublevel=1','_view_size=100%','_pos_x=50%','_pos_y=50%'
+#@cli :
+#@cli : Author: Reptorian.
+#@cli : $ 50,50,50 rep_markus_lyapunov_fractal_animation abc,50,3,100%,50%,50%,0%,100%,1
+#@cli : $ 50,50,50 rep_markus_lyapunov_fractal_animation abc,50,3,100%,50%,50%,0%,100%,0000ff,ffff00
+#@cli : $ 50,50,50 rep_markus_lyapunov_fractal_animation abc,50,3,100%,50%,50%,0%,100%,u,8,1
+#@cli : $ 50,50,50 rep_markus_lyapunov_fractal_animation abc,50,3,100%,50%,50%,0%,100%,u,u,5,8,2
+#@cli : $ 50,50,50 pal 71 rep_markus_lyapunov_fractal_animation[0] abc,50,3,100%,50%,50%,0%,100%,[1],0 rm.
+#@cli : $ 50,50,50 pal 20 pal 50 rep_markus_lyapunov_fractal_animation[0] abc,50,3,100%,50%,50%,0%,100%,[1],[2],0,0 rm[-2,-1]
+#@cli : $ 50,50,50 sp cat rep_markus_lyapunov_fractal_animation[0] abc,50,3,100%,50%,50%,0%,100%,[1],0,9 rm.
+#@cli : $ 50,50,50 sp cat sp lena rep_markus_lyapunov_fractal_animation[0] abc,50,3,100%,50%,50%,0%,100%,[-2],[-1],1,1,8,8 rm[-2,-1]
+rep_markus_lyapunov_fractal_animation:
+skip "${3=1}","${4=100%}","${5=50%}","${6=50%}","${7=0%}","${8=100%}","${9=0}","${10=}","${11=}","${12=}","${13=}","${14=}"
+check (abs($4)!=0)&&($!==1)&&(w#-1>1&&h#-1>1&&d#-1>1)
+
+strlowercase $1
+ab_string=${}
+('$ab_string') -. 97
+
+include_a={im#-1==0}
+include_b={find(crop(#-1),1,0,1)!=-1}
+include_c={iM#-1==2}
+
+if im#-1<0||iM#-1>2 error invalid_char_found! fi
+if !($include_a&&$include_b&&$include_c) error invalid_string fi
+
+ab_string={crop(#-1)}
+rm.
+
+mode=0
+use_double_u=0
+use_hex_mode=0
+
+sub={abs($3)+1}
+
+ow={w}
+oh={h}
+od={d}
+nw={round(w*$sub)}
+nh={round(h*$sub)}
+
+if narg($9)||narg($10)
+
+ if ${is_image_arg\ $9} mode+=1
+  pass$9 0
+ fi
+ if ${is_image_arg\ $10} mode+=1 
+  pass$10 0
+ fi
+ 
+ if $mode==2
+ 
+  if w#-2>1&&h#-2>1
+   colormap.. $13
+   if ($11%3)==1
+    {w#-2},1,1,1,u(0,1) 
+    pixelsort... +,x,[-1] 
+    rm. 
+   elif ($11%3)==2 
+    mirror.. x 
+   fi
+   find_color_a=I(#-1,lyapunov_surface/minv*v_length_b,0,0,1);
+  else
+   if w#-2>1
+    if ($11%3)==1
+     {w#-2},1,1,1,u(0,1) 
+     pixelsort... +,x,[-1] 
+     rm.
+    elif ($11%3)==2
+     mirror.. x
+    fi
+    find_color_a=I(#-1,lyapunov_surface/minv*v_length_b,0,0,1);
+   else
+    if ($11%3)==1
+     1,{h#-2},1,1,u(0,1) 
+     pixelsort... +,y,[-1] 
+     rm.
+    elif ($11%3)==2
+     mirror.. y
+    fi
+    find_color_a=I(#-1,0,lyapunov_surface/minv*v_length_b,0,1);
+   fi
+  fi
+
+  if w#-1>1&&h#-1>1
+   colormap. $14
+   if ($12%3)==1
+    {w},1,1,1,u(0,1) 
+    pixelsort.. +,x,[-1] 
+    rm.
+   elif ($12%3)==2
+    mirror. x
+   fi
+   find_color_b=I(#-2,lyapunov_surface/maxv*v_length_a,0,0,1);
+  else
+   if w#-1>1
+    if ($12%3)==1
+     {w},1,1,1,u(0,1) 
+     pixelsort.. +,x,[-1] 
+     rm.
+    elif ($12%3)==2
+     mirror. x
+    fi
+    find_color_b=I(#-2,lyapunov_surface/maxv*v_length_a,0,0,1);
+   else
+    if ($12%3)==1
+     1,{h},1,1,u(0,1) 
+     pixelsort.. +,y,[-1] 
+     rm.
+    elif ($12%3)==2
+     mirror. y
+    fi
+    find_color_b=I(#-2,0,lyapunov_surface/maxv*v_length_a,0,1);
+   fi
+  fi
+  
+  store. ref_colors_b
+  store. ref_colors_a
+  
+ elif $mode==1
+ 
+  if w>1&&h>1
+   colormap. $11
+   if ($10%3)==1
+    {w},1,1,1,u(0,1) 
+    pixelsort.. +,x,[-1] 
+    rm.
+   elif ($10%3)==2
+    mirror. x
+   fi
+   find_color_a=I(#-1,lyapunov_surface,0,0,1)
+  else
+   if w>1
+    if ($10%3)==1
+     {w},1,1,1,u(0,1) 
+     pixelsort.. +,x,[-1] 
+     rm.
+    elif ($10%3)==2
+     mirror. x
+    fi
+    find_color_a=I(#-1,lyapunov_surface,0,0,1)
+   else
+    if ($10%3)==1
+     1,{h},1,1,u(0,1) 
+     pixelsort.. +,y,[-1] 
+     rm.
+    elif ($10%3)==2
+     mirror. y
+    fi
+    find_color_a=I(#-1,0,lyapunov_surface,0,1)
+   fi
+  fi
+  store. ref_gradient
+  
+ else
+ 
+  if ('$9'=='u')&&('$10'=='u')
+  
+   mode=3
+   use_double_u=1
+   if narg($11)&&narg($12)
+    if narg($13)
+     if ($13%3)==2 m "cs_out: lch82rgb"
+     elif ($13%3)==1 m "cs_out: lab82rgb"
+     else m "cs_out: hsl82rgb"
+     fi
+    else m "cs_out: hsl82rgb"
+    fi
+    $11,1,1,3,u(0,255)
+    $12,1,1,3,u(0,255)
+    store. ref_rand_col_a
+    store. ref_rand_col_b
+   else error needs size_arg
+   fi
+   
+  else
+  
+   if ('$9'=='u')||('$10'=='u')
+    mode=3
+    if narg($11)
+     if ($11%3)==2 m "cs_out: lch82rgb"
+     elif ($11%3)==1 m "cs_out: lab82rgb"
+     else m "cs_out: hsl82rgb"
+     fi
+    else m "cs_out: hsl82rgb"
+    fi
+    if narg($12) srand $12 fi
+    if '$9'=='u'
+     $10,1,1,3,u(0,255)
+     store. ref_colors
+    else
+     $9,1,1,3,u(0,255)
+     store. ref_colors
+    fi
+   else
+    if (!(size('$9')%2))&&(!(size('$10')%2))
+     use_hex_mode=1
+     hex_color_a=${rep_hex2int8\ $9}
+     hex_color_b=${rep_hex2int8\ $10}
+    fi
+   fi
+  fi
+  
+ fi
+ 
+fi
+
+out_lyapunov=limit
+if !$mode&&!$use_hex_mode if $9 out_lyapunov=-limit fi fi
+
+$nw,$nh,100%,1,":begin(
+  const sqr_size=cut(abs($4),0,1);
+  const gap=1-sqr_size;
+  const px=cut($5,0,1)*gap;
+  const py=cut($6,0,1)*gap;
+  const pz_a_init=cut($7,0,1);
+  const pz_b_init=cut($8,0,1);
+  const pz_a=min(pz_a_init,pz_b_init)*2+2;
+  const pz_b=max(pz_a_init,pz_b_init)*2+2;
+  const lx=px*2+2;
+  const ly=py*2+2;
+  const rx=(px+sqr_size)*2+2;
+  const ry=(py+sqr_size)*2+2;
+  const inc_w=w+1;
+  const inc_h=h+1;
+  const inc_d=d+1;
+  
+  v_sequence=["$ab_string"];
+  const seqsize=size(v_sequence);
+  const vsize=round(max(1,abs($2))*seqsize);
+ );
+ ix=lerp(lx,rx,(x+1)/inc_w);
+ iy=lerp(ry,ly,(y+1)/inc_h);
+ iz=lerp(pz_a,pz_b,(z+1)/inc_d);
+ vn=0.5;
+ limit=0;
+ repeat(vsize,n,
+  sp = n % seqsize;
+  rn=arg(v_sequence[sp]+1,ix,iy,iz);
+  vn=rn*vn*(1-vn);
+  limit+=log(abs(rn*(1-2*vn)));
+ );
+ "$out_lyapunov";
+ "
+
+if $mode==3
+ 
+ if $use_double_u
+  $ref_rand_col_a
+  $ref_rand_col_b
+  $nw,$nh,$od,3,"begin_t(
+    const minv=im#-3;
+    const maxv=iM#-3;
+    const ww_a=w#-2-1;
+    const ww_b=w#-1-1;
+   );
+   lyapunov_surface=i0#-3;
+   use_b=lyapunov_surface>=0;
+   use_b?(I(#-1,lyapunov_surface/maxv*ww_b,0,0,1);)
+        :(I(#-2,lyapunov_surface/minv*ww_a,0,0,1););
+   "
+   cs_out.
+ else
+  $ref_colors
+  $nw,$nh,$od,3,"begin(
+   const minv=im#-2;
+   const maxv=iM#-2;
+   const vs=w#-1-1;
+   const diff=(maxv-minv)/vs;
+  );
+  lyapunov_surface=(i0#-2-minv)/diff;
+  I(#-1,lyapunov_surface,0,0,1);
+  "
+  cs_out.
+ fi
+ 
+elif $mode==2
+
+ $ref_colors_a
+ $ref_colors_b
+ $nw,$nh,$od,{max(s#-2,s#-1)},"begin_t(
+   const minv=im#-3;
+   const maxv=iM#-3;
+   const v_length_a=max(w#-2-1,h#-2-1);
+   const v_length_b=max(w#-1-1,h#-2,-1);
+  );
+  lyapunov_surface=i0#-3;
+  use_b=lyapunov_surface>=0;
+  use_b?("$find_color_b")
+       :("$find_color_a");
+  " 
+       
+elif $mode==1
+
+ $ref_gradient
+ $nw,$nh,$od,{s#-1},"begin_t(
+   const minv=im#-2;
+   const maxv=iM#-2;
+   const v_length=max(w#-1-1,h#-1-1);
+   const diff=(maxv-minv)/v_length;
+  );
+  lyapunov_surface=(i0#-2-minv)/diff;
+  "$find_color_a";
+  " 
+  
+elif $use_hex_mode
+  $nw,$nh,$od,3,"begin_t(
+ 
+   hex_a=["$hex_color_a"];
+   hex_b=["$hex_color_b"];
+   
+   const minv=im#-1;
+   const maxv=iM#-1;
+   
+   const hpi=pi/2;
+   
+   contrast(a)=(
+    b=a*pi-hpi;
+    .5*a^2+.5*(sin(b)+1)/2;
+   );
+  );
+  v=i0#-1;
+  shade=v>=0?v/maxv:contrast((1-(v/minv)^(1/2)))^2;
+  col=v>=0?hex_a:hex_b;
+  col*shade;
+ "
+fi
+k.
+s z r $ow,$oh,1,100%,6
+um cs_out
 #@cli rep_mlfrac: eq. to 'rep_markus_lyapunov_fractal : (+)
 rep_mlfrac: rep_markus_lyapunov_fractal $*
 #@cli rep_markus_lyapunov_fractal: abc_string,abc_string_repeats,_sublevel>=0,0%<_view_size[%]<=100%,0%<=_pos_x[%]<=100%,0%<=_pos_y[%]<=100%,0%<=_pos_z[%]<=100%,additional_arguments(see below)
-#@cli : Generate Markus-Lyapunov Fractal or in other words, creates a mapping of Lyapunov exponent within two values.[1] Discovered by Mario Markus of the Max Planck Institute for Nutrition. Alexander Lyapunov was the one that discovered Lyapunov exponent.
+#@cli : Generate Markus-Lyapunov Fractal or in other words, creates a mapping of Lyapunov exponent within two or three values.[1] Discovered by Mario Markus of the Max Planck Institute for Nutrition. Alexander Lyapunov was the one that discovered Lyapunov exponent.
 #@cli :
 #@cli : [1] http://charles.vassallo.pagesperso-orange.fr/en/lyap_art/lyapdoc.html
 #@cli :
@@ -416,8 +774,6 @@ fi
 
 out_lyapunov=limit
 if !$mode&&!$use_hex_mode if $8 out_lyapunov=-limit fi fi
-
-echo $sign_mode
 
 repeat $! l[$>]
 
