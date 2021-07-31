@@ -51,9 +51,24 @@
 rep_rainbowify:
 skip ${1=0},${2=0},${3=100%}
 repeat $! l[$>]
- if !(s==3||s==4) continue fi
- if s==4 sh. 0,2 fi
- f. "begin(
+ if s>4 continue fi
+ if s==4 sh 0,2 fi
+ 
+ if s<3
+  m "rainbowify : {w},{h},100%,{s==2?4:3},\"$""1\""
+  m "end_out : k."
+  calc_v="i(#0,x,y,z,0)"
+ else
+  m "rainbowify : fill. \"$""1\""
+  m "end_out : k[0]"
+  calc_v=avg(I)
+ fi
+ 
+ if s==2 calc_rainbow="[hue2rgb(fmod(v+pos+shift_hue)),i(#0,x,y,z,1)]"
+ else calc_rainbow=hue2rgb(fmod(v+pos+shift_hue))
+ fi
+ 
+ rainbowify. "begin(
   const shift_hue=$1+180;
   const ang=($2/180)*pi;
   const cos_ang=cos(ang);
@@ -81,10 +96,14 @@ repeat $! l[$>]
  px=(x-cx)/cxsx;
  py=(y-cy)/cysy;
  pos=rot_y(px,py)*rescale_pos;
- v=avg(I)*m;
- hue2rgb(fmod(v+pos+shift_hue));
+ v="$calc_v"*m;
+ "$calc_rainbow";
  "
- k[0]
+ 
+ end_out  
+
+ um rainbowify,end_out
+ 
 endl done
 #@cli rep_w_rgb82gray: eq. to 'rep_weighted_rgb82gray' : (+)
 rep_w_rgb82gray: rep_weighted_rgb82gray $*
@@ -9881,7 +9900,7 @@ gui_split_preview "fx_vibrato ${1--2}",$-1
 #@gui Construction Material Texture:_cons_turb,_cons_turb_preview(0)
 #@gui :_=note("Construction Material Texture filter is based off the following tutorial by <b>theonlychad</b> for Paint.NET software: <a href="https://forums.getpaint.net/topic/16075-concrete-texture-tutorial/">Concrete Texture Tutorial</a>.\n")
 #@gui :_=separator(), _=note("<b>Turbulance Texture</b>")
-#@gui :1-3. Background Color = color(0,0,0)
+#@gui :Seed=int(0,0,25000)
 #@gui :4. Radius=float(88,1,1024)
 #@gui :5. Octaves=int(8,1,12)
 #@gui :6. Damping per Octave=float(2.5,1,10)
@@ -9928,44 +9947,81 @@ gui_split_preview "fx_vibrato ${1--2}",$-1
 #@gui :40. Create Copy?=bool(0)
 #@gui :41. LP Frequency Power=float(3,0,16)
 #@gui :42. LP Order Cube Root=float(2,0,4)
-#@gui :43. HP Frequency Power=float(4,0,16)
-#@gui :44. HP Order Cube Root=float(2,0,4)
-#@gui :45. Colour Space=choice("RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","CMY","CMYK","Bayer")
-#@gui :46. Absolute=bool(1)
-#@gui :47. Makeup Gain=bool(1)
+#@gui :43. LP Resonance=float(0,0,5)
+#@gui :44. HP Frequency Power=float(4,0,16)
+#@gui :45. HP Order Cube Root=float(2,0,4)
+#@gui :46. HP Resonance=float(2,0,4)
+#@gui :47. Colour Space=choice("RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","CMY","CMYK","Bayer")
+#@gui :48. Absolute=bool(1)
+#@gui :49. Makeup Gain=bool(1)
 #@gui :_=separator(), _=note("<b>Relief Processing</b>")
-#@gui :48. Activate Relief Processing=bool(1)
-#@gui :49. Angle=float(0,0,360)
-#@gui :50. Depth (%)=float(100,0,200)
-#@gui :51. Smoothness=float(0,0,10)
-#@gui :52. Blending Mode=choice(0,"Grain Extract","Grain Merge")
-#@gui :53. Blending Opacity (%)=float(100,0,100)
+#@gui :50. Activate Relief Processing=bool(1)
+#@gui :51. Angle=float(0,0,360)
+#@gui :52. Depth (%)=float(100,0,200)
+#@gui :53. Smoothness=float(0,0,10)
+#@gui :54. Blending Mode=choice(0,"Grain Extract","Grain Merge")
+#@gui :55. Blending Opacity (%)=float(100,0,100)
 #@gui :_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2019/1/27</i>.</small>")
+#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2021/7/30</i>.</small>")
 _cons_turb :
 repeat $! l[$>] cons_turb $* endl done
 cons_turb :
+srand $1
 -m "MergeChoice : $""=_mode" -MergeChoice "add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor","edges","error"
 skip {$23==0},{$25==0},{$26==0},{$29==0},{$48==0}
-fill_color ${1-3}
-turbulence ${4-6},0,$7
-balance_gamma ${8-10}
+
+fill_color 0,0,0
+turbulence ${2-4},0,$5
+balance_gamma ${6-8}
+
 remove_opacity
-if $13<=4 ac "_fx_noise $11,$12",{$13+2},$14
-else ac "_fx_noise $11,$12",{$13+3},$14 fi
+
+if $11<=4 ac "_fx_noise $9,$10",{$11+2},$12
+else ac "_fx_noise $9,$10",{$11+3},$12 
+fi
+
 remove_opacity
-+jr_desaturate ${15-19}
-blend normal,$20/100
-+cons_self_blend $21,$22
-blend ${_mode{$23+1}},$24/100
-if $25==1 cut $26,$27
-elif $25==2 n $26,$27 fi
-if $28==1 ac "equalize",rgb fi
-if $29==1 negate fi
+
++jr_desaturate ${13-17}
+
+blend normal,$18/100
+
++cons_self_blend $19,$20
+
+blend ${_mode{$21+1}},$22/100
+
+if $23==1 cut $24,$25
+elif $23==2 n $24,$25 
+fi
+
+if $26==1 ac "equalize",rgb fi
+if $27==1 negate fi
+
 fx_make_seamless 256
-fx_warp_by_intensity ${30-37}
-if $39==1 if $40==0 blur $38 fx_butterworth_bp ${41-45},0,${46-47} if $48==1 +emboss_image $49,{$50/100},$51 fi else +fx_butterworth_bp ${41-45},0,${46-47} blur[0] $38 if $48==1 emboss_image[1] $49,{$50/100},$51  fi fi
-elif $39==0 blur $38 if $48==1 +emboss_image $49,{$50/100},$51  fi fi
+
+fx_warp_by_intensity ${28-35}
+
+if $37==1 
+ if $38==0 
+  blur $36 
+  fx_butterworth_bp ${39-45},0,${46-47} 
+  if $46==1 
+   +emboss_image $49,{$50/100},$51 
+  fi 
+ else 
+  +fx_butterworth_bp ${39-45},0,${46-47} 
+  blur[0] $36 
+  if $48==1 
+   emboss_image[1] $49,{$50/100},$51  
+  fi 
+ fi
+elif $37==0 
+ blur $36 
+ if $48==1 
+  +emboss_image $49,{$50/100},$51  
+ fi 
+fi
+
 if $48==1 if $52 blend grainmerge,$53/100 else blend grainextract,$53/100 fi fi
 cons_self_blend :
 -m "MergeChoice : $""=_mode" -MergeChoice "add","burn","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","linearburn","linearlight","luminance","multiply","negation","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","vividlight","edges","error"
