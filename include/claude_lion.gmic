@@ -1,0 +1,151 @@
+#@gmic
+#
+#  File        : claude_lion.gmic
+#                ( G'MIC commands file )
+#
+#  Description : Define a gmic command
+#
+#  Copyright   : Claude Lion
+#
+#  License         :
+#
+#                    CeCILL v2.1
+#                    The CeCILL license is compatible with the GNU GPL.
+#                    ( http://cecill.info/licences/Licence_CeCILL_V2.1-en.html )
+#
+#  This software is governed either by the CeCILL or the CeCILL-C license
+#  under French law and abiding by the rules of distribution of free software.
+#  You can  use, modify and or redistribute the software under the terms of
+#  the CeCILL or CeCILL-C licenses as circulated by CEA, CNRS and INRIA
+#  at the following URL: "http://cecill.info".
+#
+#  As a counterpart to the access to the source code and  rights to copy,
+#  modify and redistribute granted by the license, users are provided only
+#  with a limited warranty  and the software's author,  the holder of the
+#  economic rights,  and the successive licensors  have only  limited
+#  liability.
+#
+#  In this respect, the user's attention is drawn to the risks associated
+#  with loading,  using,  modifying and/or developing or reproducing the
+#  software by the user in light of its specific status of free software,
+#  that may mean  that it is complicated to manipulate,  and  that  also
+#  therefore means  that it is reserved for developers  and  experienced
+#  professionals having in-depth computer knowledge. Users are therefore
+#  encouraged to load and test the software's suitability as regards their
+#  requirements in conditions enabling the security of their systems and/or
+#  data to be ensured and,  more generally, to use and operate it in the
+#  same conditions as regards security.
+#
+#  The fact that you are presently reading this means that you have had
+#  knowledge of the CeCILL and CeCILL-C licenses and that you accept its terms.
+#
+
+#@gui _<b>Artistic</b>
+#@gui Comic Book: cl_comic, cl_comic_preview(0)
+#@gui : note = note("<b>Note</b>: Photo to cartoon")
+#@gui : sep = separator()
+#@gui : note = note(" ")
+#@gui : Simplification = choice(0, "None", "Light", "Light Antialias", "Strong Antialias", "Median", "Iuwt", "Thin Brush")
+#@gui : sep = separator()
+#@gui : note = note("<b>For edges:</b>")
+#@gui : Flattening for Edge (bilateral) = int(2,0,5)
+#@gui : Edge Method = choice(0, "Diff. of Gauss.", "Diff. of BoxBlur", "Diff. of Median")
+#@gui : Edge Desaturation Method = choice(1, "Lightness", "MaxRGB", "MinRGB")
+#@gui : Line Thickness = float(1,0.5,2)
+#@gui : Line Strength = float(15,0,19)
+#@gui : sep = separator()
+#@gui : Add Colors = bool(1)
+#@gui : note = note("<b>For colors:</b>")
+#@gui : Luminosity Increase = int(10,0,50)
+#@gui : Saturation Increase = int(20,0,50)
+#@gui : Final Flattening (bilateral) = int(6,0,10)
+#@gui : Lines Antialias = int(15,0,100)
+#@gui : Colors to Black or White = bool(0)
+#@gui : sep = separator()
+#@gui : Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal",
+#@gui : "Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right",
+#@gui : "Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse")
+#@gui : Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator()
+#@gui : url = link("Filter discussed here","http://gimpchat.com/viewtopic.php?f=11&t=19335&p=266517#p266512")
+#@gui : note = note("<small>Author: <i>Claude Lion</i>.      Latest Update: <i>2021/07/31</i>.</small>")
+cl_comic :
+	repeat $! l[$>]
+
+	simplif=$1
+	nbBilatBord=$2
+	methBord=$3
+	methDesat=$4
+	lineThick=$5
+	forceTrait=$6
+	addColors=$7
+	augmLum=$8
+	augmSat=$9
+	nbBilatFin=$10
+	antialias=$11
+	bw=$12
+
+	if $simplif==2
+		fx_smooth_antialias. 100,0,2.5,0,50,50
+	elif $simplif==3
+		fx_smooth_antialias. 100,0,5,0,50,50
+	elif $simplif==4
+		fx_smooth_median. 3,255,0,0,50,50
+	elif $simplif==5
+		jeje_denoise_iuwt. 3,4,2,0
+		jeje_denoise_iuwt. 3,4,2,0
+	elif $simplif==6
+		fx_smooth_anisotropic. 60,0.9,0.64,3.1,1.1,0.8,30,2,0,1,1,0,0,24
+	fi
+
+	curv="0,0,"{50-$augmLum}","{50+$augmLum}",100,100,-1,0,0,"{50-$augmSat}","{50+$augmSat}",100,100,-1,0,0,100,100,-1,0,0,100,100,-1"
+	+fx_curves_interactive.  7,0,1,"7",$curv
+	fx_smooth_nlmeans.. 4,4,10,5,0,0,24,0
+	fx_smooth_bilateral.. 10,7,$nbBilatBord,0,0
+
+	+cut.. 0,255
+	reverse[-2,-1]
+	if $methBord==0
+		blur[-3] {$lineThick}
+	elif $methBord==1
+		boxfilter[-3] xy,{$lineThick+0.01}
+	elif $methBord==2
+		median[-3] {($lineThick+0.01)*2}
+	fi
+	sub[-3,-2]
+
+	if $methDesat==0
+		fill.. "m = min(R,G,B); M = max(R,G,B); L = 0.5*(m + M); [L, L, L]"
+	elif $methDesat==1
+		fill.. "M = max(R,G,B); [M, M, M]"
+	elif $methDesat==2
+		fill.. "M = min(R,G,B); [M, M, M]"
+	fi
+
+	cut.. 0,255 n.. 0,255
+	negate..
+	threshold.. {$forceTrait+80}%
+	n.. 0,255
+
+	if $simplif>0
+		fx_smooth_antialias.. 100,0,2.5,0,50,50
+		fx_curves_interactive.. 7,0,1,"7","0,0,69,0,70,100,100,100,-1,0,0,100,0,-1,0,0,100,100,-1,0,0,100,100,-1"
+	fi
+
+	fx_smooth_antialias.. $antialias,0,1,0,50,50
+
+	if $addColors==1
+		mul[-2,-1]
+		n. 0,255
+		fx_smooth_bilateral. 10,7,$nbBilatFin,0,0
+		if $bw==1
+			fx_curves_interactive 7,0,1,"7","0,0,16,100,100,100,-1,0,0,100,0,-1,0,0,100,100,-1,0,0,100,100,-1"
+		fi
+	else
+		remove[-1]
+	fi
+
+	endl done
+
+cl_comic_preview :
+  gui_split_preview "cl_comic $*",${-3--1}
