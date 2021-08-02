@@ -1857,7 +1857,7 @@ fi
 rm.
 #@cli rep_dla : eq. to 'rep_diffusion_limited_aggregation' : (+)
 rep_dla: rep_diffusion_limited_aggregation $*
-#@cli rep_diffusion_limited_aggregation: _point_proximity,_escape,_mode,_target={ 0=dark | 1=light },_border,_keep_erase_mask={ 0=maskless | 1=mask },[mask]
+#@cli rep_diffusion_limited_aggregation: _point_proximity,_escape,_mode,_target={ 0=dark | 1=light },_border,_preserve_binary_image={ 0=maskless | 1=mask },[mask]
 #@cli : Generate Diffusion Limited Aggregation
 #@cli : (eq. to 'rep_dla').\n
 #@cli : '_point_proximity' defines how frequently noises are generated based on the proximity of pixels. The lower the number, the higher the density.
@@ -1865,145 +1865,177 @@ rep_dla: rep_diffusion_limited_aggregation $*
 #@cli : '_mode' defines how particles aggregate on the aggregation form.
 #@cli : '_target' defines where the aggregation form will fill on.
 #@cli : '_border' is only applicable if there is a planting seed map. It is used to limit particles based on proximity away from existing structure.
-#@cli : '_keep_erase_mask' is only applicable on single images with variance or '[map]' with variance. This defines whether to preserve or erase mask.
-#@cli : '[map]' is used as a map for planting seed of aggregation form. Only applicable if there is more than one image. If using a single image, then the filter will determine whether the single mask is a mask, so this argument is not needed for single image. If an image argument is not used, then the form will aggregate from the center of the image.\n
+#@cli : '_preserve_binary_image' is only applicable on images with variance.
 #@cli : Author: Reptorian\n
-#@cli : Default values: '_point_proximity=2','_escape=80','_mode=1','_target=1','_border=0','_keep_erase_mask=1','[mask]=0'
+#@cli : Default values: '_point_proximity=2','_escape=10','_mode=1','_target=1','_border=0','_keep_erase_mask=1','[mask]=0'
 rep_diffusion_limited_aggregation:
-skip ${1=2},${2=10000},${3=1},${4=0},${5=0},${6=1},${7=0}
+skip ${1=2},${2=100},${3=1},${4=0},${5=0},${6=1}
 
-m "dla_target_2s : n 0,1 s. c *"
-m "dla_target_3s : n 0,1 s c add / 3"
-m "dla_target_4s_plus : n 0,1 ts={s-1} s c add[^-1] /.. $ts *"
+__bg={$4?0:1}
+
+m "dla_target_2s : n 0,1 s. c * midpoint={avg(iM,im)} f. i>$midpoint?1"
+m "dla_target_3s : n 0,1 s c add / 3 midpoint={avg(iM,im)} f. i>$midpoint?1"
+m "dla_target_4s_plus : n 0,1 ts={s-1} s c add[^-1] /.. $ts * midpoint={avg(iM,im)} f. i>$midpoint?1"
 m "dla_target : if s==1 n 0,1 elif s==2 dla_target_2s elif s==3 dla_target_3s elif s>3 dla_target_4s_plus fi"
-m "dla_check_variance : tv=0 repeat s sh. $> tv+={iv#-1} rm. if $tv u $tv return fi done u $tv"
+m "dla_check_variance : tv=0 repeat s sh $> tv+={iv#-1} rm. if $tv break fi done u {$tv?1:0}"
+m "dla_clear_image : {w#0},{h#0},{d#0},1,$__bg rv[-1,0] rm."
 
-if $4
- m "dla_expand : if $5 dilate_circ $5 else rm. fi"
-else
- m "dla_expand : if $5 erode_circ $5 else rm. fi"
+if abs($1)>1 m " dla_create_coordinate_map : +rep_noise_poissondisk_to_coordinates {abs($1)} round."
+else m "dla_create_coordinate_map : +rep_create_alternating_coordinates_map"
 fi
 
-include_dla_map=0
-
-if $!==1
- dla_check_variance
- if ${}
-  dla_target
-  if iv#-1 include_dla_map=1 fi
- else
-  channels 0 f 0
- fi
-else
- include_dla_map=${"is_image_arg $7"}
- world_width=${-max_w}
- world_height=${-max_h}
- if $include_dla_map
-  pass$7 0
-  dla_target.
-  if !iv#-1 include_dla_map=0 f. 0 fi
-  r. $world_width,$world_height,100%,100%
- else
-  $world_width,$world_height,1,1
- fi
+if $4 m "dla_expand : if $5!=0 +dilate_circ[0] {abs($5)} fi"
+else m "dla_expand : if $5!=0 +erode_circ[0] {abs($5)} fi"
 fi
 
-l. . f.. 0
+n_threads={$_cpus}
+mt={$n_threads-1}
 
- if $1>=2 noise_poissondisk.. $1,5
- else f.. x%2*y%2
- fi
+l. 
+ $n_threads,1,1,2
+ +s. x
+ store[^0] dla_ref
+endl
 
- if $include_dla_map
-  f. i>.5?1
-  +dla_expand.
-  if $!==3
-   f[0] i#-2!=i#-1?i
-   rm.
+length_const_line=""
+dar_lines=""
+
+length_const_line.=begin(
+length_const_line.="const ww=w#0;"
+length_const_line.="const hh=h#0;"
+length_const_line.="const " length_const_line.=lim_atmp=$2;
+length_const_line.="const " length_const_line.=dlmode={($4%2)>0?1:0} length_const_line.=;
+length_const_line.="const " length_const_line.=use_border="$check_count";
+length_const_line.=use_border?(
+ repeat $n_threads
+  insert_ref_pos={2+$n_threads+$>}
+  length_const_line.=check_and_insert_point_$>()=(i(#0,I(#$insert_ref_pos,0,refpos))!=i(#-1,I(#$insert_ref_pos,0,refpos)));
+ done
+length_const_line.=):(
+ repeat $n_threads
+  insert_ref_pos={2+$n_threads+$>}
+  if $4 length_const_line.=check_and_insert_point_$>()=(i(#0,I(#$insert_ref_pos,0,refpos))<.001?1);
+  else length_const_line.=check_and_insert_point_$>()=(i(#0,I(#$insert_ref_pos,0,refpos))>0.999?1);
+  fi
+ done
+length_const_line.=);
+
+repeat $n_threads
+ 
+ insert_dar_pos={$>+2}
+ insert_ref_pos={2+$n_threads+$>}
+
+ length_const_line.="const v"
+ length_const_line.=$>=
+ length_const_line.=h#$insert_ref_pos
+ length_const_line.=;
+ 
+ dar_lines.=x==
+ dar_lines.=$>
+ dar_lines.=?(
+ dar_lines.=repeat(v$>,refpos,
+ dar_lines.=if(check_and_insert_point_$>(),dar_insert(#$insert_dar_pos,I(#$insert_ref_pos,0,refpos)););
+ dar_lines.=);
+ dar_lines.=do(n=0;
+ dar_lines.=do(
+ dar_lines.=temp_vec=I(#$insert_dar_pos,0,n);
+ dar_lines.=xp=temp_vec[0];
+ dar_lines.=yp=temp_vec[1];
+ dar_lines.=if(
+  if $4%2
+   if $3==0 dar_lines.=(i(#0,xp-1,yp-1,0,0,0,2)||i(#0,xp-1,yp+1,0,0,0,2))||(i(#0,xp+1,yp-1,0,0,0,2)||i(#0,xp+1,yp+1,0,0,0,2))
+   elif $3==1 dar_lines.=(i(#0,xp-1,yp,0,0,0,2)||i(#0,xp+1,yp,0,0,0,2))||(i(#0,xp,yp-1,0,0,0,2)||i(#0,xp,yp+1,0,0,0,2))
+   elif $3==2 dar_lines.=((i(#0,xp-1,yp-1,0,0,0,2)||i(#0,xp-1,yp+1,0,0,0,2))||(i(#0,xp+1,yp-1,0,0,0,2)||i(#0,xp+1,yp+1,0,0,0,2)))||((i(#0,xp-1,yp,0,0,0,2)||i(#0,xp+1,yp,0,0,0,2))||(i(#0,xp,yp-1,0,0,0,2)||i(#0,xp,yp+1,0,0,0,2)))
+   elif $3==3 dar_lines.=altern?(i(#0,xp-1,yp-1,0,0,0,2)||i(#0,xp-1,yp+1,0,0,0,2))||(i(#0,xp+1,yp-1,0,0,0,2)||i(#0,xp+1,yp+1,0,0,0,2)):(i(#0,xp-1,yp,0,0,0,2)||i(#0,xp+1,yp,0,0,0,2))||(i(#0,xp,yp-1,0,0,0,2)||i(#0,xp,yp+1,0,0,0,2))
+   fi
   else
-   if $4
-    f[0] i*(1-i#-1)
-   else
-    f[0] i*i#-1
+   if $3==0 dar_lines.=(i(#0,xp-1,yp-1,0,0,0,2)<1||i(#0,xp-1,yp+1,0,0,0,2)<1)||(i(#0,xp+1,yp-1,0,0,0,2)<1||i(#0,xp+1,yp+1,0,0,0,2)<1)
+   elif $3==1 dar_lines.=(i(#0,xp-1,yp,0,0,0,2)<1||i(#0,xp+1,yp,0,0,0,2)<1)||(i(#0,xp,yp-1,0,0,0,2)<1||i(#0,xp,yp+1,0,0,0,2)<1)
+   elif $3==2 dar_lines.=((i(#0,xp-1,yp-1,0,0,0,2)<1||i(#0,xp-1,yp+1,0,0,0,2)<1)||(i(#0,xp+1,yp-1,0,0,0,2)<1||i(#0,xp+1,yp+1,0,0,0,2)<1))||((i(#0,xp-1,yp,0,0,0,2)<1||i(#0,xp+1,yp,0,0,0,2)<1)||(i(#0,xp,yp-1,0,0,0,2)<1||i(#0,xp,yp+1,0,0,0,2)<1))
+   elif $3==3 dar_lines.=altern?(i(#0,xp-1,yp-1,0,0,0,2)<1||i(#0,xp-1,yp+1,0,0,0,2)<1)||(i(#0,xp+1,yp-1,0,0,0,2)<1||i(#0,xp+1,yp+1,0,0,0,2)<1):(i(#0,xp-1,yp,0,0,0,2)<1||i(#0,xp+1,yp,0,0,0,2)<1)||(i(#0,xp,yp-1,0,0,0,2)<1||i(#0,xp,yp+1,0,0,0,2)<1)
    fi
   fi
+ dar_lines.=,
+ dar_lines.=i(#0,xp%ww,yp%hh)=dlmode;
+ dar_lines.=dar_remove(#$insert_dar_pos,n);
+ dar_lines.=n--;
+ dar_lines.=attempts=0;
+ dar_lines.=);
+ dar_lines.=n++;
+ dar_lines.=,n<dar_size(#$insert_dar_pos));
+ dar_lines.=repeat(dar_size(#$insert_dar_pos),p,
+ dar_lines.=temp_vec=I(#$insert_dar_pos,0,p);
+ dar_lines.=px=temp_vec[0];
+ dar_lines.=py=temp_vec[1];
+ dar_lines.=pv=round(u(0,7));
+ dar_lines.=npx=newpos_x[pv];
+ dar_lines.=npy=newpos_y[pv];
+ dar_lines.=I(#$insert_dar_pos,0,p)=[px+npx,py+npy];
+ dar_lines.=);
+ dar_lines.=attempts++;
+ if $3==3 dar_lines.=altern=(altern+1)%2; fi
+ dar_lines.=,dar_size(#$insert_dar_pos)&&(attempts<lim_atmp));
+ dar_lines.=)
+ 
+ if ($>!=$mt) 
+  dar_lines.=:
+ else
+  dar_lines.=;
+ fi
+ 
+done
+
+length_const_line.=newpos_x=[-1,-1,-1,0,0,1,1,1];
+length_const_line.=newpos_y=[-1,0,1,-1,1,-1,0,1];
+length_const_line.=);
+length_const_line.=attempts=0;
+if $3==3 length_const_line.=altern=round(u(1)); fi
+
+repeat $! l[$>]
+ if s>4||d#0>1 continue fi
+ dla_create_coordinate_map
+ 
+ dla_check_variance[0]
+ use_dla_map=${}
+ 
+ l[0] $dla_ref endl
+ 
+ s. y,$n_threads
+ 
+ ti={$!}
+ 
+ check_count=0
+ 
+ if $use_dla_map
+  dla_target[0]
   if !$6
    if $4
-    *. .001
+    *[0] .001
    else
-    replace. 0,.999
+    replace[0] 0,.999
    fi
   fi
+  dla_expand
+  check_count={$!-$ti}
  else
-  f.. "begin(
-   const ww=w-1;
-   const hh=h-1;
-   const cx=(w-1)/2;
-   const cy=(h-1)/2;
-  );
-  xx=(x/ww-.5)*2;
-  yy=(y/hh-.5)*2;
-  sqrt(xx^2+yy^2)<1?i
-  "
-  if !$4 f. 1 fi
-  eval "
-   const ww=w-1;
-   const hh=h-1;
-   const cx=round((w-1)/2);
-   const cy=round((h-1)/2);
-   i(#-2,cx,cy)=0;
-   i(#-1,cx,cy)=!i(#-1,cx,cy);
-  "
+  dla_clear_image
+  set[0] {1-$__bg},50%,50%
  fi
+ 
+ eval[1] :${-math_lib}$length_const_line$dar_lines
+ 
+ k[0]
+ 
+ if $use_dla_map&&!$6 round fi
+endl done
 
- extract[0] "i==1",1 channels[0] 0,1
- {w#0},{h#0},{d#0},1,1 a[0,-1] c
-
- if $4
-  pt_eval=max(crop(#1,xp-50,yp-50,0,0,101,31,1,1,2))
-  if $3==0 mode=(i(#1,xp-1,yp-1,0,0,0,2)||i(#1,xp-1,yp+1,0,0,0,2))||(i(#1,xp+1,yp-1,0,0,0,2)||i(#1,xp+1,yp+1,0,0,0,2))
-  elif $3==1 mode=(i(#1,xp-1,yp,0,0,0,2)||i(#1,xp+1,yp,0,0,0,2))||(i(#1,xp,yp-1,0,0,0,2)||i(#1,xp,yp+1,0,0,0,2))
-  elif $3==2 mode=((i(#1,xp-1,yp-1,0,0,0,2)||i(#1,xp-1,yp+1,0,0,0,2))||(i(#1,xp+1,yp-1,0,0,0,2)||i(#1,xp+1,yp+1,0,0,0,2)))||((i(#1,xp-1,yp,0,0,0,2)||i(#1,xp+1,yp,0,0,0,2))||(i(#1,xp,yp-1,0,0,0,2)||i(#1,xp,yp+1,0,0,0,2)))
-  elif $3==3 mode=altern?(i(#1,xp-1,yp-1,0,0,0,2)||i(#1,xp-1,yp+1,0,0,0,2))||(i(#1,xp+1,yp-1,0,0,0,2)||i(#1,xp+1,yp+1,0,0,0,2)):(i(#1,xp-1,yp,0,0,0,2)||i(#1,xp+1,yp,0,0,0,2))||(i(#1,xp,yp-1,0,0,0,2)||i(#1,xp,yp+1,0,0,0,2))
-  fi
- else
-  pt_eval=min(crop(#1,xp-50,yp-50,0,0,101,101,1,1,2))<1
-  if $3==0 mode=(i(#1,xp-1,yp-1,0,0,0,2)<1||i(#1,xp-1,yp+1,0,0,0,2)<1)||(i(#1,xp+1,yp-1,0,0,0,2)<1||i(#1,xp+1,yp+1,0,0,0,2)<1)
-  elif $3==1 mode=(i(#1,xp-1,yp,0,0,0,2)<1||i(#1,xp+1,yp,0,0,0,2)<1)||(i(#1,xp,yp-1,0,0,0,2)<1||i(#1,xp,yp+1,0,0,0,2)<1)
-  elif $3==2 mode=((i(#1,xp-1,yp-1,0,0,0,2)<1||i(#1,xp-1,yp+1,0,0,0,2)<1)||(i(#1,xp+1,yp-1,0,0,0,2)<1||i(#1,xp+1,yp+1,0,0,0,2)<1))||((i(#1,xp-1,yp,0,0,0,2)<1||i(#1,xp+1,yp,0,0,0,2)<1)||(i(#1,xp,yp-1,0,0,0,2)<1||i(#1,xp,yp+1,0,0,0,2)<1))
-  elif $3==3 mode=altern?(i(#1,xp-1,yp-1,0,0,0,2)<1||i(#1,xp-1,yp+1,0,0,0,2)<1)||(i(#1,xp+1,yp-1,0,0,0,2)<1||i(#1,xp+1,yp+1,0,0,0,2)<1):(i(#1,xp-1,yp,0,0,0,2)<1||i(#1,xp+1,yp,0,0,0,2)<1)||(i(#1,xp,yp-1,0,0,0,2)<1||i(#1,xp,yp+1,0,0,0,2)<1)
-  fi
- fi
-
- eval[0] ":begin(
-   const ww=w#1;
-   const hh=h#1;
-   const lim_atmp=$2;
-   const use_altern=$3==3;
-   const dlmode=$4?1:0;
-   newpos_x=[-1,-1,-1,0,0,1,1,1];
-   newpos_y=[-1,0,1,-1,1,-1,0,1];
-  );
-  if(use_altern,altern=round(u(0,1)););
-  attempts=0;
-  coordinates=I;
-  xp=coordinates[0];
-  yp=coordinates[1];
-  do(
-   if("$mode",
-    i(#1,xp%ww,yp%hh)=dlmode;
-    break();
-   );
-   off_xy=round(u(0,7));
-   xp+=newpos_x[off_xy];
-   yp+=newpos_y[off_xy];
-   attempts++;
-   if(use_altern,altern=(altern+1)%2;);
-  ,attempts<lim_atmp);
- "
- k.
-endl
-um dla_target_2s,dla_target_3s,dla_target_4s_plus,dla_target,dla_check_variance
+um dla_target,dla_target_2s,dla_target_3s,dla_target_4s_plus,dla_create_coordinate_map,dla_expand
+rep_create_alternating_coordinates_map:
+1,1,1,2
+eval[0] ${-math_lib}"!((x%3==0)!=(y%3==0))*((x%3==0)||(y%3==0))?dar_insert(#-1,[x,y]);
+end(resize(#-1,1,dar_size(#-1),1,s(#-1),0););
+"
+k.
 #@cli rep_blur_splinter: _length,_duplicates,_angle,_thickness,-1<=_balance<=1,_contrast,_boundary={ 0=None | 1=Neumann | 2=Periodic | 3=Mirror },_bisided={ 0=one-line | two-line }
 #@cli : Apply Splinter Blur to Image. Based off observation from using Splinter Blur plugin within Paint.NET made by Ed Harvey, and it is inspired by this filter. Note that convolution result is different.
 #@cli : Default values: '_length=10%','_duplicates=5','_angle=0','_thickness=0','_balance=0','_contrastr=0','_boundary=1','_bisided=0'
@@ -12328,17 +12360,17 @@ rep_blur_splinter $1%,$2,$3,$4%,{$6%},{$5%},$7,$8 cut 0,255
 fx_rep_blur_splinter_preview:
 gui_split_preview "fx_rep_blur_splinter ${1-8}",${-3--1}
 #@gui Diffusion Limited Aggregation: fx_rep_dla,fx_rep_dla_preview(0)
-#@gui :_=note("Create Diffusion Limited Aggregation. Please read instructions!"),_=separator()
+#@gui :_=note("Create Diffusion Limited Aggregation. "),_=separator()
 #@gui :Pixel Proximity=int(2,1,8)
-#@gui :Escape Point=int(100000,5,1000000)
+#@gui :Escape Point=int(100,100,1000)
 #@gui :Aggregation Mode=choice(0,"Corners","Axis[Slow!]","All-Around","Alternating")
-#@gui :Target=choice(1,"Light","Dark")
+#@gui :Target=choice(1,"Dark","Light")
 #@gui :Border=int(0,0,200)
 #@gui :Keep Mask?=bool(1)
-#@gui :Negate Image?=bool(0)
-#@gui :_=separator(),_=note("<b>Instructions</b>"),_=note("If the image is a single color, then aggregation form will be created using a point from center. Border will limit the points in specified proximity away from mask.\n\n Time-consuming!\n\n<u>Apply, then undo to check result. Do not close!</u>\n\n<b>Note:</b> Mask will be treated as a binary mask. ")
-fx_rep_dla: if $7 negate[0] fi rep_diffusion_limited_aggregation[0] ${1-6} n[0] 0,255
-fx_rep_dla_preview: gui_no_preview $*
+#@gui :_=separator(), Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui :_=separator(), _=note("<small>Author: Reptorian. Latest Update: <i>2021/8/01</i>.</small>")
+fx_rep_dla: rep_diffusion_limited_aggregation ${1-6} n[0] 0,255
+fx_rep_dla_preview: gui_split_preview "fx_rep_dla ${1-6}",${-3--1}
 #@gui Pseudorandom Noise: fx_rep_mj_prn,fx_rep_mj_prn_preview
 #@gui :_=note("Generates pseudorandom noise.\n\nBased off <a href="https://forums.getpaint.net/topic/111659-regular-noise-texture-ymd-20170815/">MadJik's Regular Noise Paint.NET Plugin</a>. This is a extended version. Preview may not be accurate!")
 #@gui :_=separator(),_=note("<b>Preliminary</b>")
