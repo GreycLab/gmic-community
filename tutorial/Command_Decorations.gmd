@@ -1,0 +1,103 @@
+# Command Decorations
+
+%% images/select.png r2dy 300 %% By default, commands operate on all images in the image list. Often that is not what we want.
+
+The image list can, and often will, contain many items. As we ''-input'' or otherwise conjure images, the interpreter places them in sequence, assigning indices to them starting from zero as it goes along.
+
+Non-negative indices designate images with respect to the beginning of the stack. That is, 0, 1, 3 designate the first, second and fourth image.
+
+Negative indices designate images with respect to the end of the stack, i. e., -1, -2, -3 designate the last, penultimate and third from the last image. In a stack of four images, both -1 and 3 designate the same image, the last one in the stack. -4 and 0 designate the first image.
+
+## Image Selection
+
+G'MIC allows us to decorate commands on their right hand sides with selections that restrict the scope of a command to a subset of items in the image list. Square brackets immediately to the right of the command, with no separating white space, may contain collections of image selecting indices. Thus, the pipeline:
+~~~
+noise[0] 0.5,2 blur[2] 10 diffusiontensors[-1] 0,1,0.7,2.3
+~~~
+applies noise only to just the first image on the stack, then blurs just the third and generates diffusion tensors from the last.
+
+This illustration notwithstanding, selection notation is extensive. Selection syntax has expressions for selecting single or multiple images, ranges of images, every other, every third, or, generally, every n-th image, relative to the beginning or end of the stack, relative to the size of the overall stack, through named collections, and all images except the ones designated by a selection. It is easy (and probably inevitable) to select images which are not on the stack, an error.
+
+Here are the ways to restrict to selected images the action of some fictive command called `-foo`:
+
+|+ __Type__ | __Template__ | __Description__
+| **Everything** | `foo` | Operates on every image on the stack.
+| **Left Single** | `foo[n]` | Operates on image 'n+1', counting from the beginning of the stack. `[0]` is a common idiom demarking the first image on the stack. Example: `foo[3]` operates on the fourth image on the stack.
+| **Right Single** | `foo[-n]` | Operates on image '-n', counting from the end of the stack. `[-1]` is a common idiom demarking the last image on the stack. Example: `foo[-2]` operates on the penultimate image in the stack.
+| **Enumerated** | `-foo[a,-b,...z]` | Comma separated indices. Operates on specific images. Indices may have negative signs; these are counted from the end of the stack. Example: `foo[0,2,-1]` operates on the first, third and last image on the stack.
+| **Range** | `foo[a-b]` | Hyphenated indices. Operates on images in the range from a to b inclusive. Example: `foo[3-5]` operates on the fourth, fifth and sixth images. `foo[-3--1]` operates on the third from the last, next to the last and last images.
+| ***Relative Range*** | `foo[a%-b%]` | Hyphenated percentages. Operates on image ranges specified through relative positions, with '100%' designating the last position on the stack, however large it may be. Example: `foo[50%-100%]` operates on images on the upper half of the stack.
+| **Modulo n** | `foo[<Range>:n]` | Given a range of images, operates on every n-th image in the range. `foo[:n]` is an error. Example: `foo[0--1:3]` operates on every third image on the stack. `foo[50%-100%:2]` operates on every even-indexed image on the upper half of the stack.
+| **Except** | `foo[^<selection>]` | Caret preceding a selection. Operates on all images except those in the selection. Example: `foo[^0]` operates on all images except the first one. `foo[^0--1:2]` operates on every odd-indexed image on the stack.
+| **Names** | `foo[<label>]` | Operates on images selected by the name '<label>', an alphanumeric string which begins with a letter. Raises an error if '<label>' has not been defined. Use `name[<selection>] <label>` to establish an equivalence between `<label>` and some specific `<selection>`. Example: `name[0,-1] firstlast` equates `firstlast` with a selection that picks the first and last images on a stack; `foo[firstlast]` will then operate on the first and last items on the image stack.
+| **Enumerated Names** | `foo[<label-1>,...]` | Operate on images selected through a series of labels, which must already be defined. The overall selection is the union of the individual selections.
+
+It is possible to mix types in selections, thus `-foo[1,3,5--1]`, mixing an enumeration and range, selects the second, fourth, and sixth through the last image.
+
+It is also possible that images may be designated more than once, as in `-foo[0 - -1:2, 2, 4, 6]`, which selects all the images with even indices on the stack, then explicity selects the images corresponding to indices 2, 4 and 6.  G'MIC regards the collection of indices in selections as sets of distinct elements, so images are not selected twice, nor is there any relevance to the order of indices. `-foo[0,1,2]`, `-foo[2,1,0]`, `-foo[2-0]`, `-foo[0,1,0,2,1,2]` all select the first three images on the stack.
+
+Here are some common examples:
+
+| 1. | `blur 20` | Blur all images on the stack with a standard deviation of 20.
+| 2. | `blur[0] 10` | Blur the first image on  the stack with a standard deviation of 10.
+| 3. | `blur[-1] 5` | Blur the last image on the stack with a standard deviation of 5.
+| 4. | `blur[0,2,5] 7` | Blur the first, third, and sixth image on the stack with a standard deviation of 7.
+| 5. | `blur[^3] 6` | Blur all images on the stack except the fourth one with a standard deviation of 6.
+
+## Isolated Selections: Implied Copy Command
+
+Selections in isolation, apparently not modifying any command, imply '-copy'. The images designated by the selector are duplicated and the interpreter places the copies at the end of the image list, in the same relative order as their antecedents. Thus `[0,3,5]` by itself copies the first, fourth and sixth images; the copy of the first image becomes `-3`, the copy of the fourth becomes `-2` and the copy of the sixth becomes `-1`. The implicit presence of the ''-input'' command operates with this notation.
+
+## Lefthand Decorations: Replace or Append
+
+Items may be decorated on the lefthand side. Hyphens optionally distinguish commands from other items. Omit them for brevity; include them for clarity. In addition to identifying commands, hyphens also have copy/replace semantics. This matters with transformation commands: those that take selected images as inputs and then produce output.
+
+| 1. |Commands without hyphens or with single hyphens will replace the images they select with their outputs.
+| 2. |Commands decorated with `+` on the lefthand side create new images with their outputs; these new images go on the end of the image list.
+
+Non-transformative commands are those which implement aspects of G'MIC program flow or management of the environment. We have seen one example already. ''-name'' labels a selection but does not otherwise operate on the images in the selection's collection.
+
+## Command Line Anatomy
+
+Consider how this command line builds an image list:
+
+~~~
+$ gmic 256,256,1,3 noise[-1] 0.05,2 +bandpass[-1] 0.0005,0.001 +threshold[-1] 30% +negate[-1] thinning[-1] -normalize[^0] 0,255
+~~~
+
+| 1. | `256,256,1,3` conjures up a 256x256x1x3 pixel image with three channels, initially solid black establishing a stack with one image.
+| 2. | The `noise[-1]` command, no hyphen, two parameters, replaces this black image with a sparse, random scattering of red green and blue pixels, so the stack remains with one image.
+| 3. | The `+bandpass[-1]` command, with `+`, appends a new image at the end of the image list: the low-frequency components of the previous last image. This leaves two images on the stack.
+| 4. | Similarly, `+threshold[-1]` appends a new image at the end of the image list, with each channel undergoing a bilevel reduction of the channels of the previous last image on the stack. This leaves three images on the stack.
+| 5. | `+thinning[-1]` creates a morphologically thinned version of the last image, the 'spines' of contiguous, non-black regions residing in the various channels of the last image, appending the thinned version to the end of the stack. Four images are now on the stack.
+| 6. | `normalize[^0]`, with an optional hyphen, replaces all images on the list, except the first one, with corresponding versions where the intensity range of each channel is remapped to the range 0 – 255. The image list still has four images. Had we decorated this command with '+', the stack would have had seven images, the second, third and fourth images followed by their normalized versions in positions five, six and seven.
+
+The four images on the stack look like this:
+
+===
+%% 256,256,1,3 noise[-1] 0.05,2 +bandpass[-1] 0.0005,0.001 +threshold[-1] 30% +negate[-1] thinning[-1] normalize[^0] 0,255 _parse_cli_images %%
+===
+
+## Shorthand Selection Notation
+
+It is very common to operate on the last, penultimate, and third-from-last images on the stack. Righthand command decorations such as `[-1]`, `[-2]` and `[-3]` are so prevalent that they have an alternate shorthand form: one, two and three 'pips':
+
+- `foo[-1]` is equivalent to `foo.`, operates on the last image on the list.
+- `foo[-2]` is equivalent to `foo..`, operates on the penultimate image on the list.
+- `foo[-3]` is equivalent to `foo...`, operates on the third-from-last image on the list.
+
+G'MIC supports this shorthand notation only as a command decoration, not in any other place where a selection might be used, as an implied copy or as an argument to another command. Nor do pips work in selection expressions. The fictive command `foo[0,...]` will not operate on the first and third-from-last image.
+
+## Common Idiomata
+
+It is not uncommon to see these repeating idiomata:
+
+---
+- `...+foo[-1] <parameter list> +bar[-1] <parameter list>...`: Constructs a progression of the effects of a series of commands; the images accumulates effects from left to right....
+---
+- `+foo[0] <parameter list> +bar[0] <parameter list>...`: Illustrates the effect of different commands on one image.
+---
+- `+foo[<range>] <parameter list>`: Illustrates the effect of one command on a range of images.
+---
+- `+foo <parameter list>`: Illustrates the effect of one command on all images.
+---

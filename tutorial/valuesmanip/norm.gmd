@@ -1,0 +1,131 @@
+# norm
+
+===
+![Théâtre Molière, Sète, Hérault](images/theatre_moliere.png)
+**theatre_moliere.png**
+_Color, luminance and norm._
+===
+%% x "mkdir -p img" %%
+The ''-norm'' command regards the channel values of a pixel as components of a vector; it replaces the pixel with a single-channel value, the Euclidean length of that vector. See ''-orientation'' for the general discussion on RGB color spaces, including the treatment of a color as a position vector in that space.
+
+## Luminance, Norm and Orientation: What is the Story?
+In the RGB color space framework, ''-norm'' is complementary to ''-orientation''. If it is one's wont to regard an image as consisting of color vectors, then ''-norm'' extracts the length of those vectors and ''-orientation'' extracts their direction. ''-norm'' is rarely an end in itself; it is an intermediary command that builds a dataset of vector lengths, generally to support further calculations.
+
+Visually, ''-norm'' is often thought to be a kind of ''-luminance'' command, as its results are superficially like it. ''-luminance'', however, is intended to give displayable results.  ''-norm'' couldn't care less about displayable results; it reports on vector lengths, however they may fall. These will often exceed the upper limit of the 8 bit intensity range (0,255) of graphic formats. The image on the left of Théâtre Molière, Sète, Hérault compares original color, luminance (middle) and norm (right). Since some pixels exceeded 255 in the right hand section, the highlights are flat and the overall results are washed out. Take away: ''-norm'' is not your luminance command.
+
+## Example: Key Color
+
+The commands ''-norm'' and ''-orientation'' taken together are image decomposition commands in the vein of `-rgb2***. -split. c` leaving on the image list a set of single channel images that contain various image properties. For example, ''-rgb2hsl'' reorganizes the image into hue, saturation and lumination channels. Get those, then play tricks.
+
+The commands ''-norm'' and ''-orientation'' furnish a kind of decomposition that is congenial for those who think of colors as vectors, their luminance is comparable to their length: ''-norm'' extracts those lengths, so that command is "luminance-like." It generates single channel images containing the vector length of each pixel in the source image. ''-orientation'' extracts where pixels' colors are pointing - their orientation - so that command is is "color-like." It generates three channel images containing the red, green and blue components of a color. These "color" vectors all have lengths of one. Executing a ''-norm'' command on the output of ''-orientation'' produces a single channel image where all pels are equal to 1. There are faster ways to make such an image.
+
+One application that harnesses both these commands is popping a key color: Part of an image with a designated hue has unaffected saturation. Other colors, not so much like the key, are considerably less saturated. Complementary colors of the key aren't saturated at all. You have probably seen this in a bazillion places; it was popular a dozen years ago and now has become somewhat cliché.
+
+For those who think vectorially, dot and cross products suggest themselves as solutions to popping the key.
+
+%% colorwheel 150 output. img/cw.png +orientation. +fill. dot(I,[1,0,0]) normalize. 0,255 to_rgb. output. img/cw_dot.png rm 0 %%
+===
+||__Colorwheel__|__Dotting with the red vector__
+|![cw](img/cw.png)|![cw_dot](img/cw_dot.png)
+
+===
+* The [dot product](https://en.wikipedia.org/wiki/Dot_product) of two unit vectors is a scalar and is equal to the cosine between them.
+  - The dot of parallel unit vectors is one;
+  - the dot of right-angled unit vectors is zero;
+  - the dot of unit vectors pointing in opposite directions is negative one.
+  The dot of a color vector with the key color vector therefore furnishes a scalar that tells us how "like" a color vector is with a given key color.
+
+%% img/cw.png +orientation. +fill. cross(I,[1,0,0]) norm. normalize. 0,255 to_rgb. output. img/cw_crs.png rm 0 %%
+===
+||__Colorwheel__|__Crossing with the red vector__
+|![cw](img/cw.png)|![cw_crs](img/cw_crs.png)
+
+===
+
+* The [cross product](https://en.wikipedia.org/wiki/Cross_product) of two unit vectors is a new vector perpendicular to the two unit vectors; the length of the new vector is equal to the area of the parallelogram formed by the unit vectors.
+  - The cross of parallel unit vectors is a zero length vector;
+  - the cross of right-angled unit vectors is a unit length vector;
+  - the cross of unit vectors pointing in opposite directions is zero.
+  - Signed areas are admissable, but try explaining negative area to an eight year old. Positive area arises from considering counterclockwise rotation, negative from clockwise rotation, where one of the vectors is taken to be the reference for clockwise or counterclockwise rotation.
+
+Either dot or crossing works, but with differences. Being an operation that generates areas (square relationships) the cross product rises from zero at a steeper slope than the dot product drops from one. The cross product excludes off-colors more readily than the dot product. Choice rides on the aesthetics of drop-off.
+
+The example here uses the sharper cross product.
+
+===
+~~~
+gmic                                              \
+  -sample rooster,300                             \
+  +orientation.                                   \
+  +fill. 'cross(I,[0.935,0.235,0.265])'           \
+  -norm.                                          \
+  -normalize. 0,1                                 \
+  -fill.. "whitevect=[1,1,1]/norm([1,1,1]);       \
+           lerp(I,whitevect,i#-1)"                \
+  -fill.. 'I/norm(I)'                             \
+  -rm.                                            \
+  +norm[0]                                        \
+  -mul[-2,-1]                                     \
+  -output. rooster_keyred.png
+~~~
+%% sample rooster,150 output. img/r_alpha.png +orientation. +normalize. 0,255 output. img/r_or.png rm. +fill. cross(I,[0.935,0.235,0.265]) +normalize. 0,255 output. img/r_cpv.png rm. norm. normalize. 0,1 +normalize. 0,255 to_rgb. output. img/r_nrm.png rm. output img/r1.cimg rm 0 %%
+
+||__A rooster__|__color vectors__|__cross products__|__normed crosses__
+|![rooster](img/r_alpha.png)|![r_orient](img/r_or.png)|![r_cpv](img/r_cpv.png)|![r_cvec](img/r_nrm.png)
+===
+The rooster in the sample images has a nice, red comb, which, after G'MIC's ''-orientation'' command, furnishes a color vector image. G'MIC's color picker reports from this image that pixels in the rooster's comb center around R=0.935, G=0.235, B=0.265. That is the color we pop.
+
+We duplicate the unit vector image (__color vectors__) and harness `+fill` to host a single math expression statement: `cross(I,[0.935,0.235,0.265]).` As is its wont, the ''-fill'' command traverses the color vector image and, executing its one-line math expression for each pixel, fills the new image with the cross product of the original color vectors and the key color (__cross products__) from the rooster's comb.
+
+We have the cross product vectors. What we really want are their lengths, for the short ones - the ones that are zero or very nearly so - correspond to pixels that are exactly or nearly exactly the comb color. We harness ''-norm'' -- remember ''-norm''? ''-norm'' is the subject of this tutorial, lest we forget -- we harness ''-norm'' to convert these cross vectors to their lengths (__normed crosses__). This is our key dataset. We harness this dataset in the next section.
+
+%% img/r1.cimg -fill.. "whitevect=[1,1,1]/norm([1,1,1]);lerp(I, whitevect,i#-1)" -fill.. "I/norm(I)" +normalize.. 0,255 output. img/r_desat.png rm[-2,-1] +norm.. +normalize. 0,255 to_rgb. output. img/r_norm.png rm 0 %%
+===
+||__A rooster__|__desat color vectors__|__normed rooster__
+|![rooster](img/r_alpha.png)|![r_desat](img/r_desat.png)|![r_norm](img/r_norm.png)
+===
+This is what we do with the key dataset:
+
+===
+$$ \mathbf{C}_{desat} = (1 - t)\mathbf{C}_{sat} + t\mathbf{W} $$
+===
+
+The lefthand side represents the color vectors that are desaturated for almost every hue but for the rooster's comb, which remains a bright red. These __desat color vectors__ are what we are going to use instead of __color vectors__ from __A rooster__. We get them by "lerping" between the original __color vectors__ and a single vector, __W__ the "white vector" By "lerping" we mean making simple linear combinations between our original __color vectors__ and the white vector. Put simply, we perform a pixel-by-pixel blend between the white vector and the original color vector inhabiting the pixel. The __normed cross__ factor for the pixel - *t* in the equation - determines how much of the white vector is part of the blend. For large values of *t*, the white vector prevails, and the pixel is largely or wholly desaturated. for zero or tiny *t* values, the pixel is mainly the unblended original pixel. But those are the ones that are the key color, or very nearly so. The only saturated colors to be seen are rooster comb colors.
+
+What is the "white vector"? It is the unit length vector with all of its *R*, *G* and *B* components equal to one another. It represents - no surprise here - white. Perforce, as a unit length vector, each  *R*, *G* and *B* component equals the reciprocal of the square root of three, about 0.57735, because the square root of the squared sums of these components equals one. In math expression scripting, `[1,1,1]/norm([1,1,1])` generates the white vector.
+
+The G'MIC expression implementing the lerp is performed by the second `-fill.. whitevect=[1,1,1]/norm([1,1,1]);lerp(I, whitevect,i#-1)` That `fill` operation replaces the contents of __color vectors__ with __desat color vectors.__ The third `fill..` ensures that these blended color vectors are at unit length. Taking a lerp is a bit of a cheat: the blended vectors trace a chord of the unit vector sphere, not its surface, so some fall short of unity. Purists would insist on a higher order blending function; such would be hard to distinguish from our cheat, which is much simpler to implement.
+
+And, we're done. All that remains is cleanup and housekeeping. We remove __normed crosses__ from the pipeline; we don't need them anymore. We get a fresh set of normed lengths of the original rooster image and multiply those with __desat color vectors__ to get our resulting image.
+
+===
+%%  sample rooster,300 +orientation. +fill. cross(I,[0.935,0.235,0.265]) -norm. -normalize. 0,1 -fill.. whitevect=[1,1,1]/norm([1,1,1]);lerp(I,whitevect,i#-1) -fill.. I/norm(I) -rm. +norm[0] -mul[-2,-1] %%
+
+===
+
+## Postscript
+
+~~~
+gmic                                              \
+  -sample rooster,300                             \
+  +orientation.                                   \
+  +fill. 'cross(I,[0.935,0.235,0.265])'           \
+  -norm.                                          \
+  -normalize. 0,1                                 \
+  +fill. '1/norm([1,1,1])'                        \
+  -to_rgb.                                        \
+  -image... [-1],0,0,0,0,1,[-2]                   \
+  -rm[-2,-1]                                      \
+  +norm[0]                                        \
+  -mul[-2,-1]                                     \
+  -output. rooster_keyred_2.png
+~~~
+For those who don't have a complete feel for math expressions yet, here is an "image compositor's approach". In this approach, __normed crosses__ control the blending between a sprite image - a monocolor image filled entirely with the reciprocal of the square root of three, and the __color vectors__ image. Same results in one felled swoop. Lerping hasn't really gone away, though. It is hidden in the implementation of ''-image.''
+
+
+# Command reference
+===
+"""
+gmic -h norm
+"""
+===

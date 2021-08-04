@@ -1,0 +1,41 @@
+# Roundify
+
+===
+%% x "mkdir -p img" 256,1,1,1,'256*x/w' repeat 4 +normalize[0] 0,4 roundify. {$>/2} done rm[0] append c display_graph. 1200,900,1,4 r2dx. 50%,5 %%
+**Transitions fast or slow, as you like them.**
+===
+Like ''-round'', this command discretizes ("flattens") image values within consecutive ranges so that one discrete value prevails, informally, turning a continuous ramp of values into a staircase (red curve). These flattened ranges center on integer values and extend on either side by ± 0.5. Thus between values _n_ and _n + 1_ a transition of 1.0 occurs at _n + 0.5_. Values less than that of the transition are discretized to _n - 0.5_; those equal or greater are discretized to _n + 0.5_.
+
+Unlike ''-round'', ''-roundify'' also provides "soft" transitions (green curve). Gamma settings taken from the open interval (0, ... 1) replace the abrupt unit transitions with gamma curves, each centered on the transition value, that "eases in" from _n - 0.5_ and "eases out" to _n + 0.5, with an average slope inversely proportional to the gamma value: a large slope with small gamma values. Visually this "softens" the transition boundary. The average curve slope lessens with increased gamma, further softening the transitions, until gamma equals 1.0 and the gamma curves become linear ramps (blue curve). Gamma may exceed 1.0, shifting transition points to the integral values themselves and causing shifted, semiflat regions (bluegreen curve).
+
+## Examples:
+
+[Mach Banding](https://en.wikipedia.org/wiki/Mach_bands), where luminance values cluster around just a very few values, often drive photographers and artists nuts – unless, of course, that is the effect wanted. Mach banding, named after Austrian physicist [Ernst Mach](https://en.wikipedia.org/wiki/Ernst_Mach), typically occurs in a workflow where unsigned integer-based calculations are taking place, and, in their course, luminosity ranges are compressed to just very narrow boundaries. Being unsigned integers, the luminosity values necessarily crowd into just a very few values.
+
+The results are very well known. What, in the original is a uniform progression of values, becomes a series of abrupt transitions. Should that be the desired effect, great! But if it is not desired... no joy. To compensate, one may apply a dither pattern around the transition edges, but that is often destructive to fine detail. Sometimes, the effect is unavoidable. The unsigned integer compression and expansion is happening in hardware, or in compensation for noisy transmission. Dithering is then a necessary crutch.
+
+But if Mach banding is a desired effect, then ''-roundify'' presents the means to cluster luminosity into specific value bins with both hard or soft transitions. If desired, ''-roundify'' may cluster luminosity values to just a very few values, the classic posterization effect. But roundify also allows values near transition edges to drift a bit toward intermediary values, neither in one bin nor the other. These near-transition values are not represented well by either neighboring bin, so ''-roundify'' lets them assume luminosities closer to their original values, but only to an extent. That extent is controlled by the __gamma__ parameter. When it is zero, no drift is allowed. Transition values fall into one bin or the other. When one, it is as if ''-roundify'' has not even operated: uniform progressions of values remain so. Usually, one chooses an intermediary gamma value to force "some" binning with "some" relaxation near transitions:
+%% 80,20,1,1,'256*x/w' o. img/r_init.png n. 0,3 repeat 4 +roundify[0] {$>/3} n. 0,255 o. img/r_{$>}.png rm. done rm 0 %%
+===
+||__Original__|__Gamma = 0__|__Gamma = 0.3333__|__Gamma = 0.6667__|__Gamma = 1.0000__
+|![orig](img/r_init.png)|![g_zero](img/r_0.png)|![g_onethird](img/r_1.png)|![g_twothird](img/r_2.png)|![g_one](img/r_3.png)|
+===
+
+To harness ''-roundify'' for distinct artistic pursuits, first normalize the image to a narrow range. To "posterize" a continuous-tone image into four luminosity zones, first normalize to a [0...4] range:
+
+===
+%% sp car,300 %%
+** A car, unroundified **
+%% sp car,150 repeat 4 +n[0] 0,4 -roundify. {$>/3} n. 0,255 done rm[0] %%
+** A car: roundify gammas of 0, 1/3, 2/3 and 1.0 **
+~~~
+gmic                             \
+   -sample car,200               \
+   -repeat 4                     \
+      +normalize[0] 0,4          \
+      -roundify. '{$>/3}'        \
+      -normalize. 0,255          \
+   -done                         \
+~~~
+===
+__Roundify__ operating on images with typical lumiosity ranges: 256 steps for eight-bit PNG, or 65356 steps for the sixteen bit variant, seems to have little visible effect. One might discount ''-roundify'' as being one of those obscure G'MIC commands with no earthly purpose; perhaps something only the imaging gods use. Roundify actually operates, but with 256 steps instead of four, the posterization occurs across very small transitions and is effectively invisible – but not necessarily insignificant. Many processes begin with discretized data - values rounded into specific bins. With gamma set to zero, ''-roundify'' serves this end, as does ''-round,'' a core command upon which ''-roundify'' is built.

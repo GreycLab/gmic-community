@@ -1,0 +1,96 @@
+# Cauldron, Anyone?
+%% x "mkdir -p img" %%
+![img](images/imgstack.png) The G'MIC image has three spatial dimensions; it is mostly out of habit and custom that many people (this writer included) generally [fuhgeddaboudit](http://www.urbandictionary.com/define.php?term=fuhgeddaboudit) and only use single-slice, two dimensional images. That is a shame, as many G'MIC commands do their bidding in three dimensions as well as two. They are untapped sources of cheap (in terms of rendering time) animation.
+
+The diagram on the left illustrates how the ''-blur'' command behaves when an image has more than one slice. An orange pixel affects neighbors along the z axis (depth) as well as along the x and y axes. Play these slices as an animation and the blurred pixel becomes a kind of a pop! explosion.
+
+The ''-bandpass'' command also operates in three dimensions. In other places, we've harnessed this command for spectral filtering, eliding all but a subset of frequencies in the original image. Taking an image with such truncated spectral content back into spatial domain gives rise to a set of sine waves that do not quite [reconstitute the original](https://gmic.eu/tutorial/images/cauldron_wnb.jpg); we see patterns of constructive reinforcement and destructive interference that would not have been especially noticable had we not erased those parts of the spectrum needed to reconstitute the original.
+
+The key idea in this Cookbook piece is this: ''-bandpass'', like many G'MIC commands work in three dimensions. And when we think Animation, that extra dimension can be time. The following example happens to use the -bandpass command, but the techniques presented here aren't married to that command. They can be generalized to any other command which operates 'in the round' over slices as well as the width and height of images.
+
+## Pipeline
+
+Here is a pipeline that produces a kind of a cauldron effect. The nice thing about clips produced by this pipeline is that they can be seamlessly looped without a 'pop' crossing from the end to the beginning of the loop. Details follow.
+~~~
+gmic srand 100                            \
+   -input 360,240,200,3                   \
+   -noise[-1] 0.2,2                       \
+   -bandpass 2%,3%                        \
+   -normalize 0,255                       \
+   -display                               \
+   -split z                               \
+   -output /path/to/your/animation.mp4,24
+~~~
+|1. |First, we [conjure from the aether](https://gmic.eu/tutorial/conjuring_images_out_of_the_aether_and_other_generators.html) a contiguous volume 320 pixels wide, 240 pixels high and two hundred slices deep, sufficient for an eight second video clip playing at 24 frames per second. Into this conjured image, we salt-and-pepper a fairly sparse pattern of pixels. If you scrub through the image volume at this point in the pipeline (insert ''-display'' after ''-noise''), the animation would have the appearance of dirty film. To this sparse noise we apply a low-pass spectral filter, using the ''-bandpass'' command. The lower relative cutoff frequency is 2%, the upper relative cutoff frequency is 3%. That is, of 100% of the original image spectra, we toss all frequencies but a one percent wide band between the 2%-3% markers.
+
+|2.|Behind the scenes, the ''-bandpass'' command harnesses the [Fast Fourier Transform](https://en.wikipedia.org/wiki/Fast_Fourier_transform), embodied in the ''-fft'' command, converting the three dimensional array of pixels into a similar array of spectral coefficients, this through a process of [Fourier analysis](http://en.wikipedia.org/wiki/Fourier_analysis). It then deletes all but a hollow sphere of coefficients around the spectral space origin. The lower and upper relative cutoff frequencies set the thickness of this shell and establish the overall character of the animation. By 'cutoff', we mean that we set coefficients beyond these limits to zero and preserve coefficients within.
+
+|3. |Here, we picked low relative frequencies, producing only very large features that seem quite blurry, characteristics of a low pass frequency filter. Larger relative frequencies would give rise to high-pass filters, admitting smaller, sharper features, while the difference between the numbers controls the amount of variation in feature size. Experimenting with these numbers can give rise to a great deal of variety in texture and variation. The ''-noise'' command also affects the texture of the pattern, particularly for larger values of cutoff frequencies.
+
+|4. |With a much-elided set of spectral coefficients, the ''-bandpass'' command invokes the ''-ifft'' command, partially reconstituting the spatial image through the inverse process of Fourier synthesis.
+
+|5. |At the end of the command pipeline, housekeeping prevails. The reconstituted image generally will not be in a range suitable for presentation display; ''-normalize'' shifts all intensities into the 0,255 range, a suitable width for eight bit color animation. We use the ''-split'' command in preparation for ''-output'', a command which can create a video, but which needs a sequence of one slice images. By way of particular file extensions, one may specify one of five multimedia containers: Quicktime (.mov), Motion Picture Expert Group (MPEG) (.mp4),  Flash (.flv), Ogg/Vorbis (.ogg) or Audio Video Interleaved (.avi). This pipeline harnesses the  MPEG container (.mp4 file extension). The ",24" notation attached to the file extension sets the 24 frame-per-second rate for the stream.
+
+|6. |The multimedia file produced by the ''-output'' command contains an [h264](https://en.wikipedia.org/wiki/Advanced_Video_Coding) video stream in an MPEG container, which can be played on a wide range of hardware. If you need to tailor the multimedia stream in more precise ways, save the stream as an image sequence. Choose a lossless image file format like Portable Network Graphic images (.png). The resulting sequence of numbered files may be then imported into [Blender's video editor](https://docs.blender.org/manual/en/latest/video_editing/introduction.html) and combined with other media.
+
+===
+%% srand 100 360,240,200,3 noise. 0.2,2 bandpass 2%,3% n 0,255 s z o img/cauldron.mp4,20 rm 0 %%![anim](img/cauldron.mp4)
+*The Cauldron, sans title. See 'Further Explorations' for titling this animation.*
+===
+
+The video clip above is a product of the previous G'MIC command pipeline. It reminds us of percolating liquid in a cauldron. Poetic interpretations aside, we are observing the low frequency components of sparsely scattered noise, a three dimensional interference pattern which our "camera" depicts two dimensionally, displaying slices through time. Particular curdling textures depend very much on the choice of the lower and upper relative cutoff frequencies that we gave to the -bandpass command. Larger relative frequencies give rise to finer, higher frequency detail. The blobs are smaller and seem to curdle faster. A larger difference between relative frequencies admits a wider range of blob sizes. The cutoff frequencies can be set too close together. If the difference between the lower and upper relative frequencies becomes too small, the resulting images may be all black.
+
+Because this sequence is a product of Fourier analysis and synthesis, it can be seamlessly tiled in the x, y, and z dimensions. Not only do the top and bottom and left and right edges match, but the end of the animation segues into the beginning, so this material can be used out of the box in an endless loop without having to worry about a 'pop' as the animation loops around. This characteristic stems entirely from the -bandpass command and the underlying Fourier transform commands, ''-fft'' and ''-ifft''.
+
+## Further Explorations
+
+Nearly everything we do with G'MIC is not an end in itself, but furnishes stepping stones to other effects. The cauldron animation can furnish displacement fields to distort other visuals, and the cauldron visual need not even appear itself.
+
+===
+![cauldron_title](images/cauldron_title.png)
+*The Title, sans Cauldron.* 
+===
+
+This is a title image made by Inkscape and then exported as a PNG file. We matched its aspect ratio to the cauldron clip shown in the previous section, 360x240 pixels. Our aim is to composite this title with the cauldron clip, so we have included an alpha channel in the image file. In this manner, the base video will be visible through the transparent regions of this title image.
+
+To distort this title, as if it being affected by the cauldron, we will harness G'MIC's ''-warp'' command. -warp uses channel zero to shift a target image along the horizontal axis and channel one to shift along the vertical axis. We'll extract these channels from each frame of the caudron clip and apply them to the title image. Since it would be tedious to do this manually for each of the 200 frames in the cauldron clip, we will avail ourselves of a G'MIC loop commands, `repeat <n>... done`.
+
+===
+%% img/cauldron.mp4 b 1 images/cauldron_title.png repeat $!-1 l[$>,-1] +channels[0] 0,1 n. -15,15 +warp[1] .,1 rm.. sh. 100% n. 0,255 rm. blend[0,-1] alpha endl done rm. o img/cauldron2.mp4,20 rm 0 %%![anim2](img/cauldron2.mp4)
+*The Cauldron, with a turbulence Stirred title.* 
+===
+
+~~~
+gmic                                \
+   -input img/cauldron.mp4          \
+   -blur 1                          \ 
+   -input images/cauldron_title.png \ Step 0
+   -repeat $!-1                     \
+      -local [$>,-1]                \ Step 1
+         +channels[0] 0,1           \
+         -normalize. -15,15         \ Step 2
+         +warp[1] [-1],1            \
+         -remove..                  \ Step 3
+         -shared. 100%              \
+         -normalize. 0,255          \ Step 4
+         -remove.                   \
+         -blend[0,-1] alpha         \ Step 5
+      -endl                         \
+   -done                            \
+   -remove.                         \ Step 6
+   -output img/cauldron2.mp4,24
+
+~~~
+
+## Distorted Title Walkthrough
+
+|+ __Image List__ | __Notes__
+|%% images/cauld_3.png r2dx 25% %%| __Step 0:__ When G'MIC loads a video file, it automatically converts the frames to sRGB, a colorspace which can be read by most paint programs, and separates the frames out as separate images. The blur step is optional; it smooths out any minor artifacts introduced by the creation of the video. As a consequence, there are hundreds of items on the image list. To this we add the title slide.
+|%% images/cauld_0.png images/title_0.png r2dx 25% %%| __Step 1:__ ''-repeat'' and ''-local'', together with their companion -endlocal and -done, create an image list iterator. See the [-repeat...-done](https://gmic.eu/oldtutorial/_repeat.shtml) and [-local...-endlocal](https://gmic.eu/oldtutorial/_local.shtml) tutorials. In effect, these paired sets of commands successively take up one frame from the video along with the undistorted title slide. The indented commands between the -local...-endlocal pairs have a private image list, distinct and separate from the 'outer' image list. During each iteration, these commands constituting the inner -local...-endlocal environment distort the title slide in a manner controlled by the cauldron pattern from the video frame. It then composites the distorted title with the cauldron frame. The iteration repeats until all frames have been "stamped" with the cauldron title, distorted in a way controled by the cauldron pattern. Details follow.       
+|%% images/cauld_0.png images/title_0.png images/cauld_1.png r2dx 25% %%| __Step 2:__ At the outset of each iteration, only two images make up the private image list: one frame from the video and the title slide. ''-channels'' operates on the video frame. It extracts the red and green channels of the frame into a separate image, the third on the private list, creating a _distortion field_ for use by the ''-warp'' command. The [warp tutorial](https://gmic.eu/oldtutorial/_warp.shtml) goes into detail on how distortion fields work. Here, the specific red and green channels taken from the video frame determine how the letterforms bend. Normalizing the distortion field between ± values controls the magnitude of the distortion. Here, ± 15 means that title slide pixels will, _at most_ move fifteen pixels in the horizontal and vertical directions.    
+|%% images/cauld_0.png images/title_0.png images/title_1.png r2dx 25% %%| __Step 3:__ The ''-warp'' command harnesses the distortion field to distort the title slide. After it's use, we drop the distortion field from the image list by the ''-remove'' command. It is no longer needed; we will create a new distortion field based on the next video frame during the next iteration. 
+|%% images/cauld_0.png images/title_0.png images/title_1.png images/title_2.png r2dx 25% %%| __Step 4:__ The next couple of steps are optional, born of a sense of prudence. We re-normalize the transparency channel of the distorted title slide, as warp can alter pixel values. As a precaution, we renormalize them to the 0-255 range. The means by which we do this is common: The ''-shared'' command allows us to access internal components of an image and operate on it as if it is a separate image on the list. See the [share](https://gmic.eu/oldtutorial/_shared.shtml) tutorial for more information. In this example, we renormalize the alpha channel quickly because we are operating on the channel without needing to copy it out of the image, and then re-copy it back into the image. 
+|%% images/cauld_2.png images/title_0.png images/title_1.png r2dx 25% %%| __Step 5:__ The ''-blend'' command is G'MIC's general compositing tool. The alpha blend composites the distorted title onto the frame. And... we are done with one frame. On the next iteration, we take up the next frame on the outer image list, pulling it onto the inner list for the next round.
+|%% images/cauld_2.png r2dx 25% %%| __Step 6:__ ''-done'' executes when all images on the list have been processed. We remove the undistorted title slide leaving only the now-title-stamped frames. We write out the video in the same manner as we did initially with the cauldron effect.
+
+

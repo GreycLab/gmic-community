@@ -1,0 +1,104 @@
+# index
+
+===
+![Colorized windmill](images/windmill.jpg)
+_A lovely Belgian windmill, fully indexed and dithered with perfectly awful, randomly selected colors._
+===
+
+Given a palette or _look-up table_ of reference colors and a source image, the command determines for each source image pixel, the most closely matching reference color in the palette. Depending on the` map_palette` flag, the pixels of the output image may hold reference colors or look-up table indices to the most closely matching color.
+
+# Examples
+
+===
+%% sample gmicky r2dx[-1] 50% %%
+**gmicky**
+_Untouched Gmicky: for reference_
+===
+
+===
+%% srand 12345 sample gmicky r2dx[-1] 50% 4,4,1,3,u normalize. 0,{2^8-1} -index.. [-1],1,1 r2dx. 150,1 %%
+**cg_random.png**
+_Gmicky matched to 16 randomly chosen colors_
+~~~
+gmic                           \
+     srand 12345               \
+     sample gmicky             \
+     r2dx[-1] 50%              \
+     4,4,1,3,u                 \
+     normalize[-1] 0,'{2^8-1}' \
+     index[-2] [-1],1,1        \
+     output[-2] cg_random.png
+~~~
+===
+
+Suppose you are given 16 colors - not of your choosing - and you have to render an image in the best possible manner using _just those colors!_ You may (1) quit your job, or (2) use ''-index'' to find which color in the wretched palette is "closest" to an absolutely transcendent color in the original - that you can't use. ''-index'' finds such "closest" palette matches for every pixel in the original and substitutes the one in the palette that is a best match. "Closest", here is in terms of Euclidean color space. See ''-orientation'' and ''-norm'' for a development of this idea of "distance between colors". Note that white, in the original, goes to pink. In the randomly generated palette, the color in slot number 13 - pink - is "closest" in color space terms to the white in the original. Dithering, the next-to-the-last parameter has been set to one, permitting ''-index'' to partially compensate for not-especially-great matches by skewing its neighboring pixels in color space somewhat. Dithering ranges from 0 to 1, with zero turning off all compensation.
+
+===
+%% srand 12345 sample gmicky r2dx[-1] 50% +colormap[-1] 16,1,1 4,4,1,3 fill. [-2] rm.. index.. [-1],1,1 r2dx. 150,1 %%
+**cg_random.png**
+_Gmicky matched to 16 really good colors_
+~~~
+gmic                           \
+     sample gmicky             \
+     r2dx[-1] 50%              \
+     +colormap[-1] 16,1,1      \
+     index[-2] [-1],1,1        \
+     output[-2] cg_optimal.png
+~~~
+===
+
+Suppose you are told you can only use 16 colors but you can pick any color you want. Your friend is ''-colormap,'' which turns the problem around, asking "What 16 colors - in aggregate - give rise to the smallest sum of distances to all the colors in the original? The general answer to this is a matter of open research, but the [K-means algorithm](https://gmic.eu/tutorial/gmic-color-mapping_k-means-algorithm.shtml) can come close, using an iterative approach, and that is embodied in ''-colormap''. As a pragmatic matter, that G'MIC command gives you the colors 'most like' the original because it consists of the most "dominant" colors in the original.
+
+===
+%% sp gmicky r2dx. 50% ({255-238},238^{255-106},106^{255-83},83) resize. 16,[-1],[-1],[-1],5 index.. [-1],0 4,4,1,3 fill. [-2] rm.. resize. 150,150,[-1],[-1],1 to_rgb.. normalize.. 0,{2^8-1} %%
+**cg_tongue.png**
+_Mask of Gmicky colors most like Gmicky's tongue_
+~~~
+gmic                                                 \
+   sample gmicky                                     \
+   r2dx[-1] 50%                                      \
+   input '({255-238},238^{255-106},106^{255-83},83)' \
+   resize. 16,[-1],[-1],[-1],5                       \
+   index.. [-1],0                                    \
+   rm.                                               \
+   normalize. 0,'{2^8-1}'                            \
+   output. cg_tongue.png
+~~~
+===
+
+Suppose you wake up one morning obsessed with needing to know what colors in the Gmicky sample are most like Gmicky's tongue? (RGB: 238,106,83). You could (1) Make an appointment with your therapist to work out your obsessions, or (2) Use ''-index'' as an analytic tool.
+
+The snippet here grabs the Gmicky sample, inputs a 1x2, image with the first pixel colored as the _complement_ of Gmicky's tongue (i.e., the color least like Gmicky's tongue) and the second pixel colored as Gmicky's tongue. ''-resize'' comes along to stretch these two pixels into 16, using the cubic interpolation scheme in ''-resize''. This makes a 16 step reference palette, puts the color least like Gmicky's tongue in index zero and the color most like Gmicky's tongue in index fifteen, and the intermediary indices reference the fourteen colors less-or-more like Gmicky's tongue, indexed in that order. We harness ''-index'' to produce an image - but with `map_palette` set to zero instead of one.
+
+In this mode, ''-index'' generates an image that consists of _indices_ to select colors from the reference palette, not colors _from_ the reference palette. Though nominally an images of indices, these indices can be taken as grayscale pixel values, and in that regard, the image constitutes a mask selecting for colors most like Gmicky's tongue. That is through the organization of the palette, as the color that is exactly like Gmicky's tongue is in palette slot 15 (white), the color least like Gmicky's tongue is in slot 0 (black) and colors less-or-more like Gmicky's tongue are in slots 1-14 (dark to light gray). So, sleep well tonight.
+
+# Command reference
+===
+"""
+gmic -h index
+"""
+===
+
+1. _palette:_ An image selection or a palette name of one among a number of predefined Look-up Tables (LUT). Either form furnishes the ''-index'' command with an enumerated set of reference colors that it can compare to colors in the original image.
+   a. When palette is an image selection (a numeric index in square brackets), the selected image interpreted as a single row, multicolumn set of reference colors, regardless of the actual image dimensions. The command indexes the pixels in the reference image from left-to-right, top-to-bottom, taking each pixel to be a reference color. While the image may be any size, it is rarely practical to have more than a few hundred reference colors, and a few dozen are usually ample. The image is almost always quite small.
+
+   b. When this parameter is a name, it is taken to be a reference to a built-in color lookup table.
+   To preview these named palettes, consider:
+===
+~~~
+   gmic 256,256,1,1,'x' +map < *palette name* >
+~~~
+
+%% 256,256,1,1,'x' +map delta to_rgb.. normalize.. 0,{2^8-1} %%
+_The delta palette visualized_
+===
+
+   This places a gray ramp on the left, in this example having 256 steps, and the palette on the right - the colors to which specific gray levels on the left translate.
+
+2. _dithering:_ (float from the closed interval [0, …, 1]) Sets the size of a neighborhood around which the command attempts to match the neighborhood average, rather than a single pixel. With nonzero dithering, the command factors nearby pixels through a kernel containing a dithering pattern (see ''-convolve''). Otherwise, set to zero, it matches pixels without regard to the neighborhood.
+
+3. _map_palette:_ (boolean), when False, output image pixels contain the index number that addresses the closest matching color in the palette. That is, the image is an index map. Superficially, the index map seems to be a gray scale; in fact, each pixel contains an index into the color palette addressing the closest matching color. The ''-map'' command, in conjunction with the given palette, outputs an image with indices replaced by the reference colors. Otherwise, when True, the output image is directly composed with the closest matching reference colors.
+
+When dithering is non-zero, ''-index'' can very nearly cancel out otherwise large mismatch errors. This is especially useful when the reference colors are fixed and have no great affinity to the colors in the given source image. The command takes into account the value of neighboring pixels and can assign reference colors to adjacent pixels that are also “wrong, but wrong in different directions”, so that, when averaged in the eye of the viewer, the two errors produce an aggregate that (more or less) approximates the color of the neighborhood.
+
+When the flag `map_palette` is set to False, output pixels are set to the numeric index of the position of the reference color in the palette, rather than the reference color itself. This indirection is useful for tabulating color usage statistics; the output constitutes an index map. Retaining the palette of reference colors, and applying the ''-map'' command to the palette and index map produces an output image with the reference colors replacing their indices.
