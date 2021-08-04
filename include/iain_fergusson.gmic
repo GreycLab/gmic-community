@@ -10880,6 +10880,353 @@ by_shift={$1*$y_mul}
 -c 0,255
 -endif
 
+#@gui iain_highlight_synthesis: iain_highlight_synthesis,iain_highlight_synthesis(0)
+#@gui : red = float(1,0,2)
+#@gui : green = float(0.6,0,2)
+#@gui : blue = float(1,0,2)
+#@gui : rgb to srgb = bool(0)
+
+iain_highlight_synthesis:
+
+red_wb={$1/max($1,$2,$3)}
+green_wb={$2/max($1,$2,$3)}
+blue_wb={$3/max($1,$2,$3)}
+
+
+srgb=$4
+smoothness=2
+smoothness2=2
+smoothness3=2
+
+
+#remove_alpha channel if GIMP layer has one
+-remove_opacity
+
+
+# demosaic channels independantly (choice of demosiacing affects results)
+	#detect pattern
+	+crop 0,0,500,500 
+	sum={is}
+
+	+rgb2bayer[1] 0,1 b_sum0={is} -rm[-1] +rgb2bayer[1] 1,1 b_sum1={is} -rm[-1] +rgb2bayer[1] 2,1 b_sum2={is} -rm[-1] +rgb2bayer[1] 3,1 b_sum3={is} -rm[-1] 
+	-if {$sum==$b_sum0} b_pat=0 -elif {$sum==$b_sum1} b_pat=1 -elif {$sum==$b_sum2} b_pat=2 -elif {$sum==$b_sum3} b_pat=3 -endif
+	-k[0]
+	
+	rgb2bayer $b_pat,1
+	-split c
+
+
+	-l[1]
+
+	(1,0,0;0,-1,0;0,0,0)
+	(0,1,0;-1,0,0;0,0,0)
+	+convolve[0] [1]
+	+convolve[0] [2]
+	-rm[1,2]
+
+	(0.25,0.5,0.25;0.5,1,0.5;0.25,0.5,0.25)
+	-convolve[1,2] [-1]
+	-rm[-1]
+
+	-complex2polar[-1,-2]
+	-rm[-2]
+	-mod[1] {pi}
+	-median[-1] 3
+	-inrange[-1] 0,{pi/2}
+
+	(0.5,1,0.5)
+	(0.5;1;0.5)
+	+convolve[0] [2]
+	+convolve[0] [3]
+	-rm[0,2,3]
+	-mul[1] [0]
+	-negate[0]
+	-mul[2] [0]
+	-add[1,2]
+	-k[1]
+	-endl
+
+	-l[0]
+
+	(0.25,0.5,0.25;0.5,1,0.5;0.25,0.5,0.25)
+	-convolve[0] [-1]
+	-rm[-1]
+
+	-endl
+
+	-l[2]
+	(0.25,0.5,0.25;0.5,1,0.5;0.25,0.5,0.25)
+	-convolve[0] [-1]
+	-rm[-1]
+	-endl
+
+	-append c
+ 
+# End demosaic 
+-cut 0,255
+
+
+-split c # splits RGB image into individualgreyscael images
+
+
+	+local # create a new grey refernce image
+
+	# sort pixel values 
+	+min[0,1,2] # creates new image for minimum of RGB values
+	+blend_median[0,1,2] #creates new image for median of RGB values
+	+max[0,1,2] #creates new image for median of RGB values
+	-rm[0,1,2] #Removes indiviual RGB grey scale images in local context
+
+# highlight synthesis
+	-l[0]
+
+		-repeat 4 
+		
+		# replace clipped pixels by predications
+		# process pixels seqentially
+		+fill[0] >"
+		far = j(-1)+(j(-1)-j(-2))*0.99;
+		near = 255+(255-j(-1))*0.99;
+		predict = if(far<255,near,far);
+
+		if(i>254,predict,i)
+
+		"
+		-rotate[0] 90 # rotate 90 degress and repeat so pixels are predicted from all four directions
+
+		-done
+		# undo rotations
+		-rotate[2] -90
+		-rotate[3] -180
+		-rotate[4] 90
+		# find minimum of predictions
+		 -min[-1,-2,-3,-4] 
+
+
+	+gt[0] 254 # find clipped area
+	-distance[-1] 0 # calculate distance from edge of clipped area
+
+	-cut[-1] 0,50 # restrict max distance to 50
+	
+		# blur predicted area by the distance from the edge of the clipped area
+		
+		-repeat $smoothness 
+		-gcd_boxfilter_local[1] [2] # use garagecoder's algorthm for bluring
+		-sub[2] 0.25 # reduce blur radius a little bit for each repeat
+		-cut[2] 0,50 # clip to stop negative values
+		-done
+		
+	-cut[1] 0,{255*(2^2)} # max 2 stops of prediction
+	-keep[1] 
+
+	-endl
+
+# end synthesis
+
+# we have now refernce image with syntheised highlights from the minimum RGB values
+
+# Instead of using the reference image we have just created from the minimum RGB values, use all RGB channels for the grey reference by restoring the clipped areas of the median and max RGB images and combining them together
+
+	#  find smoothest parts of the image to propegated information from 
+
+	+blur[0] 0.5 -laplacian[-1] -abs[-1]
+	
+	# overwrite pixels on the edge of the images so they are ignored 
+	-line[-1] 0,0,100%,0,1,500
+	-line[-1] 0,0,0,100%,1,500
+	-line[-1] 100%,0,100%,100%,1,500
+	-line[-1] 0,100%,100%,100%,1,500
+
+	-negate[-1] 
+	-blur[-1] 0.5 
+
+	# fill clipped areas of median and max images
+	
+	+lt[1] 254 #create mask with unclipped area
+	-erode[-1] 3 # shrink mask to by 1 pixel 
+	-sub[1] [0] # find difference between reference
+	+mul[1] [-1] # create new image with clipped area as black by multiplying by mask
+	
+	-watershed[-1] [3] # use watershed function, guided by image smoothness to propegated values into clipped area.
+	
+	
+	# blur propegated values by the distance from the edge of the mask
+	+distance[-2] 1 
+	-erode[-1] 3
+	-c[-1] 0,20
+		-repeat $smoothness2
+		-gcd_boxfilter_local[-2] [-1]
+		-done
+	-rm[-1]
+	
+	
+
+	#combine newly progated values with difference image
+	-mul[1] [-2]
+	-negate[-2] 
+	-mul[-1,-2]
+	-add[1,-1]
+	
+	# add referance to difference iamge
+	-add[1] [0]
+	
+	# average refernce median image
+	-add[0,1]
+	-mul[0] 0.5
+	
+	#repeat propegation procedure for maxium image
+	
+	
+	+lt[1] 254
+	-erode[-1] 3
+	-sub[1] [0]
+	+mul[1] [-1]
+	-watershed[-1] [2]
+	
+		+distance[-2] 1
+	-erode[-1] 3
+	-c[-1] 0,20
+		-repeat $smoothness2
+		-gcd_boxfilter_local[-2] [-1]
+		-done
+-rm[-1]
+	
+	-mul[1] [-2]
+	-negate[-2] 
+	-mul[-1,-2]
+	-add[1,-1]
+	-add[1] [0]
+	
+	# combine min,median and max images so the result is the average of all three
+	-mul[1] 0.5
+	-add[0,1]
+	-mul[0] {1/1.5}
+	
+	-remove[-1] # remove smoothness image
+
+	-endl
+
+
+# now there is a reference image that has syntheised highlights and representes all colour channels
+
+
+#This reference image is used to propegate information into clipped areas of the R,G,B images using the same techniques as above
+
++blur[-1] 0.5 -laplacian[-1] -abs[-1]
+
+	-line[-1] 0,0,100%,0,1,500
+	-line[-1] 0,0,0,100%,1,500
+	-line[-1] 100%,0,100%,100%,1,500
+	-line[-1] 0,100%,100%,100%,1,500
+
+	-negate[-1] 
+	-blur[-1] 0.5 
+
+# red channel
+
++lt[0] 254 
+-erode[-1] 3 
+
+-mul[0] $red_wb  # apply white balance mulitplier to ensure correct proportions between channels
+
+
+-sub[0] [3]
+
++add[0] 1000 # offset differnce image because  "watershed" will might comfused 
+
+-mul[-1] [-2]
+-watershed[-1] [4]
+
++distance[-2] 1 
+	-erode[-1] 3
+	-c[-1] 0,20
+		-repeat $smoothness2
+		-gcd_boxfilter_local[-2] [-1]
+		-done
+	-rm[-1]
+
+-sub[-1] 1000
+
+-mul[0] [-2]
+-negate[-2] 
+-mul[-1,-2]
+-add[0,-1]
+-add[0] [3]
+
+
+# green channel
+
++lt[1] 254 
+-erode[-1] 3 
+
+-mul[1] $green_wb  # apply white balance mulitplier
+
+-sub[1] [3]
+
++add[1] 1000 # offset differnce image because  "watershed" will might comfused 
+
+-mul[-1] [-2]
+-watershed[-1] [4]
+
++distance[-2] 1 
+	-erode[-1] 3
+	-c[-1] 0,20
+		-repeat $smoothness2
+		-gcd_boxfilter_local[-2] [-1]
+		-done
+	-rm[-1]
+
+-sub[-1] 1000
+
+-mul[1] [-2]
+-negate[-2] 
+-mul[-1,-2]
+-add[1,-1]
+
+-add[1] [3]
+
+# blue channel
+
++lt[2] 254 
+-erode[-1] 3 
+
+-mul[2] $blue_wb  # apply white balance mulitplier to ensure correct proportions between channels
+
+
+-sub[2] [3]
+
++add[2] 1000 # offset differnce image because  "watershed" will might comfused 
+
+-mul[-1] [-2]
+-watershed[-1] [4]
+
++distance[-2] 1 
+	-erode[-1] 3
+	-c[-1] 0,20
+		-repeat $smoothness2
+		-gcd_boxfilter_local[-2] [-1]
+		-done
+	-rm[-1]
+
+-sub[-1] 1000
+
+-mul[2] [-2]
+-negate[-2] 
+-mul[-1,-2]
+-add[2,-1]
+-add[2,3]
+
+
+-append[0,1,2] c
+-keep[0]
+-cut[0] 0,1000000 # cut negative values
+
+# make output sensible for returnnig to GIMP
+-n 0,255 # normalise
+
+-if $srgb -rgb2srgb -endif
+
+
 # Local Variables:
 # mode: sh
 # End:
