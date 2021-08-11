@@ -61,31 +61,22 @@ _xpink :
   na={-1,n}
   filename=${-file_rand}
   x_filename={/$filename}
-  if {(isnum($GMIC_PINK_VERBOSE)?0$GMIC_PINK_VERBOSE:0)>0} verb=" 2>&1" xverb=1
-	else verb=" >/dev/null 2>&1" xverb={$^>2?1,0} fi
+  if {(isnum($GMIC_PINK_VERBOSE)?0$GMIC_PINK_VERBOSE:0)>0} verb=" 2>&1"
+  else if ${-is_windows} verb=" >nul 2>&1" else verb=" >/dev/null 2>&1" fi fi
   if {(isnum($GMIC_PINK_NO_RM)?0$GMIC_PINK_NO_RM:0)>0} no_rm=1 else no_rm=0 fi
   ('$1') replace_str. ":","," replace_str. "-","," pc={t} rm. pink_cmd=${arg\ 1,$pc}
   if ['${arg\ 2,$pc}']==['if'] ifo=,${arg\ 3,$pc} else ifo="" fi
-  prefix=pink. suffix=""
-  if !${-is_windows}
-    x 0,"type "${prefix}${pink_cmd}	#$verb
-    if ${}!=0 prefix=""
-      x 0,"type "$pink_cmd		#$verb
-      if ${}!=0 suffix=".exe"
-        x 0,"type "$pink_cmd$suffix		#$verb
-        if ${}!=0 error "Executable (pink.)"$pink_cmd" not found in PATH, status = "${}"!! Returning!!\n"  fi
-      fi
-    fi
-    if (isnum($GMIC_PINK_VERBOSE)?0$GMIC_PINK_VERBOSE:0)>0
-      +e ${prefix}${pink_cmd}${suffix}" "${filename}".pnk $2 "${filename}"_o.pnk"$verb fi
-    o ${filename}.pnk$ifo x $xverb,${prefix}${pink_cmd}${suffix}" "${filename}".pnk ${2} "${filename}"_o.pnk"$verb
-    _status=${}
-  else
-    if {(isnum($GMIC_PINK_VERBOSE)?0$GMIC_PINK_VERBOSE:0)>0}
-    +e $pink_cmd" "${x_filename}".pnk $2 "${x_filename}"_o.pnk" fi
-    o ${filename}.pnk$ifo x $xverb,${pink_cmd}" "${x_filename}".pnk ${2} "${x_filename}"_o.pnk"
-    _status=${}
-  fi
+  if ${-kr_is_exec\ pink.${pink_cmd}}!=0 
+    if ${-kr_is_exec\ ${pink_cmd}}!=0
+      if ${-kr_is_exec\ ${pink_cmd}.exe}!=0 
+        error "Executable (pink.)"$pink_cmd"(.exe) not found in PATH, status = "${}"!! Returning!!" 
+      else fpin_cmd=${pink_cmd}.exe fi
+    else fpin_cmd=$pink_cmd fi
+  else  fpin_cmd=pink.$pink_cmd fi
+  if {(isnum($GMIC_PINK_VERBOSE)?0$GMIC_PINK_VERBOSE:0)>0}
+    +e $fpin_cmd" "${x_filename}".pnk $2 "${x_filename}"_o.pnk" fi
+  o ${x_filename}.pnk$ifo x ${fpin_cmd}\ ${x_filename}".pnk $2 "${x_filename}"_o.pnk"$verb
+  _status=${}
   if !$no_rm delete ${x_filename}.pnk fi
   if {"$_status!=0 && same(['$pink_cmd'],['seuilauto'],9)!=0"} error "Exec status is "$_status"."
   elif isfile(['{/${filename}_o.pnk}'])
@@ -1077,14 +1068,12 @@ karos_error :
   karos_about
  text. "${1=Error}",0.5~,0.8~,36,1,200,0,200
 
-#@cli kr_is_exec : executable
-#@cli : Test for 'executable' with 'type' (unix/MacOS) or 'where' (windows)
-#@cli : Return status: unix/Macos/Windows==0 found!
+#@cli kr_is_exec : executable_name
+#@cli : Look for 'executable_name' with 'type' (unix/MacOS) or 'where' (windows)
+#@cli : Return unix/Macos/Windows status==0 found!
 kr_is_exec : 
-  if ${-is_windows} 
-    if $^!=0 x "where "$1 else x "where "$1" >nul 2>&1" fi else
-    if $^!=0 x "type "$1 else x "type "$1">/dev/null 2>/dev/null" fi 
-  fi
+  if ${-is_windows} if !($^<=1) x "where $1" else x "where $1 >nul 2>&1" fi 
+	else if !($^<=1) x "type $1" else x "type $1 >/dev/null 2>&1" fi fi
 
 #@cli kr_draw_vars : _type(0)
 #@cli : If _type==0 Draw with text several variable and function values \
