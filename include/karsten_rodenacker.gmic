@@ -61,31 +61,19 @@ _xpink :
   na={-1,n}
   filename=${-file_rand}
   x_filename={/$filename}
-  if {(isnum($GMIC_PINK_VERBOSE)?0$GMIC_PINK_VERBOSE:0)>0} verb=" 2>&1" xverb=1
-	else verb=" >/dev/null 2>&1" xverb={$^>2?1,0} fi
+  if {(isnum($GMIC_PINK_VERBOSE)?0$GMIC_PINK_VERBOSE:0)>0} verb=" 2>&1"
+  else if ${-is_windows} verb=" >nul 2>&1" else verb=" >/dev/null 2>&1" fi fi
   if {(isnum($GMIC_PINK_NO_RM)?0$GMIC_PINK_NO_RM:0)>0} no_rm=1 else no_rm=0 fi
   ('$1') replace_str. ":","," replace_str. "-","," pc={t} rm. pink_cmd=${arg\ 1,$pc}
   if ['${arg\ 2,$pc}']==['if'] ifo=,${arg\ 3,$pc} else ifo="" fi
-  prefix=pink. suffix=""
-  if !${-is_windows}
-    x 0,"type "${prefix}${pink_cmd}	#$verb
-    if ${}!=0 prefix=""
-      x 0,"type "$pink_cmd		#$verb
-      if ${}!=0 suffix=".exe"
-        x 0,"type "$pink_cmd$suffix		#$verb
-        if ${}!=0 error "Executable (pink.)"$pink_cmd" not found in PATH, status = "${}"!! Returning!!\n"  fi
-      fi
-    fi
-    if (isnum($GMIC_PINK_VERBOSE)?0$GMIC_PINK_VERBOSE:0)>0
-      +e ${prefix}${pink_cmd}${suffix}" "${filename}".pnk $2 "${filename}"_o.pnk"$verb fi
-    o ${filename}.pnk$ifo x $xverb,${prefix}${pink_cmd}${suffix}" "${filename}".pnk ${2} "${filename}"_o.pnk"$verb
-    _status=${}
-  else
-    if {(isnum($GMIC_PINK_VERBOSE)?0$GMIC_PINK_VERBOSE:0)>0}
-    +e $pink_cmd" "${x_filename}".pnk $2 "${x_filename}"_o.pnk" fi
-    o ${filename}.pnk$ifo x $xverb,${pink_cmd}" "${x_filename}".pnk ${2} "${x_filename}"_o.pnk"
-    _status=${}
-  fi
+  if ${-kr_is_exec\ pink.${pink_cmd}}==0 fpin_cmd=pink.$pink_cmd
+  elif ${-kr_is_exec\ ${pink_cmd}}==0 fpin_cmd=$pink_cmd
+  elif ${-kr_is_exec\ ${pink_cmd}.exe}==0 fpin_cmd=${pink_cmd}.exe
+  else error "Executable (pink.)"$pink_cmd"(.exe) not found in PATH, status = "${}"!! Returning!!" fi
+  if {(isnum($GMIC_PINK_VERBOSE)?0$GMIC_PINK_VERBOSE:0)>0}
+    +e $fpin_cmd" "${x_filename}".pnk $2 "${x_filename}"_o.pnk" fi
+  o ${x_filename}.pnk$ifo x ${fpin_cmd}\ ${x_filename}".pnk $2 "${x_filename}"_o.pnk"$verb
+  _status=${}
   if !$no_rm delete ${x_filename}.pnk fi
   if {"$_status!=0 && same(['$pink_cmd'],['seuilauto'],9)!=0"} error "Exec status is "$_status"."
   elif isfile(['{/${filename}_o.pnk}'])
@@ -1077,6 +1065,13 @@ karos_error :
   karos_about
  text. "${1=Error}",0.5~,0.8~,36,1,200,0,200
 
+#@cli kr_is_exec : executable_name
+#@cli : Look for 'executable_name' with 'type' (unix/MacOS) or 'where' (windows)
+#@cli : Return unix/Macos/Windows status==0 found!
+kr_is_exec : 
+  if ${-is_windows} if !($^<=1) x "where $1" else x "where $1 >nul 2>&1" fi 
+	else if !($^<=1) x "type $1" else x "type $1 >/dev/null 2>&1" fi fi
+
 #@cli kr_draw_vars : _type(0)
 #@cli : If _type==0 Draw with text several variable and function values \
 # Else Draw PATH variable into an image
@@ -1148,7 +1143,7 @@ _kr_path : ('{/{/$PATH}}')
 #@cli karo_li2st : p1,p2,...,pn
 #@cli : Convert comma separated list to space separated string.
 karo_li2st :
-  v - u "" if $#>=1 ({"'${1--1}'"}) replace. {','},{"' '"} u {t} rm. fi v +
+  u "" if $#>=1 ({"'${1--1}'"}) replace. {','},{"' '"} u {t} rm. fi
 
 #@cli _kr_ac_list : number (actually 38 in gmic_stdlib, fully 64)
 #@cli : return alpha channel mode string from number in status.
@@ -1181,10 +1176,9 @@ _kr_ac_list :
 #@cli : $ sp lena karo_xcimg pde_TschumperleDeriche2d,-iter\ 50\ -visu\ 0\ -ns +-
 karo_xcimg :
   filename=${-file_rand}
-  if !${-is_windows}
-    x "type "$1" >/dev/null 2>&1"
-    if ${} v + e "executable $1 not found in PATH, status = "${}"!! Returning!!\n" v -
-    {w},{h} karos_error "exec Error !!" return fi
+  if ${-kr_is_exec\ $1}!=0 
+    error "executable $1 not found in PATH, status = "${}"!! Returning!!\n" 
+    {w},{h} karos_error "exec Error !!" return
   fi
   o ${filename}.cimg
   x "$1 -i "${filename}".cimg $2 -o "${filename}".cimg"
@@ -1196,25 +1190,25 @@ karo_xcimg :
 #@cli : Execute use_skeleton (CImg demo) external.
 #@cli : For help execute in terminal shell "use_skeleton -help"
 #@cli : $ sp car otsu 256 +karo_skeleton "-median,5,-inv,1"
-karo_skeleton : v - if $#>0 karo_li2st ${1--1} p=${} else p="" fi v +
-  e "Compute use_skeleton exec with options \'"$p"\' on"$? v -
+karo_skeleton : if $#>0 karo_li2st ${1--1} p=${} else p="" fi
+  e "Compute use_skeleton exec with options \'"$p"\' on"$?
   repeat $! l[$>]
    s={s} if $s>1 s. c fi
    repeat $! l[$>] karo_xcimg use_skeleton,${p}" -visu 0" mv. 0 k[0] endl done
    if $s>1 a[-$s--1] c fi
-  endl done v +
+  endl done
 
 #@cli karo_nlmeans : _p1,..,pn=-zoom,1,-ng,0|1,-nu,0|1,-ns,0|1,-p,1,-lambda,-1,-sigma,-1,-alpha,3,-sampling,1
 #@cli : Execute use_nlmeans  (CImg demo) external. (see also q-nlmeans p=4,lambda=4,sigma=10)
 #@cli : For help execute  in terminal shell "use_nlmeans -help"
 #@cli : $ osteo +karo_nlmeans -p,2 +-
-karo_nlmeans : v - if $#>0 karo_li2st ${1--1} p=${} else p="" fi v +
-  e "Compute use_nlmeans exec with options "${p}" on"$? v -
+karo_nlmeans : if $#>0 karo_li2st ${1--1} p=${} else p="" fi
+  e "Compute use_nlmeans exec with options "${p}" on"$?
   repeat $! l[$>]
    s={s} if $s>1 s. c fi
    repeat $! l[$>] karo_xcimg use_nlmeans,${p}" -visu 0" mv. 0 k[0] endl done
    if $s>1 a[-$s--1] c fi
-  endl done v +
+  endl done
 
 #------------------------------------
 #
@@ -1253,7 +1247,6 @@ pseudo_c :
 #@cli : $ sp tiger +karo_luminance ,
 karo_luminance : skip ${1=itur1990}
   e[^-1] "Compute luminance $1 of image$?."
-  v -
  remove_opacity
   repeat $! l[$>]
   if s==3
@@ -1266,7 +1259,6 @@ karo_luminance : skip ${1=itur1990}
   elif s!=1 norm n 0,255
   fi endl done
   channels 0
-  v +
 
 #@cli karo_close : _size>0, _shape={0|1|2} (square|octagon|circle),_invert={0|1}, \
 # scale={0|1|2}, Value action none | cut | normalize,  \
@@ -2298,21 +2290,21 @@ _karo_shanbhag : skip "${1=0},${2=1}"
 #@cli : and the bin size per image.
 #@cli : Default values: 'nb_levels=256', '_value0=0%', '_value1=100%'
 #@cli : $ sp barbara /. 2 +. 32 _kr_histogram , e ${} dg 600,300,3
-_kr_histogram : skip "${1=256},${2=0%},${3=100%}" v -
- v + e[^-1] "Calculate histgram with $1 classes in range [${2-3}] from image$?." v -
+_kr_histogram : skip "${1=256},${2=0%},${3=100%}"
+ e[^-1] "Calculate histgram with $1 classes in range [${2-3}] from image$?."
  repeat $! l[$>]
     if ${-is_percent\ $2} mn={im+(iM-im)*$2} else mn=$2 fi
     if ${-is_percent\ $3} mx={im+(iM-im)*$3} else mx=$3 fi
    if $>==0 st=$mn,{($mx-$mn)/($1-1)} else  st=$st,$mn,{($mx-$mn)/($1-1)} fi
   histogram. $1,$mn,$mx
- endl done u $st v +
+ endl done u $st
 
 #@cli _kr_histogram8 : _nb_levels>0[%],_value0[%],_value1[%]
 #@cli : same as _kr_histogram, still defaults to byte data (256,0,255) instead of (256,0%,100%)
 #@cli : $ sp dog _kr_histogram8 {iM-im+1},{im},{iM} e ${} dg 600,300,3
 _kr_histogram8 : skip "${1=256},${2=0},${3=255}"
- e[^-1] "Calculate histgram with $1 classes in range [${2-3}] from image$?."
-  v - repeat $! l[$>] _kr_histogram. ${1-3} endl done v +
+  e[^-1] "Calculate histgram with $1 classes in range [${2-3}] from image$?."
+  repeat $! l[$>] _kr_histogram. ${1-3} endl done
 
 #@cli hist_percentile : _nth[%],_zero={0|1},_min0,_stepw
 #@cli : Estimation of _nth percentiles (lower & upper) from histogram and returning value(s) in status (${})
@@ -2358,9 +2350,9 @@ hist_percentile :
 #@cli : $ osteo +karo_morpho 4,3,,"0\,1\,0\;1\,1\,1\;0\,1\,0"
 karo_morpho :
   skip "${2=0},${3=5},${4='1,0,1;0,1,0;1,0,1'}"
-  v - ac=Ero,Dil,Open,Close,"Ori-Ero","Dil-Ori","Ori-Open","Close-Ori","(Ori*2-(Open+Close))*0.5","Close-Open"
-  ke=Square,Octagon,Circle,Custom v +
-  e[^-1] "Math. morph. filter "${arg\ {$1+1},$ac}" with kernel "${arg\ {$2+1},$ke}" and size "$3 v -
+  ac=Ero,Dil,Open,Close,"Ori-Ero","Dil-Ori","Ori-Open","Close-Ori","(Ori*2-(Open+Close))*0.5","Close-Open"
+  ke=Square,Octagon,Circle,Custom
+  e[^-1] "Math. morph. filter "${arg\ {$1+1},$ac}" with kernel "${arg\ {$2+1},$ke}" and size "$3
   ({'"$4"'}) f. "(i>=_'0' && i<=_'9') || i==_',' || i==_';'?i:-1" discard. -1 ckernel={t} rm.
   if $2==0 m "my_erode: erode $""1" m "my_dilate: dilate $""1"
   elif $2==1 m "my_erode: erode_oct $""1" m "my_dilate: dilate_oct $""1"
@@ -2386,7 +2378,6 @@ rv[-1,-3] -[-1,-3] rv - / 2"
   my_action[0]
   endl done
   uncommand my_erode,my_dilate,my_action
-  v +
 
 #@cli hist_feature : _nofeature>=-2,_nth>0,_zero={0|1},_min0,_stepw,_percent[%]>0
 #@cli : Estimation from histogram (frequency dist, 1d image) the features
@@ -2466,12 +2457,12 @@ hist_feature_demo :
 #@cli : Default values: 'n=1', 'ind=0'
 karo_nth_max : check isint(${1=1})" && "$1>0 skip ${2=0}
   e[^-1] "Return in the status the $1-th max of image$?."
-  v - repeat $! l[$>]
+  repeat $! l[$>]
 #     [0] repeat $1-1 set. {im},{[xM,yM,zM,cM]} done
 #     if $2 mx={xM} else mx={iM} fi rm.
      if $2 eval argkth(-$1,{^}) u {${}-1} else eval kth(-$1,{^}) fi mx=${}
      if $>==0 mx1=$mx else mx1=$mx1,$mx fi
-  endl done u $mx1 v +
+  endl done u $mx1
 
 #@cli karo_nth_min : _n(1),_ind(=0)
 #@cli : Return in the status the _n-th min of an image or the index of the _n-th min of an image
@@ -2479,12 +2470,12 @@ karo_nth_max : check isint(${1=1})" && "$1>0 skip ${2=0}
 #@cli : Default values: 'n=1', 'ind=0'
 karo_nth_min : check isint(${1=1})" && "$1>0 skip ${2=0}
   e[^-1] "Return in the status the $1-th min of image$?."
-  v - repeat $! l[$>]
+  repeat $! l[$>]
 #     [0] repeat $1-1 set. {iM},{[xm,ym,zm,cm]} done
 #     if $2 mn={xm} else mn={-im} fi rm.
      if $2 eval argkth($1,{^}) u {${}-1} else eval kth($1,{^}) fi mn=${}
      if $>==0 mn1=$mn else mn1=$mn1,$mn fi
-  endl done u $mn1 v +
+  endl done u $mn1
 
 #@cli karo_VST : _inverse(=0)
 #@cli : Variance Stabilizing Transformation
@@ -2492,11 +2483,11 @@ karo_nth_min : check isint(${1=1})" && "$1>0 skip ${2=0}
 #@cli : $ sp tiger v1=${-std_noise},2,2 +karo_VST. 0 v2=${-std_noise},2,2 +karo_VST. 1 text... $v1 text.. $v2
 #@cli : Default values: 'inverse=0'
 karo_VST :
-  v - skip ${1=0} if $1 inv=" (inverse)." else inv="." fi v +
-  e[^-1] "Variance Stabilizing Transformation"$inv v -
+  skip ${1=0} if $1 inv=" (inverse)." else inv="." fi
+  e[^-1] "Variance Stabilizing Transformation"$inv
   repeat $! l[$>]
     if $1 /[0] 2 sqr[0] -[0] {3/8} else +[0] {3/8} sqrt[0] *[0] 2 fi
-  endl done v +
+  endl done
 
 #@cli pearson_correlation :
 #@cli : Compute pearson-correlation using two-by-two selected images.
@@ -2516,11 +2507,11 @@ pearson_correlation :
 #@cli : Default value: 'whitevalue=100%'
 #@cli : $ osteo +karo_extinction
 karo_extinction : check "${1=100%}>0"
-  e[^-1] "Convert transmission image"$?" into extinction with white value "$1"." v -
+  e[^-1] "Convert transmission image"$?" into extinction with white value "$1"."
   repeat $! l[$>]
     if ${-is_percent\ $1} WW={iM*$1} else WW=$1 fi
     c. 1,{iM} /. $WW log10. *. -1
-  endl done v +
+  endl done
 
 #@cli region_feature : [labelimage],_region_label(1),_feature({wh})
 #@cli : Return feature for a specified region in status. \
@@ -2568,7 +2559,7 @@ region_feature_example : skip "${1=follic},${2=-1}"
 # +ge. 2 delaunay3d. n.. 0,255 j3d.. .,0,0,0,0.5,1 rm.
 karo_feat_eval_n : check ${-is_image_arg\ $1} check "${2=1}>=0" skip ${3=0}
   e[^-1] "Compute features from transmission image$? and multi-component mask image "$1"."
-  v -  repeat $! pass$1 0 l[$>,-1]
+  repeat $! pass$1 0 l[$>,-1]
     if !$3 +label_fg. 0,$2 else +neq. 0 fi
     mode=${"_karo_mode... ,"} if $mode<=160 mode={iM#-3} fi
     +karo_extinction... $mode
@@ -2587,7 +2578,7 @@ karo_feat_eval_n : check ${-is_image_arg\ $1} check "${2=1}>=0" skip ${3=0}
         =. $mode,5,$>
       done
     endl k.
-  endl done v +
+  endl done
 
 #@cli _karo_mode : _blur(=3), low(=-1), hig(=-1), _binsize(=1), _nodel(=0)
 #@cli : Estimate mode (most frequent value) of image histogram from selected image \
@@ -2597,16 +2588,16 @@ karo_feat_eval_n : check ${-is_image_arg\ $1} check "${2=1}>=0" skip ${3=0}
 #@cli : If _nodel==true the histogram is kept
 _karo_mode :
   check ${1=3}>=0 skip "${2=-1},${3=-1},${4=1},${5=0}"
- if $2==-1 low={im} else low=$2 fi
- if $3==-1 hig={iM} else hig=$3 fi
-  if $4<0 clust={abs($4)} binsize={($hig-$low)/$clust}
- else clust={round(($hig-$low+$4)/$4)} binsize=$4 fi
-  if $1>0 e[^-1] "Extract mode of image$? after smoothing $1 between "{_$low}" and "{_$hig}" binsize "$binsize" cluster "$clust
- else e[^-1] "Extract mode of image$? between "{_$low}" and "{_$hig}" binsize "$binsize" cluster "$clust fi
-  +histogram. $clust,$low,$hig
-  if $1>0 b. $1 fi
-  u {xM*$binsize+$low}
- if !$5 rm. fi
+  if $2==-1 low={im} else low=$2 fi
+  if $3==-1 hig={iM} else hig=$3 fi
+   if $4<0 clust={abs($4)} binsize={($hig-$low)/$clust}
+  else clust={round(($hig-$low+$4)/$4)} binsize=$4 fi
+   if $1>0 e[^-1] "Extract mode of image$? after smoothing $1 between "{_$low}" and "{_$hig}" binsize "$binsize" cluster "$clust
+  else e[^-1] "Extract mode of image$? between "{_$low}" and "{_$hig}" binsize "$binsize" cluster "$clust fi
+   +histogram. $clust,$low,$hig
+   if $1>0 b. $1 fi
+   u {xM*$binsize+$low}
+  if !$5 rm. fi
 
 #@cli descriptive_feature :
 #@cli : Estimation of features number(sum,m0),mean(m1),SD(m2),skewness(m3),kurtosis(m4),min,max,median
@@ -2615,9 +2606,8 @@ _karo_mode :
 
 descriptive_feature :
   e[^-1] "Calculate m0,m1,m2,m3,m4,min,max,med from data$?."
-  v -
   repeat $! l[$>]
-    if s>1 v + e[^-1] "Data ["$>"] seemingly not skalar! Break!" v - continue fi
+    if s>1 e[^-1] "Data ["$>"] seemingly not skalar! Break!" continue fi
 # Calculate features
     if $_version>=216 res={"
       ff=stats(); ff[3]=sqrt(ff[3]); _(print(ff));
@@ -2632,7 +2622,7 @@ descriptive_feature :
     fi
 # Concatenate results for image list
       if $>==0 sres=$res else sres=$sres\,$res fi
-  endl done u $sres v +
+  endl done u $sres
 
 #@cli example_descriptive_feature : [region],_all(false),_background(false),_verbose_draw(true),_verbose_text(false)
 #@cli : Example for feature extraction from a selected grey image and a [region] mask or label image \
@@ -2651,30 +2641,30 @@ example_descriptive_feature :
   check ${"is_image_arg $1"}" && isbool(${2=0}) && isbool(${3=0}) && isbool(${4=1}) && isbool(${5=0})"
   pass$1 nm. Region
   im={im}
- if $3==0&&$im==0 im+=1 fi
+  if $3==0&&$im==0 im+=1 fi
   num={iM-$im+1}
   fe="Area","Mean","SD","Curtosis","Excess","Min","Max","Median"
   m "_MC : $""=_M"
- st_ff=""
- nmax={$2?$num:9}
- if $num>9&&$2==0 warn[0--3] "More than 9 regions! Not processed!" fi
+  st_ff=""
+  nmax={$2?$num:9}
+  if $num>9&&$2==0 warn[0--3] "More than 9 regions! Not processed!" fi
   repeat $num,ii
     +extract_region[0] [1],0,{$im+$ii}
-  if h==0 rm. warn[0--3] "Empty region "{$im+$ii}"! Not processed!" continue fi
+    if h==0 rm. warn[0--3] "Empty region "{$im+$ii}"! Not processed!" continue fi
     descriptive_feature. rm. temp_ff=${} _MC ${}
-  u {$im+$ii},$temp_ff temp_ff=${}
+    u {$im+$ii},$temp_ff temp_ff=${}
     if $4 128,128,1,3 text. "Features label: "{$im+$ii},0,0,12,1,255,255,0 fi
-  if $5 e[] "Features label: "{$im+$ii} fi
+    if $5 +e[] "Features label: "{$im+$ii} fi
     repeat 8
       ff=${arg\ {$>+1},$fe}\ =\ {_${_M{$>+1}}}
-      if $5 e[] $ff fi
-   if $4 text. $ff,0,{($>+2)*12},12,1,255,255,0 fi
+      if $5 +e[] $ff fi
+      if $4 text. $ff,0,{($>+2)*12},12,1,255,255,0 fi
     done
-  if ${strlen\ $st_ff}>0 st_ff=$st_ff,$temp_ff else st_ff=$temp_ff fi
-  nmax-=1 if !$nmax break fi
+    if ${strlen\ $st_ff}>0 st_ff=$st_ff,$temp_ff else st_ff=$temp_ff fi
+    nmax-=1 if !$nmax break fi
   done rm[Region] uncommand _MC
   if $4 if $num>3 append_tiles[1--1] 3 fi fi
- u $st_ff
+  u $st_ff
 
 #@cli kr_mean_lch : _mode(0..4)
 #@cli : Calculate LCH color features from selected RGB image after application of rgb2lch \
@@ -2698,14 +2688,10 @@ kr_mean_lch :
   hmsd=${-kr_circular_mean.} hm=${-arg\ 1,$hmsd} hsd=${-arg\ 2,$hmsd}
   _kr_mean_lch={[ia#-3,ia#-2,$hm,sqrt(iv#-3),sqrt(iv#-2),$hsd]}
   lm={ia#-3} cm={ia#-2}
-  if $1==1
-    f.. i=$cm f. i=$hm
-  elif $1==2
-    f... i=$lm f.. i=$cm f. i=$hm
-  elif $1==3
-    f. i=$hm
-  elif $1==4
-    f.. i=$cm
+  if $1==1 f.. i=$cm f. i=$hm
+  elif $1==2 f... i=$lm f.. i=$cm f. i=$hm
+  elif $1==3 f. i=$hm
+  elif $1==4 f.. i=$cm
   else k[0] fi
   if $1>0&&$1<=4 a[-1--3] c lch2rgb. round. fi
   u $_kr_mean_lch
