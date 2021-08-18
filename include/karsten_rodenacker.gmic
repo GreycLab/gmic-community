@@ -146,7 +146,7 @@ pink_new :
   else np=" " fi
   if ${-strcontains\ $1,help} x "open https://perso.esiee.fr/~coupriem/Pink/doc/html/"${pp2}"_8c.html"
   else
-    e[^-1] "Call pink package on image$? with execute cmd: \"$1 [img]"$np" [img]\"."
+    e[^-1] "Call pink package on image$? with execute cmd: \"$1 [imgin]"$np" [imgout]\"."
     _xpinks $1,$np
     if (isnum($GMIC_PINK_NO_RM)?0$GMIC_PINK_NO_RM:0)==0
       repeat $#-1
@@ -252,38 +252,37 @@ pink_skelend : skip "${1=4},${2=0}"
 	pink skelend:if-uchar,$1,$2
 # #  repeat $! l[$>] _xpinks "skelend","$1 $2" endl done
 
-#@cli pink_skeleton : _prio={0|1|2|3|4|8|6|26},_connectivity={ 4 | 8 | 6 | 26 }
+#@cli pink_skeleton : _prio={0|1|2|3|4|8|6|26},_connectivity={ 4 | 8 | 6 | 26 },_inhibit=""
 #@cli : (https://perso.esiee.fr/~coupriem/Pink/doc/html/skeleton_8c.html)
 #@cli : Ultimate binary skeleton guided by a priority image (requires the PINK library to be installed).
-#@cli : Default values: 'prio=0', 'connectivity=4'.
+#@cli : Default values: 'prio=0', 'connectivity=4' and 'inhibit=""'.
 #@cli : $ sp tiger threshold 50% +pink_skeleton. ,
- pink_skeleton : skip "${1=0},${2=4}"
-  e[0] "Call pink package on image$? with execute cmd: skeleton [img] $1 $2 [img]"
-	pink skeleton:if-uchar,$1,$2
-# #  repeat $! l[$>] _xpinks "skeleton","$1 $2 $3" endl done
+ pink_skeleton : check "isin(${1=0},0,1,2,3,4,8,6,26) && isin(${2=4},4,8,6,26)" skip "${3=''}"
+   e[0] "Call pink package on image$? with execute cmd: skeleton [imgin] $1 $2 [imgout]"
+   pink skeleton:if-uchar,$1,$2
 
-#@cli pink_skelpar : _algorithm={0...29},_nsteps=_1,_inhibit=""
+#@cli pink_skelpar : _algorithm={0...31},_nsteps=_1,_inhibit=""
 #@cli : (https://perso.esiee.fr/~coupriem/Pink/doc/html/skelpar_8c.html)
 #@cli : Parallel binary skeleton (requires the PINK library to be installed).
-#@cli : Default values: 'algorithm=4', 'nsteps=-1' and 'inhibit=""'.
+#@cli : Default values: 'algorithm=4', 'nsteps=-1' and 'inhibit=""'. 
+#@cli : For most of the implemented algorithsm an inhibit image is not implemented!
 #@cli : $ sp tiger threshold 50% +pink_skelpar. 0 +pink_skelpar. 2
-pink_skelpar : skip "${1=4},${2=-1},${3=''}"
-  e[0] "Call pink package on image$? with execute cmd: skelpar [img] $1 $2 $3 [img]"
-	karo_frame 2 pink skelpar:if-uchar,$1,$2,$3
-# #  repeat $! l[$>] _xframe _xpinks "skelpar","$1 $2 $3" endl done
+pink_skelpar : check "${1=4}>=0 && $1<=31" skip "${2=-1} ${3=''}"
+  e[0] "Call pink package on image$? with execute cmd: skelpar [imgin] $1 $2 $3 [imgout]"
+	karo_frame 2 if ${-is_image_arg\ $3} pink skelpar:if-uchar,$1,$2,$3 else pink skelpar:if-uchar,$1,$2 fi
 
 #@cli pink_wshed : _connectivity={ 4 | 8 | 6 | 26 },_inverse={ 0 | 1 },_height=0
 #@cli : (https://perso.esiee.fr/~coupriem/Pink/doc/html/wshedtopo_8c.html)
 #@cli : Watershed (requires the PINK library to be installed).
 #@cli : Default values: 'connectivity=4', 'inverse=0' and 'height=0'.
 #@cli : $ sp car +pink_wshed ,1,5 pink_wshed[0] ,,5
-pink_wshed : check "${1=4}==4 || $1==8 || $1==6 || $1==26" skip "${2=0},${3=0}"
+pink_wshed : check "isin(${1=4},4,8,6,26)" skip "${2=0},${3=0}"
   if $3==0 e[^-1] "Call from Pink package: wshedtopo $1 "${"arg 1+!$2,inverted.,."}
   else e[^-1] "Call from Pink package: heightminima $1 $3 wshedtopo $1 "${"arg 1+!$2,inverted.,."} fi
   repeat $! l[$>]
     s={s} if $s>1 s. c fi
     if d==1
-      check "${1=4}==4 || $1==8"
+      check "$1==4 || $1==8"
       repeat $! l[$>]
         f max(min(i,255),0)
         if $2!=0 negate 255 fi
@@ -347,6 +346,20 @@ pink_delaunay : skip ${1=0}
   input_pinklist[] $nn".del",$1
   delete $nn.tmp
   delete $nn.del
+
+#@cli pink_asflin : _dir(x|y|z), _rad(5), _radmax(0)
+#@cli : 'asflin' filter workaround for 2D images! 
+#@cli : 'asflin' works only in 3D images (d>1)
+#@cli : 'asflin' is called with dir,rad or if radmax>rad with dir,rad,radmax 
+#@cli : (https://perso.esiee.fr/~coupriem/Pink/doc/html/asflin_8c.html)
+#@cli : pink_asflin (requires the PINK library to be installed).
+pink_asflin : 
+  check "isin(_'${1=x}',['xyz']) && ${2=5}>0 && ${3=0}>=0"
+  repeat $! l[$>] d_alt=0
+    if d==1 . a z d_alt=1 fi
+		if $3<=$2 pink asflin,$1,$2 else pink asflin,$1,$2,$3 fi
+		if $d_alt==1 s z k. fi
+	endl done
 
 #@cli pink_karo_zerleg : eq. to 'karo_zerleg'.
 pink_karo_zerleg : karo_zerleg $*
@@ -3103,7 +3116,7 @@ fx_karo_pink_bianca_preview :
 #@gui : Pink Operator = choice(3,"skelpar","skelend","skelcurv","skeleton","barycentre","border","closeball","openball","convexhull","dist","distc","label pla","Lantuejoul")
 #@gui : Connectivity / Dir = choice("Four/x","Eight/y")
 #@gui : Height/Rep = int(5,-1,25)
-#@gui : Algorithm = int(4,0,29)
+#@gui : Algorithm = int(4,0,31)
 #@gui : Channel(s) = choice("All","RGBA [All]","RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","RGBA [Alpha]",
 #@gui : "Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]",
 #@gui : "YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]",
