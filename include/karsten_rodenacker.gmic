@@ -643,7 +643,7 @@ hgKGdCDNwAAAZYIFpg=="
 #@cli kr_testimage : _sizex(256),_sizey(_sizex)
 #@cli : Another simple spectrum image for tests
 #@cli : $ kr_testimage ,
-+kr_testimage: skip "${1=256},${2=$1}"
++kr_testimage : skip "${1=256},${2=$1}"
   l[] $1,$2,1,3 fill. "if(c==0,x/w*255,if(c==1,y/h*255,if(c==2,(((x/w*255+y/h*255)-256)^2)^0.5,0)))" endl
 
 #@cli karo_read_bd : name,_verbosity(=0),_append_type(=z) {z|c|x|y},_no_delete(=0)
@@ -651,7 +651,7 @@ hgKGdCDNwAAAZYIFpg=="
 #@cli : bftools directory has to be in the PATH
 #@cli : http://www.openmicroscopy.org/site/support/bio-formats5/users/comlinetools/conversion.html
 #@cli : Default values: 'verbosity=0', 'append_type=z', 'no_delete=0'
-karo_read_bd : skip "${2=0},${3=z},${4=0}" ina=$1
++karo_read_bd : skip "${2=0},${3=z},${4=0}" ina=$1
  e[^-1] "Read biodata with OME bftool bfconvert (name=\""$ina"\", verbosity=$2, append_type=$3, no_delete=$4)."
   ona=${-path_tmp}${-file_slash}gmic_bd_$_pid.tif
   if $2<2 postf=" >/dev/null 2>&1" else postf="" fi
@@ -682,7 +682,7 @@ karo_read_bd : skip "${2=0},${3=z},${4=0}" ina=$1
 #@cli : |# y-offset = 0
 #@cli : |# Bit2nm = 1.0
 #@cli : |# Start of Data:
-gwyddionread : skip "${1=gwyddion_Example.asc}"
++gwyddionread : skip "${1=gwyddion_Example.asc}"
   e[^-1] "Read gwyddion ASCII text data: "$1
   l[]
     i raw:"$1",uchar nm={b}
@@ -734,7 +734,7 @@ gwyddionread : skip "${1=gwyddion_Example.asc}"
 #@cli : |ScannerSpeed 7 4 2.315832
 #@cli : |RAW_DATA 3 1228800
 #@cli : Default value: 'filename=Wyko_Example.ASC'
-wykoread : skip "${1=Wyko_Example.ASC}"
++wykoread : skip "${1=Wyko_Example.ASC}"
   e[^-1] "Read Vision surface profilometry OPD text data: "$1
   l[]
     i raw:"$1",uchar nm={b}
@@ -772,7 +772,7 @@ wykoread : skip "${1=Wyko_Example.ASC}"
 #@cli :   and bit level 1 in the gray image is randomized with karo_rndbit0
 #@cli : Default value: 'bit0=0'
 #@cli : Ex.: karo_dtpread Images/Beispiele/tra005.cel,1
-karo_dtpread : check isfile(['{/$1}']) check "${2=0}>=0"
++karo_dtpread : check isfile(['{/$1}']) check "${2=0}>=0"
   e[^-1] "Read dtp image file from "$1"."
   i raw:$1,uchar
   ({@22-24}) x={t} rm.
@@ -883,7 +883,7 @@ output_pink3d : skip ${2=P5}
 #@cli : Routine returns the first character from the first non comment line in status. \
 # If status == 'P'( == 80) a pnk/pnm file is expected! \
 # For pink everything else is considered as pink list or non-pink-file.
-input_pinktest :
++input_pinktest :
   i[0] raw:"$1",uchar s[0] -,10 i=0
   do u {$i,@0} i={$i+1} while ${}==35&&$i<$!
  rm
@@ -940,111 +940,141 @@ pink_setorigin : skip "${2=0},${3=0},${4=0}"
 # to the convex hull, _nsi_ denotes the number of adjacent vertices, and _si1 si2 ... sins1_ \
 # is the list of the indexes of the adjacent vertices (counted from 0) \
 # (see <https://perso.esiee.fr/~coupriem/Pink/doc/html/delaunay_8c.html>).
-input_pinklist :
++input_pinklist :
   skip ${2=0}
   e[^-1] "Read pinklist $1"
-  i[0] raw:"$1",uchar s[0] -,10
-  if i(#0,0)=='G' e[^1] "Delaunay graph list file mode "{0,t}" vertices"
-    rows[0] 2,100% n={0,t} rm[0]
-    3,$n,1,1 nm. vertices
-    1,$n,1,1 nm. vhull
-    0 nm. edges
-    repeat $!-3 l[{$>},vertices,vhull,edges]
-      s[0] -,32
-      =[vertices] {0,t},0,$> =[vertices] {1,t},1,$> =[vertices] {2,t},2,$>
-      =[vhull] {3,t},0,$> {{4,t}*3},1,1,1 p=$>
-      repeat {4,t} =. 2,{$>*3} =. $p,{$>*3+1} =. {{$>+5},t},{$>*3+2} done
-      a[edges] .,x rm[1-4,-1]
-    endl done
-    k[vhull,vertices,edges] mv[vhull] 0
-    ver={vertices,h}
-    edg={edges,{w/3}}
-    nhull={vhull,is}
-    if $2==0
-      if {vhull,is} repeat {vertices,h}
-        if {vhull,@{$>}} (1,$>) a[edges] .,x rm. edg+=1 fi
-      done fi
-      ({'CImg3d'}) mv. -3
-      ($ver,$edg) mv. -3
-      (255^255^255) r. {$edg-$nhull}
-      (0,0,255) .x{$nhull-1} a[-1--$nhull] x
-      (0.6) r. {$edg-$nhull}
-      (1) .x{$nhull-1} a[-1--$nhull] x
-      unroll y a[-1--8] y rm..
-    else
-      $ver,$ver
-      repeat {edges,w/3}
-        =. 1,{edges,@{$>*3+1}},{edges,@{$>*3+2}}
-      done
-    fi
-    u $ver,$edg,$nhull
-  elif  i(#0,0)=='e' e[^1] "1d list file mode e "{0,t}
-    s -,32 n={{1,t}} rm[0,1]
-    1,$n,1,1 nm. vertices
-    if $!-1<$n s[0] -,32 fi
-    repeat $!-1 l[{$>},vertices]
-      =[vertices] {0,t},0,$>
-    endl done
-    k[vertices]
-    ver={vertices,h}
-    u $ver
-  elif  i(#0,0)=='s' e "1d list file mode s "{0,t}
-    rows[0] 2,100% n={{0,t}} rm[0]
-    1,$n,1,1 nm. vertices
-    1,$n,1,1 nm. vhull
-    repeat $!-2 l[{$>},vertices,vhull]
-      s[0] -,32
-      =[vertices] {0,t},0,$>
-   =[vhull] {1,t},0,$>
-    endl done
-    k[vertices,vhull] a x
-    ver={vertices,h}
-    u $ver
-  elif  i(#0,0)=='b' e "2d list file mode b "{0,t}
-    rows[0] 2,100% n={{0,t}} rm[0]
-    2,$n,1,1 nm. vertices
-    repeat $!-1 l[{$>},vertices]
-      s[0] -,32
-      =[vertices] {0,t},0,$>  =[vertices] {1,t},1,$>
-    endl done
-    k[vertices]
-    ver={vertices,h}
-    u $ver
-  elif  i(#0,0)=='n' e "2d vertice list file mode n "{0,t}
-    rows[0] 2,100% n={{0,t}} rm[0]
-    2,$n,1,1 nm. vertices
-    1,$n,1,1 nm. vhull
-    repeat $!-2 l[{$>},vertices,vhull]
-      s[0] -,32
-      =[vertices] {0,t},0,$>  =[vertices] {1,t},1,$>
-   =[vhull] {2,t},0,$>
-    endl done
-    k[vertices,vhull] a x
-    ver={vertices,h}
-    u $ver
-  elif  i(#0,0)=='B' e "3d list file mode B "{0,t}
-    rows[0] 2,100% n={{0,t}} rm[0]
-    3,$n,1,1 nm. vertices
-    repeat $!-1 l[{$>},vertices]
-      s[0] -,32
-      =[vertices] {0,t},0,$> =[vertices] {1,t},1,$> =[vertices] {2,t},2,$>
-    endl done
-    k[vertices]
-    ver={vertices,h}
-    u $ver
-  elif  i(#0,0)=='N' e "3d vertice list file mode N "{0,t}
-    rows[0] 2,100% n={{0,t}} rm[0]
-    3,$n,1,1 nm. vertices
-    1,$n,1,1 nm. vhull
-    repeat $!-2 l[{$>},vertices,vhull]
-      s[0] -,32
-      =[vertices] {0,t},0,$> =[vertices] {1,t},1,$> =[vertices] {2,t},2,$>
-   =[vhull] {3,t},0,$>
-    endl done
-    k[vertices,vhull] a x
-    ver={vertices,h}
-    u $ver
-  else error "File type "{i(#0,0)}" not implemented! "{0,t} fi
+  l[]
+    i[0] raw:"$1",uchar s[0] -,10
+    if i(#0,0)=='G' e[^1] "Delaunay graph list file mode "{0,t}" vertices"
+      rows[0] 2,100% n={0,t} rm[0]
+      3,$n,1,1 nm. vertices
+      1,$n,1,1 nm. vhull
+      0 nm. edges
+      repeat $!-3 l[{$>},vertices,vhull,edges]
+        s[0] -,32
+        =[vertices] {0,t},0,$> =[vertices] {1,t},1,$> =[vertices] {2,t},2,$>
+        =[vhull] {3,t},0,$> {{4,t}*3},1,1,1 p=$>
+        repeat {4,t} =. 2,{$>*3} =. $p,{$>*3+1} =. {{$>+5},t},{$>*3+2} done
+        a[edges] .,x rm[1-4,-1]
+      endl done
+      k[vhull,vertices,edges] mv[vhull] 0
+      ver={vertices,h}
+      edg={edges,{w/3}}
+      nhull={vhull,is}
+      if $2==0
+        if {vhull,is} repeat {vertices,h}
+          if {vhull,@{$>}} (1,$>) a[edges] .,x rm. edg+=1 fi
+        done fi
+        ({'CImg3d'}) mv. -3
+        ($ver,$edg) mv. -3
+        (255^255^255) r. {$edg-$nhull}
+        (0,0,255) .x{$nhull-1} a[-1--$nhull] x
+        (0.6) r. {$edg-$nhull}
+        (1) .x{$nhull-1} a[-1--$nhull] x
+        unroll y a[-1--8] y rm..
+      else
+        $ver,$ver
+        repeat {edges,w/3}
+          =. 1,{edges,@{$>*3+1}},{edges,@{$>*3+2}}
+        done
+      fi
+      u $ver,$edg,$nhull
+    elif  i(#0,0)=='e' e[^1] "1d list file mode e "{0,t}
+      s -,32 n={{1,t}} rm[0,1]
+      1,$n,1,1 nm. vertices
+      if $!-1<$n s[0] -,32 fi
+      repeat $!-1 l[{$>},vertices]
+        =[vertices] {0,t},0,$>
+      endl done
+      k[vertices]
+      ver={vertices,h}
+      u $ver
+    elif  i(#0,0)=='s' e "1d list file mode s "{0,t}
+      rows[0] 2,100% n={{0,t}} rm[0]
+      1,$n,1,1 nm. vertices
+      1,$n,1,1 nm. vhull
+      repeat $!-2 l[{$>},vertices,vhull]
+        s[0] -,32
+        =[vertices] {0,t},0,$>
+        =[vhull] {1,t},0,$>
+      endl done
+      k[vertices,vhull] a x
+      ver={vertices,h}
+      u $ver
+    elif  i(#0,0)=='b' e "2d list file mode b "{0,t}
+      rows[0] 2,100% n={{0,t}} rm[0]
+      2,$n,1,1 nm. vertices
+      repeat $!-1 l[{$>},vertices]
+        s[0] -,32
+        =[vertices] {0,t},0,$>  =[vertices] {1,t},1,$>
+      endl done
+      k[vertices]
+      ver={vertices,h}
+      u $ver
+    elif  i(#0,0)=='n' e "2d vertice list file mode n "{0,t}
+      rows[0] 2,100% n={{0,t}} rm[0]
+      2,$n,1,1 nm. vertices
+      1,$n,1,1 nm. vhull
+      repeat $!-2 l[{$>},vertices,vhull]
+        s[0] -,32
+        =[vertices] {0,t},0,$>  =[vertices] {1,t},1,$>
+        =[vhull] {2,t},0,$>
+      endl done
+      k[vertices,vhull] a x
+      ver={vertices,h}
+      u $ver
+    elif  i(#0,0)=='B' e "3d list file mode B "{0,t}
+      rows[0] 2,100% n={{0,t}} rm[0]
+      3,$n,1,1 nm. vertices
+      repeat $!-1 l[{$>},vertices]
+        s[0] -,32
+        =[vertices] {0,t},0,$> =[vertices] {1,t},1,$> =[vertices] {2,t},2,$>
+      endl done
+      k[vertices]
+      ver={vertices,h}
+      u $ver
+    elif  i(#0,0)=='N' e "3d vertice list file mode N "{0,t}
+      rows[0] 2,100% n={{0,t}} rm[0]
+      3,$n,1,1 nm. vertices
+      1,$n,1,1 nm. vhull
+      repeat $!-2 l[{$>},vertices,vhull]
+        s[0] -,32
+        =[vertices] {0,t},0,$> =[vertices] {1,t},1,$> =[vertices] {2,t},2,$>
+        =[vhull] {3,t},0,$>
+      endl done
+      k[vertices,vhull] a x
+      ver={vertices,h}
+      u $ver
+    elif  i(#0,0)=='c' e "2d spline list file mode c "{0,t}
+      rows[0] 2,100% n={{0,t}} rm[0]
+      2,$n,1,1 nm. controlp
+      8,{$n-1},1,1 nm. coeff
+      repeat $n l[{$>},controlp]
+        s[0] -,32
+        =[controlp] {0,t},0,$> =[controlp] {1,t},1,$>
+      endl done
+      repeat $n-1,ii l[{$>+$n},coeff]
+        +s[0] -,32
+        repeat 8 =[coeff] {$>,t},$>,$ii done
+        rm[-1--8]
+      endl done
+      k[controlp,coeff] a x
+      ver={controlp,h}
+      u $ver
+    elif  i(#0,0)=='C' e "3d spline list file mode C "{0,t}
+      rows[0] 2,100% n={{0,t}} rm[0]
+      3,$n,1,1 nm. controlp
+      12,{$n-1},1,1 nm. coeff
+      repeat $!-2 l[{$>},controlp,coeff]
+        s[0] -,32
+        =[controlp] {0,t},0,$> =[controlp] {1,t},1,$>
+        =[coeff] {3,t},0,$>
+      endl done
+      k[controlp,coeff] a x
+      ver={controlp,h}
+      u $ver
+    else error "File type "{i(#0,0)}"/'"{`i(#0,0)`}"' not implemented! "{0,t} fi
+  endl
 
 #@cli pink_input_pnk: filename
 #@cli : Read pgm P2 extended (pink) ascii files via pink exec pgm2list \
@@ -1069,10 +1099,10 @@ input_pinklist :
 #@cli pink_input_test : file_name
 #@cli : Test file type of file_name for pnk (pink) and pnm (portable anymap) file type.
 #@cli : Routine returns the first character from the first non comment line in status. \
-# Only ['PQesbnBNcCdDGS#'] are allowed, 
+# Only ['PQesSbnBNcCdDG#'] are allowed, 
 #@cli : 'P'=80 is returned for pgm files with type <> P2 (not ascii pgm), \n\
 # 'Q'=81 is returned for pgm files with type == P2. \n\
-# ['esbnBNcCdDGS'] is returned for PINK list files where the second char is ' '. \n\
+# ['esSbnBNcCdDG'] is returned for PINK list files where the second char is ' '. \n\
 # '#'=35 is returned otherwise.
 +pink_input_test :
   l[]
