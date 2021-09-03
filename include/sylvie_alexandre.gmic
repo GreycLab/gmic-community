@@ -36,7 +36,7 @@
 #@gui :_=link("https://github.com/dtschump/gmic-community","https://github.com/dtschump/gmic-community")
 #@gui :_=note("Les filtres contenus dans ce répertoire sont majoritairement traduits en français et/ou en cours de développement.")
 #@gui :_=note("The filters included in this directory are mostly translated into French and/or experimental.")
-#@gui :_=note("Version 2021/05/09 GMIC 2.9.8_pre")
+#@gui :_=note("Version 2021/09/01 GMIC 2.9.9_pre")
 
 samj_about :
 
@@ -23764,6 +23764,98 @@ samj_rien_various :
 ####     #@gui :_=note("5 \303\275      )
 ####     #@gui :_=note("6 \303\276      )
 ####     #@gui :_=note("7 \303\277   ÿ   )
+
+#################################################
+##                                             ##
+##         samj_test_paint_gmic_gimp           ##
+##                                             ##
+#################################################
+
+#@cli samj_test_paint_gmic_gimp : _Iterations>0,_Seed>0,0.01<=_DiffusionTensors<=0.1,0<=_Blur<=10,_ImageSequence={0=No | 1=Yes},_Brush={0=Ellipse | 1=Circle},0.1<=_BrushSize>0<=4
+#@cli : Paint an Image by Randomly Exploring a Space of Brush Strokes by David Tschumperlé.
+#@cli : Default values: 'Iterations=200', 'Seed=0', 'DiffusionTensors=0.01', 'Blur=10', 'ImageSequence=0', 'Brush=0' and 'BrushSize=1'.
+#@cli : $ image.jpg samj_test_paint_gmic_gimp 300
+
+samj_test_paint_gmic_gimp : check $1>=1 skip "${1=200},${2=0},${3=0.01},${4=10},${5=0},${6=0},${7=1}"
+
+# Version 2021/09/01
+# Auteur David Tschumperlé
+# A Greedy Algorithm to Paint an Image by Randomly Exploring a Space of Brush Strokes
+# https://discuss.pixls.us/t/a-greedy-algorithm-to-paint-an-image-by-randomly-exploring-a-space-of-brush-strokes/26589
+# 
+# $1=Itérations = int(200,1,1400)
+# $2=Graine/Seed = int(0,0,65536)      # trop lent, manque de diversité : à améliorer
+# $3=DiffusionTensors = float(0.01,0.01,0.1)
+# $4=Flou/Blur % = float(10,0,10)
+# $5=Images Sequence = bool(0)      # Windows :  C:\Users\[user]\AppData\Local\Temp\frame_000000.png || Linux :  /tmp/\\frame_000000.png
+# $6= Brosse/Brush = choice(0,"Ellipse","Cercle/Circle")
+# $7= Taille Brosse/Brush Size = float(1,0.1,4)
+# samj_test_paint_gmic_gimp 400,0,0.05,1,0,0,1
+
++diffusiontensors $3,0.95,0.5,1
++gradient_norm..
++b[0] $4%
+f=0
+if $2>0 Iterations={$1*2} else Iterations=$1 endif
+repeat $Iterations,t
+	beta={1-exp(-$t/100)}
+
+	100%,100%,1,4
+	if $2>0 srand {$2+$f} endif
+	
+	{u(16,512)},1,1,1,"*
+	const da = 15;
+	const dl = 1;
+
+	const echelle = $7;
+	const beta = $beta;
+	const bs = lerp(60,1,beta);
+	const anisotropy = lerp(0.5,1,beta);
+	const opac = lerp(0.5,1,beta);
+	const alea = $2+$f;
+	if($2>0, srand(alea) );
+	X0 = round(u([w#0,h#0]-1));
+	RGBA = [ lerp(I(#0,X0),u([255,255,255]),0),255 ];
+	lmax = lerp(1,10,beta^2);
+
+	for (a = 0, a<360, a+=da,
+	X = X0;
+	U = [cos(0.017453292*$a), sin(0.017453292*$a)];
+	for (l = 0, l<lmax, l+=dl,
+	C = I(#1,X,1);
+	T = [ C[0],C[1],C[1],C[2] ];
+	eig = eig(T);
+	l1 = eig[0];
+	l2 = eig[1];
+	u = eig[2];
+	v = eig[3];
+
+	RGBA[3] = opac*lerp(10,255,min(1,i(#2,X0)/10));
+	nbs = bs;
+	nbs*=lerp(3,1,min(1,i(#2,X0)/20));
+
+	if($6==0, ellipse(#-1,X[0],X[1],echelle*nbs,echelle*nbs*lerp(1,(1 - l1 + l2),anisotropy),atan2(v,u),1,RGBA), ellipse(#-1,X[0],X[1],echelle*nbs,echelle*nbs,0,1,RGBA));
+	U = T*U;
+	X+=dl*U;
+	U/=max(1e-9,norm(U));
+	);
+	);" rm.
+
+	opac={lerp(0,0.5,$beta)}
+
+	blend[3,-1] alpha,{u(0.05,$opac)}
+	w. -1,-1,0
+	if $5==1 on. ${-path_tmp}\\frame.png,$f endif
+	f+=1
+done	
+rm[0,-3,-2]
+
+#################################################
+##                                             ##
+##       FIN samj_test_paint_gmic_gimp         ##
+##                                             ##
+#################################################
+
 #################################################
 ##                                             ##
 ##              samj_test_cercle               ##
