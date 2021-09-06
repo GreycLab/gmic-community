@@ -1,14 +1,122 @@
 %% x "mkdir -p img" rm %%
 |+ [Cheat Home](cheatsheet.html) | [Custom Cheat](custom_cheat.html) | [Display Cheat](display_cheat.html) | **Debug Cheat** |                    |                    
 |                    |                    |                    |                    |                    |                    
-### Cheat #4: You've Broken Things. Now What?
-__TL;DR:__ You have written a G'MIC pipeline. It doesn't work. (1) Unexpected image metrics (2) Shell interference (3) Misplaced spaces (4) Mistaken argument values account for the vast majority of problems. These are easily detected/fixed by running down a check list.
+### Cheat #4: You've Moved Fast and Broken Things. Now What?
+__TL;DR:__ You have written a G'MIC pipeline. It doesn't work.
+
+This is the usual gang of suspects:
+| 1.  | [Unexpected image metrics](https://gmic.eu/tutorial/images.html)
+| 2.  | [Shell interference](https://gmic.eu/tutorial/custom_cheat.html)
+| 3.  | [Misplaced spaces](https://gmic.eu/reference/items_of_a_processing_pipeline.html#top)
+| 4.  | [Mistaken argument values](https://gmic.eu/reference/help.html#top)
+
+They account for the vast majority of problems and may be detected/fixed by running down a check list:
 |-Event:     |__The pipeline runs without error, but images are black or look weird or the results are substandard.__|  
-|Check:     |G’MIC writes a log to your shell. Are there any curious, surprising or inexplicable items? See [Running Commands](https://gmic.eu/tutorial/basics.html#running_commands) and [Introduction to the G'MIC command line tool G'MIC](https://github.com/dtschump/gmic-community/wiki/Introduction-to-the-G%27MIC-command-line-tool-%27gmic%27)| □
+|Check:     |G’MIC writes a log to your shell (But! See [Verbosity](#verbosity) following). Are there any curious, surprising or inexplicable items? See [Running Commands](https://gmic.eu/tutorial/basics.html#running_commands) and [Introduction to the G'MIC command line tool G'MIC](https://github.com/dtschump/gmic-community/wiki/Introduction-to-the-G%27MIC-command-line-tool-%27gmic%27)| □
 |Check:     |Do image metrics produced by `-print` or `-display` comply with constraints imposed by formats like `.png,` `.tiff,` or `.jpg`? The G'MIC log writes metrics after image list positions like `[0] =` _<an image name>_. Do the metrics make sense? Are you outputting to unsigned image formats (`.jpg`, `.png`) but the image `im` metric is less than zero? See ''Images as Data Sets''| □
 |Check:     |Recall that `-display` indicates; it does not prove. ` display0 ` more closely approximates an image proofing tool. See [Cheat #3: The -display Command Lies](display_cheat.html)| □
 |Check:     |Are command arguments sane? Recall that commands generally expect arguments in a certain order. Depending on how they are written, commands may permit certain arguments to be omitted and defaults are applied. That means mis-ordered argument lists may not even raise an error, as G'MIC may apply defaults for arguments. Use `gmic h` _<your command>_ for argument list ordering and what arguments have default values.| □
 |Event:     |__G'MIC doesn't run the pipeline. It prints some error message about failing to load an image — but the "image" is actually a part of the command!__|  
-|Check:     |Are there misplaced space charcters? Only commas separate items in argument lists, not commas _and_ spaces. When G'MIC identifies an unexpected item as an image file or assigns the wrong values to arguments, it is usually a sign that misplaced space characters are causing G'MIC to block out the command line in a way other than your intents. See [Items of a Processing Pipeline](https://gmic.eu/reference/items_of_a_processing_pipeline.html#top).| □
-If this
-Updated: 03-September-2021 12:15 UTC Commit: ac07d69f1082
+|Check:     |Are there misplaced space charcters? Only commas separate items in argument lists, not commas _and_ spaces. When G'MIC identifies an unexpected item as an image file or assigns the wrong values to arguments, it is usually a sign that misplaced space characters are causing G'MIC to block out the command line in a way other than your intents. See [Items of a Processing Pipeline](https://gmic.eu/reference/items_of_a_processing_pipeline.html#top). See also [Debuggery](#debuggery), following.| □
+
+It is expected that G'MIC behaves unexpectedly when you're new to the _cli_ command line, so run down the checklist looking for the usual gang of suspects: your image metrics are not compatible with your output image format; the shell is changing the composition of the command line before it gets to G'MIC; you've inadvertently put spaces in the wrong places; separate command arguments with _just_ commas; you've made a mistake in the order of command arguments, or omitted arguments which have no defaults. That covers 99 out of 100 cases.
+
+So. Step away from the computer. Stretch. Take a deep breath. Then proof-read the command line as if you have never seen it before. More often or not, your difficulties stem from one or more of this usual gang of suspects.
+
+Sometimes, it doesn't seem that any of the usual gang of suspects is in play. Then turn up the volume. First try ''-verbose'', then ''-debug''.
+
+= verbosity
+#### Verbosity
+Most G'MIC commands announce how they've interpreted their arguments, which shows up in the G'MIC log printed in the shell. These provide leads when those interpretations are strange. Are defaults being used when explicit values have been supplied? Do numeric arguments have unexpected values? Do empty strings show up as arguments? Many of these hints point to problems relating to how G'MIC blocks out command line items. But with the ''-verbose'' command (shortcut: `v`), script writers can set verbosity levels. Setting it to zero kills the G'MIC log.
+
+This may not be a terrible thing. Day-to-day, people often prefer quiet scripts — until it leaves the rails. Then all the hints that can possibly be had are needed. Fortunately, the `-verbose` command can make a script noisy as well as quiet. The behavior depends on the notion of "level". Recall that G'MIC commands may call other commands. "Level" is just the countdown of callers from the ultimate on the command line. By default, G'MIC assigns a verbosity level of one to the command line. For commands that call other commands, those "nested" on a level deeper by one, G'MIC deducts one from the caller's level and assigns the reduced level to the callee. If the callee's level is still positive, G'MIC will echo whatever messages the callee produces. Zero or less, and G'MIC suppresses the message. The default verbosity level permits messages from the top-level commands, but not from any callee removed more than once.
+
+Spelunkers can change the default verbosity level, upping the noise. `-verbose 3 (v 3)` allows messages emitting from the command line (3), messages that come from "callees," that is, those called from the command line (2), and messages from those commands that callees invoke in turn (1). Further calls reach level zero in this example; messages from that level are not seen.
+
+So:
+~~~
+$ gmic v 0 256,256,1,2 =. {w^2},3,2,0,0 s. c -ifft[-2,-1] rm.
+~~~
+operates entirely on the QT. No G'MIC log. No exit messages. Nothing — _not even a `-display`!_ — to hint what is going on. Unless a command somewhere throws an exception, there's only silence, while:
+
+~~~
+$ gmic v 1 256,256,1,2 =. {w^2},3,2,0,0 s. c -ifft[-2,-1] rm.
+~~~
+===
+%% 256,256,1,2 =. {w^2},3,2,0,0 s. c -ifft[-2,-1] rm. n. 0,255 %%
+===
+displays a sinusoidal wavefront of amplitude ±1 rotated from the vertical by ≈33.69°, the right angle less the angle whose tangent is a 3:2 ratio, which, in retrospect, is perfectly obvious — don't you think? Just count the cycles to a side.
+
+One may also employ relative notation. `-verbose +` increases the level by one from whatever it was before, while `-verbose -` decreases it by one. Often, relative notation is harnessed to "punch out" a script message over and above the prevailing verbosity level, whatever that may be — sort of like raising your voice:
+~~~
+v 0   # Everybody: just shut up.
+…
+/. 0
+if isnan(im) v + e "Well Stanley, here's another fine mess you've gotten me into." v - fi
+…
+~~~
+
+= debuggery
+#### Debuggery
+The previous section discussed "calling" commands. In G'MIC, this "calling" action is that of the G'MIC command processor taking up an item on the pipeline and identifying it as a command. In doing so, G'MIC's execution behavior figuratively traverses a tree. Taking up a custom command and entering its scope is akin to following a branch on a tree.
+
+In following the branch, G'MIC "enters the scope" of the called command. G'MIC puts on hold the pipeline from which the calling takes place and commences a _new scope_: the pipeline that makes up the called command. For technical reasons, that scope entry is a quiet affair for built-in commands; these are implemented in the underlying `CImg` library and cannot be actively traced by G'MIC. But the majority of G'MIC commands are _custom commands_ implemented in G'MIC and embodying a pipeline of their own. When operating with an active `-debug` command, G'MIC may trace their execution.
+
+When following the branch, G'MIC essentially goes through the same process of scope passage: expanding — or "decomposing" — commands into their pipeline definitions, putting the current pipeline on hold, then "entering the new scope," operating on that new pipeline from start to finish as if that is the only task it has in the whole, wide world. Upon finish, G'MIC returns to the "trunk", "parent branch" or "parent scope", resuming operations on the pipeline that had been put on hold. Of course, while on the branch, G'MIC may very well encounter a subsequent custom command. That induces entry into an even deeper scope; the mechanics of which is like entering any other scope. Once one grasps the mechanics of scope passage, the _giganormous!_ text dumps of the `-debug` command can be unpacked into the same story, only different. The steps are the same; perhaps the actions of the actors differ. In any case, G'MIC could be at the end any number of branches during the course of its operations. The leaves of the tree are ultimately the built-in commands; they just do image processing and do not call for deeper scopes.       
+
+The _very beginning_ is a special case: G'MIC isn't in any scope. It just has a shell command line. G'MIC prepares to enter the _root scope_ in exactly the same manner as it enters any other scope: it blocks out the shell command line into an itemized pipeline and then enters the root scope (`\`), comparable to entering the scope of any other custom command.
+
+Now G'MIC is no longer operating in a special case. Its entry into the root scope is like its entry into any other scope: it takes incoming pipeline and begins traversing it from start to finish. Should it encounter any built-in command along its way, it invokes the corresponding `CImg` call. Should it encounter a custom command, it decomposes it into its pipeline definition, puts the current scope on hold and then enters the new scope, one named after the command. And so on, and so forth. 
+
+In light of this let's unpack the initial giganormous amount of text produced by a modestly simple command line. First, G'MIC prepares to enter the root scope:
+
+~~~
+ gmic v 3 -debug bar='{3*exp(-(0.75/(2*pi)))}' \
+      images/e_letter.png                    \
+      -blur[-1] 3 -sharpen. 300,2            \
+      -bandpass[0] 0.01,0.005
+
+[gmic]-0./ Start G'MIC interpreter (in debug mode).<gmic>-0./ Initial command line: 'v 3 cli_start , -debug bar={3*exp(-(0.75/(2*pi)))} images/e_letter.png -blur[-1] 3 -sharpen. 300,2 -bandpass[0] 0.01,0.005 e[] "Bar is :{$bar}"'.
+<gmic>./ Decompose command line into 15 items: 
+<gmic>./   item[0] = 'v'
+<gmic>./   item[1] = '3'
+<gmic>./   item[2] = 'cli_start'
+<gmic>./   item[3] = ','
+<gmic>./   item[4] = '-debug'
+<gmic>./   item[5] = 'bar={3*exp(-(0.75/(2*pi)))}'
+<gmic>./   item[6] = 'images/e_letter.png'
+<gmic>./   item[7] = '-blur[-1]'
+<gmic>./   item[8] = '3'
+<gmic>./   item[9] = '-sharpen.'
+<gmic>./   item[10] = '300,2'
+<gmic>./   item[11] = '-bandpass[0]'
+<gmic>./   item[12] = '0.01,0.005'
+
+<gmic>-0./ Enter scope './'.
+…
+~~~
+At the very beginning, G'MIC turns the command line into an itemized pipeline to give to the root scope `./`. Of the fifteen items, numbered zero through fourteen, two may be surprising. G'MIC inserted a custom command, `item[2] = 'cli_start'` and its empty argument list `item[3] = ','`. This is a _command line hook_. G'MIC's default implementation of the custom command `cli_start` is an empty pipeline, which gets an empty argument list. As it stands, `cli_start` does nothing, but you may _override_ `cli_start,` perhaps by defining it in your default `%AppData%\user.gmic` (Windows) or `$HOME/.gmic` (Unix-like) file, or defining it in any other set of custom `*.gmic` commands. However defined, this now-overloaded custom command operates whenever you invoke `gmic,` doing whatever initial steps you may deem necessary at your "G'MIC site". Typically, `cli_start` may be used to transparently introduce site-specific `*.gmic` command files, but other purposes may be served.
+
+Apart from creating a hook, G'MIC constructs the itemized pipeline from the command line _as it sees it!_ For spelunkers, this deserves much attention, because if G'MIC sees the command line differently from the way you see it, difficulties may arise. For example, consider this alternative itemization following `item[11] = '-bandpass[0]'`:
+~~~
+<gmic>./   item[11] = '-bandpass[0]'
+<gmic>./   item[12] = '0.01,'
+<gmic>./   item[13] = '0.005'
+~~~
+Problems are brewing! Probably, the comma following `item[12] = 0.01,` had an unnoticed space following it — and G'MIC splits on spaces when it is itemizing command lines. This detatches `'0.005'` as an independent `item[13]`, wholly unrelated to the `-bandpass` command argument list; at least this is as it is in G'MIC's eyes.
+
+Upon entry into the `bandpass/` scope, the command will be given only one argument. As it happens, `-bandpass` can accept one argument and succeed, though the results may not be entirely expected. Such differences from expectations is moot, however, as there is now a root scope list item, `0.005`, which G'MIC does not associate with the `-bandpass` argument list. After G'MIC exits from the `./bandpass` scope, it takes up `item[13]` as the next order of business:
+~~~
+…
+<gmic>-1./bandpass/ Exit scope 'bandpass/'.
+
+<gmic>-1./ Item '0.005', selection [].
+<gmic>-1./ Command 'input': arguments = '0.005'.
+[gmic]-1./ Input file '0.005' at position 1
+[gmic]-1./ *** Error *** Unknown command or filename '0.005'.
+~~~
+G'MIC treats unmatched items as potential image inputs; it inserts an `-input` command in front of unmatched items, regarding them as a references to image sources. `-input`, a built-in command, executes, but throws an exception when the operating system fails to deliver '0.005' as an accessible image source.
+
+As you may have gathered, this whirlwind tour of command processing has dropped some concepts on the conceptual editorial floor. We have left out other circumstances which induce the G'MIC command processor to enter specialized scopes, those related to `-local…-endlocal` and others augmenting command line substitutions. The `-explain_scope` command is further down the pipeline. For spelunking purposes, the initial command line expansion — or decomposition — into a scope list is of paramount interest: most pipeline maladys arise from unexpected itemization of this list. Since it embodies how G'MIC "sees" the pipeline, it well behooves us to ensure that we see it the same way.
+
+Updated: 06-September-2021 15:00 UTC Commit: 1c0c9bd7ceb3
