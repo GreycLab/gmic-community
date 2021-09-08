@@ -44,6 +44,53 @@
 #
 #-------------------------------
 
+#@cli rep_exp_sig_adj : eq. to 'rep_exponential_sigmoid_adjustment' : (+)
+rep_exp_sig_adj: rep_exponential_sigmoid_adjustment $*
+#@cli rep_exponential_sigmoid_adjustment: -1>=midpoint_shift>=1,sigmoid_level>=0,_endval
+#@cli : Assign exponential-sigmoid function into image.
+#@cli :
+#@cli : midpoint_shift defines the center value point. If it at .5, then the center value point will between the largest value and the middle value.
+#@cli : sigmoid_level influence how much S-Curve will be applied. If 0, then there is no sigmoid function.
+#@cli : On _endval, positive values will return a image with the maximum value equal to the original maximum value by the value assigned to _endval, and in case of negative values, it will return a image with the maximum value being equal to the absolute of _endval.
+#@cli : Default values: '_endval=1'
+#@cli :
+#@cli : Author: Reptorian.
+rep_exponential_sigmoid_adjustment:
+skip ${3=1}
+check "$3!=0"
+f "begin(
+ const midpoint_shift=min(1-abs($1),1);
+ const maxval_mul_by_factor=$3>0?iM*$3:abs($3);
+ 
+ $1>=0?(
+  calc_exp_shift(n)=n^midpoint_shift;
+ ):(
+  calc_exp_shift(n)=1-((1-n)^midpoint_shift);
+ );
+ 
+ const sig_scale=abs($2);
+ 
+ sig_scale==0?(
+  calc(n)=calc_exp_shift(n);
+ ):(
+ 
+  change_slope(a)=(a-.5)*sig_scale;
+  sigmoid_curve(a)=(ne=e^a;(ne)/(ne+1));
+  
+  const start_point=change_slope(0);
+  const val_ref=(e^start_point)/(e^start_point+1);
+  const min_height=abs(val_ref);
+  const max_height=1-2*min_height;
+  
+  calc(n)=(
+   new_curve=calc_exp_shift(n);
+   (sigmoid_curve(change_slope(new_curve))-min_height)/max_height;
+  );
+  
+ );
+);
+start_slope=I/iM;
+calc(start_slope)*maxval_mul_by_factor;"
 #@cli rep_compb : eq. to 'rep_complexion_burst' : (+)
 rep_compb: rep_complexion_burst $*
 #@cli rep_complexion_burst: _points>0,_density>0,_H,_K,_zoom,_rotation_angle,_origin_x,_origin_y,_numbers_extraction_mode={ 0=Individual | 1=Additive },_mode={ 0=C-4 | C=C-6},_f1={ 0=csin | 1=ccos | 2=ctan | 3=clog},...
