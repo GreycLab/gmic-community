@@ -2333,12 +2333,12 @@ else error (-1<=\$\6<=1)=F
 fi
 
 repeat $! l[$>]
- hypo={norm(w,h)/2}
- if ${is_percent\ $1} length={round(abs($1)*$hypo)}
+ half_img_diag={norm(w,h)/2}
+ if ${is_percent\ $1} length={round(abs($1)*$half_img_diag)}
  else length={round(abs($1))}
  fi
 
- if ${is_percent\ $4} thickness={round(abs($4)*$hypo)}
+ if ${is_percent\ $4} thickness={round(abs($4)*$half_img_diag)}
  else thickness={round(abs($4))}
  fi
 
@@ -2364,9 +2364,9 @@ rep_splinter_blur_convolve_map : skip ${1=10%},${2=5%},${3=0},${4=0},${5=1},${6=
 ang={($3/180)*pi*-1}
 cos_ang={cos($ang)};
 sin_ang={sin($ang)};
-hypo={norm($6,$7)/2}
-if ${is_percent\ $1} length={round($1*$hypo)} else length={round($1)} fi
-if ${is_percent\ $2} thickness={max(round($2*$hypo),1)} else thickness={max(round($2),1)} fi
+diag={norm($6,$7)/2}
+if ${is_percent\ $1} length={round($1*$diag)} else length={round($1)} fi
+if ${is_percent\ $2} thickness={max(round($2*$diag),1)} else thickness={max(round($2),1)} fi
 
 point_b_x=0
 point_b_y={$length/2}
@@ -3274,10 +3274,10 @@ elif $ms==1&&$ms<3 to_graya
 else error max_chan<5==F
 fi
 
-ntimg={$timg-1}
+tnimg={$timg-1}
 
-u {"endvec=vector$ntimg(0);for (n=1,n<=$ntimg,++n,endvec[n-1]=w#n;);(endvec)"} vec_w=[${}]
-u {"endvec=vector$ntimg(0);for (n=1,n<=$ntimg,++n,endvec[n-1]=h#n;);(endvec)"} vec_h=[${}]
+u {expr('w#(x+1)',$tnimg-1)} vec_w=[${}]
+u {expr('h#(x+1)',$tnimg-1)} vec_h=[${}]
 
 r {w#0},{h#0},100%,100%,0
 
@@ -3545,17 +3545,7 @@ _rep_keep_original_dimension_and_or_layer:
 skip ${2=0},${3=0},${4=3},${5=.5},${6=.5},${7=0}
 if $2==0||$2==1
  image_count={$!*3}
- imgs={$!}
- eval "
- const lc=$image_count;
- dimension_list=vectorlc(0);
- repeat($imgs,imgc,
-  dimension_list[3*imgc+0]=w#imgc;
-  dimension_list[3*imgc+1]=h#imgc;
-  dimension_list[3*imgc+2]=d#imgc;
- );
- (dimension_list)"
- dimensions_info=[${}]
+ dimensions_info=[{expr('p=int(x/3);arg(x%3+1,w#p,h#p,d#p);',$image_count);}]
 fi
 m "apply_filter:$1"
 if abs($2)>=0&&abs($2)<=2
@@ -4952,8 +4942,8 @@ elif $2==4 channel_order=[2,0,1]
 elif $2==5 channel_order=[2,1,0]
 fi
 
-repeat $!
-if s#$><3||s#$>>4 error s#{$>}>2&&s#{$>}<4==F fi
+repeat $!,img_id
+ if s#$img_id<3||s#$img_id>4 error s#$img_id>2&&s#$img_id<4==F fi
 done
 
 if isnum($1)
@@ -5386,20 +5376,20 @@ rep_pw: rep_point_warp $*
 rep_point_warp:
 skip ${1=10},${2=10},${3=0},${4=0},${5=0},${6=0},${7=3}
 f "begin(
-const img_hypotenuse=($2*norm(w,h));
+const scaled_img_diagonal=($2*norm(w,h));
 const radius=log2((10^(abs($3)*300))*1000)*e;
-const d=log(radius^($1*(.25*min(w,h))));
+const lograd=log(radius^($1*(.25*min(w,h))));
 const hw=w/2;
 const hh=h/2;
 const angle=($6/180)*pi+pi;
-const ox=cos(angle)*img_hypotenuse;
-const oy=sin(angle)*img_hypotenuse;
+const ox=cos(angle)*scaled_img_diagonal;
+const oy=sin(angle)*scaled_img_diagonal;
 const dx=$4*hw;
 const dy=$5*hh;
 );
 xd=x-dx;
 yd=y+dy;
-radinf=radius^(-(((xd-hw)/d)^2+((yd-hh)/d)^2)^2);
+radinf=radius^(-(((xd-hw)/lograd)^2+((yd-hh)/lograd)^2)^2);
 rx=(ox*radinf)+x;
 ry=(oy*radinf)+y;
 I(rx,ry,z,2,$7);
@@ -7665,7 +7655,7 @@ rep_dupsdaxy: rep_duplicate_by_shift_distance_angle_xy $*
 #@cli rep_duplicate_by_shift_distance_angle_xy: duplicates_count>=2,_radius_offset>0,_offset_angle,_keep_original={ 0=remove_original | 1=keep_original },_boundary_condition={ 0=None | 1=Neumann | 2=Periodic | 3=Mirror },_interpolation={ 0=nearest_neighbor | 1=linear }
 #@cli : Creates copies of image at a distance from original point.
 #@cli : (eq. to 'rep_dupsdaxy').\n
-#@cli : _radius_offset refers to the distance the duplicates are from the original image. Each circular duplicates are of the same distance. radius_offset can be in percentage form, or in integer form. When it is in percentage form, the length of each duplicates offset is equal to the percentage of hypotenuse of image.
+#@cli : _radius_offset refers to the distance the duplicates are from the original image. Each circular duplicates are of the same distance. radius_offset can be in percentage form, or in integer form. When it is in percentage form, the length of each duplicates offset is equal to the percentage of diagonal of image.
 #@cli : _offset_angle refers to the starting angle the original duplicate is at. The primary duplicate starts from the right.\n
 #@cli : Default value: '_radius_offset={sqrt(w^2+h^2)*.05}','_offset_angle=0','_keep_original=0','_boundary_condition=0','_interpolation=1'\n
 #@cli : Author: Reptorian.
@@ -7679,7 +7669,7 @@ rep_frblur: rep_fragment_blur $*
 #@cli rep_fragment_blur: duplicates_count>=2,_radius_offset>0,_offset_angle,_keep_original={ 0=remove_original | 1=keep_original },_boundary_condition={ 0=None | 1=Neumann | 2=Periodic | 3=Mirror },_interpolation={ 0=nearest_neighbor | 1=linear },_color_space={ 0=RGB | 1=SRGB | 2=RYB | 3=CMYK | 4=HCY | 5=HSI | 6=HSL | 7=HSV | 8=LAB | 9=LCH }
 #@cli : Fragment Blur is a effect that originated from the Windows software named Paint.NET. Copies or "fragments" of images are superimposed over their respective images. Copies are redrawn at a distance, and starting copy starts from the right at 0.
 #@cli : (eq. to 'rep_frblur').\n
-#@cli : _radius_offset refers to the distance the duplicates are from the original image. Each circular duplicates are of the same distance. radius_offset can be in percentage form, or in integer form. When it is in percentage form, the length of each duplicates offset is equal to the percentage of hypotenuse of image.
+#@cli : _radius_offset refers to the distance the duplicates are from the original image. Each circular duplicates are of the same distance. radius_offset can be in percentage form, or in integer form. When it is in percentage form, the length of each duplicates offset is equal to the percentage of diagonal of image.
 #@cli : _offset_angle refers to the starting angle the original duplicate is at. The primary duplicate starts from the right.
 #@cli : _keep_original options is to keep the original image as a duplicate without offsetting it.\n
 #@cli : Default values: '_radius_offset=5%','_offset_angle=0','_keep_original=0','_boundary_condition=1','_interpolation=1','_color_space=0'\n
@@ -11365,7 +11355,7 @@ gui_split_preview "fx_ncee $*",${-3--1}
 #@gui :_=note("Inspired by the Paint.NET Fragment Blur filter, this implementation improves upon it by adding color space options, preservation of original image as a option, boundary condition option, and interpolation option.\n\n<b>Warning -</b> Preview may not be accurate with image with completely opaque images. The output will not show any transparency regardless."), _=separator(), _=note("<b>Main Setting</b>")
 #@gui :Color Space=choice(0,"RGB","sRGB","RYB","CMYK","HCY","HSI","HSL","HSV","LAB","LCH")
 #@gui :Additional Duplicates Count=int(10,2,100)
-#@gui :Percent of image half-hypotenuse (%)=float(5,0,100)
+#@gui :Percent of half image-diagonal (%)=float(5,0,100)
 #@gui :Angle=float(0,-180,180)
 #@gui :Superimpose with Original?=bool(0)
 #@gui :_=separator(),_=note("<b>Secondary Setting</b>")
@@ -11719,7 +11709,7 @@ rep_sqrlogpindis_gui_preview:
 gui_split_preview "rep_sqrlogpindis_gui $*",${-3--1}
 #@gui Stitch :rep_stitch_gui,rep_stitch_gui_preview(0)
 #@gui :_=note("This is a extended version of a existing filter within the Paint.NET software named <a href="https://forums.getpaint.net/topic/5936-stitch/">Stitch</a> which was made by pyrochild. The extension would be that it supports 1 angle, and it can support more than 2 angles. Anti-aliasing via interpolation and subpixel processing, along with boundary options are also supported.\n\n<i>Warning!Preview is only for giving a idea on the result!</i>"), _=separator()
-#@gui :Pixel Offset of Hypotenuse (%)=float(5,0,100)
+#@gui :Pixel Offset of Image Diagonal(%)=float(5,0,100)
 #@gui :Thickness of Stitches=float(3,1,20)
 #@gui :Stitches Repeat Pattern (0 means no repeat)=int(10,0,500)
 #@gui :Interpolation=choice(4,"Nearest","Average","Linear","Grid","Bicubic","Lanczos")
@@ -11743,19 +11733,19 @@ gui_split_preview "rep_sqrlogpindis_gui $*",${-3--1}
 #@gui :_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split=point(50,50,0,0,200,200,200,0,10)_0
 #@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2019/7/24</i>.</small>")
 rep_stitch_gui:
-hypo={sqrt(w^2+h^2)*($1/100)}
-if $8==1 rep_stitch $hypo,${2-7},$9
-elif $8==2 rep_stitch $hypo,${2-7},${9-10}
-elif $8==3 rep_stitch $hypo,${2-7},${9-11}
-elif $8==4 rep_stitch $hypo,${2-7},${9-12}
-elif $8==5 rep_stitch $hypo,${2-7},${9-13}
-elif $8==6 rep_stitch $hypo,${2-7},${9-14}
-elif $8==7 rep_stitch $hypo,${2-7},${9-15}
-elif $8==8 rep_stitch $hypo,${2-7},${9-16}
-elif $8==9 rep_stitch $hypo,${2-7},${9-17}
-elif $8==10 rep_stitch $hypo,${2-7},${9-18}
-elif $8==11 rep_stitch $hypo,${2-7},${9-19}
-elif $8==12 rep_stitch $hypo,${2-7},${9-20}
+img_diag={norm(w,h)*($1/100)}
+if $8==1 rep_stitch $img_diag,${2-7},$9
+elif $8==2 rep_stitch $img_diag,${2-7},${9-10}
+elif $8==3 rep_stitch $img_diag,${2-7},${9-11}
+elif $8==4 rep_stitch $img_diag,${2-7},${9-12}
+elif $8==5 rep_stitch $img_diag,${2-7},${9-13}
+elif $8==6 rep_stitch $img_diag,${2-7},${9-14}
+elif $8==7 rep_stitch $img_diag,${2-7},${9-15}
+elif $8==8 rep_stitch $img_diag,${2-7},${9-16}
+elif $8==9 rep_stitch $img_diag,${2-7},${9-17}
+elif $8==10 rep_stitch $img_diag,${2-7},${9-18}
+elif $8==11 rep_stitch $img_diag,${2-7},${9-19}
+elif $8==12 rep_stitch $img_diag,${2-7},${9-20}
 fi
 rep_stitch_gui_preview:
 gui_split_preview "rep_stitch_gui $*",${-3--1}
@@ -13104,7 +13094,7 @@ gui_split_preview "fx_rep_loupasc_ordered_dither ${1-3}",${-3--1}
 #@gui Edge Fade: fx_rep_edgefade,fx_rep_edgefade_preview(0)
 #@gui :_=note("If your image has slim alpha, activate Use Max Distance for better control over the fade, however preview will not be as accurate unless you view the full image."),_=separator()
 #@gui :_=note("<b>Main</b>")
-#@gui :Half-Hypotenuse (%)=float(10,.1,100)
+#@gui :Half Image-Diagonal(%)=float(10,.1,100)
 #@gui :Max Distance (%)=float(10,.1,100)
 #@gui :Use Max Distance?=bool(0)
 #@gui :Exponential Factor=float(2,0,3)
@@ -13118,8 +13108,8 @@ fx_rep_edgefade:
 if $3
     rep_edgefade $2%,${4-5},$6%,$7%
 else
-    hypo={round((norm(w,h)/2)*($1/100))}
-    rep_edgefade $hypo,${4-5},$6%,$7%
+    diag={round((norm(w,h)/2)*($1/100))}
+    rep_edgefade $diag,${4-5},$6%,$7%
 fi
 fx_rep_edgefade_preview:
 gui_split_preview "fx_rep_edgefade ${1-7}",${-3--1}
@@ -13466,7 +13456,7 @@ u "{$1}"\
 "{$23}"
 #@gui Blur [Splinter]: fx_rep_blur_splinter,fx_rep_blur_splinter_preview
 #@gui :_=note(" Apply Splinter Blur.\n\nBased off observation from using Splinter Blur plugin within Paint.NET made by Ed Harvey, and it is inspired by this filter.\n\nComputationally intensive!"),_=separator()
-#@gui :Half-Hypotenuse(%) = float(20,0.1,100)
+#@gui :Half Image-Diagonal(%) = float(20,0.1,100)
 #@gui :Duplicates=int(3,3,100)
 #@gui :Angle=float(0,-180,180)
 #@gui :Thickness(%)=float(0,0,100)
@@ -13551,16 +13541,16 @@ u "{$1}"\
 "{$8,$9}"
 #@gui Tiled Zoom: fx_rep_tz,fx_rep_tz_preview(0)
 #@gui :_=note("Create tiled zoom."),_=separator()
-#@gui :Square Width - Half Hypotenuse(%)=float(10,1,100)
-#@gui :Square Height - Half Hypotenuse(%)=float(10,1,100)
+#@gui :Square Width - Half Image-Diagonal(%)=float(10,1,100)
+#@gui :Square Height - Half Image-Diagonal(%)=float(10,1,100)
 #@gui :Scale=float(2,1,10)
 #@gui :Boundary=choice(0,"None","Neumann","Periodic","Mirror")
 #@gui :_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2020/9/22</i>.</small>")
 fx_rep_tz:
-halfhyp={norm(w,h)/2}
-sw={$1%*$halfhyp}
-sh={$2%*$halfhyp}
+half_img_diag={norm(w,h)/2}
+sw={$1%*$half_img_diag}
+sh={$2%*$half_img_diag}
 rep_tiled_zoom $sw,$sh,$3,$4
 fx_rep_tz_preview:
 gui_split_preview "fx_rep_tz ${1-4}",${-3--1}
@@ -13952,8 +13942,8 @@ gui_split_preview "fx_rep_skew ${1-6}",${-3--1}
 #@gui :_=note("Create Random Gradient Bar.\n\n<b>Note -</b> Preview is only for giving a idea.")
 #@gui :_=separator(),_=note("<b>Main</b>")
 #@gui :Seed=int(0,0,100000)
-#@gui :Bar Size - Quarter-Hypotenuse(%)=float(2,0,100)
-#@gui :Space Size - Quarter-Hypotenuse(%)=float(0,0,100)
+#@gui :Bar Size - Quarter Image-Diagonal(%)=float(2,0,100)
+#@gui :Space Size - Quarter Image-Diagonal(%)=float(0,0,100)
 #@gui :Angle=float(0,-180,180)
 #@gui :Skew Angle=float(0,-89,89)
 #@gui :Origin=point(50,50,0,1,255,255,255,255)
