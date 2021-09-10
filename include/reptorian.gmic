@@ -1301,8 +1301,9 @@ repeat $! l[$>]
    const hh=h-1;
    const sd=max(ww,hh)/min(ww,hh);
    const sx=ww>hh?sd:1;
-   const sy=ww>hh?1:sd;  
-   const pyth_img=norm(ww,hh);
+   const sy=ww>hh?1:sd; 
+   rec_diag_dist(a,b)=sqrt(a^2+b^2);
+   const diag_img=rec_diag_dist(ww,hh);
    const ww_div_sx=ww/sx;
    const hh_div_sy=hh/sy;
    const cx=ww/2;
@@ -1310,7 +1311,7 @@ repeat $! l[$>]
    const ox=cx-(ww*-$5);
    const oy=cy-(hh*$6);
    const skew_ang=-($4/180)*pi;
-   const mdist=tan(skew_ang)*pyth_img;
+   const mdist=tan(skew_ang)*diag_img;
    const ang=-($3/180)*pi;
    const cos_ang=cos(ang);
    const sin_ang=sin(ang);
@@ -1320,12 +1321,12 @@ repeat $! l[$>]
    const inversion_mode=($16+2)%3;
    
    "${is_percent\ $1}"?(
-    const bar_width=max($sub,round((abs($1)*pyth_img/4)));
+    const bar_width=max($sub,round((abs($1)*diag_img/4)));
    ):(
     const bar_width=max($sub,round(abs($1)*$sub));
    );
    "${is_percent\ $2}"?(
-    const space_width=abs($2)>0?max($sub,round((abs($2)*pyth_img/4)));
+    const space_width=abs($2)>0?max($sub,round((abs($2)*diag_img/4)));
    ):(
     const space_width=round(abs($2)*$sub);
    );
@@ -1346,7 +1347,7 @@ repeat $! l[$>]
    fmod_cont(a,b)=floor(a/b)%2?b-fmod(a,b):fmod(a,b);
    fcut(a,b)=(cut(a,-b,b)+b)/2;
 
-   const number_of_bars=ceil(norm(ww,hh)/total_width);
+   const number_of_bars=ceil(rec_diag_dist(ww,hh)/total_width);
    const shift_bars=int(number_of_bars/2);
   
    symmetry_mode==1?(calc_bar()=(-1*abs(floor(point_x/total_width))+shift_bars)%number_of_bars;):
@@ -1446,7 +1447,7 @@ repeat $! l[$>]
 
   initial_x=(x-ox)/ww*sx;
   initial_y=(y-oy)/hh*sy;
-  gradient=-rot_y(initial_x,initial_y)*hh_div_sy/pyth_img;
+  gradient=-rot_y(initial_x,initial_y)*hh_div_sy/diag_img;
   point_x=rot_x(initial_x,initial_y)*ww_div_sx+gradient*mdist+half_total_width;
   bar=calc_bar();
   spaces=calc_spacing();
@@ -4746,6 +4747,7 @@ cv_8={narg($12)?$12:u(0,1)}
 
 eval ${-math_lib}"
 interpolate(a,b)=a*-b+(1-a)*b;
+rec_diag_dist(a,b)=sqrt(a^2+b^2);
 
 const use_run=$13;
 
@@ -4753,7 +4755,8 @@ const mw=w#-2;
 const mh=h#-2;
 const cenx=mw/2;
 const ceny=mh/2;
-const cenf=(norm(cenx,ceny)/2.5)*$3;
+const cenf=(rec_diag_dist(cenx,ceny)/2.5)*$3;
+
 
 xc=yc=zc=0;
 
@@ -5246,9 +5249,14 @@ if $include_alp_cut
 else outcolor=I
 fi
 
-if $12>0 boundary=avg(bndcut(radial_gradient_v[0]),bndcut(radial_gradient_v[1]),bndcut(radial_gradient_v[2]),bndcut(radial_gradient_v[3]))
-calc_antialias=ox=sur_x(start_x(x+.5));oy=sur_y(start_y(y+.5));radial_gradient_v=[nm(norm(xx,yy)),nm(norm(ox,yy)),nm(norm(xx,oy)),nm(norm(ox,oy))];
-else boundary=bndcut(radial_gradient)
+if $12>0
+
+ boundary=avg(bndcut(radial_gradient_v[0]),bndcut(radial_gradient_v[1]),bndcut(radial_gradient_v[2]),bndcut(radial_gradient_v[3]))
+ 
+ calc_antialias=ox=sur_x(start_x(x+.5));oy=sur_y(start_y(y+.5));radial_gradient_v=[nm(norm(xx,yy)),nm(norm(ox,yy)),nm(norm(xx,oy)),nm(norm(ox,oy))];
+ 
+else 
+ boundary=bndcut(radial_gradient)
 fi
 
 f "
@@ -5375,7 +5383,8 @@ rep_pw: rep_point_warp $*
 rep_point_warp:
 skip ${1=10},${2=10},${3=0},${4=0},${5=0},${6=0},${7=3}
 f "begin(
-  const scaled_img_diagonal=($2*norm(w,h));
+  rec_diag_dist(a,b)=sqrt(a^2+b^2);
+  const scaled_img_diagonal=($2*rec_diag_dist(w,h));
   const radius=log2((10^(abs($3)*300))*1000)*e;
   const lograd=log(radius^($1*(.25*min(w,h))));
   const hw=w/2;
@@ -10371,7 +10380,9 @@ repeat $! l[$>]
  
  1,1,1,$dim 1,1,1,1
  
- {vector$dim(2*ceil(sqrt($dim))+1)} r. 100%,100%,100%,2
+ {vector$dim(2*ceil(sqrt($dim))+1)} 
+ 
+ r. 100%,100%,100%,2
  
  f. "P=[x,y,z]-int([w/2,h/2,d/2]);[sum(sqr(P)),dot(P,[1,w#2,w#2*h#2])]"
  
