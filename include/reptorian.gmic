@@ -5658,57 +5658,38 @@ if $5<0 if $#<6 error ""$#">6==F" fi fi
 
 tcr=3
 
+convert_colors_fwd=${arg\ $5,rgb2srgb,rgb2ryb,rgb2cmy,error,rgb2hcy,rgb2hsi,rgb2hsl,rgb2hsv,rgb2lab,rgb2lch,rgb2yiq,rgb2yuv,rgb2ycbcr,rgb2ycbcrglic,rgb2xyz,rgb2yes,rgb2k1,rgb2ohta}
+convert_colors_bwd=${arg\ $5,srgb2rgb,ryb2rgb,cmy2rgb,error,hcy2rgb,hsi2rgb,hsl2rgb,hsv2rgb,lab2rgb,lch2rgb,yiq2rgb,yuv2rgb,ycbcr2rgb,ycbcrglic2rgb,xyz2rgb,yes2rgb,k12rgb,ohta2rgb}
+
 repeat $! l[$>]
-if (s==3||s==4)&&$5
- convert_back=1
- if $5!=4
-  sh 0,2
-  if $5==1 rgb2srgb.
-  elif $5==2 rgb2ryb.
-  elif $5==3 rgb2cmy.
-  elif $5==5 rgb2hcy.
-  elif $5==6 rgb2hsi.
-  elif $5==7 rgb2hsl.
-  elif $5==8 rgb2hsv.
-  elif $5==9 rgb2lab.
-  elif $5==10 rgb2lch.
-  elif $5==11 rgb2yiq.
-  elif $5==12 rgb2yuv.
-  elif $5==13 rgb2ycbcr.
-  elif $5==14 rgb2ycbcrglic.
-  elif $5==15 rgb2xyz.
-  elif $5==16 rgb2yes.
-  elif $5==17 rgb2k1.
-  elif $5==18 rgb2ohta.
-  fi
-  rm.
- else
-  if s==3 rgb2cmyk tcr+=1
-  elif s==4 s c,-3 rgb2cmyk.. a c
+ if (s==3||s==4)&&$5
+  convert_back=1
+  if $5!=4
+   $convert_colors_fwd.
+  else
+   if s==3 rgb2cmyk tcr+=1
+   elif s==4 s c,-3 rgb2cmyk.. a c
+   fi
   fi
  fi
-fi
 
-if !$6&&(s>$tcr||s==2) sh. 0,{s-2} remove_image=1 fi
+ if !$6&&(s>$tcr||s==2) sh. 0,{s-2} remove_image=1 fi
 
-f. "
-begin(
- const dc=($1-1)/2;
- const kern=dc*2+1;
- const ts=s*2;
- NEW_COL=vectors(0);
- if($6,mm=vectorts("$colour",0,255);
-   ,mm=vectorts("$colour");
+ f. "begin(
+  const dc=($1-1)/2;
+  const kern=dc*2+1;
+  const ts=s*2;
+  NEW_COL=vectors(0);
+  if($6,mm=vectorts("$colour",0,255);,mm=vectorts("$colour"););
+  skip=1;
  );
- skip=1;
-);
-repeat(s,ss,
- N=crop(x-dc,y-dc,0,ss,kern,kern,1,1,1);
- min_val=min(mm[ss*2],mm[ss*2+1]);
- max_val=max(mm[ss*2],mm[ss*2+1]);
- tolerance=$2*(max_val-min_val)+min_val;
- if(skip,
-  if($3,
+ repeat(s,ss,
+  N=crop(x-dc,y-dc,0,ss,kern,kern,1,1,1);
+  min_val=min(mm[ss*2],mm[ss*2+1]);
+  max_val=max(mm[ss*2],mm[ss*2+1]);
+  tolerance=$2*(max_val-min_val)+min_val;
+  if(skip,
+   if($3,
     if($4
     ,calc_newcol()=i(x,y,z,ss)<tolerance?min_val:max_val;
     ,calc_newcol()=i(x,y,z,ss)<tolerance?min(N):max(N);
@@ -5718,15 +5699,15 @@ repeat(s,ss,
     ,calc_newcol()=i(x,y,z,ss)>tolerance?min_val:max_val;
     ,calc_newcol()=i(x,y,z,ss)>tolerance?min(N):max(N);
     );
-  );
+   );
   skip--;
+  );
+  NEW_COL[ss]=calc_newcol();
  );
- NEW_COL[ss]=calc_newcol();
-);
 
-NEW_COL;
+ NEW_COL;
 
-end(if(!skip,
+ end(if(!skip,
   if($3,
     if($4
     ,calc_newcol()=i(x,y,z,ss)<tolerance?min_val:max_val;
@@ -5739,39 +5720,19 @@ end(if(!skip,
     );
    );
   );
- );
-"
+ );"
 
-if $remove_image rm. fi
+ if $remove_image rm. fi
 
-if $convert_back
- if $5!=4
-  sh 0,2
-  if $5==1 srgb2rgb.
-  elif $5==2 ryb2rgb.
-  elif $5==3 cmy2rgb.
-  elif $5==5 hcy2rgb.
-  elif $5==6 hsi2rgb.
-  elif $5==7 hsl2rgb.
-  elif $5==8 hsv2rgb.
-  elif $5==9 lab2rgb.
-  elif $5==10 lch2rgb.
-  elif $5==11 yiq2rgb.
-  elif $5==12 yuv2rgb.
-  elif $5==13 ycbcr2rgb.
-  elif $5==14 ycbcrglic2rgb.
-  elif $5==15 xyz2rgb.
-  elif $5==16 yes2rgb.
-  elif $5==17 k12rgb.
-  elif $5==18 ohta2rgb.
-  fi
-  rm.
- else
-  if s==4 cmyk2rgb tcr-=1
-  elif s==5 s c,-4 cmyk2rgb.. a c
+ if $convert_back
+  if $5!=4
+   $convert_colors_bwd.
+  else
+   if s==4 cmyk2rgb tcr-=1
+   elif s==5 s c,-4 cmyk2rgb.. a c
+   fi
   fi
  fi
-fi
 endl done
 #@cli rep_pstrk: eq. to 'rep_perspective_streak' : (+)
 rep_pstrk: rep_perspective_streak $*
@@ -7015,10 +6976,14 @@ diag=$33
 interpolation={abs($37)+1}
 subpixel={abs($36)+1}
 tc={$cs!=3?3+$alp:4}
+
 if $modvalue_a_1==$modvalue_b_1 v + error "Mod Value A for first channel and Mod Value B for first channel cannot be the same value!" v - fi
 if $modvalue_a_2==$modvalue_b_2 v + error "Mod Value A for second channel and Mod Value B for second channel cannot be the same value!" v - fi
 if $modvalue_a_3==$modvalue_b_3 v + error "Mod Value A for third channel and Mod Value B for third channel cannot be the same value!" v - fi
 if $tc==4 if $modvalue_a_4==$modvalue_b_4 v + error "Mod Value A for fourth channel and Mod Value B for fourth channel cannot be the same value!" v - fi fi
+
+from_color_space=${arg\ $cs,ryb2rgb,cmy2rgb,error,hsi82rgb,hsl82rgb,hsv82rgb,lab82rgb,lch82rgb,yiq82rgb,yuv82rgb,ycbcr2rgb,ycbcrglic2rgb,xyz82rgb,yes82rgb}
+
 repeat $! l[$>]
     iw={w}
     ih={h}
@@ -7060,25 +7025,10 @@ repeat $! l[$>]
     fi
     k[0]
     if $interpolation&&$subpixel>1 r $iw,$ih,100%,100%,$interpolation fi
-    if $cs!=3
-        if $cs!=0 sh 0,2 fi
-        if $cs==1 ryb2rgb.
-        elif $cs==2 cmy2rgb.
-        elif $cs==4 hsi82rgb.
-        elif $cs==5 hsl82rgb.
-        elif $cs==6 hsv82rgb.
-        elif $cs==7 lab82rgb.
-        elif $cs==8 lch82rgb.
-        elif $cs==9 yiq82rgb.
-        elif $cs==10 yuv82rgb.
-        elif $cs==11 ycbcr2rgb.
-        elif $cs==12 ycbcrglic2rgb.
-        elif $cs==13 xyz82rgb.
-        elif $cs==14 yes82rgb.
-        fi
-        if $cs!=0 rm. fi
+    if $cs!=3&&$cs
+     $from_color_space
     else
-        cmyk2rgb
+     cmyk2rgb
     fi
 endl done
 #@cli rep_shape_brick: brick_width>0,brick_height>0,_mortar_width>0,_mortar_height>0,_outline>=0,_bevel>=0,_bevel_style= { 0=round | 1=inverse_round | 2=diamond },-1>=_shift_val>=1,_shift_direction= { 0=horizontal | 1=vertical },_flip_offset= { 0= Do Not Flip | 1= Flip },_subpixel_processing_level>=0
