@@ -111,6 +111,291 @@ f ":begin(
 );
 start_slope=I/iM;
 calc(start_slope)*maxval_mul_by_factor;"
+#@cli rep_ekb: eq. to 'rep_ellsworth_board' : (+)
+rep_rep_ekb: rep_ellsworth_kelly_board $*
+#@cli rep_ellsworth_board: sqr_size,_border_size[%],_border_value[%],_distribution,_{pal_id,[image]},_background_hex,fit_mode,_color_space,_exterior_border_color...
+#@cli : Outputs a color board based on colored square tiles art made by Ellsworth Kelly with transparent areas.
+#@cli :
+#@cli : (eq. to 'rep_ekb')
+#@cli : sqr_size defines the painted square size.
+#@cli : _border_size defines the size of border. Negative number will take away areas from the painted squares. Positive number will separate painted areas by this amount.
+#@cli : _border_value defines the gray level of border.
+#@cli : _distribution defines the probability of a square to be painted.
+#@cli : _{pal_id,[image]} defines the color. If you choose a name of a existing palette, then this will be the base of the colors of the square. Otherwise, it will be based off the palette.
+#@cli : _background_hex defines the background color. This is based on RGB-Hex value.
+#@cli : _fit_mode defines whether the resulting board should exceed the size of the original image.
+#@cli : _color_space defines the color space of the board.
+#@cli : _border_color defines the color of the border. Dependent on color space.
+#@cli : Default values: '_border_size=10%','_border_value=50%','_distribution=50%','{pal_id,[image]}=120','_background_hex=n/a',_fit_mode=0,'_color_space=0','_exterior_border_color=n/a'
+#@cli :
+#@cli : Author: Reptorian
+rep_ellsworth_kelly_board:
+skip "${2=10%},${3=50%},${4=50%},${5=120},${6=},${7=0},${8=0},${9=}"
+
+check "($1==int(abs($1)))&&(int(abs($1))>=1)&&$4>0"
+
+cs={$8%15}
+
+ref_sqr_size={abs($1)}
+
+mode=1
+
+border_direction={$2>=0}
+
+('$2')
+
+if i(#-1,w-1)==37 use_percent=1 else use_percent=0 fi
+
+rm.
+ 
+if $border_direction&&$ref_sqr_size>1
+
+ if $use_percent border_size={round(($ref_sqr_size)*abs($2))}
+ else border_size={round(abs($2))}
+ fi
+ 
+ if $border_size>0
+  sqr_size={$ref_sqr_size+$border_size}
+ else
+  sqr_size=$ref_sqr_size
+ fi
+ 
+elif !$border_direction||$ref_sqr_size==1
+
+ if $use_percent border_size={round(($ref_sqr_size-1)*abs($2))}
+ else border_size={min(round(abs($2)),$ref_sqr_size-1)}
+ fi
+ sqr_size=$ref_sqr_size
+ 
+else
+ border_size=0
+ sqr_size=$ref_sqr_size
+fi
+
+border_value={cut($3,0,1)}
+
+if ${is_image_arg\ $5}
+
+ pass$5 0
+ 
+ if !((w>1&&h==1)||(w==1&&h>1)) error dim_inv fi
+ 
+ l.
+  if w>h
+   s x
+  else
+   s y
+  fi
+  remove_duplicates
+  a x
+ endl
+
+else
+
+ pal $5
+ 
+ cs=0
+ 
+fi
+
+convert_colors_fwd=${arg\ $cs+1,error,rgb2ryb,rgb2cmy,error,rgb2hcy,rgb2hsi,rgb2hsl,rgb2hsv,rgb2lab,rgb2lch,rgb2ycbcr,rgb2ycbcrglic,rgb2yiq,rgb2yuv,rgb2xyz,rgb2yes}
+convert_colors_bwd=${arg\ $cs+1,error,ryb2rgb,cmy2rgb,error,hcy2rgb,hsi2rgb,hsl2rgb,hsv2rgb,lab2rgb,lch2rgb,ycbcr2rgb,ycbcrglic2rgb,yiq2rgb,yuv2rgb,xyz2rgb,yes2rgb}
+
+if w#-1<5 error min_cols>=5==F fi
+
+if narg($6)
+ bg_color=${rep_hex2int8\ $6}
+ 1,1,1,{s},"vectors("$bg_color")"
+ if $8 $convert_colors_fwd. fi
+ eval.. "begin(test_color=I(#-1,0,0,0););if(I==test_color,run('error inval_bant'));"
+ empty_color=[{[crop(#-1),255]}]
+ rm.
+else
+ empty_color=vector(#s,0)
+fi
+
+if $border_size
+ condition_text=condition=(nx>=border_size)&&(ny>=border_size);
+ result=condition?color:border_color
+else
+ result=color
+fi
+
+mode={$7%2}
+
+border_value={cut($3,0,1)}
+
+if ${is_image_arg\ $5}
+ if $8<2 init_border_color={vector3($border_value*255)}
+ elif $8==2 init_border_color=0,0,{$border_value*255}
+ elif $8==3 init_border_color=0,0,0,{$border_value*255}
+ elif $8>=4&&$8<=7 init_border_color=0,0,{$border_value}
+ elif $8>=8&&$8<=13||$cs==15 init_border_color={$border_value*255},0,0
+ elif $8==14 init_border_color={vector3($border_value*255})}
+ fi
+else init_border_color={vector3($border_value*255)}
+fi
+
+use_bg_color=0
+
+if narg($9)&&!$mode bg_color=${9--1},255 use_bg_color=1 fi
+
+repeat $!-1 l[$>,-1]
+
+ if $mode
+  mini_w={ceil(w#0/$sqr_size)}
+  mini_h={ceil(h#0/$sqr_size)}
+ else
+  mini_w={int(w#0/$sqr_size)}
+  mini_h={int(h#0/$sqr_size)}
+ fi
+ 
+ large_w={$mini_w*$sqr_size+$border_size}
+ large_h={$mini_h*$sqr_size+$border_size}
+ 
+ if $mode
+  if ($large_w-$sqr_size)>w#0 
+   large_w-=$sqr_size 
+   mini_w-=1
+  fi
+  if ($large_h-$sqr_size)>h#0  
+   large_h-=$sqr_size 
+   mini_h-=1
+  fi
+ else
+  if $large_w>w#0 
+   large_w-=$sqr_size 
+   mini_w-=1
+  fi
+  if $large_h>h#0 
+   large_h-=$sqr_size 
+   mini_h-=1
+  fi
+ fi
+ 
+ $mini_w,$mini_h,1,1,"begin(
+   const probability=cut($4,0,1);
+   if(probability==1,
+    calc_result()=int(u(w#-1));,
+    calc_result()=u(1)<probability?int(u(w#-1)):-1;
+   );
+  );
+  calc_result();
+  "
+  
+ f. >"begin(
+   const num_of_colors=w#-2;
+   const mx=w-1;
+   const my=h-1;
+   find_new_color()=(
+    new_col_id=int(u(num_of_colors));
+    do(
+     new_col_id++;
+    ,cols[new_col_id%num_of_colors]
+    );
+    new_col_id%num_of_colors;
+   );
+  );
+  cols=vector(#num_of_colors,0);
+  (i+1)?(
+   (x==0&&y==0)?(
+    (j(1,0)+1)?cols[j(1,0)]=1;
+    (j(0,1)+1)?cols[j(0,1)]=1;
+    find_new_color();
+   ):
+   (x==mx&&y==0)?(
+    (j(-1,0)+1)?cols[j(-1,0)]=1;
+    (j(0,1)+1)?cols[j(0,1)]=1;
+    find_new_color();
+   ):
+   (x==0&&y==my)?(
+    (j(1,0)+1)?cols[j(1,0)]=1;
+    (j(0,-1)+1)?cols[j(0,-1)]=1;
+    find_new_color();
+   ):
+   (x==mx&&y==my)?(
+    (j(-1,0)+1)?cols[j(-1,0)]=1;
+    (j(0,-1)+1)?cols[j(0,-1)]=1;
+    find_new_color();
+   ):
+   (x==0)?(
+    (j(1,0)+1)?cols[j(1,0)]=1;
+    (j(0,1)+1)?cols[j(0,1)]=1;
+    (j(0,-1)+1)?cols[j(0,-1)]=1;
+    find_new_color();
+   ):
+   (x==mx)?(
+    (j(-1,0)+1)?cols[j(-1,0)]=1;
+    (j(0,1)+1)?cols[j(0,1)]=1;
+    (j(0,-1)+1)?cols[j(0,-1)]=1;
+    find_new_color();
+   ):
+   (y==0)?(
+    (j(0,1)+1)?cols[j(0,1)]=1;
+    (j(1,0)+1)?cols[j(1,0)]=1;
+    (j(-1,0)+1)?cols[j(-1,0)]=1;
+    find_new_color();
+   ):
+   (y==my)?(
+    (j(0,-1)+1)?cols[j(0,-1)]=1;
+    (j(1,0)+1)?cols[j(1,0)]=1;
+    (j(-1,0)+1)?cols[j(-1,0)]=1;
+    find_new_color();
+   ):(
+    (j(1,0)+1)?cols[j(1,0)]=1;
+    (j(-1,0)+1)?cols[j(-1,0)]=1;
+    (j(0,1)+1)?cols[j(0,1)]=1;
+    (j(0,-1)+1)?cols[j(0,-1)]=1;
+    find_new_color();
+   );
+  ):-1"
+  
+  $large_w,$large_h,1,{s#-2+1},*"begin(
+   const col_s=s#-2;
+   const border_size=$border_size;
+   modv(a)=a-int(a/$sqr_size)*$sqr_size;
+   mini(a)=int(a/$sqr_size);
+   const gv=$border_value*255;
+   border_color=["$init_border_color",255];
+   empty_color="$empty_color";
+  );
+  nx=modv(x);
+  ny=modv(y);
+  mx=mini(x);
+  my=mini(y);
+  "$condition_text"
+  color_pos=i(#-1,mx,my,0,0);
+  color=(color_pos+1)?[I(#-2,color_pos,0,0),255]:empty_color;
+  "$result";"
+
+ if $use_bg_color
+  {w#0},{h#0},1,{s#-3+1},"["$bg_color"]"
+  j[-1] [-2],.5~,.5~
+  rv[0,-1]
+  rm[-3--1]
+ else
+  if !$mode
+   r. {w#0},{h#0},1,100%,0,0,.5,.5
+  fi
+  rv[0,-1]
+  rm[-2--1]
+ fi
+ 
+ if $cs
+  if $cs!=3 
+   $convert_colors_bwd[0]   
+  else 
+   if s#0==5
+    s[0]. c,-4 cmyk2rgb[0] a[0,1] c
+   else
+    cmyk2rgb[0]
+   fi   
+  fi
+ fi
+ 
+endl done
+
+rm.
 #@cli rep_compb : eq. to 'rep_complexion_burst' : (+)
 rep_compb: rep_complexion_burst $*
 #@cli rep_complexion_burst: _points>0,_density>0,_H,_K,_zoom,_rotation_angle,_origin_x,_origin_y,_numbers_extraction_mode={ 0=Individual | 1=Additive },_mode={ 0=C-4 | C=C-6},_f1={ 0=csin | 1=ccos | 2=ctan | 3=clog},...
@@ -14157,6 +14442,90 @@ u "{$1}"\
 "{$25}_"{$26?1:2}\
 "{$26}"\
 "{$27}"
+#@gui Ellsworth Kelly Board: fx_rep_ekb,fx_rep_ekb_preview
+#@gui :_=separator(),_=note("<b>Main</b>")
+#@gui :Square Size - Minimum Dimension(%)=float(10,1,100)
+#@gui :Border Size - Square Size(%)=float(10,-100,100)
+#@gui :Border Size - Pixel=int(1,-50,50)
+#@gui :Use Pixel Unit to define Border=bool(1)
+#@gui :Frequency(%)=float(50,5,100)
+#@gui :Output=choice(0,"Inside","Resized")
+#@gui :_=separator(),_=note("<b>Color Options</b>")
+#@gui :Unfilled Area Color=color(210,205,230)
+#@gui :Keep Unfilled Area Empty?=bool(1)
+#@gui :Exterior Border Color=color(255,255,255)
+#@gui :Keep Exterior Border Color Empty?=bool(1)
+#@gui :Border Value(%)=float(0,0,100)
+#@gui :Palette=choice(0,"Predefined",Random)
+#@gui :Number of Colors=int(12,5,100)
+#@gui :Color Space=choice(0,"RGB","RYB","CMY","CMYK","HCY","HSI","HSL","HSV","LAB","LCH","YCbCr","YCbCrGLIC","YIQ","YUV","XYZ","YES")_0
+#@gui :Predefined Palette=choice(10,"BW-RGB-{5}","W-CMYK-{5}","RGBCMY-{6}","1-Bit-RGB-{8}","Aurora-{256}","PLAYPAL-{249}","Sonic Robo Blast 2-{256}","Famicube-{64}","Andrew Kensler - 16","Andrew Kensler - 32","Andrew Kensler - 54","AAP-Micro 12","AAP-16","AAP-64","AAP-SPLENDOR128","DB8","DB16","DB32","DB-ISO22","DimWiddy 17","DimWiddy 23","Endesga-8","Endesga-16","Endesga-32","Endesga-36","Endesga-64","Juicy-32","Juicy-56","XAIUE-22","15P-DX","20P-DX","24P-DX","Cabana-64","Fantasy 16","Fantasy 24","Tranquil Fantasy 23","Tranquility Plus 39","Faraway 48","Fleja Master Palette-{33}","Koni32","Linear Color Palette Basic-{31}","Vines Flexible Linear Ramps-{38}","Arcade Standard 29","ARQ16","BLK 36","BLK-NEO-{46}","Broken Facility","Bubblegum-16","Cade 15","Calder 8-{11}","Chromatic16","CD-BAC-{16}","CG Arne-{16}","CPC BOY-{32}","Dinoknight 16","||||-22","FZT Ethereal 16","GZXP-{11}","Indecision-{17}","Island Joy 16","Journey-{64}","Juicy 17","Oak21', "Nature's Embrace 55", 'Nauris-16","Pear 36","Peachy Pop 16-{16}","Pineapple 32","Resurrect 32-{32}","Rosy 42","SLSO-CLR17","Softy 15","SPEC12","Starmancer-{52}","Superb 8","SuperFuture25","Sweetie 16","Taffy 16","Todayland Palette V2-{25}","Vivid-17","Voodo34","Zughy 32","ENOS16","Undertones-17","Equpix 15","Night 16","Star 29","Star 34","Still-Life-{14}","SimpleJPC-16","Acid 15","Battery 24","Clumpy 18","Cthulhu-{16}","Crimso 11","Copper-Tech-{16}","DRZ15A","Eggy 15","Eroge-Copper","Europa 16-{16}","GreyT-bit-{8}","Jewel-{15}","Polar 11","Sheltzy 32","Rube-Goldberg-{9}","BoomBoom-{7}","Generic-8","Matriax8c","NT1H-{26}","Autum 15","Autum 15 [Yellow]","JerryPie 22","Naji 16","Blessing-{5}","Crayola Blind-{9}","Easter Island-{16}","Fairy Tales-{8}","0xdb-01-{17}","Ocaso-{17}","Pastel-{15}","17 Pastels","Pollen-8","Nopal-12","Sy17","Syz15","TUI-15","Cave-{8}","Psygnosia-{16}","MarshMellow32","Rabbit 7","Finlal 11","Vinik 24","YKB-22","Graveyard-21","Steam Lords-{16}","AAP-RadiantXV-{15}","AAP-Majesty XVII-{17}","Daruda 22","Rust-6","XAIUE-Radiant-{22}","Firestorm-{9}","SuperNova 7","NYX8","OIL6","SGM-Palette 2-{17}","Fornax Void I-{256}","Fornax Void II-{128}","Pixelwave-{12}","Spacey Easter-{17}","Moonlit-39","Petite-8","Petite-8 Afterdark","Autochrome 5","Amiga 2600 NTSC-{128}","Amiga 2600 PAL-{104}","Amiga 2600 SECAM-{8}","Amiga 7800 M.E.S.S-{256}","Amiga 7800-{256}","Amstrad CPC-{27}","Apple II-{15}","CGA-{16}","Commodore 64 [Pepto Interpretation]-{16}","Commodore 64 [Colodore Interpretation]-{16}","Commodore VIC-20-{16}","Colecovision-{15}","Japanese Machine Palette-{16}","Macintosh II-{16}","NES-{52}","PICO-8-{16}","RISC OS-{16}","SAM Coupe-{128}","Thomson MO5-{16}","VGA-{244}","ZX Spectrum-{15}","GNOME 32-{32}","Electronic Crayon 22","Chip16","MSX-{15}","Deluxe Paint-{222}","Legacy Paint-{16}","XP Paint-{28}","Vista Paint-{28}")
+#@gui :_=separator(),_=note("<b>Random</b>")
+#@gui :Main=int(0,0,1000000)
+#@gui :Color=int(0,0,1000000)_0
+#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2021/09/15</i>.</small>")
+fx_rep_ekb:
+srand $20
+to_a
+
+#Random Below#
+#Main=arg20#
+#Color=arg21#
+
+square_size={round(min(w,h)/2*$1%)}
+if $4
+ border_size=$3
+else
+ border_size=$2%
+fi
+
+main_arg=$square_size,$border_size,$15%,$5%
+
+if !$10 ufc=${rep_int82hex\ ${7-9}} fi
+
+second_set_arg=$6,$18
+
+if !$14 second_set_arg.=,${11-13} fi
+
+if $16
+ mimg={$!-1}
+ if $18<4||$18==11 vcol=[u(255),u(255),u(255)]
+ elif $18<8 vcol=[u(359.999,1,1]
+ elif $18==8 vcol=[u(0,100),u(-128,182),u(-155,155)]
+ elif $18==9 vcol=[u(0,100),u(240),u(-pi,pi)]
+ elif $18==10 vcol=[u(16.5,236),u(16.9375,240.0625),u(16.9375,240.0625)]
+ elif $18==12 vcol=[u(255),u(-151.90757751464844,151.90757751464844),u(-133.26069641113281,133.26069641113281)]
+ elif $18==13 vcol=[u(1),u(-.436,.436),u(-.615,.615)]
+ elif $18==14 vcol=vector(#3,u(1))
+ elif $18==15 vcol=[u(255),vector2(u(-127.5,127.5))]
+ fi
+ $17,1,1,{$18==3?4:3},$vcol
+ rep_ellsworth_kelly_board[0-$mimg] $main_arg,[-1],$ufc,$second_set_arg
+ rm.
+else
+ ppc=${arg\ $19+1,3,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,124,125,126,127,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,160,189,190,191,192,193,194,195,196,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223}
+ rep_ellsworth_kelly_board $main_arg,$ppc,$ufc,$second_set_arg
+fi
+fx_rep_ekb_preview:
+fx_rep_ekb $*
+a={$16?2:0}
+u "{$1}"\
+"{$2}"_{!$4?2:0}\
+"{$3}"_{$4?2:0}\
+"{$4}"\
+"{$5}"\
+"{$6}"\
+"{$7,$8,$9}"_{!$10?2:1}\
+"{$10}"\
+"{$11,$12,$13}"_{$6?0:!$14?2:1}\ 
+"{$14}"_{$6?0:2}\
+"{$15}"_{(($4?$3:$2)!=0)?2:1}\
+"{$16}"\
+"{$17}"_$a\
+"{$18}"_$a\
+"{$19}"_{!$16?2:0}\
+"{$20}"\
+"{$21}"
 ######################
 
 # Local Variables:
