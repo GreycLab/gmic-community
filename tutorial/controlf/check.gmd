@@ -1,15 +1,19 @@
 # check (+)
 %% x "mkdir -p img" %%
 %% m scripts/roses.gmic roses 4096,1,0,-11,1,0,-7,1,0,5 expand_xy[canvas] 16 -dilate_circ[canvas] 16 *[canvas] -1 label[canvas] *[canvas] {255/iM} -map[canvas] hocuspocus r2dx[canvas] 300,5 o. img/arabesque.png rm %%
-|![frontimage](img/arabesque.png)|''-check'' throws exceptions if the given test expressions resolve to false, otherwise taking no action. If any command on the calling chain is a ''-local'' … ''-endlocal'' block that has a defined ''-onfail'' section, the exception is caught and further processing resumes. Otherwise G'MIC prints the test expressions as an exception message, appearing in G'MIC's shell log.\nPrior to G'MIC 2.6, `-check` could take a file system object and test for its existence. That is no longer supported. Use the mathematical expression function `isfile()` or `isdir()` instead:\n\n`gmic check "isfile('/this/doesnt/exist.here')"`\n\nConsider using ''-error'' if some control over the error message is desired. `-error` unconditionally throws exceptions, so it is combined with conditional commands to emulate `-check,` but in a less compact way.
+|![frontimage](img/arabesque.png)|''-check'' throws exceptions if the given test expressions resolve to false, otherwise it takes no action. If any command on the calling chain is a ''-local'' … ''-endlocal'' block that has an ''-onfail'' section, the exception is caught and further processing resumes. Otherwise G'MIC prints the test expression, which appears in G'MIC's shell log, and ceases operation.\nPrior to G'MIC 2.6, `-check` could take a file system object and test for its existence. That is no longer supported. Use the mathematical expression function `isfile()` or `isdir()` instead:\n\n`gmic check "isfile('/this/doesnt/exist.here')"`\n\nConsider using ''-error'' if some control over the error message is desired. `-error` unconditionally throws exceptions, so it is combined with conditional commands to emulate `-check,` but in a less compact way.
+= examples
 ## Examples
-
+= arabesques
 ## Drawing arabesques
-In the realm of change two representations hold sway: variations in the frequency domain and those of time. The latter has a more visceral hold on us — we live through time — but the former indicates transience. And so in our school days we embarked upon forced marches through [Fourier transforms](https://en.wikipedia.org/wiki/Fourier_transform) from time to frequency and back again, not stopping to admire the scenery. A pity. Some of it is quite nice, and nearly all is thoroughly intriguing. Ponder wheels-within-wheels.
+In the realm of change two representations hold sway: variations in the frequency domain and those of time. The latter has a more visceral hold on us — we live through time — but the former encompasses transience. And so, in our school days, we forced marched through [Fourier transforms](https://en.wikipedia.org/wiki/Fourier_transform) without stopping to admire the scenery. A pity. Some of it is quite nice and nearly all is thoroughly intriguing. Ponder wheels-within-wheels.
 
-Not too many years ago, [wheels-within-wheels animations](https://www.youtube.com/watch?v=-qgreAUpPwM) erupted on YouTube and similar venues — fantastic constructions of gyrating circles, doing etch-a-sketch things: drawing birds, flowers, even portraits of Jean-Baptiste Joseph Fourier, the French mathematician who devised these eponymous transforms. [3blue1brown](https://www.youtube.com/watch?v=s_L-fp8gDzY) entered the expository fray with [But what is the Fourier Transform? A visual introduction.](https://www.youtube.com/watch?v=spUNpyF58BY) favoring illustrative animations over notational expository, capturing that crucial interplay between frequency and time. This is our arabesque jumping off point, which requires but few circles a-spinning.
+Not too many years ago, [wheels-within-wheels animations](https://www.youtube.com/watch?v=-qgreAUpPwM) erupted on YouTube and similar venues — fantastic constructions of gyrating circles doing etch-a-sketch things: drawing birds, flowers, even portraits of Jean-Baptiste Joseph Fourier, the French mathematician who devised these eponymous transforms. [3blue1brown](https://www.youtube.com/watch?v=s_L-fp8gDzY) entered the expository fray with [But what is the Fourier Transform? A visual introduction.](https://www.youtube.com/watch?v=spUNpyF58BY) favoring illustrative animations over notational expository. Just a few wheels occasion arabesques, our jumping off point.
 
-With each we may:
+Let us build an arabesque drawing script, one that takes any number of spinning circles as arguments and draws the ensuing path. Argument sanity checking furnishes an ample exercise for using `-check.`
+= arguments
+### Arguments and check tests
+With each circle we may:
 1. rotate clockwise or counterclockwise.
 2. choose a rate of rotation.
 3. pick a starting orientation.
@@ -17,16 +21,81 @@ With each we may:
 5. attach another circle to the rim. Do that any number of times, _or_
 6. attach a pen to the rim of a terminal circle. Do that once.
 
-Actions 1 through 4 encode a frequency sample: a circle of a particular size spinning in a particular manner. Action 5 admits samples in multitude. Action 6 connects frequency samples to time-varying phenomena. From aggregates of frequency encoding circles emerges a time-signal: the path that the pen draws. This may seem like silly fun — and it is — but that last action is key: it connects frequency and time through a chain of spinning cirles.
+Actions 1 through 4 encode a frequency sample: a circle of a particular size spinning clockwise or counterclockwise at a particular rate and starting from a specific orientation. Action 5 admits samples in multitude. Action 6 connects frequency samples to time-varying phenomena. From aggregates of frequency-encoding circles emerges a time-signal: the path that the pen draws. This may seem like silly fun — and it is — but that last action is key: it connects the frequency and time domains through a chain of spinning circles.
 
-Let us build an arabesque drawing script, one that takes any number of spinning circles as arguments and draws the ensuing path.
-|1. |Let the initial argument specify the size of a square drawing field: an image of the complex plane, origin centered. This is expressed in a count of pixels greater than zero.
-|2. |Let the remaining arguments – as many as we wish – form triplets:
-|   a. |A relative circle diameter, taken from the closed interval [0…1]
-|   b. |An orientation, or _phase_ angle, taken from the closed interval [0…360] 
-|   c. |A discrete angular velocity, a relative integral revolution rate that is commensurate to some unspecified time base. It matters not a whit that drawings arise from revolutions taking place in microseconds or millenia, as it is the eventual outcome that interests us. an integer taken from [-∞…+∞]
+To make best use of ''-check'', aim to be as exacting about argument specifications as possible; then sanity checks practically write themselves.
 
-The last bears a little further explanation. There are many flavors of fourier transforms; we take the discrete approach here, expressing samples as being taken at discrete intervals. The fourth aspect of frequency sampling - clock- or counterclockwise rotation - finds its way 
+1. Let the initial argument specify the size of a square drawing field: an image of the complex plane, origin centered. This is expressed in an integer count of pixels greater than zero.
+2. Let the remaining arguments – as many as we wish – form triplets:
+   a. A relative circle diameter, taken from the closed interval \[0…1]
+   b. An orientation, or _phase_ angle, taken from the closed interval \[0…360]
+   c. A discrete angular velocity, expressed as a relative number of integral revolutions per an unspecified period. It matters not a whit to us whether millenia or microseconds pass in a single revolution; it is the outcome, not the drawing time, that interests us. The argument is an integer taken from the interval \[-∞…+∞] — but see [Angular Velocity](#angularvelocity) for practical limitations.
+= angularvelocity
+### Angular Velocity
+In the last, through the angular velocity's sign, we've coded counter- versus clockwise rotation. Let positive angular velocities represent counterclockwise rotations, negative clockwise, a preference of the right hand rule over the left; we may easily have preferred left-handedness over right with a sign change. We express angular velocity in fixed integral steps of whole revolutions per period, a consequence of using the discrete form of the Fourier transform; G'MIC implements these with built-in commands, simplifying the implementation greatly.
+
+We are not quite yet shut of angular velocity; there is the [Nyquist frequency](https://en.wikipedia.org/wiki/Nyquist_frequency) with which to contend, arising from image size. Consider the mapping of one cycle to a pair of alternating pixels. This two-pixel "wavelength" relative to the image's smallest dimension establishes its Nyquist frequency – the ultimate cap to image transience from one color or tone to another. A 4,000 pixel square image has a Nyquist frequency of 2,000 cycles. This is a hard, absolute rate of variation which cannot be higher, for higher rates of variation instead appear as aliasing artifacts: the distant picket fence in silhouette differs against the spacing of camera sensing elements: a slowly varying sinusoidal pattern, a beat frequency, aliasing for fence pickets. Since the world is more than black and white, with shades of gray between these extremes, there is a "practical" upper frequency limit that is less — perhaps _much_ less — than the Nyquist frequency.
+
+How much less? Much depends on artifact tolerance. In any case, we might consider `-check` tests keyed to limiting the discrete angular velocity to some fraction of the size of the drawing image. We'll defer the rest of this discussion to after the implementation of the arabesque drawing script itself.
+= roses
+### Roses
+
+### Arabesques
+Let us feed the script some triplets
+### The Forward Transform
+Let us feed some triplits to roses that we got somewhere:
+
+??? roses.gmic
+~~~
+roses :
+   # Fetch an arbitrarily long argument list to $a0, $a1, … $an
+   $=a
+
+   # Two row vectors for real and imaginary frequency domain samples. Size from first
+   # argument
+   sw={$a1/2}
+   -input $sw,1,1,1
+   -name. real
+   -input $sw,1,1,1
+   -name. imag
+
+   # Fetch and check diameter, phase angle and angular velocity parameters
+   -repeat $#-1,j
+      -if   $j%3==0 # get radius
+         rad=${a{2+$j}}
+         -check isnum($rad)" && "$rad>=0" && "$rad<=1
+      -elif $j%3==1 # get angle, degrees
+         ang=${a{2+$j}}
+         -check isnum($ang)" && "$ang>=0" && "$ang<=360
+      -else         # get ω and set spectral coefficient
+         sf=${a{2+$j}}
+         -check isnum($sf)" && "$sf%1==0" && "abs($sf)<=0.1*$sw
+         -if $sf<0
+            sf={$sf+$sw}
+         -fi
+	 rr={$rad*cos(deg2rad($ang))}
+	 ir={$rad*sin(deg2rad($ang))}
+	 -set[real] $rr,$sf,0,0,0
+	 -set[imag] $ir,$sf,0,0,0
+      -fi
+   -done
+
+   # Frequency domain → time domain
+   -ifft[imag,real]
+   -append[-2,-1] c
+   -name. temporal
+   -normalize[temporal] 0,{2*$sw-16}
+   -add[temporal] 8
+   -input {2*$sw},{2*$sw},1,1
+   -name. canvas
+
+   # Plot arabesque
+   -permute[temporal] cyzx
+   -eval[canvas] ">begin(PV=crop(#0);polygon(#-1,-s#0,PV,1,0xffffffff,255))"
+   -keep[canvas]
+~~~
+???
+
 # Command reference
 
 ===
