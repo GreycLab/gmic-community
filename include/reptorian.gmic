@@ -48,7 +48,7 @@
 #
 #-------------------------------
 
-#@cli rep_custom_map: _shift_value>0,_[palette],_seed_a...
+#@cli rep_custom_map: _shift_value>0,_negate={ 0=no_negation | 1=negate },_[palette],_seed_a...
 #@cli : Custom mapping function with more options than default map.
 #@cli : _shift_value defines the shift of base values used for mapping of color. This can be either percentage of integer.
 #@cli : _[palette] is used to map into image.
@@ -57,7 +57,7 @@
 #@cli :
 #@cli : Author: Reptorian
 rep_custom_map:
-skip "${1=}","${2=}","${3=}"
+skip "${1=}","${2=0}","${3=}","${4=}"
 check narg($1)||(narg(${2--1})>1)
 
 if narg($1)
@@ -79,25 +79,27 @@ if narg($1)
  fi
 fi
 
-if narg($2)
+if $2 negate fi
 
- if ${is_image_arg\ $2}
+if narg($3)
+
+ if ${is_image_arg\ $3}
  
-  pass$2 0
+  pass$3 0
   
   check "w#-1==1||h#-1==1"
   
   store. ordered
   
-  if narg($*)==3 
+  if narg($*)==4
   
-   if narg($3)
+   if narg($4)
     $ordered
     if w>h
-     {w#-1},1,1,1,begin(if(narg($3),srand($3)));u
+     {w#-1},1,1,1,begin(if(narg($4),srand($4)));u
      pixelsort.. +,x,[-1]
     else
-     1,{h#-1},1,1,begin(if(narg($3),srand($3)));u
+     1,{h#-1},1,1,begin(if(narg($4),srand($4)));u
      pixelsort.. +,y,[-1]
     fi
     map[0--3] [-2],2
@@ -120,16 +122,16 @@ if narg($2)
     
    fi
    
-  elif narg($*)>3
+  elif narg($*)>4
   
    $=seed
    repeat $!
     $ordered
     if w>h
-     {w#-1},1,1,1,begin(srand(${seed{3+$>}}));u
+     {w#-1},1,1,1,begin(srand(${seed{4+$>}}));u
      pixelsort.. +,x,[-1]
     else
-     1,{h#-1},1,1,begin(srand(${seed{3+$>}}));u
+     1,{h#-1},1,1,begin(srand(${seed{4+$>}}));u
      pixelsort.. +,y,[-1]
     fi
     map[$>] [-2],2
@@ -6690,7 +6692,7 @@ f "begin(
 v -
 #@cli rep_fibo_fill: eq. to 'rep_fibonacci_fill' : (+)
 rep_fibo_fill: rep_fibonacci_fill $*
-#@cli rep_fibonacci_fill: stack={ 0= top-left | 1= top-right | 2= bottom-left | 3= bottom-right },output_mode={ 0=corner | 1=spiral }, _initial_orientation={ 0=landscape | 1=portrait },_iteration>=0,{ boundary={0=periodic | 1=mirror} | -1<=spiral_location_x<=1 },{ append_mode={ 0=x | 1=y } | -1<=spiral_location_y<=1 },_palette_cycle,_[palette],_seed_a...
+#@cli rep_fibonacci_fill: stack={ 0= top-left | 1= top-right | 2= bottom-left | 3= bottom-right },output_mode={ 0=corner | 1=spiral }, _initial_orientation={ 0=landscape | 1=portrait },_iteration>=0,{ boundary={0=periodic | 1=mirror} | -1<=spiral_location_x<=1 },{ append_mode={ 0=x | 1=y } | -1<=spiral_location_y<=1 },_palette_cycle,negate,_[palette],_seed_a...
 #@cli : Generated filled image of fibonacci. If you need a complete fibonacci to use as a base, then execute 'gmic h +rep_fibonacci' for more information.
 #@cli :
 #@cli : (eq. to 'rep_fibo_fill')
@@ -6701,15 +6703,16 @@ rep_fibo_fill: rep_fibonacci_fill $*
 #@cli : 5) If _iteration==0, and _output_mode==1, this option would be spiral_location_x. Otherwise, it would become boundary which is only applicable for _iteration>0.
 #@cli : 6) If _iteration==0, and _output_mode==1, this option would be spiral_location_y. Otherwise, it would become append_mode which is only applicable for _iteration>0.
 #@cli : 7) _palette_cycle* defines the shift of palette.
-#@cli : 8) _[palette]* defines the palette to be used for filling the fibonacci.
-#@cli : 9) _seed* would define the seed to be used for generating order.
+#@cli : 8) _negate defines whether to invert the order of palette.
+#@cli : 9) _[palette]* defines the palette to be used for filling the fibonacci.
+#@cli : 10) _seed* would define the seed to be used for generating order.
 #@cli :
 #@cli : *=See rep_custom_map for more details on how these options would work.
 #@cli : Default values: '_initial_orientation=0','_iteration=0','{ boundary={0=periodic | 1=mirror} | -1<=spiral_location_x<=1 }=0','{ append_mode={ 0=x | 1=y } | -1<=spiral_location_y<=1 }}=0','_palette_cycle=n/a','_[palette]=n/a','seed=n/a'
 #@cli :
 #@cli : Author: Reptorian
 rep_fibonacci_fill:
-skip ${3=1},${4=0},${5=0},${6=0},${7=},${8=}
+skip ${3=1},${4=0},${5=0},${6=0},${7=},${8=0},${9=}
 
 check $!>0
 
@@ -6725,15 +6728,15 @@ mh=${-max_h}
 fibo_id={$!-1}
 
 if $4
- if narg(${8--1})>1 
+ if narg(${9--1})>1 
   .
-  pass$8 0
+  pass$9 0
   rep_custom_map[-3,-2] ${7--1}
   rm.
  else
   +negate.
   if $6<0 rv[-2,-1] fi
-  if narg($7) rep_custom_map[-2,-1] $7 fi
+  if narg($7,$8) rep_custom_map[-2,-1] $7,$8 fi
  fi
  
  if $5
@@ -6777,12 +6780,12 @@ else
  fi
  
  if narg(${7--1})
-  if narg($8)
-   pass$8 0
-   rep_custom_map[0--3] $7,[-1],${9--1}
+  if narg($9)
+   pass$9 0
+   rep_custom_map[0--3] $7,$8,[-1],${10--1}
    rm.
   else
-   rep_custom_map[^-1] $7
+   rep_custom_map[^-1] $7,$8
   fi
  fi
  
@@ -12594,21 +12597,19 @@ fx_rep_fibonacci:
 if $1
  if $10
   pal {$10-1}
-  rep_fibonacci_fill[^-1] ${3-5},0,{($6-50)/100*2},{($7-50)/100*2},$11%,[-1],$12
+  rep_fibonacci_fill[^-1] ${3-5},0,{($6-50)/100*2},{($7-50)/100*2},$11%,$15,[-1],$12
   rm.
  else 
-  rep_fibonacci_fill ${3-5},0,{($6-50)/100*2},{($7-50)/100*2},$11% 
-  if $15 negate fi
+  rep_fibonacci_fill ${3-5},0,{($6-50)/100*2},{($7-50)/100*2},$11%,$15
   n 0,255
  fi
 else
  if $10
   pal {$10-1}
-  rep_fibonacci_fill[^-1] ${3-5},$2,$8,$9,$11%,[-1],$13,$14
+  rep_fibonacci_fill[^-1] ${3-5},$2,$8,$9,$11%,$15,[-1],$13,$14
   rm.
  else
-  rep_fibonacci_fill ${3-5},$2,$8,$9,$11%
-  if $15 negate fi
+  rep_fibonacci_fill ${3-5},$2,$8,$9,$11%,$15
   n 0,255
  fi
 fi
@@ -12625,7 +12626,7 @@ u "{$1}"\
 "{$12}_"{$1?($10?2:1):0}\
 "{$13}_"{$1?0:($10?2:1)}\
 "{$14}_"{$1?0:($10?2:1)}\
-"{$15}_"{!$10?2:1}
+"{$15}"
 #@gui Spiral Distortion:gui_rep_sd,gui_rep_sd_preview(0)
 #@gui :_=note("Transform image using spiral gradient for x-coordinate, and radial gradient for y-coordinate."),_=separator()
 #@gui :Revolution=float(1,.1,10)
