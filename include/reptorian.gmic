@@ -48,6 +48,254 @@
 #
 #-------------------------------
 
+#@cli rep_rdiv: eq. to 'rep_random_subdivision' : (+)
+rep_rdiv: rep_random_subdivision $*
+#@cli rep_random_subdivision: division>1,_q1_thick>=0,_max_iter>=2,_probability[%]>0,_loop_limit>1,_seed
+#@cli : Generate random subdivision as in random number of subdivision and varying thickness within rectangle.
+#@cli : _q1_thick refers to the lower median thickness value. In the case of 0, this is assumed that no border can be added even though the max thickness is 1 px.
+#@cli : _max_iter limits the number of iterations per rectangle.
+#@cli : _probability determines the probability that a rectangle will be permitted to be utilized for further iteration.
+#@cli : _loop_limit limits the number of time the process of subdivision is done.
+#@cli : _seed generates the output based on defined parameter.
+#@cli : Default values: '_gen_thick=0','_max_iter=5','_probability[%]=95%','_loop_limit=5000','_seed=n/a'
+rep_random_subdivision:
+skip ${2=0},${3=5},${4=95%},${5=5000},${6=}
+check "$4>0"
+repeat $! l[$>]
+ _rep_random_subdivision $*
+endl done
+_rep_random_subdivision:
+skip ${2=0},${3=5},${4=95%},${5=5000},${6=}
+
+r 100%,100%,1,1
+
+1,1,1,5 #Modifiable Rectangle Array
+1,1,1,5 #Unmodifiable Rectangle Array
+
+eval ${-math_lib}"
+ if(narg($6),srand($6););
+ const ww=w#-3-1;
+ const hh=h#-3-1;
+ const md=max(1,int(abs($1)));
+ const ib=int(abs($2));
+ const border_size=ib?ib;
+ const test_boundary=!ib?1:border_size+1;
+ const max_iter=max(2,round(abs($3)));
+ const odd=cut($4,0,1);
+ const arr_limit=round(abs($5));
+ 
+ diff_check(a)=(
+  mri=md;
+  ds=a/mri;
+  if(mri>1&&ds<1,
+   while(mri>1&&ds<1,
+    mri--;
+    ds=a/mri;
+   );
+  );
+  ds>1;
+ );
+ 
+ width_check=diff_check(ww-border_size*2);
+ height_check=diff_check(hh-border_size*2);
+ 
+ !(width_check||height_check)?run('error inv_dim');
+ 
+ dar_insert(#-2,[0,ww,0,hh,0]);
+ 
+ sub_column(v,point)=(
+  ri=int(u(1,md))+1;
+  mri=ri-1;
+  sx=v[0]+border_size;
+  ex=v[1]-border_size;
+  bound_check=(ex-sx)>test_boundary;
+  skip=0;
+  dar_remove(#-2,point);
+  if(bound_check, 
+   diff=(ex-sx);
+   ds=diff/mri;
+   if(mri>1&&ds<test_boundary,
+    while(mri>1&&ds<test_boundary,
+     ri--;
+     mri--;
+     ds=diff/mri;
+    );
+   );   
+   if(ds>test_boundary,   
+    py=[v[2],v[3]];
+    iter=v[4]+1;
+    p=v[0];   
+    repeat(ri,ri_ind,   
+     rb=odd<1?u(0,1)>odd:0;   
+     ri_ind==mri?(
+      (rb||(iter==max_iter))?(
+       dar_insert(#-1,[p,v[1],py,iter]);
+      ):(
+       dar_insert(#-2,[p,v[1],py,iter]);
+      );
+     ):
+     !ri_ind?(
+      mx=sx+ds;
+      np=min(max(sx,round(u(p,mx))),ex);
+      vp=[p,np];
+      (rb||(iter==max_iter))?(
+       dar_insert(#-1,[vp,py,iter]);
+      ):(
+       dar_insert(#-2,[vp,py,iter]);
+      );
+      p=np+1;
+      if(border_size,
+       if(p==ex,skip=1;);
+      ,
+       if(p==ex,continue(););
+      );
+     ):(
+      if(skip,break(););
+      mx+=ds;
+      np=min(max(p+border_size,round(u(p,mx))),ex);
+      vp=[p,np];
+      (rb||(iter==max_iter))?(
+       dar_insert(#-1,[vp,py,iter]);
+      ):(
+       dar_insert(#-2,[vp,py,iter]);
+      );     
+      p=np+1;
+     );
+    );
+   ,dar_insert(#-1,v);
+   );
+  ,dar_insert(#-1,v);
+  );
+ );
+ 
+ sub_row(v,point)=(
+  ri=int(u(1,md))+1;
+  mri=ri-1;
+  sy=v[2]+border_size;
+  ey=v[3]-border_size;
+  bound_check=(ey-sy)>test_boundary;
+  skip=0;
+  dar_remove(#-2,point);
+  if(bound_check, 
+   diff=(ey-sy);
+   ds=diff/mri;
+   if(mri>1&&ds<test_boundary,
+    while(mri>1&&ds<test_boundary,
+     ri--;
+     mri--;
+     ds=diff/mri;
+    );
+   );   
+   if(ds>test_boundary,    
+    px=[v[0],v[1]];
+    iter=v[4]+1;
+    p=v[2];   
+    repeat(ri,ri_ind,   
+     rb=odd<1?u(0,1)>odd:0;   
+     ri_ind==mri?(
+      (rb||(iter==max_iter))?(
+       dar_insert(#-1,[px,p,v[3],iter]);
+      ):(
+       dar_insert(#-2,[px,p,v[3],iter]);
+      );
+     ):
+     !ri_ind?(
+      my=sy+ds;
+      np=min(max(sy,round(u(p,my))),ey);
+      vp=[p,np];
+      (rb||(iter==max_iter))?(
+       dar_insert(#-1,[px,vp,iter]);
+      ):(
+       dar_insert(#-2,[px,vp,iter]);
+      );
+      p=np+1;
+      if(border_size,
+       if(p==ey,skip=1;);
+      ,
+       if(p==ey,continue(););
+      );
+     ):(
+      if(skip,break(););
+      my+=ds;
+      np=min(max(p+border_size,round(u(p,my))),ey);
+      vp=[p,np];
+      (rb||(iter==max_iter))?(
+       dar_insert(#-1,[px,vp,iter]);
+      ):(
+       dar_insert(#-2,[px,vp,iter]);
+      );
+      p=np+1;
+     );
+    );
+   ,dar_insert(#-1,v);
+   );
+  ,dar_insert(#-1,v);
+  );
+ );
+ 
+ 
+ v=I[#-2,0];
+ 
+ width_check&&height_check?(
+  u(0,1)<=.5?(
+   sub_row(v,0);
+  ):(
+   sub_column(v,0);
+  );
+ ):
+ width_check?(
+  sub_column(v,0);
+ ):
+ height_check?(
+  sub_row(v,0);
+ );
+ 
+ arr_point=0;
+ 
+ while(dar_size(#-2),
+  p_ind=int(u(dar_size(#-2)));
+  cv=I[#-2,p_ind];
+  u(0,1)<.5?(
+   sub_row(cv,p_ind);
+  ):(
+   sub_column(cv,p_ind);
+  );
+  arr_point++;
+  if(arr_point>=arr_limit,break());
+ );
+ resize(#-2,1,dar_size(#-2),1,4,0);
+ resize(#-1,1,dar_size(#-1),1,4,0);"
+ 
+a[-2,-1] y
+
+#Below : Cheap way of trying to hide bleeding pixels
+
+1,{h},1,1,"begin(
+  max_dim(v)=(
+   a=v[3]-v[2];
+   b=v[1]-v[0];
+   a*b;
+  );
+ );
+ dims=I(#-1);
+ max_dim(dims);"
+
+ pixelsort.. +,y,[-1] rm.
+
+#Above : Cheap way of trying to hide bleeding pixels
+
+eval. >"begin(
+  convert2coords(c)=(
+   tl=[c[0],c[2]];
+   tr=[c[1],c[2]];
+   bl=[c[0],c[3]];
+   br=[c[1],c[3]];
+   [tl,tr,br,bl];
+  );
+ );
+ polygon(#-2,4,convert2coords(I),1,y);"
+
+rm.
 #@cli rep_custom_map: _shift_value>0,_negate={ 0=no_negation | 1=negate },_[palette],_seed_a...
 #@cli : Custom mapping function with more options than default map.
 #@cli : _shift_value defines the shift of base values used for mapping of color. This can be either percentage of integer.
@@ -14691,6 +14939,69 @@ u "{$1}"\
 "{$19}"_{!$16?2:0}\
 "{$20}"\
 "{$21}"_{$16?2:0}
+#@gui Random Subdivision: fx_rep_rsub,fx_rep_rsub
+#@gui :_=separator(),_=note("<b>Main</b>")
+#@gui :Division=int(10,1,20)
+#@gui :First Quartile Thickness=int(5,0,20)
+#@gui :Maximum Division Iteration=int(5,2,10)
+#@gui :Probability of Division(%)=float(95,20,100)
+#@gui :Loop Limit=int(5000,1000,100000)
+#@gui :Seed=int(0,0,300)
+#@gui :Border(%)=float(0,0,100)
+#@gui :_=separator(),_=note("<b>Color</b>")
+#@gui :Mode=choice(0,"Grayscale","Palette","Random")
+#@gui :Normalize?=bool(1)
+#@gui :Palette=choice(12,"BW-{2}","RGB-{3}","B-RGB-{4}","BW-RGB-{5}","CMY-{3}","CMYK-{4}","W-CMYK-{5}","RGBCMY-{6}","1-Bit-RGB-{8}","Aurora-{256}","PLAYPAL-{249}","Sonic Robo Blast 2-{256}","Famicube-{64}","Andrew Kensler - 16","Andrew Kensler - 32","Andrew Kensler - 54","AAP-Micro 12","AAP-16","AAP-64","AAP-SPLENDOR128","DB8","DB16","DB32","DB-ISO22","DimWiddy 17","DimWiddy 23","Endesga-4","Endesga-8","Endesga-16","Endesga-32","Endesga-36","Endesga-64","Juicy-32","Juicy-56","XAIUE-22","15P-DX","20P-DX","24P-DX","Cabana-64","Fantasy 16","Fantasy 24","Tranquil Fantasy 23","Tranquility Plus 39","Faraway 48","Fleja Master Palette-{33}","Koni32","Linear Color Palette Basic-{31}","Vines Flexible Linear Ramps-{38}","Arcade Standard 29","ARQ16","BLK 36","BLK-NEO-{46}","Broken Facility-{40}","Bubblegum-16","Cade 15","Calder 8-{11}","Chromatic16","CD-BAC-{16}","CG Arne-{16}","CPC BOY-{32}","Dinoknight 16","||||-22","FZT Ethereal 16","GZXP-{11}","Indecision-{17}","Island Joy 16","Journey-{64}","Juicy 17","Oak21","Nature's Embrace 55","Nauris-16","Pear 36","Peachy Pop 16-{16}","Pineapple 32","Resurrect 32-{32}","Rosy 42","SLSO-CLR17","Softy 15","SPEC12","Starmancer-{52}","Superb 8","SuperFuture25","Sweetie 16","Taffy 16","Todayland Palette V2-{25}","Vivid-17","Voodo34","Zughy 32","ENOS16","Undertones-17","Equpix 15","Night 16","Star 29","Star 34","Still-Life-{14}","SimpleJPC-16","Acid 15","Battery 24","Clumpy 18","Cthulhu-{16}","Crimso 11","Copper-Tech-{16}","DRZ15A","Eggy 15","Eroge-Copper","Europa 16-{16}","GreyT-bit-{8}","Jewel-{15}","Polar 11","Sheltzy 32","Rube-Goldberg-{9}","BoomBoom-{7}","Generic-8","Matriax8c","NT1H-{26}","Autum 15","Autum 15 [Yellow]","JerryPie 22","Naji 16","Blessing-{5}","Crayola Blind-{9}","Easter Island-{16}","Fairy Tales-{8}","Fuzzy Four-{4}","0xdb-01-{17}","Ocaso-{17}","Pastel-{15}","17 Pastels","Pollen-8","Nopal-12","Sy17","Syz15","TUI-15","Cave-{8}","Psygnosia-{16}","MarshMellow32","Rabbit 7","Finlal 11","Vinik 24","YKB-22","Graveyard-21","Steam Lords-{16}","AAP-RadiantXV-{15}","AAP-Majesty XVII-{17}","Daruda 22","Rust-6","XAIUE-Radiant-{22}","Firestorm-{9}","SuperNova 7","NYX8","OIL6","SGM-Palette 2-{17}","Fornax Void I-{256}","Fornax Void II-{128}","Pixelwave-{12}","Spacey Easter-{17}","Moonlit-39","Petite-8","Petite-8 Afterdark","Autochrome 3","Autochrome 5","GB Default #1-{4}","GB Default #2-{4}","GB Andrade-{4}","GB Blue Seni-{4}","GB Blackzone-{4}","GB Crimson-{4}","GB Didi-{4}","GB Dirty-{4}","GB Arne-{4}","GB Easy-{4}","GB Forest-{4}","GB Harsh Green-{4}","GB Light Green-{4}","GB Nostalgia-{4}","GB Platinum-{4}","GB Kirokaze-{4}","GB PJ-{4}","GB Cyber-{4}","GB Wish-{4}","GB Grapefruit-{4}","GB Ice Cream-{4}","GB Red_Blue-{4}","GB Spacehaze-{4}","GB Chocolate-{4}","GB Purple Dawn-{4}","GB Gray-{4}","ARNE4","HallowPumpkin-{4}","Amiga 2600 NTSC-{128}","Amiga 2600 PAL-{104}","Amiga 2600 SECAM-{8}","Amiga 7800 M.E.S.S-{256}","Amiga 7800-{256}","Amstrad CPC-{27}","Apple II-{15}","CGA-{16}","CGA Mode 0 [Low]-{4}","CGA Mode 0 [High]-{4}","CGA Mode 1 [Low]-{4}","CGA Mode 1 [High]-{4}","CGA Mode 2 [Low]-{4}","CGA Mode 2 [High]-{4}","Commodore 64 [Pepto Interpretation]-{16}","Commodore 64 [Colodore Interpretation]-{16}","Commodore VIC-20-{16}","Colecovision-{15}","Japanese Machine Palette-{16}","Macintosh II-{16}","NES-{52}","PICO-8-{16}","RISC OS-{16}","SAM Coupe-{128}","Thomson MO5-{16}","VGA-{244}","ZX Spectrum-{15}","GNOME 32-{32}","Electronic Crayon 22","Chip16","MSX-{15}","Deluxe Paint-{222}","Legacy Paint-{16}","XP Paint-{28}","Vista Paint-{28}")
+#@gui :Color Space=choice(0,"RGB","HSI")
+#@gui :Number of Color=int(0,0,100)
+#@gui :Seed=int(0,0,100000)
+#@gui :Border=color(128,128,128)
+fx_rep_rsub:
+border_size={max(0,round($2*$7/100))}
+repeat $! l[$>]
+ rep_random_subdivision ${1-3},$4%,${5-6}
+ 
+ if $8==0 
+  if $9 n. 0,255 fi 
+  to_rgb.
+ elif $8==1 pal $10 {w},1,1,1,begin(srand($13));u pixelsort.. +,x,[-1] rm.
+ else
+  if $11 {$12?$12:iM+1},1,1,3,begin(srand($13));[u(360),u(1),u(1)]
+  else {$12?$12:iM+1},1,1,3,begin(srand($13));[u(255),u(255),u(255)]
+  fi
+ fi
+ 
+ if $border_size +f[0] x==(w-$border_size)||y==(h-$border_size)||(i!=j(-1,0))||(i!=j(0,-1)) fi
+ 
+ if $8
+  map[0] [1],2 rm[1]
+  if $11&&$8==2 hsi2rgb[0] fi 
+ fi
+ 
+ if $border_size>1
+  dilate. {$border_size}
+ fi
+ 
+ if $border_size
+  eval. i?I(#0)=[${14-16}];
+ fi
+ 
+ k[0]
+endl done
+u "{$1}"\
+"{$2}"\
+"{$3}"\
+"{$4}"\
+"{$5}"\
+"{$6}"\
+"{$7}"\
+"{$8}"\
+"{$9}"_{!$8?2}\
+"{$10}"_{$8==1?2}\
+"{$11}"_{$8==2?2}\
+"{$12}"_{$8==2?2}\
+"{$13}"_{$8?2}\
+"{$14,$15,$16}"_{$border_size?2:1}
 ######################
 
 # Local Variables:
