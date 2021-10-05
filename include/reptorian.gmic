@@ -72,12 +72,7 @@ contain_palette=0
 dims={w},{h}
 ns=1
 col=0
-
-if narg($9)&&$border_size&&!narg($10)
- col=${rep_hex2int8\ $9}
- ns={narg($col)}
- col=vector(#$ns,$col)
-fi
+activate_code_block=1
 
 if narg($10)
  ms=3
@@ -85,6 +80,32 @@ if narg($10)
  if '$10'=='pal'
  elif ${is_image_arg\ $10} pass$10 0 ms={s#-1} rm.
  else contain_palette=0
+ fi
+fi
+
+if narg($10)
+ ms=3
+ contain_palette=1
+ if '$10'=='pal'
+ elif ${is_image_arg\ $10} pass$10 0 ms={s#-1} rm.
+ else
+  contain_palette=0
+  if !narg($11)||(narg($11)?abs($11)==0)
+   activate_code_block=0
+   if narg($9)&&$border_size
+    col=${rep_hex2int8\ $9}
+    ns={narg($col)}
+    col=vector(#$ns,$col)
+   else
+    ns=3
+   fi
+  fi
+ fi
+else
+ if narg($9)&&$border_size
+  col=${rep_hex2int8\ $9}
+  ns={narg($col)}
+  col=vector(#$ns,$col) 
  fi
 fi
 
@@ -298,6 +319,7 @@ eval. :${-math_lib}"begin(
   const b_a=floor(border_size/2);
   const b_b=ceil(border_size/2);
   const contain_border=$border_size?1;
+  if(narg($12),srand($12););
   $8&&!narg($10)?(
    $ns>1?(
     const rescale_factor=(h-1)/255;
@@ -307,7 +329,15 @@ eval. :${-math_lib}"begin(
     calc_out()=(y+contain_border)/rescale_factor;
    );
   ):(
-   calc_out=calc_out()=y+contain_border;
+   $activate_code_block?(
+    calc_out=calc_out()=y+contain_border;
+   ):(
+    $10==1?(
+     calc_out()=hsv2rgb(vector(#3,u(360),u(1),u(1)));
+    ):(
+     calc_out()=vector(#3,u(255),u(255),u(255));
+    );
+   );
   );
   convert2coords(c)=(
    sx=c[0]+(!(c[0]==0)?b_a);
@@ -337,7 +367,7 @@ eval. :${-math_lib}"begin(
 
 rm.
 
-if narg($10)
+if narg($10)&&$activate_code_block
  if $contain_palette
   orientation=0
   if $border_size
