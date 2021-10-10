@@ -1,0 +1,171 @@
+wheelie:
+
+   # wheelie: a circle of a particular (1) radius, (2) phase angle
+   # (orientation) and (3) discrete angular velocity - a relative
+   # integral number of revolutions per some unspecified base interval,
+   # perhaps however long one revolution takes. Wheelies chain
+   # together, the center of one situated at 0° on the rim of its
+   # predecessor. The first wheelie of the chain centers at the origin
+   # and the last has, instead of another wheelie, an attached marking
+   # pen. Thus, the entire chain draws an "arabesque" as the
+   # individual wheelies rotate at their respective angular velocities from
+   # their initial orientations. This script animates such.
+    
+   # This script renders arabesques "traditionally": Each wheelie has
+   # radial, phase and angular velocity components.  For each
+   # increment, and, for each wheelie, apply the angular velocity
+   # increment, rotating the wheelie, then, with all wheelies rotated,
+   # plot the endpoint.
+   
+   # Fetch an arbitrarily long argument list to $a0, $a1, …, $an
+
+   $=a
+
+   # Expect data triplets: radius, phase angle, angular velocity.
+
+   -check {!(($#-1)%3)}
+
+   # Initial argument: Spectral width (sw)
+
+   sw={$a1/2}
+   -if $sw%2==0
+      sw+=1
+   -fi
+
+   # Circles argument vector: For each wheelie, compose radius and
+   # phase arguments into a homogeneous transform. In the animation
+   # loop, we compose this with atk-dependent rotational transform to
+   # plot the wheelie in an generic plotting space.
+
+   ccnt={round(($#-1)/3,1,-1)}
+   -input $ccnt,1,1,12
+   -name  args
+
+   # For both methods: Iterate over argument vector. For each triplet
+   # – representing a wheelie circle – Fetch radius (rad), phase angle
+   # (ang) and angular velocity (sf) parameters.
+   
+   -repeat $#-1,j
+      -if   $j%3==0 # get radius
+         rad=${a{2+$j}}
+         -check isnum($rad)" && "$rad>=0" && "$rad<=1
+         -set[args] $rad,{round($j/3,1,-1)},0,0,0
+      -elif $j%3==1 # get angle, degrees
+         ang=${a{2+$j}}
+         -check isnum($ang)" && "$ang>=0" && "$ang<=360
+         -set[args] $ang,{round($j/3,1,-1)},0,0,1
+      -else         # get ω and set spectral coefficient
+         sf=${a{2+$j}}
+         -check isnum($sf)" && "$sf%1==0" && "abs($sf)<=0.1*$sw
+         -set[args] $sf,{round($j/3,1,-1)},0,0,2
+      -fi
+   -done
+
+   # Iterate over argument image, each 12 channel pixel representing
+   # one wheelie. The first three channels contain wheelie radius,
+   # phase angle and radial velocity. Compose a homogeneous matrix
+   # transforming the origin to the tip of the wheelie radius, a
+   # radial translation and phase rotation. Populate the nine
+   # remaining channels with this matrix.
+   
+   -fill[args] ">
+                  CPX=I;
+                  orot=rot([0,0,1],deg2rad(CPX[1])); # phase rotation
+                  xlat=eye(3);
+                  xlat[2]=CPX[0];                    # translation origin-to-rim
+                  FIN=[CPX[0,3,1],mul(orot,xlat,3)]; # args+"RADX" i.e. 'rotation & xlation'
+                  FIN                                # store above in 12-channel pixel
+               "
+
+   -permute[args] cyzx
+   -store[args] circles
+
+   # Partial screenspace transform.
+   ssxfrm={specw=get('sw',1,0);id=eye(3);id[1]=-specw[0]/1.5;id[3]=-specw[0]/1.5;id}
+   -echo $ssxfrm
+   -input {2*$sw},{2*$sw},1,4
+   -name. backplate
+   tik=0
+   atk=0
+   tracerim={vector3([0,0,1])}
+
+   # Set the viewport backplate
+   -fill[backplate] ">lerp([30,40,135,255],[10,100,175,255],y/(h-1))"
+
+   # Arabesque arabesque
+   -input 100%,100%,100%,100%
+   -name. arabesque
+
+   # Circle arabesque
+   -input 100%,100%,100%,100%
+   -name. circles
+
+   # Stash backplate for duplication in loop
+   -store[backplate] back
+
+   # Animate arabesque
+   -do
+       -input (0.99^0.98^0.95^0.995)
+       -resize. [-2],[-2],[-2],[-2]
+       -mul[-3,-1]
+       -input $back
+
+       # Plot wheelie indicators: rotate wheelies by their respective
+       # angular velocity increments, compose this rotation into the
+       # pre-computed phase, radial-displacement transform from the
+       # argument image, compose with screenspace transform and plot
+       # via polygon()
+
+       -eval[circles]   ">
+                          begin(
+                                  ccnt="$ccnt";
+                                  omega=get('atk',1,0);
+                                  trc=get('tracerim',3,0);
+                                  pp=vector"{3*($ccnt+1)}"([0,0,1]);
+                                  circs=get('circles',"{12*$ccnt}",0);
+                                  repeat(
+                                           ccnt,k,
+                                           idx=ccnt-k-1;
+                                           rbradx=mul(rot([0,0,1],circs[12*idx+2]*omega[0]),circs[12*idx+3,9,1],3);
+                                           repeat(
+                                                   k+1,j,
+                                                   foo=rbradx*pp[3*(k-j),3];
+                                                   pp[3*(k-j)]=foo[0];
+                                                   pp[3*(k-j)+1]=foo[1];
+                                                   pp[3*(k-j)+2]=foo[2];
+                                                 )
+                                        );
+                                  ssx=get('ssxfrm',9,0);
+                                  if(ssx[2]==0,
+                                          sw=get('sw',1,0);
+                                          ni=norm2(pp[0,2,1]);
+                                          ssx[1]=ssx[1]/ni;
+                                          ssx[3]=ssx[3]/ni;
+                                          ssx[2]=sw[0];
+                                          ssx[5]=sw[0];
+                                          store(ssx,'ssxfrm',9,1,1,1)
+                                    );
+                                  repeat(
+                                          ccnt,k,
+                                              p0=ssx*pp[3*(k),3];
+                                              p1=ssx*pp[3*(k+1),3];
+                                              polygon(#-2,-2,[p0[0,2],p1[0,2]],1,0xffffffff,[200,200,200,127]);
+                                        );
+                                  foo=ssx*pp[0,3];
+                                  if(omega[0]>0,
+                                     polygon(#-3,-2,[foo[0,2],trc[0,2]],1,0xffffffff,[70,200,255,255])
+                                    );
+                                  store(foo,'tracerim',3,1,1,1)
+                                )
+                                "
+       -blend[backplate] [circles],alpha
+       -blend[backplate] [arabesque],alpha
+
+       # Pause animation
+       -window[backplate] {2*$sw},{2*$sw}
+       -wait -100
+       tik={($tik+1)%(3*$sw+2)}
+       atk={2*pi*$tik/(3*$sw+2)}
+       rm[backplate]
+       mul[circles] 0
+    -while {*}" && "!{*,ESC}
