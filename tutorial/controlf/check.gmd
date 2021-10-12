@@ -1,68 +1,193 @@
 # check (+)
 %% x "mkdir -p img" %%
-%% m scripts/roses.gmic roses 4096,0.5,0,2,0.5,0,-6,0.5,0,1,0.4375,0,-3 expand_xy[canvas] 16 -dilate_circ[canvas] 16 *[canvas] -1 label[canvas] *[canvas] {255/iM} -map[canvas] hocuspocus r2dx[canvas] 300,5 shift[canvas] 0,13%,0,0,2,1 o. img/arabesque.png rm %%
+%% m mic scripts/roses.gmic roses 4096,0.6,0,-1,0.75,0,-5,0.1875,0,7,0.45,0,-19 expand_xy[canvas] 16 -dilate_circ[canvas] 16 -mul[canvas] -1 label[canvas] -mul[canvas] {255/iM} -map[canvas] hocuspocus r2dx[canvas] 300,5 o. img/arabesque.png rm %%
 |![frontimage](img/arabesque.png)|''-check'' throws exceptions if the given test expression arguments resolve to false, otherwise it takes no action. It is the command of choice for sanity-checking argument lists.\nIf any command on the calling chain is a ''-local'' … ''-endlocal'' block with an ''-onfail'' section, the exception is caught and further processing resumes. Otherwise G'MIC prints the test expression in the shell log and ceases operation.\nIf the test expression is not a math expression, `-check` tests if the expression is a filename and resolves to True if the file exists, and false otherwise.\nConsider using ''-error'' if some control over the error message is desired. `-error` unconditionally throws exceptions, so it is combined with conditional commands to emulate `-check,` but in a less compact way.
 = examples
 ## Examples
 = arabesques
 ## Drawing arabesques
-%% -m scripts/wheelie_anim.gmic wheelie_anim 300,0.1875,0,1,0.375,0,-3,0.375,0,1,0.3125,0,-3,0.25,0,-11,0.0625,0,13 o img/arabesque.mp4,{30000/1001},H264 rm %%
+%% -m scripts/wheelie_anim.gmic wheelie_anim 300,0.25,0,1,0.5,0,-3,0.5,0,1,0.4,0,-3,0.25,0,-11,0.0875,0,15 o img/arabesque.mp4,{30000/1001},H264 rm %%
+|![Arabesque](img/arabesque.mp4)\n*"Six wheelies on a lark"*|"Follow your nose" is a much disparaged slant, spoken among the chattering classes to convey a lack of poise, grace or finesse about an algorithmic approach. It entails taking what is more-or-less in front of your nose and transcribing it to a working model. Disparagements aside, a great deal of yeoman work, useful if not exceptional, has found its way into How Things Work. Eventually the arch comes along; but until then, post-and-lintel serves the exigencies of doors, so long as spans aren't too ambitious.\n\nTake, for example, the [wheels-within-wheels](https://www.youtube.com/watch?v=-qgreAUpPwM) animations that have erupted recently on YouTube and like venues — fantastic constructions of gyrating arrows doing etch-a-sketch things: drawing birds, flowers, even portraits of Jean-Baptiste Joseph Fourier, the French mathematician. At the heart of the play are _wheelies,_ segments with one rooted and one free endpoint. To compose arabesques, one need not look further than a chain of wheelies, chalk attached to the free end of the last.|
+= wheelie
+### Wheelies
+With a wheelie, we may:
+1. rotate clockwise or counterclockwise.
+2. choose a rate of rotation.
+3. pick a starting orientation.
+4. set a length.
+5. root the first wheelie at the origin.
+6. root other wheelies at free end points. Do that any number of times, _or_
+7. attach a pen to the rim of a terminal wheelie. Do that once.
+This supplies a nice follow-your-nose approach for building a basic, yeoman-like, chain of wheelies for drawing arabesques. We'd like to chain up any number of wheelies, each differing in length, initial orientation and rotation rate. Along the way, sanity-checking a chain of such furnishes ample exercises for using `-check,` so let us have at it.
 
-|![Arabesque](img/arabesque.mp4)|Not too many years ago, animations of [wheels-within-wheels](https://www.youtube.com/watch?v=-qgreAUpPwM) erupted on venues like YouTube and similar — fantastic constructions of gyrating circles doing etch-a-sketch things: drawing birds, flowers, even portraits of Jean-Baptiste Joseph Fourier, the French mathematician.\n\nFourier? Fourier! What does Fourier have to do with wheels-within-wheels?\n\nWe'll see.|
-
-Let us follow our nose and build an arabesque drawing script, one that takes any number of spinning circles as arguments and draws the ensuing path. Argument sanity checking furnishes an ample exercise for using `-check.`
-= arguments
-### Arguments and check tests
-With each circle we may:
-1. rotate clockwise or counterclockwise.
-2. choose a rate of rotation.
-3. pick a starting orientation.
-4. change diameter.
-5. attach another circle to the rim. Do that any number of times, _or_
-6. attach a pen to the rim of a terminal circle. Do that once.
-
-Actions 1 through 4 encode a frequency sample: a circle of a particular size spinning clockwise or counterclockwise at a particular rate and starting from a specific orientation. Action 5 admits samples in multitude. Action 6 connects frequency samples to time-varying phenomena. From aggregates of frequency-encoding circles emerges a time-signal: the path that the pen draws. This may seem like silly fun — and it is — but that last action is key: it connects the frequency and time domains through a chain of spinning circles.
-
-= argspec
-#### Argument specification
-To make best use of ''-check'', aim to be as exacting about argument specifications as possible; then sanity checks practically write themselves.
-1. Let the initial argument specify the size of a square drawing field: an image of the complex plane, origin centered. This is expressed in an integer count of pixels greater than zero.
-2. Let the remaining arguments – as many as we wish – form triplets:
-   a. A relative circle diameter, taken from the closed interval \[0…1]
-   b. An orientation, or _phase_ angle, taken from the closed interval \[0…360]
-   c. A discrete angular velocity, expressed as a relative number of integral revolutions per an unspecified period. It matters not a whit to us whether millenia or microseconds pass in a single revolution; it is the outcome, not the drawing time, that interests us. The argument is an integer taken from the interval \[-∞…+∞] — but see [Angular Velocity](#angularvelocity) for practical limitations.
-= angularvelocity
-### Angular Velocity
-We've may code counter- versus clockwise rotation in the angular velocity's sign. Let positive angular velocities represent counterclockwise rotations, negative clockwise. This reflects a preference of the right hand rule; we may easily have preferred left-handedness with a sign change. We also express angular velocity in fixed, whole revolutions per period steps, a consequence of using the discrete form of the Fourier transform. G'MIC implements these with built-in commands, simplifying the implementation greatly.
-
-We are not quite yet shut of angular velocity; there is the [Nyquist frequency](https://en.wikipedia.org/wiki/Nyquist_frequency). Consider the mapping of one cycle to a pair of contrasting pixels. This two-pixel "wavelength", relative to the image's smallest dimension, establishes the image's Nyquist frequency – the ultimate rate-of-change cap on transience from one contrast to another. A 4,000 pixel square image has a Nyquist frequency of 2,000 cycles. higher frequency variations instead appear as aliasing artifacts. Think of the distant picket fence image projecting onto evenly spaced camera sensing elements: a slowly varying sinusoidal pattern, the beat frequency between fence pickets and sensors, alias for fence pickets instead. However, there is a "practical" upper frequency limit that is less — perhaps _much_ less — than the Nyquist frequency.
-
-How much less? Much depends on artifact tolerance. In any case, we might consider `-check` tests keyed to limiting the discrete angular velocity to some fraction of the size of the drawing image. We'll put that in our kit of possible improvements and take up the implementation of the arabesque script itself.
-= roses
-### Roses
-The name has whimsical origins; many arabesques look like roses. You may alias this as you like, however. The full script, uninterrupted by commentary, concludes the last section. The impatient may scroll down and swipe `roses.gmic` into their personal `.gmic` or        `user.gmic` files.
+To make best use of ''-check'', be as exacting about your arguments as patience allows; then the sanity checks practically write themselves.
+1. We need to draw on something. Let the initial argument specify the size of a square drawing field, origin centered. This encapsulates an integer count of pixels greater than zero.
+2. Let the remaining arguments – as many as we wish – form triplets, each a wheelie:
+   a. length, taken from the closed interval \[0…1]
+   b. orientation, taken from the closed interval \[0…360]
+   c. rotational velocity, a relative integer multiplier of one revolution. That revolution may take microseconds or millenia, but — we being in a relative frame of mind — don't care. It is the outcome, not the drawing interval, that interests us. The integer multiplier may be taken from the interval \[-∞…+∞] — but resolution will certainly impose a narrower range. We may code counter- versus clockwise rotation in the angular velocity's sign. Let positive angular velocities represent clockwise rotations, negative counterclockwise. This reflects a preference for the left hand rule, the author's native handedness; those preferring otherwise may drop a sign somewhere. Mind your feet. Signs can be heavy.
 ===
 ~~~
-roses:
+wheelie:
    # Fetch an arbitrarily long argument list to $a0, $a1, … $an
    $=a
-
-   # Two row vectors for real and imaginary frequency domain samples. Size from first
-   # argument
-   sw={$a1/2}
-   -input $sw,1,1,1
-   -name. real
-   -input $sw,1,1,1
-   -name. imag
-
 ~~~
 ===
-| 1.  |The line beginning with `roses: ` commences a [custom command definition](https://gmic.eu/tutorial/bouncing_balls_tutorial.html) of the form _<custom_command_name>_ : _<definition…>,_ with the commands after `:` constituting the implementation; see and [Use Custom Commands to Bypass the Shell](https://gmic.eu/tutorial/custom_cheat.html) and [Adding Custom Commands](https://gmic.eu/reference/adding_custom_commands.html#top).
-| 2.  |The construct `$=a`, a kind of meta-assignment, belongs to a set of `$-expressions` available inside command definitions, and, in conjunction two other `$-expressions, `$*` and `$#,` furnishes information about `roses` argument list. G`MIC substitutes occurences of `$*` with the argument list as detected in the [parent scope](https://gmic.eu/tutorial/debug_cheat.html#debuggery). `$*` duplicates the argument list _exactly_ as it appears following `roses` itself. The other two `$-expressions` furnish additional parsing of the argument list. G'MIC substitutes `$#` with the count of argument list items. These items arise from splitting the argument list on its comma separators, excluding those that might appear in properly escaped string arguments. `$=`_<nametemplate>_ is a meta-assignment which G'MIC expands into a set of actual variable assignments, one for each item in the blocked-out argument list, plus command name itself. The variable names consist of the `nametemplate,` here `a`, appended with the position numeral. Thus, for the pipeline `roses 2048,0.875,31.75,5` G'MIC expands `$=a` into a0=roses a1=2048 a2=0.875 a3=31.75 a4=5`. This preliminary argument list processing saves some work for us and permits open-ended, variable-length argument lists. For our purposes, we have no use for `$a0`, though other scripts could perform conditional processing based on the command name. `$a1` identifies the length of one side of the drawing field. pattern_ we have settled upon is first: the size, in pixels, of the neighborhood surrounding the origin of the complex plane. Following: any number of triplets, to wit: a relative radial length, zero to one inclusive, an initial orientation, in degrees  
+| 1.  |The line beginning with `wheelie: ` commences a [custom command definition](https://gmic.eu/tutorial/bouncing_balls_tutorial.html) of the form _<custom_command_name>_ : _<definition…>,_ with the commands after `:` constituting the implementation; see and [Use Custom Commands to Bypass the Shell](https://gmic.eu/tutorial/custom_cheat.html) and [Adding Custom Commands](https://gmic.eu/reference/adding_custom_commands.html#top).
+| 2.  |The construct `$=a`, a kind of meta-assignment, belongs to a set of `$-expressions` available inside command definitions, and, in conjunction two other `$-expressions,` `$*` and `$#,` furnish information about the argument list. G'MIC substitutes occurences of `$*` with the argument list as detected in the [parent scope](https://gmic.eu/tutorial/debug_cheat.html#debuggery). `$*` duplicates the argument list _exactly_ as it appears following `wheelie` itself. The other two `$-expressions` furnish additional parsing of the argument list. G'MIC substitutes `$#` with the count of argument list items. These items arise from splitting the argument list on its comma separators, excluding those that might appear in properly escaped string arguments. `$=` _<nametemplate>_ is a meta-assignment which G'MIC expands into a set of actual variable assignments, one for each item in the blocked-out argument list, plus command name itself. The variable names consist of the `nametemplate,` here `a`, appended with the position numeral. Thus, for the pipeline `wheelie 2048,0.875,31.75,5` G'MIC expands `$=a` into `a0=wheelie a1=2048 a2=0.875 a3=31.75 a4=5`. This preliminary argument list processing saves some work for us and permits open-ended, variable-length argument lists. For our purposes, we have no use for `$a0`, though other scripts could perform conditional processing based on the command name. `$a1` identifies the length of one side of the drawing field. The remaining arguments, taken three at a time, specify wheelies.
+===
+~~~
+   # Expect data triplets: radius, phase angle, angular velocity.
 
-= arabesques
-### Arabesques
-Let us feed the script some triplets
+   -check "isint($a1) && !(($#-1)%3)"
+
+   # Initial argument: side width (sw)
+
+   sw={$a1/2}
+
+   # Argument image: For each wheelie, compose radius and phase
+   # arguments into a homogeneous transform. In the animation loop, we
+   # compose this with the angle resulting from one angular velocity
+   # step.
+
+   ccnt={round(($#-1)/3,1,-1)}
+   -input $ccnt,1,1,12
+   -name  args
+~~~
+===
+| 1.  |It is common to furnish `-check` with one string argument which G'MIC parses. G'MIC recognizes math expression operators and functions in this argument string. Here, we subject the argument list to two broad tests. We wish the first argument, `$a1` is to be an integer, as this argument conveys a discrete space of pixels and there is a provision against fractional pixels. We wish the count of remaining arguments however many there may be, to be divisible by three. Here, G'MIC substitutes `$#-1` for the number of items in the argument list, less one, to account for the initial argument conveying the size of the drawing field. If the count of remaining arguments does not evenly divide by three, then _some_ error has taken place in specifying wheelie properties, which come in groups of threes.\n\nWe could check more. In fact, we could check _everything_, right _here_, in an all-inclusive logic string; it is not uncommon to find such in the start-up of custom commands. It may be a matter of style, but a case can be made for distributive checking, to wit: check just what is needed to be checked, and no more, at various parts of the script. Recall that `-check` includes its entire argument string in a thrown exception. Should that argument string encapsulate dozens of tests, then it may not be clear which part the failure occurs. Contrast this with a small number of tests originating from a `-check` that concerns itself with just the matters of an immediate locale. Quite likely, it may be quite a bit more clear what the difficulty is, as the `-check` string embodies only a few tests.    
+| 2.  |`$sw` — "side width." Half the width, or height of the arabesque image figures in many places, both in and out of the  
+| 3.  |`bb
+
+??? wheelie.gmic
+~~~
+wheelie :
+   # wheelie: a circle of a particular (1) radius, (2) phase angle
+   # (orientation) and (3) discrete angular velocity - a relative
+   # integral number of revolutions per however long one revolution
+   # takes. Wheelies chain together, the center of one situated at 0°
+   # on the rim of its predecessor. The first wheelie of the chain
+   # centers at the origin and the last has, instead of another
+   # wheelie, an attached marking pen. Thus, the entire ensemble draws an
+   # "arabesque" as the individual wheelies rotate at their respective
+   # angular velocities from their initial orientations. This script
+   # animates such.
+
+   # Fetch an arbitrarily long argument list to $a0, $a1, …, $an
+
+   $=a
+
+   # Expect data triplets: radius, phase angle, angular velocity.
+
+   -check "isint($a1) && !(($#-1)%3)"
+
+   # Initial argument: side width (sw)
+
+   sw={$a1/2}
+
+   # Argument image: For each wheelie, compose radius and phase
+   # arguments into a homogeneous transform. In the animation loop, we
+   # compose this with the angle resulting from one angular velocity
+   # step.
+
+   ccnt={round(($#-1)/3,1,-1)}
+   -input $ccnt,1,1,12
+   -name  args
+
+   # Iterate over argument vector. For each triplet – representing a
+   # wheelie – Fetch radius (rad), phase angle (ang) and angular
+   # velocity (sf) parameters.
+
+   -repeat $#-1,j
+      -if   $j%3==0 # get radius
+         rad=${a{2+$j}}
+         -check isnum($rad)" && "$rad>=0" && "$rad<=1
+         -set[args] $rad,{round($j/3,1,-1)},0,0,0
+      -elif $j%3==1 # get angle, degrees
+         ang=${a{2+$j}}
+         -check isnum($ang)" && "$ang>=0" && "$ang<=360
+         -set[args] $ang,{round($j/3,1,-1)},0,0,1
+      -else         # get ω and set spectral coefficient
+         sf=${a{2+$j}}
+         -check isnum($sf)" && "$sf%1==0" && "abs($sf)<=0.1*$sw
+         -set[args] $sf,{round($j/3,1,-1)},0,0,2
+      -fi
+   -done
+
+   # Iterate over argument image, each 12 channel pixel representing
+   # one wheelie. The first three channels contain wheelie radius,
+   # phase angle and radial velocity. Compose a homogeneous matrix
+   # transforming the origin to the tip of the wheelie, a radial
+   # translation and phase rotation. Populate the nine remaining
+   # channels with this matrix.
+
+   -fill[args] ">
+                  CPX=I;
+                  orot=rot([0,0,1],deg2rad(CPX[1])); # phase rotation
+                  xlat=eye(3);
+                  xlat[2]=CPX[0];                    # translation origin-to-rim
+                  FIN=[CPX[0,3,1],mul(orot,xlat,3)]; # args+"RADX" i.e. 'rotation & xlation'
+                  FIN                                # store above in 12-channel pixel
+               "
+   -permute[args] cyzx
+   -store[args] circles
+
+   # Screenspace transform.
+   ssxfrm={specw=get('sw',1,0);id=eye(3);id[0]=0;id[1]=specw[0]/2;id[2]=specw[0];id[3]=-specw[0]/2;id[4]=0;id[5]=specw[0];id}
+
+   # Draw arabesques on this image
+   -input {2*$sw},{2*$sw},1,1
+   -name. canvas
+
+   # Animate arabesque
+   atk=0
+   lastpt={vector3([0,0,1])}
+   firstpt={vector3([0,0,1])}
+   -repeat 3*$sw,k
+       # For each wheelie:
+       #    increment by angular velocity
+       #    find corresponding homogeneous rotation matrix
+       #    compose with radial argument image, compose with screenspace transform and plot
+       # via polygon()
+
+       -eval ">
+                ccnt="$ccnt";
+                fpt=get('firstpt',3,0);
+                ik=get('k',1,0);
+                lpt=get('lastpt',3,0);
+                omega=get('atk',1,0);
+                specw=get('sw',1,0);
+                pp=vector"{3*($ccnt+1)}"([0,0,1]);
+                circs=get('circles',"{12*$ccnt}",0);
+                repeat(
+                         ccnt,k,
+                         idx=ccnt-k-1;
+                         rbradx=mul(
+                                     rot([0,0,1],circs[12*idx+2]*omega[0]),
+                                     circs[12*idx+3,9,1],
+                                     3
+                                   );
+                         repeat(
+                                 k+1,j,
+                                 px=rbradx*pp[3*(k-j),3];
+                                 pp[3*(k-j)]=px[0];
+                                 pp[3*(k-j)+1]=px[1];
+                                 pp[3*(k-j)+2]=px[2];
+                               )
+                      );
+               ssx=get('ssxfrm',9,0);
+               plt=ssx*pp[0,3];
+               ik[0]>0?
+                   polygon(#-1,-2,[plt[0,2],lpt[0,2]],1,0xffffffff,255):
+                   store(plt,'firstpt',3,1,1,1);
+               store(plt,'lastpt',3,1,1,1);
+               ik[0]==(3*specw[0]-1)?
+                  polygon(#-1,-2,[fpt[0,2],plt[0,2]],1,0xffffffff,255)
+              "
+       atk={2*pi*($k/(3*$sw-1))}
+   -done
+~~~
+???
 
 = forwardtransform
 ### The Forward Transform
@@ -73,59 +198,6 @@ Let us feed some triplits to roses that we got somewhere:
 
 
 
-
-
-
-??? roses.gmic
-~~~
-roses :
-   # Fetch an arbitrarily long argument list to $a0, $a1, … $an
-   $=a
-
-   # Two row vectors for real and imaginary frequency domain samples. Size from first
-   # argument
-   sw={$a1/2}
-   -input $sw,1,1,1
-   -name. real
-   -input $sw,1,1,1
-   -name. imag
-
-   # Fetch and check diameter, phase angle and angular velocity parameters
-   -repeat $#-1,j
-      -if   $j%3==0 # get radius
-         rad=${a{2+$j}}
-         -check isnum($rad)" && "$rad>=0" && "$rad<=1
-      -elif $j%3==1 # get angle, degrees
-         ang=${a{2+$j}}
-         -check isnum($ang)" && "$ang>=0" && "$ang<=360
-      -else         # get ω and set spectral coefficient
-         sf=${a{2+$j}}
-         -check isnum($sf)" && "$sf%1==0" && "abs($sf)<=0.1*$sw
-         -if $sf<0
-            sf={$sf+$sw}
-         -fi
-         rr={$rad*cos(deg2rad($ang))}
-         ir={$rad*sin(deg2rad($ang))}
-         -set[real] $rr,$sf,0,0,0
-         -set[imag] $ir,$sf,0,0,0
-      -fi
-   -done
-
-   # Frequency domain → time domain
-   -ifft[imag,real]
-   -append[-2,-1] c
-   -name. temporal
-   -normalize[temporal] 0,{2*$sw-16}
-   -add[temporal] 8
-   -input {2*$sw},{2*$sw},1,1
-   -name. canvas
-
-   # Plot arabesque
-   -permute[temporal] cyzx
-   -eval[canvas] ">begin(PV=crop(#0);polygon(#-1,-s#0,PV,1,0xffffffff,255))"
-   -keep[canvas]
-~~~
-???
 
 # Command reference
 
