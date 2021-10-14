@@ -1,9 +1,29 @@
 # check (+)
 %% x "mkdir -p img" %%
 %% m mic scripts/roses.gmic roses 4096,0.6,0,-1,0.75,0,-5,0.1875,0,7,0.45,0,-19 expand_xy[canvas] 16 -dilate_circ[canvas] 16 -mul[canvas] -1 label[canvas] -mul[canvas] {255/iM} -map[canvas] hocuspocus r2dx[canvas] 300,5 o. img/arabesque.png rm %%
-|![frontimage](img/arabesque.png)|''-check'' throws exceptions if the given test expression arguments resolve to false, otherwise it takes no action. It is the command of choice for sanity-checking argument lists.\nIf any command on the calling chain is a ''-local'' … ''-endlocal'' block with an ''-onfail'' section, the exception is caught and further processing resumes. Otherwise G'MIC prints the test expression in the shell log and ceases operation.\nIf the test expression is not a math expression, `-check` tests if the expression is a filename and resolves to True if the file exists, and false otherwise.\nConsider using ''-error'' if some control over the error message is desired. `-error` unconditionally throws exceptions, so it is combined with conditional commands to emulate `-check,` but in a less compact way.
+|![frontimage](img/arabesque.png)|''-check'' throws exceptions if the given expression argument resolve to False, otherwise it takes no action. Commonly, the argument is a string math expression so composed to embody a number of tests logically joined by `&&` and `||`. As such, it is the command of choice for sanity-checking argument lists.\nIf any calling scope encompasses a ''-local'' … ''-endlocal'' block with an ''-onfail'' section, the exception is caught and further processing resumes in the `-onfail` section. Otherwise G'MIC prints its argument as an exception message in the shell and ceases operation.\nIf the argument is not a math expression, `-check` tests if the string represents a filename; such resolves to True if the file exists and False otherwise.\nConsider using ''-error'' if some control over the error message is desired. `-error` unconditionally throws exceptions, so it is combined with conditional commands to emulate `-check,` but in a less compact way.
 = examples
 ## Examples
+===
+~~~
+$ gmic check 0 echo 'Done!'
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ *** Error *** Command 'check': Expression '0' evaluated to false.
+
+$ gmic check 1 echo 'Fooooo!'
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Fooooo!
+[gmic]-0./ End G'MIC interpreter.
+~~~
+===
+`-check` throws an exception immediately if its argument is false; G'MIC does not operate on the remainder of the pipeline. Instead, the exception message echoes the expression argument given to `-check.`
+~~~
+:display_graph : check "${1=0}>=0 && ${2=0}>=0" …
+dg : check "${1=0}>=0 && ${2=0}>=0" skip ${3=1},${4=0},${5=0},${6=0},${7=0},${8=0},"${9=x-axis}","${10=y-axis}"…
+~~~
+===
+Very frequently, `-check` appears as the first line in [custom command definitions](https://gmic.eu/reference/adding_custom_commands.html#top) to sanity-check custom command arguments. In these examples, `-check` takes one argument, a string, which G'MIC processes as a [math expression](https://gmic.eu/reference/mathematical_expressions.html#top), substituting the results for the string. `-check` interprets non-zero results as True; G'MIC proceeds with the rest of the pipeline. Zero-results are False and `-check` throws an exception, using its argument string as the exception message.
+Use ''-skip'' with ''-check'' to set a custom command argument item to a default value, but exclude it from `-check` processing. Effectively, this creates an optional argument that has a default value.
 = arabesques
 ## Drawing arabesques
 %% -m scripts/wheelie_anim.gmic wheelie_anim 300,0.25,0,1,0.5,0,-3,0.5,0,1,0.4,0,-3,0.25,0,-11,0.0875,0,15 o img/arabesque.mp4,{30000/1001},H264 rm %%
@@ -55,9 +75,9 @@ wheelie:
    -name  args
 ~~~
 ===
-| 1.  |It is common to furnish `-check` with one string argument which G'MIC parses. G'MIC recognizes math expression operators and functions in this argument string. Here, we subject the argument list to two broad tests. We wish the first argument, `$a1` is to be an integer, as this argument conveys a discrete space of pixels and there is a provision against fractional pixels. We wish the count of remaining arguments however many there may be, to be divisible by three. Here, G'MIC substitutes `$#-1` for the number of items in the argument list, less one, to account for the initial argument conveying the size of the drawing field. If the count of remaining arguments does not evenly divide by three, then _some_ error has taken place in specifying wheelie properties, which come in groups of threes.\n\nWe could check more. In fact, we could check _everything_, right _here_, in an all-inclusive logic string; it is not uncommon to find such in the start-up of custom commands. It may be a matter of style, but a case can be made for distributive checking, to wit: check just what is needed to be checked, and no more, at various parts of the script. Recall that `-check` includes its entire argument string in a thrown exception. Should that argument string encapsulate dozens of tests, then it may not be clear which part the failure occurs. Contrast this with a small number of tests originating from a `-check` that concerns itself with just the matters of an immediate locale. Quite likely, it may be quite a bit more clear what the difficulty is, as the `-check` string embodies only a few tests.    
-| 2.  |`$sw` — "side width." Half the width, or height of the arabesque image figures in many places, both in and out of the  
-| 3.  |`bb
+| 1.  |It is common to furnish `-check` with one string argument which G'MIC parses. G'MIC recognizes math expression operators and functions in this argument string. Here, we subject the argument list to two broad tests. We wish the first argument, `$a1` is to be an integer, as this argument conveys a discrete space of pixels and there is a provision against fractional pixels. We wish the count of remaining arguments however many there may be, to be divisible by three. Here, G'MIC substitutes `$#-1` for the number of items in the argument list, less one, to account for the initial argument conveying the size of the drawing field. If the count of remaining arguments does not evenly divide by three, then _some_ error has taken place in specifying wheelie properties, which come in groups of threes.\n\nWe could check more. In fact, we could check _everything_, right _here_, in an all-inclusive logic string; it is not uncommon to find such in the start-up of custom commands. It may be a matter of style, but a case can be made for distributive checking, to wit: check just what is needed to be checked, and no more, at various parts of the script. Recall that `-check` includes its entire argument string in a thrown exception. Should that argument string encapsulate dozens of tests, then it may not be clear which part the failure occurs. Contrast this with a small number of tests originating from a `-check` that concerns itself with just the matters of an immediate locale. Quite likely, it may be quite a bit more clear what the difficulty is, as the `-check` string embodies only a few tests.
+| 2.  |`$sw` — "side width." Half the width, or height of the arabesque image.
+| 3.  |`<to come…>`
 
 ??? wheelie.gmic
 ~~~
