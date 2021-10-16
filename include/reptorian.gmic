@@ -47,58 +47,122 @@
 #@cli :: Reptorian's CLI Commands
 #
 #-------------------------------
-#@cli rep_cubic_map: [image]
-#@cli : Map palette into image with smooth periodic condition using cubic interpolation.
+#@cli rep_cubic_map: [image],mode={ 0=neumann | 1=periodic | 2=continuous }
+#@cli : Map palette into image with cubic interpolation.
 rep_cubic_map:
+skip ${2=2}
 pass$1 0
 ts={s#-1}
 length={max(w,h,d)}
+eval print($2)
 repeat $!-1 l[$>,-1]
  {w#-2},{h#-2},{d#-2},$ts,:"begin(
-  const length=$length;
-  cubic_interpolation(p0,p1,p2,p3,v)=(
-   (-.5*p0+1.5*p1-1.5*p2+.5*p3)*v^3
-   +(p0-2.5*p1+2*p2-.5*p3)*v^2
-   +(-.5*p0+.5*p2)*v
-   +p1
+   const length=$length;
+   const mi=length-1;
+   const smi=mi-1;
+   cubic_interpolation(p0,p1,p2,p3,v)=(
+    (-.5*p0+1.5*p1-1.5*p2+.5*p3)*v^3
+    +(p0-2.5*p1+2*p2-.5*p3)*v^2
+    +(-.5*p0+.5*p2)*v
+    +p1
+   );
+   w#-1==length?(
+    $2?(
+     calc()=cubic_interpolation(
+      I(#-1,p_s,0,0),
+      I(#-1,p_0,0,0),
+      I(#-1,p_1,0,0),
+      I(#-1,p_e,0,0),
+      interp
+     );
+    ):(
+     calc()=(
+      inrange(pref,0,smi,1,1)?(
+       cubic_interpolation(
+        I(#-1,p_s,0,0),
+        I(#-1,p_0,0,0),
+        I(#-1,p_1,0,0),
+        I(#-1,p_e,0,0),
+        interp
+       );     
+      ):(
+       pref>0?I(#-1,mi,0,0):I(#-1,0,0,0);
+      );
+     );
+    );
+   ):
+   h#-1==length?(
+    $2?(
+     calc()=cubic_interpolation(
+      I(#-1,0,p_s,0),
+      I(#-1,0,p_0,0),
+      I(#-1,0,p_1,0),
+      I(#-1,0,p_e,0),
+      interp
+     );
+    ):(
+     calc()=(
+      inrange(pref,0,smi,1,1)?(
+       cubic_interpolation(
+        I(#-1,0,p_s,0),
+        I(#-1,0,p_0,0),
+        I(#-1,0,p_1,0),
+        I(#-1,0,p_e,0),
+        interp
+       );     
+      ):(
+       pref>0?I(#-1,0,mi,0):I(#-1,0,0,0);
+      );
+     );
+    );
+   ):(
+    $2?(
+     calc()=cubic_interpolation(
+      I(#-1,0,0,p_s),
+      I(#-1,0,0,p_0),
+      I(#-1,0,0,p_1),
+      I(#-1,0,0,p_e),
+      interp
+     );
+    ):(
+     calc()=(
+      inrange(pref,0,smi,1,1)?(
+       cubic_interpolation(
+        I(#-1,0,0,p_s),
+        I(#-1,0,0,p_0),
+        I(#-1,0,0,p_1),
+        I(#-1,0,0,p_e),
+        interp
+       );     
+      ):(
+       pref>0?I(#-1,0,0,mi):I(#-1,0,0,0);
+      );
+     );
+    );
+   );
+   $2==2?(
+    calc_ps()=[pref-1,pref,pref+1,pref+2]%length;
+   ):
+   $2==1?(
+    calc_ps()=(
+     npref=pref%length;
+     [max(0,npref-1),npref,min(mi,npref+1),min(npref+2,mi)];
+    );
+   ):(
+    calc_ps()=[pref-1,pref,pref+1,pref+2];
+   );
   );
-  w#-1==length?(
-   calc()=cubic_interpolation(
-    I(#-1,p_s,0,0),
-    I(#-1,p_0,0,0),
-    I(#-1,p_1,0,0),
-    I(#-1,p_e,0,0),
-    interp
-   );
-  ):
-  h#-1==length?(
-   calc()=cubic_interpolation(
-    I(#-1,0,p_s,0),
-    I(#-1,0,p_0,0),
-    I(#-1,0,p_1,0),
-    I(#-1,0,p_e,0),
-    interp
-   );
-  ):(
-   calc()=cubic_interpolation(
-    I(#-1,0,0,p_s),
-    I(#-1,0,0,p_0),
-    I(#-1,0,0,p_1),
-    I(#-1,0,0,p_e),
-    interp
-   );
-  );
- );
- vp=i(#-2,x,y,z,0);
- pref=floor(vp);
- interp=vp-pref;
- ps=[pref-1,pref,pref+1,pref+2]%length;
- p_s=ps[0]; #Start Point
- p_0=ps[1];
- p_1=ps[2];
- p_e=ps[3]; #End Point
- calc();
- "
+  vp=i(#-2,x,y,z,0);
+  pref=floor(vp);
+  npref=int(pref/2);
+  interp=vp-pref;
+  ps=calc_ps();
+  p_s=ps[0]; #Start Point
+  p_0=ps[1];
+  p_1=ps[2];
+  p_e=ps[3]; #End Point
+  calc();"
+ 
  rv[0,-1] rm.
 endl done
 rm.
@@ -15504,7 +15568,7 @@ u "{$1}"\
 "{$12}"_{$8==2?2}\
 "{$13}"_{$8?2}\
 "{$14,$15,$16}"_{$border_size?2:1}
-#@gui Three-Coupled Oscillators: fx_rep_tco,fx_rep_tco
+#@gui Three-Coupled Oscillators: new_fx_rep_tco,new_fx_rep_tco
 #@gui :_=note("<b>Main</b>"),_=separator()
 #@gui :Maximum Iteration=int(50,1,200)
 #@gui :K-A Tau(%)=float(50,-100,100)
@@ -15515,20 +15579,21 @@ u "{$1}"\
 #@gui :Axis-Scale=float(1,1,15)
 #@gui :_=note("<b>Coloring</b>"),_=separator()
 #@gui :Mode=choice(0,"Grayscale","Palette","Random")
-#@gui :Boundary=choice(1,"Periodic","Continous")
 #@gui :Palette=choice(12,"BW-{2}","RGB-{3}","B-RGB-{4}","BW-RGB-{5}","CMY-{3}","CMYK-{4}","W-CMYK-{5}","RGBCMY-{6}","1-Bit-RGB-{8}","Aurora-{256}","PLAYPAL-{249}","Sonic Robo Blast 2-{256}","Famicube-{64}","Andrew Kensler - 16","Andrew Kensler - 32","Andrew Kensler - 54","AAP-Micro 12","AAP-16","AAP-64","AAP-SPLENDOR128","DB8","DB16","DB32","DB-ISO22","DimWiddy 17","DimWiddy 23","Endesga-4","Endesga-8","Endesga-16","Endesga-32","Endesga-36","Endesga-64","Juicy-32","Juicy-56","XAIUE-22","15P-DX","20P-DX","24P-DX","Cabana-64","Fantasy 16","Fantasy 24","Tranquil Fantasy 23","Tranquility Plus 39","Faraway 48","Fleja Master Palette-{33}","Koni32","Linear Color Palette Basic-{31}","Vines Flexible Linear Ramps-{38}","Arcade Standard 29","ARQ16","BLK 36","BLK-NEO-{46}","Broken Facility-{40}","Bubblegum-16","Cade 15","Calder 8-{11}","Chromatic16","CD-BAC-{16}","CG Arne-{16}","CPC BOY-{32}","Dinoknight 16","||||-22","FZT Ethereal 16","GZXP-{11}","Indecision-{17}","Island Joy 16","Journey-{64}","Juicy 17","Oak21","Nature's Embrace 55","Nauris-16","Pear 36","Peachy Pop 16-{16}","Pineapple 32","Resurrect 32-{32}","Rosy 42","SLSO-CLR17","Softy 15","SPEC12","Starmancer-{52}","Superb 8","SuperFuture25","Sweetie 16","Taffy 16","Todayland Palette V2-{25}","Vivid-17","Voodo34","Zughy 32","ENOS16","Undertones-17","Equpix 15","Night 16","Star 29","Star 34","Still-Life-{14}","SimpleJPC-16","Acid 15","Battery 24","Clumpy 18","Cthulhu-{16}","Crimso 11","Copper-Tech-{16}","DRZ15A","Eggy 15","Eroge-Copper","Europa 16-{16}","GreyT-bit-{8}","Jewel-{15}","Polar 11","Sheltzy 32","Rube-Goldberg-{9}","BoomBoom-{7}","Generic-8","Matriax8c","NT1H-{26}","Autum 15","Autum 15 [Yellow]","JerryPie 22","Naji 16","Blessing-{5}","Crayola Blind-{9}","Easter Island-{16}","Fairy Tales-{8}","Fuzzy Four-{4}","0xdb-01-{17}","Ocaso-{17}","Pastel-{15}","17 Pastels","Pollen-8","Nopal-12","Sy17","Syz15","TUI-15","Cave-{8}","Psygnosia-{16}","MarshMellow32","Rabbit 7","Finlal 11","Vinik 24","YKB-22","Graveyard-21","Steam Lords-{16}","AAP-RadiantXV-{15}","AAP-Majesty XVII-{17}","Daruda 22","Rust-6","XAIUE-Radiant-{22}","Firestorm-{9}","SuperNova 7","NYX8","OIL6","SGM-Palette 2-{17}","Fornax Void I-{256}","Fornax Void II-{128}","Pixelwave-{12}","Spacey Easter-{17}","Moonlit-39","Petite-8","Petite-8 Afterdark","Autochrome 3","Autochrome 5","GB Default #1-{4}","GB Default #2-{4}","GB Andrade-{4}","GB Blue Seni-{4}","GB Blackzone-{4}","GB Crimson-{4}","GB Didi-{4}","GB Dirty-{4}","GB Arne-{4}","GB Easy-{4}","GB Forest-{4}","GB Harsh Green-{4}","GB Light Green-{4}","GB Nostalgia-{4}","GB Platinum-{4}","GB Kirokaze-{4}","GB PJ-{4}","GB Cyber-{4}","GB Wish-{4}","GB Grapefruit-{4}","GB Ice Cream-{4}","GB Red_Blue-{4}","GB Spacehaze-{4}","GB Chocolate-{4}","GB Purple Dawn-{4}","GB Gray-{4}","ARNE4","HallowPumpkin-{4}","Amiga 2600 NTSC-{128}","Amiga 2600 PAL-{104}","Amiga 2600 SECAM-{8}","Amiga 7800 M.E.S.S-{256}","Amiga 7800-{256}","Amstrad CPC-{27}","Apple II-{15}","CGA-{16}","CGA Mode 0 [Low]-{4}","CGA Mode 0 [High]-{4}","CGA Mode 1 [Low]-{4}","CGA Mode 1 [High]-{4}","CGA Mode 2 [Low]-{4}","CGA Mode 2 [High]-{4}","Commodore 64 [Pepto Interpretation]-{16}","Commodore 64 [Colodore Interpretation]-{16}","Commodore VIC-20-{16}","Colecovision-{15}","Japanese Machine Palette-{16}","Macintosh II-{16}","NES-{52}","PICO-8-{16}","RISC OS-{16}","SAM Coupe-{128}","Thomson MO5-{16}","VGA-{244}","ZX Spectrum-{15}","GNOME 32-{32}","Electronic Crayon 22","Chip16","MSX-{15}","Deluxe Paint-{222}","Legacy Paint-{16}","XP Paint-{28}","Vista Paint-{28}")
 #@gui :Number of Colors=int(6,2,100)
 #@gui :Color Space=choice(0,"RGB","HSI","HCY","LAB")
 #@gui :Seed=int(0,0,3000)
+#@gui :Boundary=choice(1,"Periodic","Continous")
 #@gui :Negate=bool(0)
 #@gui :Shift Value=float(0,-1,1)
 #@gui :Multiplier=float(1,.25,10)
 #@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2021/10/11</i>.</small>")
-fx_rep_tco:
+new_fx_rep_tco:
 mpi={100*pi}
 tau={2*pi}
 ow={w}
 oh={h}
+mode={$14?2:1}
 l[0]
  rep_three_coupled_oscillators $1,{$tau*$2%},{$tau*$3%},-$4,$5,{($6-50)/50},{($7-50)/50},$8
  if $9==0
@@ -15536,7 +15601,7 @@ l[0]
    if $-1>1
     n 0,{255*$-1}
     if $-2!=0 + {$-2*255} fi
-    modf {$10?3:2},255,1
+    modf {$-4?3:2},255,1
    else
     n 0,{255*$-1}
    fi
@@ -15545,37 +15610,37 @@ l[0]
   fi
   if $-2!=0&&(!($-1>1))
    + {$-2*255}
-   modf {$10?3:2},255,1
+   modf {$-4?3:2},255,1
   fi
   if $-3 negate fi
  elif $9==1 
-  pal $11
+  pal $10
   n.. 0,{$-1*(w#-1-1)}
   if $-3 negate.. fi
   if $-2!=0 +.. {(w#-1-1)*$-2} fi
-  rep_cubic_map.. [-1]
+  rep_cubic_map.. [-1],$mode
   rm.
  fi
  if $9!=2 r $ow,$oh,100%,100%,6 fi
 endl
 if $9==2
- if $13 convert_colors_bwd=${arg\ $13,hsi2rgb,hcy2rgb,lab2rgb} fi
+ if $12 convert_colors_bwd=${arg\ $12,hsi2rgb,hcy2rgb,lab2rgb} fi
  ti={$!}
  if $ti>1 
   rm[^0] 
   repeat $ti-1 . done 
  fi
  repeat $! l[$>]
-  if $13==3 $12,1,1,3,begin(srand($14+$>););[u(0,100),u(-128.014,182.136),u(-155.5,155.5)];
-  elif $13 $12,1,1,3,begin(srand($14+$>););[u(0,359.999999),u(0,1),u(0,1)];
-  else $12,1,1,3,begin(srand($14););u(255);
+  if $12==3 $11,1,1,3,begin(srand($13+$>););[u(0,100),u(-128.014,182.136),u(-155.5,155.5)];
+  elif $12 $11,1,1,3,begin(srand($13+$>););[u(0,359.999999),u(0,1),u(0,1)];
+  else $11,1,1,3,begin(srand($13););u(255);
   fi
   n.. 0,{$-1*(w#-1-1)}
   if $-3 negate.. fi
   if $-2!=0 +.. {(w#-1-1)*$-2} fi
-  rep_cubic_map.. [-1]
+  rep_cubic_map.. [-1],$mode
   rm.
-  if $13 $convert_colors_bwd. fi
+  if $12 $convert_colors_bwd. fi
   r $ow,$oh,100%,100%,6
  endl done
 else
@@ -15594,11 +15659,11 @@ u "{$1}"\
 "{$6,$7}"\
 "{$8}"\
 "{$9}"\
-"{$10}"_{$9==0?2}\
-"{$11}"_{$9==1?2}\
+"{$10}"_{$9==1?2}\
+"{$11}"_$rand_col_set\
 "{$12}"_$rand_col_set\
 "{$13}"_$rand_col_set\
-"{$14}"_$rand_col_set\
+"{$14}"\
 "{$15}"\
 "{$16}"\
 "{$17}"
