@@ -1,7 +1,7 @@
 # check (+)
 %% x "mkdir -p img" %%
 %% m mic scripts/roses.gmic roses 4096,0.6,0,-1,0.75,0,-5,0.1875,0,7,0.45,0,-19 expand_xy[canvas] 16 -dilate_circ[canvas] 16 -mul[canvas] -1 label[canvas] -mul[canvas] {255/iM} -map[canvas] hocuspocus r2dx[canvas] 300,5 o. img/arabesque.png rm %%
-|![frontimage](img/arabesque.png)|''-check'' throws exceptions if the given expression argument resolve to False, otherwise it takes no action. Commonly, the argument is a string math expression so composed to embody a series of tests, often on required features that command arguments are to have. As such, it is the command of choice for sanity-checking argument lists.\nIf any calling scope encompasses a ''-local'' … ''-endlocal'' block with an ''-onfail'' section, the exception is caught and further processing resumes in the `-onfail` section. Otherwise G'MIC prints its argument as an exception message in the shell and ceases operation.\nIf the argument is not a math expression, `-check` tests if the string represents a file system object; such resolves to True if it exists and False otherwise.\nConsider using ''-error'' if some control over the error message is desired. `-error` unconditionally throws exceptions, so it is combined with conditional commands to emulate `-check,` but in a less compact way.
+|![frontimage](img/arabesque.png)|''-check'' throws exceptions if the given expression argument resolve to False, otherwise it takes no action. Commonly, the argument is a string math expression so composed to embody a set of tests, often for features that command arguments are to have. As such, it is the command of choice for sanity-checking argument lists.\nIf any calling scope encompasses a ''-local'' … ''-endlocal'' block with an ''-onfail'' section, the exception is caught and further processing resumes in the `-onfail` section. Otherwise `-check` uses its argument for the exception message and exits G'MIC.\nIf the argument is not a math expression, `-check` tests if it might represent a file system object; it resolves to True if the object exists and False otherwise.\nConsider using ''-error'' if a custom message is desired. Since `-error` unconditionally throws exceptions, combine it with conditional commands to emulate `-check,` but in a less compact way.
 = examples
 ## Examples
 ===
@@ -16,7 +16,7 @@ $ gmic check 1 echo 'Fooooo!'
 [gmic]-0./ End G'MIC interpreter.
 ~~~
 ===
-`-check` throws an exception immediately if its argument is false; G'MIC does not operate on the remainder of the pipeline. Instead, the exception message echoes the expression argument given to `-check.`
+`-check` throws an exception immediately if its argument is False; G'MIC does not operate on the remainder of the pipeline. Instead, `-check` commences to exit the scopes in which the pipeline may be embedded. Should any of those scopes reside in an ''-onfail'' section of a ''-local''…''-endlocal'' block, then G'MIC resumes processing in that section. Otherwise, `-check` echoes its argument in the shell log and G'MIC quits. `-check` performs no operation if its argument is True.
 ===
 ~~~
 display_graph : check "${1=0}>=0 && ${2=0}>=0" …
@@ -28,7 +28,7 @@ Use ''-skip'' with ''-check'' to set a custom command argument item to a default
 = arabesques
 ## Drawing arabesques
 %% -m scripts/wheelie_anim.gmic wheelie_anim 300,0.6,0,1,0.5,0,5,0.125,0,-7,0.3,0,-14 o img/arabesque.mp4,{30000/1001},H264 rm %%
-|![Arabesque](img/arabesque.mp4)\n*"Four wheelies on a lark"*|"Follow your nose" is a disparaging slant, uttered by the chattering classes when consumed over a certain lack of finesse in some poor sod's code. "Follow your nose" entails taking what is more-or-less in front of one's nose and coding a design — functional, straightforward and unimaginative. Denigrations aside, much straightfoward and unimaginative work has found its way into The Making of Things, a yeoman effort, useful if not exceptional, built along obvious, if not optimal, lines. Eventually, somebody comes along with an arch, but until then, post-and-lintel serves all the exigencies that doors may have.\n\nSo consider [wheelies](https://www.youtube.com/watch?v=-qgreAUpPwM): fantastic constructions of gyrating arrows, erupting on YouTube and the like, that do etch-a-sketch things: drawing birds, flowers, even portraits of Jean-Baptiste Joseph Fourier. Follow your nose and find just line segments — _wheelies_ — each with one rooted and one free endpoint. If making arabesques is your order, then look no further than a chains of wheelies to draw them.\n\nLet's do that.|
+|![Arabesque](img/arabesque.mp4)\n*"Four wheelies on a lark"*|"Follow your nose" is a disparaging slant, uttered by the chattering classes when consumed over a certain lack of finesse in some poor sod's code. "Follow your nose" entails taking what is more-or-less in front of one's nose and coding a design — functional, straightforward and unimaginative. Denigrations aside, much straightfoward and unimaginative work has found its way into The Making of Things, a yeoman effort, useful if not exceptional, built along obvious, if not optimal, lines. Eventually, somebody comes along with an arch, but until then, post-and-lintel serves all the exigencies that doors may have.\n\nSo consider [wheelies](https://www.youtube.com/watch?v=-qgreAUpPwM): fantastic constructions of gyrating arrows, erupting on YouTube and the like, that do etch-a-sketch things: drawing birds, flowers, even portraits of Jean-Baptiste Joseph Fourier. Follow your nose and find just line segments — _wheelies_ — each with one rooted and one free endpoint. If making arabesques is your order, then look no further than a chain of wheelies.\n\nLet's do that.|
 = wheelie
 ### Wheelies
 With a wheelie, one could:
@@ -178,83 +178,93 @@ wheelie :
 ### Walkthroughs
 ===
 ~~~
-wheelie:
-   # Fetch an arbitrarily long argument list to $a0, $a1, … $an
-   $=a
+01. wheelie:
+02.    # Fetch an arbitrarily long argument list to $a0, $a1, … $an
+03.    $=a
 ~~~
 ===
-| 1.  |The line beginning with `wheelie: ` commences a [custom command definition](https://gmic.eu/tutorial/bouncing_balls_tutorial.html) of the form _<custom_command_name>_ : _<definition…>,_ with the commands after `:` constituting the implementation; see and [Use Custom Commands to Bypass the Shell](https://gmic.eu/tutorial/custom_cheat.html) and [Adding Custom Commands](https://gmic.eu/reference/adding_custom_commands.html#top).
-| 2.  |The construct `$=a`, a kind of meta-assignment, belongs to a set of `$-expressions` available inside command definitions, and, in conjunction two other `$-expressions,` `$*` and `$#,` furnish information about the argument list.
+| 01.  |The line beginning with `wheelie: ` commences a [custom command definition](https://gmic.eu/tutorial/bouncing_balls_tutorial.html) of the form _<custom_command_name>_ : _<definition…>,_ with the commands after `:` constituting the implementation; see [Use Custom Commands to Bypass the Shell](https://gmic.eu/tutorial/custom_cheat.html) and [Adding Custom Commands](https://gmic.eu/reference/adding_custom_commands.html#top).
+| 03.  |The construct `$=a`, a kind of meta-assignment, belongs to a set of `$-expressions` available inside command definitions, and, in conjunction two other `$-expressions,` `$*` and `$#,` furnish information about the argument list.
 |   a.  |G'MIC substitutes occurences of `$*` with the argument list as detected in the [parent scope](https://gmic.eu/tutorial/debug_cheat.html#debuggery). `$*` duplicates the argument list _exactly_ as it appears following `wheelie` itself.
 |   b.  |The other two `$-expressions` furnish additional parsing of the argument list. G'MIC substitutes `$#` with the count of argument list items. These items arise from splitting the argument list on its comma separators, excluding those that might appear in properly escaped string arguments.
 |   c.  |`$=` _<nametemplate>_ is a meta-assignment which G'MIC expands into a sequence of actual assignments, one for each item in the blocked-out argument list, plus command name itself. The variable names consist of the `nametemplate,` here `a`, appended with the position numeral. Thus, for the pipeline `wheelie 2048,0.875,31.75,5` G'MIC expands `$=a` into `a0=wheelie a1=2048 a2=0.875 a3=31.75 a4=5`. This preliminary argument list processing saves some work for us and permits open-ended, variable-length argument lists. For our purposes, we have no use for `$a0`, though other scripts could perform conditional processing based on the command name. `$a1` identifies the length of one side of the drawing field. The remaining arguments, taken three at a time, specify wheelies.
 ===
 ~~~
-   # Expect data triplets: radius, phase angle, angular velocity.
-
-   -check "isint($a1) && !(($#-1)%3)"
-
-   # Initial argument: side width (sw)
-
-   sw={$a1/2}
-
-   # Argument image: For each wheelie, compose radius and phase
-   # arguments into a homogeneous transform. In the generator loop, we
-   # compose this with the angle resulting from one angular velocity
-   # step.
-
-   ccnt={round(($#-1)/3,1,-1)}
-   -input $ccnt,1,1,12
-   -name  args
+04.    # Expect data triplets: radius, phase angle, angular velocity.
+05. 
+06.    -check "isint($a1) && !(($#-1)%3)"
+07. 
+08.    # Initial argument: side width (sw)
+09. 
+10.    sw={$a1/2}
+11. 
+12.    # Argument image: For each wheelie, compose radius and phase
+13.    # arguments into a homogeneous transform. In the generator loop, we
+14.    # compose this with the angle resulting from one angular velocity
+15.    # step.
+16. 
+17.    ccnt={round(($#-1)/3,1,-1)}
+18.    -input $ccnt,1,1,12
+19.    -name  args
 ~~~
 ===
-| 1.  |Here, we subject the argument list to two broad tests. We wish the first argument, `$a1` is to be an positive integer, as this argument conveys a discrete length of pixels and there is a provision against fractional pixels. We wish the count of remaining arguments however many that may be, to be divisible by three — because wheelie parameters come in groups of three and _some_ remainder indicates omitted or excess arguments. Here, G'MIC substitutes `$#-1` for the number of items in the argument list, less one, to account for the initial canvas size argument.\n\nWe could check more. In fact, we could check _everything_, right _here_, in an all-inclusive logic string; it is not uncommon to find such in the start-up of custom commands. It may be a matter of style, but a case can be made for distributive checking, to wit: check just what is needed to be checked, and no more, at various parts of the script. Recall that `-check` includes its entire argument string in a thrown exception. Should that argument string encapsulate dozens of tests, then it may not be clear in which part of the script that the failure occurs. Contrast this with a small number of tests originating from a `-check` that concerns itself with just the matters of an immediate locale. Quite likely, that check may be quite a bit more clear on what the difficulty may be, as the `-check` string embodies just a few tests on variables in a certain locality.
-| 2.  |`$sw` — "side width." Half the width, or height of the arabesque image. This is a significant metric to the rest of the script as it establishes working resolution and how to scale the arabesque image.
-| 3.  |We assess `$#-1` once again, this time to determine the number of wheelies defined by the command line: divide `$#-1` by three to get the number of triplets or "circle counts", taking "circle" to be an alias for "wheelie".\n\nThe curly braces around the computation signals the G'MIC command line parser to run the math expression processor on the string. The math expression parser doesn't _exactly_ see this string as written: command line variables like `$#` undergo `$-expression` substitutions before the math expression parser sees the string. Following the substitution, the math expression parser just processes the substituted `$#` _value_, whatever that may be, and not the literal string `$#` — which it never "sees". It is worthwhile to note that _successive_ substitutions take place here. After the command line processor performs the various `$-expression` substitutions, it passes the transformed string to the math expression processor. That processor compiles the string into bytecode, using a "Just-in-time (JIT)" compiler, and then executes that bytecode. Barring a throw of an exception, the math expression parser returns a numeric string reflecting the value produced by the last computation encoded in the math expression — for math expressions can be multi-line, these marked by `;` separators, for multi-stage computation. Examples of such follow in the arabesque plotter, further down in the script.     
-| 4.  |The twelve channel G'MIC image _args_ is not harnessed to display anything; rather, it is destined for use as an argument table for follow-on math expressions. The layout of one twelve channel pixel consists of the wheelie length, phase angle and angular velocity. The remaining channels contain a nine element homogeneous transformation matrix that, when composed, carries a point centered at the base of the wheelie to its tip. Finding this matrix is a pre-composition exercise. The long game entails computing matrices that carry points from the image origin to wheelie tips so as to plot tip paths under rotation; the matrix pre-composed here is just the transform from a wheelie's root to its tip.    
+| 06.  |Here, we subject the argument list to two broad tests. We wish the first argument, `$a1` is to be an positive integer, as this argument conveys a discrete length of pixels and there is a provision against fractional pixels. We wish the count of remaining arguments, however many that may be, to be divisible by three — because wheelie parameters come in groups of three and _some_ remainder indicates omitted or excess arguments. Here, G'MIC substitutes `$#-1` for the number of items in the argument list, less one, to account for the initial canvas size argument.\n\nWe could check more. In fact, we could check _everything_, right _here_, in an all-inclusive logic string; it is not uncommon to find such in the start-up of custom commands. It may be a matter of style, but a case can be made for distributive checking, to wit: check just what is needed to be checked, and no more, at various parts of the script. Recall that `-check` includes its entire argument string in a thrown exception. Should that argument string encapsulate dozens of tests, then it may not be clear in which part of the script that the failure occurs. Contrast this with a small number of tests originating from a `-check` that concerns itself with just the matters of an immediate locale. Quite likely, that check may be quite a bit more clear on what the difficulty may be, as the `-check` string embodies just a few tests on variables in a certain locality.
+| 10.  |`$sw` — "side width." Half the width, or height of the arabesque image. This is a significant metric to the rest of the script as it establishes working resolution and how to scale the arabesque image.
+| 17.  |We assess `$#-1` once again, this time to determine the number of wheelies defined by the command line: divide `$#-1` by three to get the number of triplets or "circle counts", taking "circle" to be an alias for "wheelie".
+= curlybraces
+
+??? More on Math Expressions Within Curly Braces:
+|      |The curly braces around the computation signals the G'MIC command line parser to run the math expression processor on the string. The math expression parser doesn't _exactly_ see this string as written: command line variables like `$#` undergo `$-expression` substitutions before the math expression parser sees the string. Following the substitution, the math expression parser just processes the substituted `$#` _value_, whatever that may be, and not the literal string `$#` — which it never "sees". It is worthwhile to note that _successive_ substitutions take place here. After the command line processor performs the various `$-expression` substitutions, it passes the transformed string to the math expression processor. That processor compiles the string into bytecode, using a "Just-in-time (JIT)" compiler, and then executes that bytecode. Barring a throw of an exception, the math expression parser returns a numeric string reflecting the value produced by the last computation encoded in the math expression — for math expressions can be multi-line, these marked by `;` separators, for multi-stage computation. Examples of such follow in the arabesque plotter, further down in the script.
+
+???
+| 18.  |The twelve channel G'MIC image _args_ is not harnessed to display anything; rather, it is destined for use as an argument table for follow-on math expressions. The layout of one twelve channel pixel consists of the wheelie length, phase angle and angular velocity. The remaining channels contain a nine element homogeneous transformation matrix that, when composed, carries a point centered at the base of the wheelie to its tip. Finding this matrix is a pre-composition exercise. The long game entails computing matrices that carry points from the image origin to wheelie tips so as to plot tip paths under rotation; the matrix pre-composed here is just the transform from a wheelie's root to its tip.    
 ===
 ~~~
-   # Iterate over argument vector. For each triplet – representing a
-   # wheelie – Fetch radius (rad), phase angle (ang) and angular
-   # velocity (sf) parameters.
-
-   -repeat $#-1,j
-      -if   $j%3==0 # get radius
-         rad=${a{2+$j}}
-         -check isnum($rad)" && "$rad>=0" && "$rad<=1
-         -set[args] $rad,{round($j/3,1,-1)},0,0,0
-      -elif $j%3==1 # get angle, degrees
-         ang=${a{2+$j}}
-         -check isnum($ang)" && "$ang>=0" && "$ang<=360
-         -set[args] $ang,{round($j/3,1,-1)},0,0,1
-      -else         # get ω and set spectral coefficient
-         sf=${a{2+$j}}
-         -check isnum($sf)" && "$sf%1==0" && "abs($sf)<=0.1*$sw
-         -set[args] $sf,{round($j/3,1,-1)},0,0,2
-      -fi
-   -done
-
-   # Iterate over argument image, each 12 channel pixel representing
-   # one wheelie. The first three channels contain wheelie radius,
-   # phase angle and radial velocity. Compose a homogeneous matrix
-   # transforming the origin to the tip of the wheelie, a radial
-   # translation and phase rotation. Populate the nine remaining
-   # channels with this matrix.
-
-   -fill[args] ">
-                  CPX=I;
-                  orot=rot([0,0,1],deg2rad(CPX[1])); # phase rotation
-                  xlat=eye(3);
-                  xlat[2]=CPX[0];                    # translation origin-to-rim
-                  FIN=[CPX[0,3,1],mul(orot,xlat,3)]; # args+"RADX" i.e. 'rotation & xlation'
-                  FIN                                # store above in 12-channel pixel
-               "
+20.   # Iterate over argument vector. For each triplet – representing a
+21.   # wheelie – Fetch radius (rad), phase angle (ang) and angular
+22.   # velocity (sf) parameters.
+23. 
+24.   -repeat $#-1,j
+25.      -if   $j%3==0 # get radius
+26.         rad=${a{2+$j}}
+27.         -check isnum($rad)" && "$rad>=0" && "$rad<=1
+28.         -set[args] $rad,{round($j/3,1,-1)},0,0,0
+29.      -elif $j%3==1 # get angle, degrees
+30.         ang=${a{2+$j}}
+31.         -check isnum($ang)" && "$ang>=0" && "$ang<=360
+32.         -set[args] $ang,{round($j/3,1,-1)},0,0,1
+33.      -else         # get ω and set spectral coefficient
+34.         sf=${a{2+$j}}
+35.         -check isnum($sf)" && "$sf%1==0" && "abs($sf)<=0.1*$sw
+36.         -set[args] $sf,{round($j/3,1,-1)},0,0,2
+37.      -fi
+38.   -done
+39. 
+40.   # Iterate over argument image, each 12 channel pixel representing
+41.   # one wheelie. The first three channels contain wheelie radius,
+42.   # phase angle and radial velocity. Compose a homogeneous matrix
+43.   # transforming the origin to the tip of the wheelie, a radial
+44.   # translation and phase rotation. Populate the nine remaining
+45.   # channels with this matrix.
+46. 
+47.   -fill[args] ">
+48.                  CPX=I;
+49.                  orot=rot([0,0,1],deg2rad(CPX[1])); # phase rotation
+50.                  xlat=eye(3);
+51.                  xlat[2]=CPX[0];                    # translation origin-to-rim
+52.                  FIN=[CPX[0,3,1],mul(orot,xlat,3)]; # args+"RADX" i.e. 'rotation & xlation'
+53.                  FIN                                # store above in 12-channel pixel
+54.               "
 ~~~
 ===
 = tripletiteration
-| 1.  |The `-repeat…done` loop iterates over the portion of the argument list following the image size specification; an `-if…-elif…-else…-fi` "argument sieve" occupies the body of this iterator. Each section of the sieve checks, respectively, an argument of the triplet, wheelie length when the argument index modulo 3 is zero, phase angle when modulo 3 is one and angular of the  hosts three `-check 
-| 2.  |
-| 3.  |
+| 24.  |The `-repeat…done` loop iterates over the portion of the argument list following the image size specification; an `-if…-elif…-else…-fi` "argument sieve" occupies the body of this iterator. Each section of the sieve checks, respectively, an argument of the triplet, wheelie length when the argument index `j modulo 3` is zero, phase angle when `j modulo 3` is one and angular velocity otherwise, effectively when `j modulo 3` is 2. 
+| 27.  |
+| 31.  |
+| 35.  |
+| 47.  |
+| 49.  |
+| 50.  |
 = forwardtransform
 ### The Forward Transform
 Let us feed some triplits to roses that we got somewhere:
