@@ -2232,6 +2232,152 @@ gcd_dither_srgb : check "isint(${1=2}) && $1>=2"
 #@cli : $ uniform_distribution 8,3 gcd_shuffle
 gcd_shuffle : f "<begin(P=whd-2^-14);swap(I[int(u(P--))],I)"
 
+#=============================================
+#************* FILE BROWSER ******************
+#=============================================
+
+#@cli gcd_browse : "commands",_width,_height
+#@cli : Navigate and display images from local storage.
+#@cli : Specified "commands" can be applied while viewing.
+#@cli : All Arguments are optional.
+#@cli :
+#@cli : Controls:
+#@cli : * `ESC or Q`     : Exit.
+#@cli : * `Arrow Keys`   : Navigate directories.
+#@cli : * `Page Up/Down` : Navigate images within current directory.
+#@cli : * `SPACE`   : Enable/disable specified commands.
+#@cli : * `i`       : Toggle information display.
+#@cli : * `f`       : Toggle fullscreen mode.
+#@cli : * `e`       : Toggle edge filtering.
+gcd_browse : check "isnum(${2=-1}) && isnum(${3=-1})" skip "${1=,}"
+if same(["'$1'"],',')
+  m "_gcd_tmp_cmd : +gcd_std_score_patch 3 compose_channels. add orientation.. mul.. 2 add n 0,255"
+else m "_gcd_tmp_cmd : $1"
+fi
+  w,h={[$2>0?$2:{*,u}-1,$3>0?$3:{*,v}]} # get usable screen dimensions
+  cursor[0] 0 font={max(13,sqrt($w*$h)/48)} # font size
+  info,hq,fs,cmdon,refresh,pid={[1,0,0,0,1,0]}
+  path_current path=${}
+  gcd_parentdir {``$path} files2img 1,${} nm. dirs
+  gcd_currentdir {``$path} gcd_argnum[dirs] ${}
+  dlim,dpos={dirs,[h,${}]} 0 nm. imgfiles 0 nm. vwimg
+  1 store. cid # history of subfolder ids
+  1 store. pid # history of parentfolder ids
+  do
+    if $refresh
+      rm[imgfiles]
+      gcd_filelist {``$path},"*.jpg","*.JPG","*.jpeg","*.png","*.tif","*.TIF","*.tiff"
+      nm. imgfiles lim,pos={imgfiles,[h,1]}
+      refresh={!$refresh}
+    fi
+    if $lim>0
+      rm[vwimg] gcd_imgarg[imgfiles] $pos i ${}
+      dim={`string(w,'x',h,'x',s)`}
+      details="dim: "$dim"  "{x}": "{b} nm. vwimg
+    else
+      rm[vwimg] 1,1,1,3 nm. vwimg details="no images"
+    fi
+    if $cmdon l[vwimg] _gcd_tmp_cmd endl fi
+    to_rgb[vwimg] gcd_resize_for_fs[vwimg] $w,$h,$hq
+    if $info
+      if $hq fe="edge " else fe="" fi if $cmdon fe.="cmd " fi
+      0 t. $path,0,0,$font,1,255,255,255 j[vwimg] .
+      0 t. $dpos"/"$dlim,0,0,{$font*2},1,255,0,255 j[vwimg] .,0,{h#-2} rm[-2,-1]
+      0 t. $details,0,0,$font,1,255,255,255 j[vwimg] .,0,{h#-2-h} rm.
+      0 t. $fe$pos"/"$lim,0,0,{$font*2},1,0,255,0 j[vwimg] .,{w#-2-w} rm.
+    fi
+    # display and wait/check for keypress
+    w[vwimg] 100%,100%,0,$fs cursor[0] 0 wait
+    if {*,PAGEUP}" && "$pos>1 pos-=1 wait -1 fi
+    if {*,PAGEDOWN}" && "$pos<$lim pos+=1 wait -1 fi
+    if {*,HOME} pos=1 wait -1 elif {*,END} pos=$lim wait -1 fi
+    if {*,E} hq={!$hq} wait -1 elif {*,SPACE} cmdon={!$cmdon} wait -1 fi
+    if {*,F} fs={!$fs} wait -1 elif {*,I} info={!$info} wait -1 fi
+    if {*,ARROWLEFT}
+      i $cid eval "da_push("$dpos")" store. cid
+      i $pid eval "S=da_size();V=i[S-1]; S>0?da_remove(); V" nxt=${} store. pid
+      gcd_parentdir {``$path} path=${}
+      rm[dirs] gcd_parentdir {``$path} files2img 1,${} nm. dirs
+      dlim,dpos={dirs,[h,max($nxt,1)]}
+      refresh=1 wait -1
+    fi
+    if {*,ARROWRIGHT}" && "$dlim>0
+      files2img 1,{``$path} nm. subdirs
+      if h>0
+        i $pid eval "da_push("$dpos")" store. pid
+        i $cid eval "S=da_size();V=i[S-1]; S>0?da_remove(); V" nxt=${} store. cid
+        rm[dirs] nm[subdirs] dirs
+        dlim,dpos={dirs,[h,max($nxt,1)]}
+        gcd_imgarg[dirs] $dpos path.=${}"/"
+        refresh=1 wait -1
+      else rm[subdirs] fi
+    fi
+    if {*,ARROWUP}" && "$dpos>1
+      1 store. cid # invalidate subfolder history
+      dpos-=1 gcd_parentdir {``$path} path=${}
+      gcd_imgarg[dirs] $dpos path.=${}"/"
+      refresh=1 wait -1
+    fi
+    if {*,ARROWDOWN}" && "$dpos<$dlim
+      1 store. cid # invalidate subfolder history
+      dpos+=1 gcd_parentdir {``$path} path=${}
+      gcd_imgarg[dirs] $dpos path.=${}"/"
+      refresh=1 wait -1
+    fi
+  while {*}" && "!{*,Q}" && "!{*,ESC}
+  um _gcd_tmp_cmd cursor[0] 1 w 0 # restore view and exit
+  e $path e $details rm[dirs,imgfiles,vwimg]
+
+#@cli gcd_imgarg : n>=1
+#@cli : Return the n-th argument of the specified string list image.
+gcd_imgarg : skip ${1=1} u {``{`I[$1-1]`}}
+
+#@cli gcd_argnum : "search_str"
+#@cli : Return the index of the first matching argument in the specified string list image.
+gcd_argnum :
+  num,sz={[0,s]}
+  +l.
+    s y ({'"$1"'}:y) r. 1,$sz,1,1,0 neq[^-1] . rm. discard 0
+    repeat $! if {$>,whds}==0 num={$>+1} break fi done rm
+  endl u $num
+
+#@cli gcd_parentdir : "path"
+#@cli : Return the parent directory path of the specified directory path.
+gcd_parentdir :
+  if size(['"$1"'])<3 u "$1" return fi
+  ('"$1"') replace_str. "\\","/"
+  l.
+    if i[#-1,h-1]!='/' ('/') a[-2,-1] y fi
+    s +,y,47 rm[-2,-1] a y
+  endl u {t} rm.
+
+#@cli gcd_currentdir : "path"
+#@cli : Return the last directory name of the specified directory path.
+gcd_currentdir :
+  if size(['"$1"'])<2 u "/" return fi
+  ('"$1"') replace_str. "\\","/"
+  l. s -,y,47 k. endl u {t} rm.
+
+#@cli gcd_filelist : "path",_arg1,...,_argN
+#@cli : Return the list of files within the specified directory path.
+gcd_filelist :
+  path="$1" globs=${2--1} num={$#-1}
+  repeat $num
+    arg {$>+1},$globs glob=${}
+    files2img 3,{``$path}$glob
+  done a[-$num--1] y
+
+#@cli gcd_resize_for_fs : width,_height,_is_filtered_edge
+#@cli : Resize image for fullscreen display.
+gcd_resize_for_fs : skip ${1=1920},${2=1080},${3=0}
+  repeat $! l[$>]
+    w,h={[w,h]} mx={[im,iM]}
+    if $h>=$2" || "$3==0 r2dy $2,3 else gcd_upscale_edge {$2/$h},1 fi
+    gcd_noalpha le={(w-$1)/2} z $le,0,{$le+$1-1},100% c $mx
+  endl done
+
+#=============================================
+
 #@gui _
 
 # Local Variables:
