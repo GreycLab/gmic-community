@@ -47,6 +47,90 @@
 #@cli :: Reptorian's CLI Commands
 #
 #-------------------------------
+#@cli rep_hsl2ryb2rgb
+#@cli : Convert color representation of selected image from HSL to RYB to RGB
+rep_hsl2ryb2rgb:
+e[^-1] "Convert color representation of image$? from HSL to RYB to RGB."
+f "H=(i0/60)%6;C=(1-abs(2*i2-1))*i1;X=C*(1-abs(H%2-1));
+ m=i2-C/2;
+ RYB=arg(1+int(H),[C,X,0],[X,C,0],[0,C,X],[0,X,C],[X,0,C],[C,0,X]);
+ RYB+=m*=255;
+ red=RYB[0];
+ yellow=RYB[1];
+ blue=RYB[2];
+ white=min(RYB);
+ red-=white;
+ yellow-=white;
+ blue-=white;
+ maxyellow=max(red,yellow,blue);
+ green=min(yellow,blue);
+ yellow-=green;
+ blue-=green;
+ blue>0&&green>0?(
+  blue*=2; 
+  green*=2
+ );
+ red+=yellow;
+ green+=yellow;
+ maxgreen = max(red,green,blue);
+ maxgreen>0?(
+  N=maxyellow/maxgreen;
+  red*=N;
+  green*=N;
+  blue*=N;
+ );
+ red+=white;
+ green+=white;
+ blue+=white;
+ [red,green,blue];"
+#@cli rep_color_harmony_palette: -360<=ang<=360,0<=_saturation<=1,-100[%]<=shade_tint<=100[%],0<=choice<=10,ryb_mode={ 0=rgb | 1=ryb | 2=hsl+rgb | 3=hsl+ryb }
+#@cli : Create a harmony palette. In other word, create a palette based on the color wheel.
++rep_color_harmony_palette:
+ang,saturation,shade_tint,choice,ryb_mode=${1-5}
+{arg(1+$choice%11,6,6,6,2,3,3,4,3,4,5,6)},1,1,3,">begin(
+  fmod(a)=a-360*floor(a/360);
+  const start_ang=fmod($ang);
+  const saturation=cut($saturation,0,1);
+  const shade_tint=cut((1+$shade_tint)/2,0,1);
+  const choice=$choice%11;
+  ang=start_ang;
+  choice<3?( #Neutral 8-15 and Analogous 30
+   const add_ang=arg(choice+1,8,15,30);
+   new_ang()=x?(ang+=add_ang;ang=fmod(ang););
+  ):
+  choice==3?( #Complementary
+   new_ang()=x?ang=fmod(ang+180);
+  ):
+  choice==4?( #Split-Complementary
+   new_ang()=x==2?(ang+=60;ang=fmod(ang);):x==1?(ang+=150;ang=fmod(ang););
+  ):
+  choice==5?( #Triadic
+   new_ang()=x?ang=fmod(ang+120);
+  ):
+  choice==6?( #Tetradic
+   new_ang()=x?ang=fmod(ang+90);
+  ):
+  choice==7?( #Clash
+   new_ang()=x?(ang=fmod(start_ang+(x%2?90:-90)));
+  ):
+  choice==8?( #Four Tones
+   new_ang()=x?(ang=fmod(ang+arg(x%2+1,120,60)););
+  ):
+  choice==9?( #Five Tones
+   new_ang()=x?(x==1?(ang=fmod(ang+120);):(ang=fmod(ang+arg(x%2+1,30,60))););
+  ):(         #Six Tones
+   new_ang()=x?(ang=fmod(ang+(x%2?30:90)););
+  );
+ );
+ new_ang();
+ [ang,saturation,shade_tint];"
+
+if $ryb_mode>1
+ if $ryb_mode%2 +rep_hsl2ryb2rgb. else +hsl2rgb. fi
+else
+ if $ryb_mode rep_hsl2ryb2rgb. else hsl2rgb. fi
+fi
+round.
 #@cli rep_cubic_map: [image],mode={ 0=neumann | 1=periodic | 2=continuous }
 #@cli : Map palette into image with cubic interpolation.
 rep_cubic_map:
@@ -15765,6 +15849,499 @@ u "{$1}"\
 "{$15}"\
 "{$16}"\
 "{$17}"
+#@gui Color Harmonies [DEMO]: fx_rep_color_harmonies, fx_rep_color_harmonies_preview(0)
+#@gui :_=note("<b>This is a demo filter!</b> This means it's only used to demonstrate capability of G'MIC. Right now, there is still a unresolved bug with regard to moving points. Until that can be fixed, this will remain a demo filter!")
+#@gui :_=separator(),_=note("<b>Reference Point</b>")
+#@gui :Hue=float(50,0,360)
+#@gui :Saturation(%)=float(100,0,100)
+#@gui :Shade/Tint(%)=float(0,-100,100)
+#@gui :Color Space=choice(0,"RGB",RYB")
+#@gui :_=separator(),_=note("<b>Additional Information</b>")
+#@gui :Palette Mode=choice(0,"Neutral 8","Neutral 15","Analogous 30","Complementary","Split-Complementary","Triadic","Tetradic","Clash","Four Tones","Five Tones","Six Tones")
+#@gui :_=separator(),_=note("<b>Output Color</b>")
+#@gui :Color A=color(0,0,0)
+#@gui :Color B=color(0,0,0)
+#@gui :Color C=color(0,0,0)
+#@gui :Color D=color(0,0,0)
+#@gui :Color E=color(0,0,0)
+#@gui :Color F=color(0,0,0)
+#@gui :_=separator(),_=note("<b>Preview</b>")
+#@gui :Color Point Position=point(50,50,0,1,128,128,128,255)
+#@gui :Color Select Position(%)=float(10,10,50)
+#@gui :Scaling(%)=float(90,30,100)
+#@gui :Point-X=point(50,50,0,0,0,0,0,0,0)_0
+#@gui :Color A=color(0,0,0)_0
+#@gui :Color B=color(0,0,0)_0
+#@gui :Color C=color(0,0,0)_0
+#@gui :Color D=color(0,0,0)_0
+#@gui :Color E=color(0,0,0)_0
+#@gui :Color F=color(0,0,0)_0
+#@gui :Hue=float(0,0,360)_0
+#@gui :Saturation(%)=float(100,0,100)_0
+#@gui :Shade/Tint(%)=float(0,-100,100)_0
+#@gui :Hue=float(0,0,360)_0
+#@gui :Saturation(%)=float(100,0,100)_0
+#@gui :Shade/Tint(%)=float(0,-100,100)_0
+#@gui :Hue=float(0,0,360)_0
+#@gui :Saturation(%)=float(100,0,100)_0
+#@gui :Shade/Tint(%)=float(0,-100,100)_0
+#@gui :Hue=float(0,0,360)_0
+#@gui :Saturation(%)=float(100,0,100)_0
+#@gui :Shade/Tint(%)=float(0,-100,100)_0
+#@gui :Hue=float(0,0,360)_0
+#@gui :Saturation(%)=float(100,0,100)_0
+#@gui :Shade/Tint(%)=float(0,-100,100)_0
+#@gui :Hue=float(0,0,360)_0
+#@gui :Saturation(%)=float(100,0,100)_0
+#@gui :Shade/Tint(%)=float(0,-100,100)_0
+#@gui :Color Space=choice(0,"RGB",RYB")_0
+#@gui :Palette Mode=choice(0,"Neutral 8","Neutral 15","Analogous 30","Complementary","Split-Complementary","Triadic","Tetradic","Clash","Four Tones","Five Tones","Six Tones")_0
+#@gui :Color Select Position(%)=float(10,10,50)_0
+#@gui :Scaling(%)=float(90,30,100)_0
+#@gui :Preview Palette?=bool(0)_0
+#@gui :Orientation=choice(0,"Horizontal","Vertical")_0
+#@gui :Palette X=choice(1,"Bottom","Middle","Top")_0
+#@gui :Palette Y=choice(1,"Left","Middle","Top")_0
+fx_rep_color_harmonies:
+error demo_filter
+fx_rep_color_harmonies_preview:
+_hsl_h,_hsl_s,_hsl_l,\
+_rgb_0_r,_rgb_0_g,_rgb_0_b,\
+_rgb_1_r,_rgb_1_g,_rgb_1_b,\
+_rgb_2_r,_rgb_2_g,_rgb_2_b,\
+_rgb_3_r,_rgb_3_g,_rgb_3_b,\
+_rgb_4_r,_rgb_4_g,_rgb_4_b,\
+_rgb_5_r,_rgb_5_g,_rgb_5_b,\
+_rgb_0_r_alt,_rgb_0_g_alt,_rgb_0_b_alt,\
+_rgb_1_r_alt,_rgb_1_g_alt,_rgb_1_b_alt,\
+_rgb_2_r_alt,_rgb_2_g_alt,_rgb_2_b_alt,\
+_rgb_3_r_alt,_rgb_3_g_alt,_rgb_3_b_alt,\
+_rgb_4_r_alt,_rgb_4_g_alt,_rgb_4_b_alt,\
+_rgb_5_r_alt,_rgb_5_g_alt,_rgb_5_b_alt,\
+_hsl_0_h,_hsl_0_s,_hsl_0_l,\
+_hsl_1_h,_hsl_1_s,_hsl_1_l,\
+_hsl_2_h,_hsl_2_s,_hsl_2_l,\
+_hsl_3_h,_hsl_3_s,_hsl_3_l,\
+_hsl_4_h,_hsl_4_s,_hsl_4_l,\
+_hsl_5_h,_hsl_5_s,_hsl_5_l,\
+_point_x_0,_point_y_0\
+=${1-3},${6-23},${30-65},$24,$25
+
+m "draw_points :
+  eval[1] \"begin(
+    const radius=9;
+    const colsize=sqr(radius)*3;
+    blkcol=vector(#colsize,128);
+    circle_alpha_component=expr('begin(
+     const ww=w-1;
+     const hh=h-1;
+     const cx=ww/2;
+     const cy=hh/2;
+    );
+    xx=(x-cx)/cx;
+    yy=(y-cy)/cy;
+    inrange(norm(xx,yy),.4,1,1);'
+    ,radius,radius,1,1);
+   );
+  m=(I/100)*[w#0,h#0];
+  if(x,
+   draw(#0,blkcol,round(m[0])-6,round(m[1])-6,0,0,radius,radius,1,3,1,circle_alpha_component,1);
+  );
+  \"
+ "
+
+m "gen_pt_info :
+
+ width,height={w#0},{h#0}
+ 
+ l..
+ 
+  lightness={i(#-1,0,0,0,2)}
+  
+  {w},{h},{d},2,\"begin(
+    const scale=$27%;
+    const lightness=($lightness+100)/200;
+    const width=$width;
+    const height=$height;
+    const ww=width-1;
+    const hh=height-1;
+    const cx=ww/2;
+    const cy=hh/2;
+    const ref_dim=min(cx,cy);
+    const max_length=ref_dim*scale;
+    const min_length=max_length*$26/100;
+    const length=lerp(min_length,max_length,lightness);
+   );
+   rad_ang=((360-i(#-1,x,0,0,0))-90)°;
+   center=[cx,cy];
+   off=[cos(rad_ang)*length,sin(rad_ang)*length];
+   point=center+off;
+   point[0]/=ww;
+   point[1]/=hh;
+   point*=100;\"
+   
+  _point_x_0,_point_y_0={I(#-1,0)}
+  rv
+  
+ endl
+ 
+ draw_points "
+ 
+# Below, this is a test code to see if I can fix the point location change bug.
+
+m "gen_pt_info_alt :
+
+ width,height={w#0},{h#0}
+ 
+ l..
+  {w},{h},{d},2,\"begin(
+    const scale=$27%;
+    const width=$width;
+    const height=$height;
+    const mx=width-1;
+    const my=height-1;
+    const cx=mx/2;
+    const cy=my/2;
+    const ref_dim=min(cx,cy);
+    const max_length=ref_dim*scale;
+    const min_length=max_length*$26/100;
+    const pos_x=mx*$24/100;
+    const pos_y=my*$25/100;
+    const dx=pos_x-cx;
+    const dy=pos_y-cy;
+    const dist=cut(sqrt(dx^2+dy^2),min_length,max_length);
+   );
+   rad_ang=((360-i(#-1,x,0,0,0))-90)°;
+   center=[cx,cy];
+   off=[cos(rad_ang)*dist,sin(rad_ang)*dist];
+   point=center+off;
+   point[0]/=mx;
+   point[1]/=my;
+   point*=100;\"
+   
+   _point_x_0,_point_y_0=$24,$25
+   rv
+ endl
+ 
+ draw_points "
+
+m "gen_col_info : 
+
+ if w==2
+ 
+  _hsl_0_h,_hsl_1_h,\
+  _hsl_0_s,_hsl_1_s,\
+  _hsl_0_l,_hsl_1_l\
+  ={crop(#-2)}
+ 
+  _rgb_0_r,_rgb_1_r,\
+  _rgb_0_g,_rgb_1_g,\
+  _rgb_0_b,_rgb_1_b\
+  ={crop(#-1)}
+  
+  _rgb_0_r_alt,_rgb_1_r_alt,\
+  _rgb_0_g_alt,_rgb_1_g_alt,\
+  _rgb_0_b_alt,_rgb_1_b_alt\
+  ={crop(#-1)}
+  
+ elif w==3
+ 
+  _hsl_0_h,_hsl_1_h,_hsl_2_h,\
+  _hsl_0_s,_hsl_1_s,_hsl_2_s,\
+  _hsl_0_l,_hsl_1_l,_hsl_2_l\
+  ={crop(#-2)}
+ 
+  _rgb_0_r,_rgb_1_r,_rgb_2_r,\
+  _rgb_0_g,_rgb_1_g,_rgb_2_g,\
+  _rgb_0_b,_rgb_1_b,_rgb_2_b\
+  ={crop(#-1)}
+  
+  _rgb_0_r_alt,_rgb_1_r_alt,_rgb_2_r_alt,\
+  _rgb_0_g_alt,_rgb_1_g_alt,_rgb_2_g_alt,\
+  _rgb_0_b_alt,_rgb_1_b_alt,_rgb_2_b_alt\
+  ={crop(#-1)}
+  
+ elif w==4
+ 
+  _hsl_0_h,_hsl_1_h,_hsl_2_h,_hsl_3_h,\
+  _hsl_0_s,_hsl_1_s,_hsl_2_s,_hsl_3_s,\
+  _hsl_0_l,_hsl_1_l,_hsl_2_l,_hsl_3_l\
+  ={crop(#-2)}
+ 
+  _rgb_0_r,_rgb_1_r,_rgb_2_r,_rgb_3_r,\
+  _rgb_0_g,_rgb_1_g,_rgb_2_g,_rgb_3_g,\
+  _rgb_0_b,_rgb_1_b,_rgb_2_b,_rgb_3_b\
+  ={crop(#-1)}
+  
+  _rgb_0_r_alt,_rgb_1_r_alt,_rgb_2_r_alt,_rgb_3_r_alt,\
+  _rgb_0_g_alt,_rgb_1_g_alt,_rgb_2_g_alt,_rgb_3_g_alt,\
+  _rgb_0_b_alt,_rgb_1_b_alt,_rgb_2_b_alt,_rgb_3_b_alt\
+  ={crop(#-1)}
+  
+ elif w==5
+
+  _hsl_0_h,_hsl_1_h,_hsl_2_h,_hsl_3_h,_hsl_4_h,\
+  _hsl_0_s,_hsl_1_s,_hsl_2_s,_hsl_3_s,_hsl_4_s,\
+  _hsl_0_l,_hsl_1_l,_hsl_2_l,_hsl_3_l,_hsl_4_l\
+  ={crop(#-2)}
+ 
+  _rgb_0_r,_rgb_1_r,_rgb_2_r,_rgb_3_r,_rgb_4_r,\
+  _rgb_0_g,_rgb_1_g,_rgb_2_g,_rgb_3_g,_rgb_4_g,\
+  _rgb_0_b,_rgb_1_b,_rgb_2_b,_rgb_3_b,_rgb_4_b\
+  ={crop(#-1)}
+  
+  _rgb_0_r_alt,_rgb_1_r_alt,_rgb_2_r_alt,_rgb_3_r_alt,_rgb_4_r_alt,\
+  _rgb_0_g_alt,_rgb_1_g_alt,_rgb_2_g_alt,_rgb_3_g_alt,_rgb_4_g_alt,\
+  _rgb_0_b_alt,_rgb_1_b_alt,_rgb_2_b_alt,_rgb_3_b_alt,_rgb_4_b_alt\
+  ={crop(#-1)}
+  
+ elif w==6
+ 
+  _hsl_0_h,_hsl_1_h,_hsl_2_h,_hsl_3_h,_hsl_4_h,_hsl_5_h,\
+  _hsl_0_s,_hsl_1_s,_hsl_2_s,_hsl_3_s,_hsl_4_s,_hsl_5_s,\
+  _hsl_0_l,_hsl_1_l,_hsl_2_l,_hsl_3_l,_hsl_4_l,_hsl_5_l\
+  ={crop(#-2)}
+ 
+  _rgb_0_r,_rgb_1_r,_rgb_2_r,_rgb_3_r,_rgb_4_r,_rgb_5_r,\
+  _rgb_0_g,_rgb_1_g,_rgb_2_g,_rgb_3_g,_rgb_4_g,_rgb_5_g,\
+  _rgb_0_b,_rgb_1_b,_rgb_2_b,_rgb_3_b,_rgb_4_b,_rgb_5_b\
+  ={crop(#-1)}
+  
+  _rgb_0_r_alt,_rgb_1_r_alt,_rgb_2_r_alt,_rgb_3_r_alt,_rgb_4_r_alt,_rgb_5_r_alt,\
+  _rgb_0_g_alt,_rgb_1_g_alt,_rgb_2_g_alt,_rgb_3_g_alt,_rgb_4_g_alt,_rgb_5_g_alt,\
+  _rgb_0_b_alt,_rgb_1_b_alt,_rgb_2_b_alt,_rgb_3_b_alt,_rgb_4_b_alt,_rgb_5_b_alt\
+  ={crop(#-1)}
+  
+ fi"
+
+if ([${1-3}]!=[${48-50}])||($4!=$66)||($5!=$67)
+ rep_create_hsl_color_select $2%,{$26/100},$4,{$27/100}
+ +rep_color_harmony_palette $1,{$2/100},{$3/100},$5,{$4+2}
+ 
+ sh.. 2 *. 200 -. 100 sh... 1 *. 100 rm[-2,-1]
+ 
+ gen_col_info gen_pt_info
+ 
+elif [${6-23}]!=[${30-47}]
+
+ eval "
+  vec_a=[${6-23}];
+  vec_b=[${30-47}];
+  repeat(arg(1+$5,6,6,6,2,3,3,4,3,4,5,6),p,
+   a=(vec_a)[3*p,3];
+   b=(vec_b)[3*p,3];
+   a!=b?(
+    v=p;
+    run('col_a=',vtos(a));
+    run('col_b=',vtos(b));
+    break();
+   );
+  );
+  v;"
+  
+ 1,1,1,3,([${6-23}])[3*${},3]
+ 1,1,1,3,([${30-47}])[3*${},3]
+  
+ if $4
+  rgb2ryb[-2,-1]
+  rgb2hsl[-2,-1]
+ else
+  rgb2hsl[-2,-1]
+ fi
+ 
+ hsl_base={"
+  fmod(a)=a-360*floor(a/360);
+  rescale_lightness(a)=(a+100)/200;
+  new_col=crop(#-2);
+  old_col=crop(#-1);
+  diff=new_col-old_col;
+  out_hsl=[${1-3}];
+  out_hsl[1]/=100;
+  out_hsl[2]=rescale_lightness(out_hsl[2]);
+  out_hsl+=diff;
+  out_hsl[2]=cut(out_hsl[2]*2-1,-1,1);
+  out_hsl[1]=cut(out_hsl[1],0,1);
+  out_hsl;
+ "}
+ 
+ rep_create_hsl_color_select {arg(2,$hsl_base)},{$26/100},$4,{$27/100}
+ +rep_color_harmony_palette $hsl_base,$5,{$4+2}
+ 
+ sh.. 2 *. 200 -. 100 sh... 1 *. 100 rm[-2,-1]
+ 
+ _hsl_h,_hsl_s,_hsl_l={I(#-2,0)}
+ 
+ gen_col_info gen_pt_info
+ 
+elif [${24-25}]!=[${28-29}]
+
+ rep_create_hsl_color_select $2%,{$26/100},$4,{$27/100}
+ 
+ hsl_base={"
+  const scale=$27%;
+  const mx=w-1;
+  const my=h-1;
+  const cx=mx/2;
+  const cy=my/2;
+  const ref_dim=min(cx,cy);
+  const max_length=ref_dim*scale;
+  const min_length=max_length*$26/100;
+  const length=max_length-min_length;
+  const pos_x=mx*$24%;
+  const pos_y=my*$25%;
+  const dx=pos_x-cx;
+  const dy=pos_y-cy;
+  const hue=(atan2(dx,dy)+pi)/((pi*2)/360);
+  const dist=2*((cut(sqrt(dx^2+dy^2),min_length,max_length)-min_length)/length)-1;
+  [hue,$2/100,dist];
+ "}
+ 
+ +rep_color_harmony_palette $hsl_base,$5,{$4+2}
+ 
+ sh.. 2 *. 200 -. 100 sh... 1 *. 100 rm[-2,-1]
+ 
+ _hsl_h,_hsl_s,_hsl_l={I(#-2,0)}
+ 
+ gen_col_info gen_pt_info_alt
+ 
+else
+ rep_create_hsl_color_select $2%,{$26/100},$4,{$27/100}
+ +rep_color_harmony_palette $1,{$2/100},{$3/100},$5,{$4+2}
+ gen_pt_info
+fi
+
+num_of_col={w+1}
+
+um draw_points,gen_pt_info,gen_pt_info_alt,gen_col_info
+
+u "{"$_hsl_h"}"\
+"{"$_hsl_s"}"\
+"{"$_hsl_l"}"\
+"{$4}"\
+"{$5}"\
+"{"$_rgb_0_r","$_rgb_0_g","$_rgb_0_b"}"\
+"{"$_rgb_1_r","$_rgb_1_g","$_rgb_1_b"}"\
+"{"$_rgb_2_r","$_rgb_2_g","$_rgb_2_b"}_"{3<$num_of_col?2}\
+"{"$_rgb_3_r","$_rgb_3_g","$_rgb_3_b"}_"{4<$num_of_col?2}\
+"{"$_rgb_4_r","$_rgb_4_g","$_rgb_4_b"}_"{5<$num_of_col?2}\
+"{"$_rgb_5_r","$_rgb_5_g","$_rgb_5_b"}_"{6<$num_of_col?2}\
+"{"$_point_x_0","$_point_y_0"}"\
+"{$26}"\
+"{$27}"\
+"{"$_point_x_0","$_point_y_0"}"\
+"{"$_rgb_0_r_alt","$_rgb_0_g_alt","$_rgb_0_b_alt"}"\
+"{"$_rgb_1_r_alt","$_rgb_1_g_alt","$_rgb_1_b_alt"}"\
+"{"$_rgb_2_r_alt","$_rgb_2_g_alt","$_rgb_2_b_alt"}"\
+"{"$_rgb_3_r_alt","$_rgb_3_g_alt","$_rgb_3_b_alt"}"\
+"{"$_rgb_4_r_alt","$_rgb_4_g_alt","$_rgb_4_b_alt"}"\
+"{"$_rgb_5_r_alt","$_rgb_5_g_alt","$_rgb_5_b_alt"}"\
+"{"$_hsl_0_h"}"\
+"{"$_hsl_0_s"}"\
+"{"$_hsl_0_l"}"\
+"{"$_hsl_1_h"}"\
+"{"$_hsl_1_s"}"\
+"{"$_hsl_1_l"}"\
+"{"$_hsl_2_h"}"\
+"{"$_hsl_2_s"}"\
+"{"$_hsl_2_l"}"\
+"{"$_hsl_3_h"}"\
+"{"$_hsl_3_s"}"\
+"{"$_hsl_3_l"}"\
+"{"$_hsl_4_h"}"\
+"{"$_hsl_4_s"}"\
+"{"$_hsl_4_l"}"\
+"{"$_hsl_5_h"}"\
+"{"$_hsl_5_s"}"\
+"{"$_hsl_5_l"}"\
+"{$4}"\
+"{$5}"\
+"{$26}"\
+"{$27}"\
+"{$70}"\
+"{$71}"\
+"{$72}"\
+"{$73}"
+rep_create_hsl_color_select:
+skip ${2=.25},${3=0},${4=.9}
+ow,oh={w#0},{h#0}
+rm
+$ow,$oh,1,3,"*begin(
+  const ww=w-1;
+  const hh=h-1;
+  const cx=ww/2;
+  const cy=hh/2;
+  const sd=max(w,h)/min(w,h);
+  const scaling=1/$4;
+  const sx=(w>h?sd:1)*scaling;
+  const sy=(w>h?1:sd)*scaling;
+  const cxsx=cx/sx;
+  const cysy=cy/sy;
+  const pt=$2;
+  const ipt=1/(1-pt);
+  const res_atan_end=(2*pi)/360;
+  const saturation=$1;
+  rescale_radial(a)=(a-pt)*ipt;
+  rescale_atan2(a)=(a+pi)/res_atan_end;
+  hsl2rgb(hue,saturation,lightness)=(
+   H=(hue/60)%6;
+   C=(1-abs(2*lightness-1))*saturation;
+   X=C*(1-abs(H%2-1));
+   m=lightness-C/2;
+   RGB=arg(1 + int(H),[C,X,0],[X,C,0],[0,C,X],[0,X,C],[X,0,C],[C,0,X]);
+   (RGB+=m)*=255;
+  );
+  hsl2ryb2rgb(hue,saturation,lightness)=(
+   H=(hue/60)%6;
+   C=(1-abs(2*lightness-1))*saturation;
+   X=C*(1-abs(H%2-1));
+   m=lightness-C/2;
+   RYB=arg(1+int(H),[C,X,0],[X,C,0],[0,C,X],[0,X,C],[X,0,C],[C,0,X]);
+   RYB+=m*=255;
+   red=RYB[0];
+   yellow=RYB[1];
+   blue=RYB[2];
+   white=min(RYB);
+   red-=white;
+   yellow-=white;
+   blue-=white;
+   maxyellow=max(red,yellow,blue);
+   green=min(yellow,blue);
+   yellow-=green;
+   blue-=green;
+   blue>0&&green>0?(
+    blue*=2; 
+    green*=2
+   );
+   red+=yellow;
+   green+=yellow;
+   maxgreen = max(red,green,blue);
+   maxgreen>0?(
+    N=maxyellow/maxgreen;
+    red*=N;
+    green*=N;
+    blue*=N;
+   );
+   red+=white;
+   green+=white;
+   blue+=white;
+   [red,green,blue];
+  );
+  if($3
+  ,calc(hue,saturation,lightness)=hsl2ryb2rgb(hue,saturation,lightness);
+  ,calc(hue,saturation,lightness)=hsl2rgb(hue,saturation,lightness);
+  );
+  ev_light=vector(#3,255);
+  ev_dark=vector(#3,0);
+ );
+ xx=(x-cx)/cxsx;
+ yy=(y-cy)/cysy;
+ radial_gradient=rescale_radial(norm(xx,yy));
+ inrange(radial_gradient,0,1,1,1)?(
+  conical_gradient=rescale_atan2(atan2(xx,yy));
+  calc(conical_gradient,saturation,radial_gradient);
+ ):(
+  radial_gradient>.5?ev_light:ev_dark;
+ );"
 ######################
 
 # Local Variables:
