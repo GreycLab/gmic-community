@@ -8837,14 +8837,89 @@ rep_frblur: rep_fragment_blur $*
 #@cli : Default values: '_radius_offset=5%','_offset_angle=0','_keep_original=0','_boundary_condition=1','_interpolation=1','_color_space=0'\n
 #@cli : Author: Reptorian.
 rep_fragment_blur:
-skip ${2=5%},${3=0},${4=0},${5=1},${6=1},${7=0}
+skip ${2=5%},${3=0},${4=0},${5=1},${6=0},${7=0}
+
 convert_colors_fwd=${arg\ 1+$7,,rgb2srgb,rgb2ryb,,rgb2hcy,rgb2hsi,rgb2hsl,rgb2hsv,rgb2lab,rgb2lch}
 convert_colors_bwd=${arg\ 1+$7,,srgb2rgb,ryb2rgb,,hcy2rgb,hsi2rgb,hsl2rgb,hsv2rgb,lab2rgb,lch2rgb}
+
+_frblur_iter_ang,_frblur_shift_ang,_ti,_frblur_dist={(2*pi)/$1},{deg2rad($3)},{abs($1)+($4?1)},1
+
+
+if $6
+
+ m "rep_frblur_sdaxy_add : 
+  100%,100%,100%,100% .
+  
+  $1,1,1,2,\"begin(
+    const iter_ang=$_frblur_iter_ang;
+    const shift_ang=$_frblur_shift_ang;   
+   );
+   [cos(x*iter_ang+shift_ang)*$""1,sin(x*iter_ang+shift_ang)*$""1];\"
+  
+  repeat $1
+   j.. [0]
+   shift.. {I(#-1,$>)},0,0,$5,1
+   add... ..
+  done
+  
+  if $4 k[0,-3] add else k... fi"
+  
+else
+ if $5 # Boundary
+ 
+  m "rep_frblur_sdaxy_add : 
+   dist={ceil($""1)}
+   
+   100%,100%,100%,100%
+   
+   +expand_xy[0] $dist,$5
+   
+   $1,1,1,2,\"begin(
+     const offset=$dist;
+     const iter_ang=$_frblur_iter_ang;
+     const shift_ang=$_frblur_shift_ang;
+    );
+    [round(cos(x*iter_ang+shift_ang)*$""1-offset),round(sin(x*iter_ang+shift_ang)*$""1-offset)];\"
+    
+   repeat $1
+    j[1] [-2],{I(#-1,$>)},0,0,-1
+   done
+
+   if $4 k[0,1] add else k[1] fi"
+   
+ else # No Boundary
+
+  m "rep_frblur_sdaxy_add :
+   100%,100%,100%,100%
+   
+   $1,1,1,2,\"begin(
+     const iter_ang=$_frblur_iter_ang;
+     const shift_ang=$_frblur_shift_ang;
+    );
+    [round(cos(x*iter_ang+shift_ang)*$""1),round(sin(x*iter_ang+shift_ang)*$""1)];\"
+    
+   repeat $1
+    j[1] [0],{I(#-1,$>)},0,0,-1
+   done
+   
+   if $4 k[0,1] add else k[1] fi"
+   
+ fi
+fi
+
+m "rep_frblur_alp :
+ sh,{s-2} sh.. {s} maxa={iM#-1} /. $maxa *.. rm[-2,-1]
+ rep_frblur_sdaxy_add $""1
+ sh 0,{s-2} sh.. {s} f.. I/(i0#-1?i0#-1:1) *. {$maxa/iM#-1} rm[-2,-1]"
+ 
+m "rep_frblur_nalp : rep_frblur_sdaxy_add $""1 / $_ti"
+
 repeat $! l[$>]
  if ${is_percent\ $2} dist={abs($2)*norm(w,h)/2}
- else dist=abs($2) fi
- tcr=3
- convert_back=0
+ else dist={abs($2)} fi
+ 
+ tcr,convert_back=3,0
+ 
  if (s==3||s==4)&&$7
   convert_back=1
   if $7!=3
@@ -8855,11 +8930,13 @@ repeat $! l[$>]
    fi
   fi
  fi
+ 
  if !(s==1||s==$tcr)
-  rep_frblur_1 $1,$dist,${3-6}
+  rep_frblur_alp $dist
  else
-  rep_frblur_2 $1,$dist,${3-6}
+  rep_frblur_nalp $dist
  fi
+ 
  if $convert_back
   if $7!=3
    $convert_colors_bwd.
@@ -8869,18 +8946,10 @@ repeat $! l[$>]
    fi
   fi
  fi
+ 
 endl done
-rep_frblur_1:
-skip ${2={sqrt(w^2+h^2)*.05}},${3=0},${4=0},${5=1},${6=1}
-sh 0,{s-2} sh.. {s} maxa={iM#-1} /. $maxa *.. . rm[-2,-1]
-rep_duplicate_by_shift_distance_angle_xy $1,$2,$3,$4,{abs($5)},$6
-add
-sh 0,{s-2} sh.. {s} f.. i/(i0#-1?i0#-1:1) *. {$maxa/iM#-1} rm[-2,-1]
-rep_frblur_2:
-skip ${2={sqrt(w^2+h^2)*.05}},${3=0},${4=0},${5=1},${6=1}
-rep_duplicate_by_shift_distance_angle_xy $1,$2,$3,$4,{$5!=0?abs($5):1},$6
-ti=$!
-add / $ti
+
+um rep_frblur_sdaxy_add,rep_frblur_alp,rep_frblur_nalp
 #@cli rep_ncee: _distance>0,0<=_angle<=360,boundary_condition={ 0=none | 1=neumann | 2=periodic | 3=mirror },_interpolation={ 0=nearest_neighbor | 1=linear },_contrast>=0,_process_alpha={ 0=do_not_process_alpha | 1=process_alpha },_color_space,_blend_mode,0<=_blend_opacity[%]<=1
 #@cli : Default value: 'boundary_condition=3','interpolation=1','contrast=1','process_alpha=1','color_space=0','blend_mode=1','blend_opacity=100%'\n
 #@cli : Author: Reptorian.
