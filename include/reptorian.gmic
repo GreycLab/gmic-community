@@ -8239,7 +8239,7 @@ done
 rm.
 #@cli rep_colmt: eq. to 'rep_color_modulo_texture'. : (+)
 rep_colmt: rep_color_modulo_texture $*
-#@cli new_rep_color_modulo_texture: _colorspace={ 0=rgb | 1=ryb | 2=cmy | 3=cmyk | 4=hsi | 5=hsl | 6=hsv | 7=lab | 8=lch | 9=yiq | 10=yuv | 11=ycbcr | 12=ycbcrglic | 13=xyz | 14=yes },_include_alpha={ 0=no_alpha | 1=alpha},0<=_channel_order<{ 6 | 24 },_flip_diagonal={ 0=do_not_flip | 1=flip },sublevel>=0,interpolation>=0,_modulo_method_1= { 0=Mod | 1=Reflected Mod | 2=Divmod | 3=Reflected Divmod },_modulo_value_a_1>0,_modulo_value_b_1>0,_angle_1<=360,_value_shift_1>0,_centered_1= { 0=Not centered | 1=Centered },_negate_mod_1= { 0=Not Negated | 1=Negated },_normalize_bool_1= { 0=Do not Normalize | 1=Normalize }..._negate_mod_3
+#@cli rep_color_modulo_texture: colorspace={ 0=rgb | 1=ryb | 2=cmy | 3=cmyk | 4=hsi | 5=hsl | 6=hsv | 7=lab | 8=lch | 9=yiq | 10=yuv | 11=ycbcr | 12=ycbcrglic | 13=xyz | 14=yes },_include_alpha={ 0=no_alpha | 1=alpha},0<=_channel_order<{ 6 | 24 },_flip_diagonal={ 0=do_not_flip | 1=flip },sublevel>=0,interpolation>=0,_modulo_method_1= { 0=Mod | 1=Reflected Mod | 2=Divmod | 3=Reflected Divmod },_modulo_value_a_1>0,_modulo_value_b_1>0,_angle_1<=360,_value_shift_1>0,_centered_1= { 0=Not centered | 1=Centered },_negate_mod_1= { 0=Not Negated | 1=Negated },_normalize_bool_1= { 0=Do not Normalize | 1=Normalize }..._negate_mod_3
 #@cli : Inspired by MadJik's Color Modulo Texture for Paint.NET, this is a extension of that filter converted into G'MIC form. New features is being able to change color space, allow alpha, and anti-aliasing.
 #@cli : (eq. to 'rep_colmt').\n
 #@cli : '_modulo_method' defines what method of modulo operation would be applied to each channel.
@@ -8256,8 +8256,9 @@ rep_colmt: rep_color_modulo_texture $*
 #@cli : '_subpixel_processing_level' defines the subpixel processing level.
 #@cli : '_interpolation' defines the method of interpolation.
 #@cli : '_channel_num' defines the order of channel.
-new_rep_color_modulo_texture:
-skip ${7=},${8=},${9=},${10=},${11=},${12=},${13=},${14=},${15=},${16=},${17=},${18=},${19=},${20=},${21=},${22=},${23=},${24=},${25=},${26=},${27=},${28=},${29=},${30=},${31=},${32=},${33=},${34=},${35=},${36=},${37=},${38=}
+#@cli : Default values: '_include_alpha=0','_channel_order=0','_flip_diagonal=0','_sublevel=1','_interpolation=1','_modulo_method_n=3','_modulo_value_a_n=196','_modulo_value_b_n=255','_angle_n=0','_value_shift_n=0','_center_n=0','_negate_n=0','_normalize_n=0'
+rep_color_modulo_texture:
+skip ${2=0},${3=0},${4=0},${5=1},${6=5},${7=},${8=},${9=},${10=},${11=},${12=},${13=},${14=},${15=},${16=},${17=},${18=},${19=},${20=},${21=},${22=},${23=},${24=},${25=},${26=},${27=},${28=},${29=},${30=},${31=},${32=},${33=},${34=},${35=},${36=},${37=},${38=}
 if narg($7)  modulo_method_0={$7%4}  else modulo_method_0=3 fi
 if narg($8)  modvalue_a_0={abs($8)}  else modvalue_a_0=196 fi
 if narg($9)  modvalue_b_0={abs($9)}  else modvalue_b_0=255 fi
@@ -8836,14 +8837,88 @@ rep_frblur: rep_fragment_blur $*
 #@cli : Default values: '_radius_offset=5%','_offset_angle=0','_keep_original=0','_boundary_condition=1','_interpolation=1','_color_space=0'\n
 #@cli : Author: Reptorian.
 rep_fragment_blur:
-skip ${2=5%},${3=0},${4=0},${5=1},${6=1},${7=0}
+skip ${2=5%},${3=0},${4=0},${5=1},${6=0},${7=0}
+
 convert_colors_fwd=${arg\ 1+$7,,rgb2srgb,rgb2ryb,,rgb2hcy,rgb2hsi,rgb2hsl,rgb2hsv,rgb2lab,rgb2lch}
 convert_colors_bwd=${arg\ 1+$7,,srgb2rgb,ryb2rgb,,hcy2rgb,hsi2rgb,hsl2rgb,hsv2rgb,lab2rgb,lch2rgb}
+
+_frblur_iter_ang,_frblur_shift_ang,_ti,_frblur_dist={(2*pi)/$1},{deg2rad($3)},{abs($1)+($4?1)},1
+
+if $6
+
+ m "rep_frblur_sdaxy_add : 
+  100%,100%,100%,100% .
+  
+  $1,1,1,2,\"begin(
+    const iter_ang=$_frblur_iter_ang;
+    const shift_ang=$_frblur_shift_ang;   
+   );
+   [cos(x*iter_ang+shift_ang)*$""1,sin(x*iter_ang+shift_ang)*$""1];\"
+  
+  repeat $1
+   j.. [0]
+   shift.. {I(#-1,$>)},0,0,$5,1
+   add... ..
+  done
+  
+  if $4 k[0,-3] add else k... fi"
+  
+else
+ if $5 # Boundary
+ 
+  m "rep_frblur_sdaxy_add : 
+   dist={ceil($""1)}
+   
+   100%,100%,100%,100%
+   
+   +expand_xy[0] $dist,$5
+   
+   $1,1,1,2,\"begin(
+     const offset=$dist;
+     const iter_ang=$_frblur_iter_ang;
+     const shift_ang=$_frblur_shift_ang;
+    );
+    [round(cos(x*iter_ang+shift_ang)*$""1-offset),round(sin(x*iter_ang+shift_ang)*$""1-offset)];\"
+    
+   repeat $1
+    j[1] [-2],{I(#-1,$>)},0,0,-1
+   done
+
+   if $4 k[0,1] add else k[1] fi"
+   
+ else # No Boundary
+
+  m "rep_frblur_sdaxy_add :
+   100%,100%,100%,100%
+   
+   $1,1,1,2,\"begin(
+     const iter_ang=$_frblur_iter_ang;
+     const shift_ang=$_frblur_shift_ang;
+    );
+    [round(cos(x*iter_ang+shift_ang)*$""1),round(sin(x*iter_ang+shift_ang)*$""1)];\"
+    
+   repeat $1
+    j[1] [0],{I(#-1,$>)},0,0,-1
+   done
+   
+   if $4 k[0,1] add else k[1] fi"
+   
+ fi
+fi
+
+m "rep_frblur_alp :
+ sh,{s-2} sh.. {s} maxa={iM#-1} /. $maxa *.. rm[-2,-1]
+ rep_frblur_sdaxy_add $""1
+ sh 0,{s-2} sh.. {s} f.. I/(i0#-1?i0#-1:1) *. {$maxa/iM#-1} rm[-2,-1]"
+ 
+m "rep_frblur_nalp : rep_frblur_sdaxy_add $""1 / $_ti"
+
 repeat $! l[$>]
  if ${is_percent\ $2} dist={abs($2)*norm(w,h)/2}
- else dist=abs($2) fi
- tcr=3
- convert_back=0
+ else dist={abs($2)} fi
+ 
+ tcr,convert_back=3,0
+ 
  if (s==3||s==4)&&$7
   convert_back=1
   if $7!=3
@@ -8854,11 +8929,13 @@ repeat $! l[$>]
    fi
   fi
  fi
+ 
  if !(s==1||s==$tcr)
-  rep_frblur_1 $1,$dist,${3-6}
+  rep_frblur_alp $dist
  else
-  rep_frblur_2 $1,$dist,${3-6}
+  rep_frblur_nalp $dist
  fi
+ 
  if $convert_back
   if $7!=3
    $convert_colors_bwd.
@@ -8868,18 +8945,10 @@ repeat $! l[$>]
    fi
   fi
  fi
+ 
 endl done
-rep_frblur_1:
-skip ${2={sqrt(w^2+h^2)*.05}},${3=0},${4=0},${5=1},${6=1}
-sh 0,{s-2} sh.. {s} maxa={iM#-1} /. $maxa *.. . rm[-2,-1]
-rep_duplicate_by_shift_distance_angle_xy $1,$2,$3,$4,{abs($5)},$6
-add
-sh 0,{s-2} sh.. {s} f.. i/(i0#-1?i0#-1:1) *. {$maxa/iM#-1} rm[-2,-1]
-rep_frblur_2:
-skip ${2={sqrt(w^2+h^2)*.05}},${3=0},${4=0},${5=1},${6=1}
-rep_duplicate_by_shift_distance_angle_xy $1,$2,$3,$4,{$5!=0?abs($5):1},$6
-ti=$!
-add / $ti
+
+um rep_frblur_sdaxy_add,rep_frblur_alp,rep_frblur_nalp
 #@cli rep_ncee: _distance>0,0<=_angle<=360,boundary_condition={ 0=none | 1=neumann | 2=periodic | 3=mirror },_interpolation={ 0=nearest_neighbor | 1=linear },_contrast>=0,_process_alpha={ 0=do_not_process_alpha | 1=process_alpha },_color_space,_blend_mode,0<=_blend_opacity[%]<=1
 #@cli : Default value: 'boundary_condition=3','interpolation=1','contrast=1','process_alpha=1','color_space=0','blend_mode=1','blend_opacity=100%'\n
 #@cli : Author: Reptorian.
@@ -12461,8 +12530,8 @@ alp=$2
 tc={$cs!=3?3+$alp:4}
 pos={$tc==4?$3:$4}
 argset=${1-2},$pos,$6,${49-50}
-if $5 new_rep_color_modulo_texture $argset,${17-48}
-else new_rep_color_modulo_texture $argset,${7-14}
+if $5 rep_color_modulo_texture $argset,${17-48}
+else rep_color_modulo_texture $argset,${7-14}
 fi
 gui_rep_colmt_preview:
 gui_rep_colmt $*
