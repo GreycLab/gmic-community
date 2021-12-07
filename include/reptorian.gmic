@@ -47,6 +47,74 @@
 #@cli :: Reptorian's CLI Commands
 #
 #-------------------------------
+#@cli rep_er : eq. to 'rep_emboss_relief' : (+)
+rep_er : rep_emboss_relief $*
+#@cli rep_emboss_relief : int_radius>=4,-360>=_ang>=360,_sigma>0,_scale>0,_output={ 0=emboss | 1=relief },_color_out={ 0=gray | 1=color },_bias>0
+#@cli : Generates effect of embossing onto image via convolution.
+#@cli : Default values: '_ang=45','_sigma=.5','_scale=2','_output=1','_bias=128','_color_out=1'
+rep_emboss_relief:
+skip ${2=45},${3=.5},${4=2},${5=1},${6=1},${7=128}
+
+_rep_er_radius,_rep_er_angle,_rep_er_sigma,_rep_er_scale,relief_mode,_use_graymode,_rep_er_bias=${1-5},{!$6},$7
+
+m "process_alpha_case : sh 0,{s-2} process_er_filter. rm."
+
+if $_use_graymode
+ m "end_relief : +.. . rm."
+ um process_alpha_case
+ m "process_alpha_case : split_opacity process_er_filter.. a c"
+else
+ m "end_relief : add"
+fi
+
+if $relief_mode
+ m "process_er_filter : +_rep_steerable_gaussian_convolve $_rep_er_radius,$_rep_er_angle,$_rep_er_sigma,$_rep_er_scale,$_use_graymode end_relief"
+else
+ m "process_er_filter : +_rep_steerable_gaussian_convolve $_rep_er_radius,$_rep_er_angle,$_rep_er_sigma,$_rep_er_scale,$_use_graymode +. $_rep_er_bias k."
+fi
+
+repeat $! l[$>]  
+ if s==2||s==4 process_alpha_case
+ else process_er_filter
+ fi 
+endl done
+
+um process_alpha_case,process_er_filter,end_relief
++_rep_steerable_gaussian_convolve:
+
+sg={max(5,int(abs($1)))}
+
+theta={-deg2rad($2)}
+sigma={$3}
+M={ceil(3*$sigma)}
+
+$sg,1,1,2,"begin(
+  const center_index=(w-1)/2;
+  const sigma_exp=2*$sigma^2;
+  const sqrsig=$sigma*sqrt(2*pi);
+ );
+ nx=(x-center_index)/center_index*$M;
+ g=exp(-(nx^2)/sigma_exp)/sqrsig;
+ gp=(nx/$sigma^2)*g;
+ [g,gp];"
+
+sh. 0 ts={is#-1/$4} rm. /. $ts
+
++rotate. 90
+
+s[-2,-1] c
+
++convolve[0] [-4]
+convolve. [-2]
++convolve[0] [-3]
+convolve. [-5]
+*. {cos($theta)}
+*.. {sin($theta)}
+add.. .
+
+k[0,-2]
+
+if $5 ss={s} compose_channels. + /. $ss fi
 #@cli rep_hsl2ryb2rgb
 #@cli : Convert color representation of selected image from HSL to RYB to RGB
 rep_hsl2ryb2rgb:
@@ -9740,24 +9808,6 @@ f[0-{$arg_img}] "begin(eps=10^-8;image=1;skip=1;);
 "
 replace_nan 0
 if $arg_img==-2 rm. fi
-#@cli em:
-#@cli : eq. to 'emboss_image' : (+)
-#@cli : $ sp , em 90,1,1
-em : emboss_image $*
-#@cli emboss_image : 0<=_angle<=360, 0<=_depth, _smoothness>=0,
-#@cli : (eq. to 'em').\n
-#@cli : Default values: 'depth=1','smoothness=0'\n
-#@cli : Author: Reptorian.
-#@cli : $ sp , emboss_image 90,1,1 ,
-emboss_image: -skip ${2=1},${3=0}
-l[0]
-luminance
-fx_gradient2rgb $3,0,100,0,0
-[0]
-repeat 2 l[$>] rgb2hsv s c l[0] + {$1+($>*180)} % 360 endl a c hsv2rgb to_rgb s c rm[1,2] endl done
-l[0] n 128,255 endl l[1] negate n 0,128 endl
-+fill_color[0] 128,128,128,255 rv blend grainmerge - 128 mul $2 + 128 cut 0,255
-endl
 #@cli rep_bchstatfunc: eq. to 'rep_by_channel_statistical_function'. : (+)
 rep_bchstatfunc : rep_by_channel_statistical_function $*
 #@cli rep_by_channel_statistical_function: _variable,_resize_bool={ 0=Do not resize | 1= Resize to 1x1 }
@@ -12169,73 +12219,75 @@ gui_split_preview "fx_vibrato ${1--2}",$-1
 #@gui Construction Material Texture:_cons_turb,_cons_turb_preview(0)
 #@gui :_=note("Construction Material Texture filter is based off the following tutorial by <b>theonlychad</b> for Paint.NET software: <a href="https://forums.getpaint.net/topic/16075-concrete-texture-tutorial/">Concrete Texture Tutorial</a>.\n")
 #@gui :_=separator(),_=note("<b>Turbulance Texture</b>")
-#@gui :4. Radius=float(88,1,1024)
-#@gui :5. Octaves=int(8,1,12)
-#@gui :6. Damping per Octave=float(2.5,1,10)
-#@gui :7. Mode=choice(2,"Turbulence","Turbulence 2","Fractal Noise","Fractured Clouds","Stardust","Pea Soup")
-#@gui :8-10. Color Balance = color(128,128,128)
+#@gui :1. Radius=float(88,1,1024)
+#@gui :2. Octaves=int(8,1,12)
+#@gui :3. Damping per Octave=float(2.5,1,10)
+#@gui :4. Mode=choice(2,"Turbulence","Turbulence 2","Fractal Noise","Fractured Clouds","Stardust","Pea Soup")
+#@gui :5-7. Color Balance = color(128,128,128)
 #@gui :_=separator(),_=note("<b>Noise Processing</b>")
-#@gui :11. Amplitude=float(20,0,200)
-#@gui :12. Noise Type=choice(3,"Gaussian","Uniform","Salt and Pepper","Poisson")
-#@gui :_=separator(),13. Channel(s)=choice(0,"RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]","YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]","YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]","Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]","HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]","CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]")
-#@gui :14. Value Action=choice(1,"None","Cut","Normalize")
+#@gui :8. Amplitude=float(20,0,200)
+#@gui :9. Noise Type=choice(3,"Gaussian","Uniform","Salt and Pepper","Poisson")
+#@gui :_=separator()
+#@gui :10. Channel(s)=choice(0,"RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]","YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]","YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]","Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]","HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]","CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]")
+#@gui :11. Value Action=choice(1,"None","Cut","Normalize")
 #@gui :_=separator(),_=note("<b>Grayscale Processing</b>")
-#@gui :15. Colour Space=choice("RGB","sRGB")
-#@gui :15. Channel 1=float(1,0,3)
-#@gui :16. Channel 2=float(1,0,3)
-#@gui :17. Channel 3=float(1,0,3)
-#@gui :18. Normalise=bool(1)
-#@gui :19. Desaturation (%)=float (100,0,100)
+#@gui :12. Colour Space=choice("RGB","sRGB")
+#@gui :13. Channel 1=float(1,0,3)
+#@gui :14. Channel 2=float(1,0,3)
+#@gui :15. Channel 3=float(1,0,3)
+#@gui :16. Normalise=bool(1)
+#@gui :17. Desaturation (%)=float(100,0,100)
 #@gui :_=separator(),_=note("<b>Self-Image Processing</b>")
-#@gui :21. Self-Blending=choice(20,"add","burn","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","linearburn","linearlight","luminance","multiply","negation","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","vividlight")
-#@gui :22. Self-Blending Opacity (%)=float (100,0,100)
-#@gui :23. Self-Blending V. Original Blending=choice(15,"add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor")
-#@gui :24. Self-Blend V. Original Opacity (%)=float (100,0,100)
+#@gui :18. Self-Blending=choice(20,"add","burn","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","linearburn","linearlight","luminance","multiply","negation","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","vividlight")
+#@gui :19. Self-Blending Opacity (%)=float (100,0,100)
+#@gui :20. Self-Blending V. Original Blending=choice(15,"add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor")
+#@gui :21. Self-Blend V. Original Opacity (%)=float (100,0,100)
 #@gui :_=separator(),_=note("<b>Value Processing</b>")
-#@gui :25. Value Action=choice(2,"None","Cut","Normalize")
-#@gui :26. Number #1=float(0,0,255)
-#@gui :27. Number #2=float(188,0,255)
-#@gui :28. Equalize?=bool(0)
-#@gui :29. Negate?=bool(0)
+#@gui :22. Value Action=choice(2,"None","Cut","Normalize")
+#@gui :23. Number #1=float(0,0,255)
+#@gui :24. Number #2=float(188,0,255)
+#@gui :25. Equalize?=bool(0)
+#@gui :26. Negate?=bool(0)
 #@gui :_=separator(),_=note("<b>Warp by Intensity</b>")
-#@gui :30. X-Factor=float(0.19,-6,6)
-#@gui :31. Y-Factor=float(0.52,-6,6)
+#@gui :27. X-Factor=float(0.19,-6,6)
+#@gui :28. Y-Factor=float(0.52,-6,6)
 #@gui :_=separator()
-#@gui :32. X-Offset=float(128,0,255)
-#@gui :34. Y-Offset=float(128,0,255)
+#@gui :29. X-Offset=float(128,0,255)
+#@gui :30. Y-Offset=float(128,0,255)
 #@gui :_=separator()
-#@gui :34. Correlated Channels=bool(0)
-#@gui :35. Interpolation=choice(1,"Nearest Neighbor","Linear")
-#@gui :36. Boundary=choice(2,"Transparent","Nearest","Periodic","Mirror")
-#@gui :_=separator(),37. Channel(s)=choice("All","RGBA [All]","RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","RGBA [Alpha]","Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]","YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]","YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]","Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]","HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]","CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]")
+#@gui :31. Correlated Channels=bool(0)
+#@gui :32. Interpolation=choice(1,"Nearest Neighbor","Linear")
+#@gui :33. Boundary=choice(2,"Transparent","Nearest","Periodic","Mirror")
+#@gui :_=separator()
+#@gui :34. Channel(s)=choice("All","RGBA [All]","RGB [All]","RGB [Red]","RGB [Green]","RGB [Blue]","RGBA [Alpha]","Linear RGB [All]","Linear RGB [Red]","Linear RGB [Green]","Linear RGB [Blue]","YCbCr [Luminance]","YCbCr [Blue-Red Chrominances]","YCbCr [Blue Chrominance]","YCbCr [Red Chrominance]","YCbCr [Green Chrominance]","Lab [Lightness]","Lab [ab-Chrominances]","Lab [a-Chrominance]","Lab [b-Chrominance]","Lch [ch-Chrominances]","Lch [c-Chrominance]","Lch [h-Chrominance]","HSV [Hue]","HSV [Saturation]","HSV [Value]","HSI [Intensity]","HSL [Lightness]","CMYK [Cyan]","CMYK [Magenta]","CMYK [Yellow]","CMYK [Key]","YIQ [Luma]","YIQ [Chromas]")
 #@gui :_=separator(),_=note("<b>Style Processing</b>")
-#@gui :38. Blur Original=float(0,0,16)
+#@gui :35. Blur Original=float(0,0,16)
 #@gui :_=separator(),_=note("<b>Butterworth Bandpass Processing</b>")
-#@gui :39. Activate Butterworth Bandpass Processing=bool(0)
-#@gui :40. Create Copy?=bool(0)
-#@gui :41. LP Frequency Power=float(3,0,16)
-#@gui :42. LP Order Cube Root=float(2,0,4)
-#@gui :43. LP Resonance=float(0,0,5)
-#@gui :44. HP Frequency Power=float(4,0,16)
-#@gui :45. HP Order Cube Root=float(2,0,4)
-#@gui :46. HP Resonance=float(2,0,4)
-#@gui :47. Colour Space=choice("RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","CMY","CMYK","Bayer")
-#@gui :48. Absolute=bool(1)
-#@gui :49. Makeup Gain=bool(1)
+#@gui :36. Activate Butterworth Bandpass Processing=bool(0)
+#@gui :37. Create Copy?=bool(0)
+#@gui :38. LP Frequency Power=float(3,0,16)
+#@gui :39. LP Order Cube Root=float(2,0,4)
+#@gui :40. LP Resonance=float(0,0,5)
+#@gui :41. HP Frequency Power=float(4,0,16)
+#@gui :42. HP Order Cube Root=float(2,0,4)
+#@gui :43. HP Resonance=float(2,0,4)
+#@gui :44. Colour Space=choice("RGB","sRGB","HSV8","HSV","HSL8","HSL","HSI8","HSI","LCH8","LCH","Lab8","Lab","YCbCr","YCbCrGLIC","YCbCrJPEG","YIQ8","YIQ","YUV8","YUV","HCY","XYZ8","XYZ","CMY","CMYK","Bayer")
+#@gui :45. Absolute=bool(1)
+#@gui :46. Makeup Gain=bool(1)
 #@gui :_=separator(),_=note("<b>Relief Processing</b>")
-#@gui :50. Activate Relief Processing=bool(1)
-#@gui :51. Angle=float(0,0,360)
-#@gui :52. Depth (%)=float(100,0,200)
-#@gui :53. Smoothness=float(0,0,10)
-#@gui :54. Blending Mode=choice(0,"Grain Extract","Grain Merge")
-#@gui :55. Blending Opacity (%)=float(100,0,100)
+#@gui :47. Activate Relief Processing=bool(1)
+#@gui :48. Radius=int(5,5,100)
+#@gui :49. Angle=float(0,-180,180)
+#@gui :50. Sigma=float(.5,.05,4)
+#@gui :51. Value Scale=float(2,.5,10)
+#@gui :52. Output Color=bool(1)
+#@gui :53. Blending Mode=choice(0,"Grain Extract","Grain Merge")
+#@gui :54. Blending Opacity (%)=float(100,0,100)
 #@gui :_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2021/7/30</i>.</small>")
+#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2021/12/07</i>.</small>")
 _cons_turb :
 repeat $! l[$>] cons_turb $* endl done
 cons_turb :
-skip {$23==0},{$25==0},{$26==0},{$29==0},{$48==0}
-
 -m "MergeChoice : $""=_mode" -MergeChoice "add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor","edges","error"
 
 fill_color 0,0,0
@@ -12262,36 +12314,34 @@ if $22==1 cut $23,$24
 elif $22==2 n $23,$24
 fi
 
-if $25==1 ac "equalize",rgb fi
-if $26==1 negate fi
+if $25 ac "equalize",rgb fi
+if $26 negate fi
 
 fx_make_seamless 256
 
 fx_warp_by_intensity ${27-34}
 
-if $36==1
-
- if $37==0
+if $36
+ if !$37
   blur $35
   fx_butterworth_bp ${38-44},0,${45-46}
   if $45==1
-   +emboss_image $48,{$49/100},$50
+   +rep_emboss_relief ${48-51},0,$52
   fi
  else
   +fx_butterworth_bp ${38-44},0,${45-46}
   blur[0] $35
   if $47==1
-   emboss_image[1] $48,{$49/100},$50
+   rep_emboss_relief[1] ${48-51},0,$52
   fi
  fi
-elif $36==0
+else
  blur $35
- if $47==1
-  +emboss_image $48,{$49/100},$50
+ if $47
+  +rep_emboss_relief ${48-51},0,$52
  fi
 fi
-
-if $47==1 if $51 blend grainmerge,$52/100 else blend grainextract,$52/100 fi fi
+if $47 if $53 blend grainmerge,{$54/100} else blend grainextract,{$54/100} fi fi
 cons_self_blend :
 -m "MergeChoice : $""=_mode" -MergeChoice "add","burn","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","linearburn","linearlight","luminance","multiply","negation","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","vividlight","edges","error"
 [0]
@@ -12299,31 +12349,19 @@ blend ${_mode{$1+1}},$2/100
 _cons_turb_preview :
 gui_split_preview "_cons_turb $*",${-3--1}
 #@gui Emboss-Relief:fx_emboss_relief,fx_emboss_relief_preview(0)
-#@gui :_=separator(),Enable Extreme Emboss or Relief?=bool(0), _=separator()
-#@gui :Angle=float(0,0,360)
-#@gui :Depth (%)=float(100,0,500)
-#@gui :Depth (%)=float(500,500,5000)
-#@gui :Smoothness=float(0,0,10)
-#@gui :Invert Embossing?=bool(0)
+#@gui :Radius=int(5,5,100)
+#@gui :Angle=float(0,-180,180)
+#@gui :Sigma=float(.5,.05,4)
+#@gui :Value Scale=float(2,.5,10)
+#@gui :Output=choice(0,"Emboss","Relief")
+#@gui :Output Color=bool(1)
 #@gui :Preserve Alpha?=bool(1)
-#@gui :_=separator(),_=note("Relief Section")
-#@gui :Apply Relief?=bool(1)
-#@gui :Blending Opacity (%)=float(100,0,100)
 #@gui :_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui :_=separator(),_=note("<small>Author: Reptorian, Samj.      Latest Update: <i>2019/3/24</i>.</small>")
-fx_emboss_relief : to_a repeat $! l[$>] split_opacity if $8 +em[0] {$6?$2+180:$2},{$1?$4/100:$3/100},$5 blend[^1] grainmerge,{$9/100} else em[0] {$6?$2+180:$2},{$1?$4/100:$3/100},$5 fi if $7 a c else k[0] fi endl done
-fx_emboss_relief_preview :
-gui_split_preview "fx_emboss_relief $*",${-3--1}
-u "{$1}"\
-"{$2}"\
-"{$3}_"{$1==1?0:2}\
-"{$4}_"{$1==1?2:0}\
-"{$5}"\
-"{$6}"\
-"{$7}"\
-"{$8}"\
-"{$9}_"{$8==1?2:1}\
-"{$10}{$11,$12}"
+#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2021/12/07</i>.</small>")
+fx_emboss_relief: 
+if !$7 remove_opacity fi
+rep_emboss_relief ${1-6}
+fx_emboss_relief_preview: gui_split_preview "rep_emboss_relief ${1-7}",${-3--1}
 #@gui Premade Palette:palgen,palgen
 #@gui :_=note("This filter creates palettes. Credits are given below. "), _=separator()
 #@gui :Palette=choice(10,"BW-{2}","RGB-{3}","B-RGB-{4}","BW-RGB-{5}","CMY-{3}","CMYK-{4}","W-CMYK-{5}","RGBCMY-{6}","1-Bit-RGB-{8}","Aurora-{256}","PLAYPAL-{249}","Sonic Robo Blast 2-{256}","Famicube-{64}","Andrew Kensler - 16","Andrew Kensler - 32","Andrew Kensler - 54","AAP-Micro 12","AAP-16","AAP-64","AAP-SPLENDOR128","DB8","DB16","DB32","DB-ISO22","DimWiddy 17","DimWiddy 23","Endesga-4","Endesga-8","Endesga-16","Endesga-32","Endesga-36","Endesga-64","Juicy-32","Juicy-56","XAIUE-22","15P-DX","20P-DX","24P-DX","Cabana-64","Fantasy 16","Fantasy 24","Tranquil Fantasy 23","Tranquility Plus 39","Faraway 48","Fleja Master Palette-{33}","Koni32","Linear Color Palette Basic-{31}","Vines Flexible Linear Ramps-{38}","Arcade Standard 29","ARQ16","BLK 36","BLK-NEO-{46}","Broken Facility-{40}","Bubblegum-16","Cade 15","Calder 8-{11}","Chromatic16","CD-BAC-{16}","CG Arne-{16}","CPC BOY-{32}","Dinoknight 16","||||-22","FZT Ethereal 16","GZXP-{11}","Indecision-{17}","Island Joy 16","Journey-{64}","Juicy 17","Oak21","Nature's Embrace 55","Nauris-16","Pear 36","Peachy Pop 16-{16}","Pineapple 32","Resurrect 32-{32}","Rosy 42","SLSO-CLR17","Softy 15","SPEC12","Starmancer-{52}","Superb 8","SuperFuture25","Sweetie 16","Taffy 16","Todayland Palette V2-{25}","Vivid-17","Voodo34","Zughy 32","ENOS16","Undertones-17","Equpix 15","Night 16","Star 29","Star 34","Still-Life-{14}","SimpleJPC-16","Acid 15","Battery 24","Clumpy 18","Cthulhu-{16}","Crimso 11","Copper-Tech-{16}","DRZ15A","Eggy 15","Eroge-Copper","Europa 16-{16}","GreyT-bit-{8}","Jewel-{15}","Polar 11","Sheltzy 32","Rube-Goldberg-{9}","BoomBoom-{7}","Generic-8","Matriax8c","NT1H-{26}","Autum 15","Autum 15 [Yellow]","JerryPie 22","Naji 16","Blessing-{5}","Crayola Blind-{9}","Easter Island-{16}","Fairy Tales-{8}","Fuzzy Four-{4}","0xdb-01-{17}","Ocaso-{17}","Pastel-{15}","17 Pastels","Pollen-8","Nopal-12","Sy17","Syz15","TUI-15","Cave-{8}","Psygnosia-{16}","MarshMellow32","Rabbit 7","Finlal 11","Vinik 24","YKB-22","Graveyard-21","Steam Lords-{16}","AAP-RadiantXV-{15}","AAP-Majesty XVII-{17}","Daruda 22","Rust-6","XAIUE-Radiant-{22}","Firestorm-{9}","SuperNova 7","NYX8","OIL6","SGM-Palette 2-{17}","Fornax Void I-{256}","Fornax Void II-{128}","Pixelwave-{12}","Spacey Easter-{17}","Moonlit-39","Petite-8","Petite-8 Afterdark","Autochrome 3","Autochrome 5","GB Default #1-{4}","GB Default #2-{4}","GB Andrade-{4}","GB Blue Seni-{4}","GB Blackzone-{4}","GB Crimson-{4}","GB Didi-{4}","GB Dirty-{4}","GB Arne-{4}","GB Easy-{4}","GB Forest-{4}","GB Harsh Green-{4}","GB Light Green-{4}","GB Nostalgia-{4}","GB Platinum-{4}","GB Kirokaze-{4}","GB PJ-{4}","GB Cyber-{4}","GB Wish-{4}","GB Grapefruit-{4}","GB Ice Cream-{4}","GB Red_Blue-{4}","GB Spacehaze-{4}","GB Chocolate-{4}","GB Purple Dawn-{4}","GB Gray-{4}","ARNE4","HallowPumpkin-{4}","Amiga 2600 NTSC-{128}","Amiga 2600 PAL-{104}","Amiga 2600 SECAM-{8}","Amiga 7800 M.E.S.S-{256}","Amiga 7800-{256}","Amstrad CPC-{27}","Apple II-{15}","CGA-{16}","CGA Mode 0 [Low]-{4}","CGA Mode 0 [High]-{4}","CGA Mode 1 [Low]-{4}","CGA Mode 1 [High]-{4}","CGA Mode 2 [Low]-{4}","CGA Mode 2 [High]-{4}","Commodore 64 [Pepto Interpretation]-{16}","Commodore 64 [Colodore Interpretation]-{16}","Commodore VIC-20-{16}","Colecovision-{15}","Japanese Machine Palette-{16}","Macintosh II-{16}","NES-{52}","PICO-8-{16}","RISC OS-{16}","SAM Coupe-{128}","Thomson MO5-{16}","VGA-{244}","ZX Spectrum-{15}","GNOME 32-{32}","Electronic Crayon 22","Chip16","MSX-{15}","Deluxe Paint-{222}","Legacy Paint-{16}","XP Paint-{28}","Vista Paint-{28}")
@@ -15840,7 +15878,6 @@ u "{$1}"\
 #@gui :Multiplier=float(1,.25,10)
 #@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2021/10/15</i>.</small>")
 fx_rep_tco:
-mpi={100*pi}
 tau={2*pi}
 ow={w}
 oh={h}
