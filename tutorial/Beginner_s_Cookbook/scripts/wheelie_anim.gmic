@@ -1,5 +1,20 @@
-wheelie_anim:
+#@cli wheelie_anim : frames_per_revolution,radius_0,phase_0,angular_velocity_0,…,radius_k,phase_k,angular_velocity_k,…
+#@cli : Compose arabesque rotational animation using a three image selection:
+#@cli : [-3] Transparent, optionally pre-drawn, image for the arabesque. [-2]:
+#@cli : four channel fader multiplier and [-1]: background image. The number
+#@cli : of segments follow from the like number of argument triplets formed by
+#@cli : the arguments following "frames_per_revolution". A single triplet of
+#@cli : three arguments specifies length, orientation and integral angular
+#@cli : velocity of one "wheelie", or anchored segment, It is an error if the
+#@cli : argument list, less the frames_per_revolution argument, is not
+#@cli : divisible by three. Replaces selection with (1) an animation image
+#@cli : sequence of a length equal to the frames_per_revolution argument, and
+#@cli : (2) the arabesque transparency reflecting the last frame state,
+#@cli : suitable for use as a pre-drawn image for successor arabesque
+#@cli : animations.
+#@cli : $ 1024,1024,1,4 nm. arabesque (0.99^0.94^0.92^0.99) nm. mult [0] nm. back fill_color[back] 127,127,127,255 wheelie_anim[arabesque,mult,back] 360,0.5,0,1,0.5,30,-5,0.5,315,-2 rm. o wheelanim.mp4,30,H264
 
+wheelie_anim:
    # wheelie: a circle of a particular (1) radius, (2) phase angle
    # (orientation) and (3) discrete angular velocity - a relative
    # integral number of revolutions per some unspecified base interval,
@@ -17,152 +32,234 @@ wheelie_anim:
    # increment, rotating the wheelie, then, with all wheelies rotated,
    # plot the endpoint.
 
-   # Fetch an arbitrarily long argument list to $a0, $a1, …, $an
-
-   $=a
-
-   # Expect data triplets: radius, phase angle, angular velocity.
-
-   -check {!(($#-1)%3)}
-
-   # Initial argument: Spectral width (sw)
-
-   sw={$a1/2}
-   -if $sw%2==0
-      sw+=1
+   emsg="Select three images, to wit: [-3]: Transparent, optionally pre-drawn, image for the arabesque. [-2]: four channel fader multiplier and [-1]: three channel background image; 1:1 aspect ratio works best."
+   -if size([$[]])!=3
+      -error $emsg
    -fi
+   -name... arabesque
+   -name..  multiplier
+   -name.   background
+   -resize[multiplier] [arabesque],[arabesque],[arabesque],[arabesque],1
+   -remove_opacity[background]
+   -store[multiplier] multiplerimage
+   -local[arabesque,background]
+      # Fetch an arbitrarily long argument list to $a0, $a1, …, $an
+      $=a
 
-   # Circles argument vector: For each wheelie, compose radius and
-   # phase arguments into a homogeneous transform. In the animation
-   # loop, we compose this with atk-dependent rotational transform to
-   # plot the wheelie in an generic plotting space.
+      # Expect argument one as initial frames per revolution, followed by
+      # data triplets: radius, phase angle, angular velocity.
 
-   ccnt={round(($#-1)/3,1,-1)}
-   -input $ccnt,1,1,12
-   -name  args
+      -check {!(($#-1)%3)}
 
-   # Iterate over argument vector. For each triplet – representing a
-   # wheelie circle – Fetch radius (rad), phase angle (ang) and
-   # angular velocity (sf) parameters.
+      # Initial argument: frame count per revolution
+      -check "isint($a1) && $a1>0"
+      frames_per_rev=$a1
 
-   -repeat $#-1,j
-      -if   $j%3==0 # get radius
-         rad=${a{2+$j}}
-         -check isnum($rad)" && "$rad>=0" && "$rad<=1
-         -set[args] $rad,{round($j/3,1,-1)},0,0,0
-      -elif $j%3==1 # get angle, degrees
-         ang=${a{2+$j}}
-         -check isnum($ang)" && "$ang>=0" && "$ang<=360
-         -set[args] $ang,{round($j/3,1,-1)},0,0,1
-      -else         # get ω and set spectral coefficient
-         sf=${a{2+$j}}
-         -check isint($sf)" && "abs($sf)<=0.1*$sw
-         -set[args] $sf,{round($j/3,1,-1)},0,0,2
+      # scaling width is the smallest dimension
+      sw={min(w,h)/2}
+      -if $sw%2==0
+         sw+=1
       -fi
-   -done
 
-   # Iterate over argument image, each 12 channel pixel representing
-   # one wheelie. The first three channels contain wheelie radius,
-   # phase angle and radial velocity. Compose a homogeneous matrix
-   # transforming the origin to the tip of the wheelie radius, a
-   # radial translation and phase rotation. Populate the nine
-   # remaining channels with this matrix.
+      # Circles argument vector: For each wheelie, compose radius and
+      # phase arguments into a homogeneous transform. In the animation
+      # loop, we compose this with the "angular tick dependent" (atk)
+      # rotational transform to plot the wheelie in an generic plotting
+      # space.
 
-   -fill[args] ">
-                  CPX=I;
-                  orot=rot([0,0,1],deg2rad(CPX[1])); # phase rotation
-                  xlat=eye(3);
-                  xlat[2]=CPX[0];                    # translation origin-to-rim
-                  FIN=[CPX[0,3,1],mul(orot,xlat,3)]; # args+"RADX" i.e. 'rotation & xlation'
-                  FIN                                # store above in 12-channel pixel
-               "
+      ccnt={round(($#-1)/3,1,-1)}
+      -input $ccnt,1,1,12
+      -name. args
 
-   -permute[args] cyzx
-   -store[args] circles
+      # Iterate over argument vector. For each triplet – representing a
+      # wheelie circle – Fetch radius (rad), phase angle (ang) and
+      # angular velocity (sf) parameters.
 
-   # Partial screenspace transform.
-   ssxfrm={specw=get('sw',1,0);id=eye(3);id[0]=0;id[1]=specw[0]/2;id[2]=specw[0];id[3]=-specw[0]/2;id[4]=0;id[5]=specw[0];id}
-   -input {2*$sw},{2*$sw},1,4
-   -name. backplate
-   tracerim={vector3([0,0,1])}
-   firstpt={vector3([0,0,1])}
+      -repeat $#-1,j
+         -if   $j%3==0 # get radius
+            rad=${a{2+$j}}
+            -check isnum($rad)" && "$rad>=0" && "$rad<=1
+            -set[args] $rad,{round($j/3,1,-1)},0,0,0
+         -elif $j%3==1 # get angle, degrees
+            ang=${a{2+$j}}
+            -check isnum($ang)" && "$ang>=0" && "$ang<=360
+            -set[args] $ang,{round($j/3,1,-1)},0,0,1
+         -else         # get ω and set spectral coefficient
+            sf=${a{2+$j}}
+            -check isint($sf)" && "abs($sf)<=0.1*$sw
+            -set[args] $sf,{round($j/3,1,-1)},0,0,2
+         -fi
+      -done
 
-   # Set the viewport backplate
-   -fill[backplate] ">lerp([30,40,135,255],[10,100,175,255],y/(h-1))"
+      # Iterate over argument image, each 12 channel pixel representing
+      # one wheelie. The first three channels contain wheelie radius,
+      # phase angle and radial velocity. Compose a homogeneous matrix
+      # transforming the origin to the tip of the wheelie radius, a
+      # radial translation and phase rotation. Populate the nine
+      # remaining channels with this matrix.
 
-   # Arabesque arabesque
-   -input 100%,100%,100%,100%
-   -name. arabesque
+      -fill[args] ">
+                     CPX=I;
+                     orot=rot([0,0,1],deg2rad(CPX[1])); # phase rotation
+                     xlat=eye(3);
+                     xlat[2]=CPX[0];                    # translation origin-to-rim
+                     FIN=[CPX[0,3,1],mul(orot,xlat,3)]; # args+"RADX" i.e. 'rotation & xlation'
+                     FIN                                # store above in 12-channel pixel
+                  "
 
-   # Circle arabesque
-   -input 100%,100%,100%,100%
-   -name. circles
+      -permute[args] cyzx
+      -store[args] circles
 
-   # Stash backplate for duplication in loop
-   -store[backplate] back
+      # Partial screenspace transform.
+      ssxfrm={">
+                 specw=get('sw',0,0);
+                 id=eye(3);
+                 id[0]=0;
+                 id[1]=specw/1.5;
+                 id[2]=specw;
+                 id[3]=-specw/1.5;
+                 id[4]=0;
+                 id[5]=specw;
+                 id"}
 
-   # Animate arabesque
-   atk=0
-   -repeat 6*$sw,k
-      -local[-2,-1]
-          -input (0.99^0.94^0.92^0.9985)
-          -resize. [-2],[-2],[-2],[-2]
-          -mul[-3,-1]
-          -input $back
+      # Homogeneous position vectors for plotting initial/final segments
+      tracerim={vector3([0,0,1])}
+      firstpt={vector3([0,0,1])}
 
-          # Plot wheelie indicators: rotate wheelies by their respective
-          # angular velocity increments, compose this rotation into the
-          # pre-computed phase, radial-displacement transform from the
-          # argument image, compose with screenspace transform and plot
-          # via polygon()
+      # Transparent image to plot wheelies themselves
+      -input [arabesque],[arabesque],[arabesque],[arabesque]
+      -name. wheelplot
 
-          -eval[circles]   ">
-                             begin(
-                                     ccnt="$ccnt";
-                                     omega=get('atk',1,0);
-                                     specw=get('sw',1,0);
-                                     ik=get('k',1,0);
-                                     fpt=get('firstpt',3,0);
-                                     trc=get('tracerim',3,0);
-                                     pp=vector"{3*($ccnt+1)}"([0,0,1]);
-                                     circs=get('circles',"{12*$ccnt}",0);
-                                     repeat(
-                                              ccnt,k,
-                                              idx=ccnt-k-1;
-                                              rbradx=mul(rot([0,0,1],circs[12*idx+2]*omega[0]),circs[12*idx+3,9,1],3);
-                                              repeat(
-                                                      k+1,j,
-                                                      foo=rbradx*pp[3*(k-j),3];
-                                                      pp[3*(k-j)]=foo[0];
-                                                      pp[3*(k-j)+1]=foo[1];
-                                                      pp[3*(k-j)+2]=foo[2];
-                                                    )
-                                           );
-                                    ssx=get('ssxfrm',9,0);
-                                    repeat(
-                                             ccnt,k,
-                                                 p0=ssx*pp[3*(k),3];
-                                                 p1=ssx*pp[3*(k+1),3];
-                                                 polygon(#-2,-2,[p0[0,2],p1[0,2]],1,0xffffffff,[252,255,185,170]);
-                                                 ellipse(#-2,p0[0,2],1,1,0,1,[255,150,100,200]);
+      # Stash background for duplication in loop
+      +store[background] back
 
-                                           );
-                                     plt=ssx*pp[0,3];
-                                     ik[0]>0?
-                                        polygon(#-3,-2,[plt[0,2],trc[0,2]],1,0xffffffff,[255,200,100,255]):
-                                        store(plt,'firstpt',3,1,1,1);
-                                     store(plt,'tracerim',3,1,1,1);
-                                     ellipse(#-2,plt[0,2],2,2,0,1,[230,90,45,255]);
-                                     ik[0]==(6*specw[0]-1)?
-                                        polygon(#-1,-2,[fpt[0,2],plt[0,2]],1,0xffffffff,[255,200,100,255])
-                                  )
-                           "
-          -blend[backplate] [arabesque],alpha
-          -blend[backplate] [circles],alpha
-          atk={2*pi*($k/(3*$sw-1))}
-          -mul[circles] 0
-          -mv[backplate] 0
-      -endlocal
-   -done
-   -rm[circles,arabesque]
+      # Animate arabesque
+      atk=0
+      -repeat $frames_per_rev,k
+         atk={2*pi*($k/($frames_per_rev-1))}
+         -local[arabesque,background,wheelplot]
+             -input $multiplerimage
+             -mul[arabesque,multiplier]
 
+             # Plot wheelie indicators: rotate wheelies by their respective
+             # angular velocity increments, compose this rotation into the
+             # pre-computed phase, radial-displacement transform from the
+             # argument image, compose with screenspace transform and plot
+             # via polygon()
+
+             -eval[wheelplot]   ">
+                                begin(
+                                        ccnt=get('ccnt',0,0);
+                                        omega=get('atk',0,0);
+                                        fpr=get('frames_per_rev',0,0);
+                                        ik=get('k',0,0);
+                                        fpt=get('firstpt',3,0);
+                                        trc=get('tracerim',3,0);
+                                        pp=vector"{3*($ccnt+1)}"([0,0,1]);
+                                        circs=get('circles',"{12*$ccnt}",0);
+                                        repeat(
+                                                 ccnt,k,
+                                                 idx=ccnt-k-1;
+                                                 rbradx=mul(rot([0,0,1],circs[12*idx+2]*omega),circs[12*idx+3,9,1],3);
+                                                 repeat(
+                                                         k+1,j,
+                                                         foo=rbradx*pp[3*(k-j),3];
+                                                         pp[3*(k-j)]=foo[0];
+                                                         pp[3*(k-j)+1]=foo[1];
+                                                         pp[3*(k-j)+2]=foo[2];
+                                                       )
+                                              );
+                                       ssx=get('ssxfrm',9,0);
+                                       repeat(
+                                                ccnt,k,
+                                                    p0=ssx*pp[3*(k),3];
+                                                    p1=ssx*pp[3*(k+1),3];
+                                                    polygon(#$wheelplot,-2,[p0[0,2],p1[0,2]],1,0xffffffff,[115,160,205,255]);
+                                                    ellipse(#$wheelplot,p0[0,2],1,1,0,1,[230,90,45,255]);
+                                              );
+                                        plt=ssx*pp[0,3];
+                                        ik>0?
+                                           polygon(#$arabesque,-2,[plt[0,2],trc[0,2]],1,0xffffffff,[255,200,100,255]):
+                                           store(plt,'firstpt',3,1,1,1);
+                                        store(plt,'tracerim',3,1,1,1);
+                                        ellipse(#$wheelplot,plt[0,2],2,2,0,1,[230,90,45,255]);
+                                        ik==(fpr-1)?
+                                           polygon(#$arabesque,-2,[fpt[0,2],plt[0,2]],1,0xffffffff,[255,200,100,255])
+                                     )
+                              "
+             -blend[background] [arabesque],alpha
+             -blend[background] [wheelplot],alpha
+             -mul[wheelplot] 0
+             -mv[background] 0
+             -name[background] frame-$k
+         -endlocal
+         -input[-2] $back
+      -done
+      -rm[wheelplot,background]
+   -endlocal # [arabesque,background]
+
+#@cli durga : _radius_0,_phase_0,_angular_velocity_0,…,_radius_k,_phase_k,_angular_velocity_k,…
+#@cli : Sequence a series of animations by successively adding wheelies, one
+#@cli : at a time, starting with the initial wheelie that just generates a
+#@cli : circular arabesque. Furnish any number of wheelie triplets in the
+#@cli : argument list, or leave that list empty; durga will generate a list of
+#@cli : five randomly composed wheelies. Selected image sets the animation
+#@cli : size and background composition. Framerate is fixed at 24
+#@cli : frames/second. Select the background image to set animation frame
+#@cli : size. Arguments should be in groups of three: radius, phase, angular
+#@cli : velocity.
+#@cli : $ durga 
+durga :
+   emsg="Select the background image to set animation frame size. Arguments should be in groups of three: radius, phase, angular velocity."
+   -if size([$[]])==0
+      -input 300,300,1,3,lerp([200,200,230],[230,200,200],y/(h-1))
+   -fi
+   -name. background
+   -remove_opacity[background]
+
+   # Wheelie arguments?
+   -if size([$#])>0
+      -if $#%3==0
+         $=a
+         ccnt=$#/3
+	 ra="" # empty radius vector
+	 ph="" # empty phase vector
+	 av="" # empty angular velocity vector
+         -repeat $#,j
+            -if $j%3==0 # get radius
+    	       rad=${a{1+$j}}
+               -check isnum($rad)" && "$rad>=0" && "$rad<=1
+               ra={[[$ra],[$rad]]}}
+            -elif $j%3==1 # get angle, degrees
+               ang=${a{1+$j}}
+               -check isnum($ang)" && "$ang>=0" && "$ang<=360
+               ph={[[$ph],[$ang]]}}
+            -else         # get ω and set spectral coefficient
+               sf=${a{1+$j}}
+               -check isint($sf)
+               ph={[[$av],[$sf]]}}            
+            -fi
+         -done
+      -else
+         -error $emsg
+      -fi
+   # No arguments. Make up our own. Fixed at 5 wheelies 
+   -else
+      ccnt=5
+      ra={u(vector$ccnt(1))}
+      ph={u(vector$ccnt(360))}
+      av={">
+             rad=u(k=vector$ccnt(2))-1;
+	     sgn=2*round(rad,1,1)-1};
+	     mag=round(sort(abs(10*rad),1),1,1);
+	     rmag=mag/min(mag);
+	     rmag*sgn"
+	 }
+   -fi
+   300,300,1,4
+   nm. arabesque
+   (0.99^0.94^0.92^0.994)
+   nm. mult
+   [0] nm. back
+   fill[back] lerp([190,240,220,255],[240,200,190,255],y/(h-1))
+   wheelie_anim[arabesque,mult,back] 360,0.5,0,1,0.5,30,-5,0.5,315,-2 rm. o wheelanim.mp4,60,H264
