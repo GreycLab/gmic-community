@@ -45,7 +45,7 @@ wheelie_anim:
    -local[arabesque,background]
       # Fetch an arbitrarily long argument list to $a0, $a1, …, $an
       $=a
-
+      v + echo[0] $* v -
       # Expect argument one as initial frames per revolution, followed by
       # data triplets: radius, phase angle, angular velocity.
 
@@ -198,7 +198,9 @@ wheelie_anim:
       -rm[wheelplot,background]
    -endlocal # [arabesque,background]
 
-#@cli durga : _radius_0,_phase_0,_angular_velocity_0,…,_radius_k,_phase_k,_angular_velocity_k,…
+# 0.8,0,-2,0.4,0,3,0.1,0,-2,0.3,0,3 
+
+#@cli durga : _radius_0,_phase_0,_angular_velocity_0,…,_radius_k,_phase_k,_angular_velocity_k,… : (no arg)
 #@cli : Sequence a series of animations by successively adding wheelies, one
 #@cli : at a time, starting with the initial wheelie that just generates a
 #@cli : circular arabesque. Furnish any number of wheelie triplets in the
@@ -209,57 +211,91 @@ wheelie_anim:
 #@cli : size. Arguments should be in groups of three: radius, phase, angular
 #@cli : velocity.
 #@cli : $ durga 
-durga :
+durga : -skip "${1=}" 
    emsg="Select the background image to set animation frame size. Arguments should be in groups of three: radius, phase, angular velocity."
+   frames={24*10}
+   -local[]
+      is_arg={isnum("$1")}
+   -onfail
+      is_arg=0
+   -endlocal
    -if size([$[]])==0
       -input 300,300,1,3,lerp([200,200,230],[230,200,200],y/(h-1))
    -fi
+
+   # Create, get construction images
    -name. background
    -remove_opacity[background]
+   -input[-2] (0.99^0.94^0.92^0.9995)
+   -name.. multiplier
+   -input[-3] [background],[background],[background],4
+   -name... arabesque
 
    # Wheelie arguments?
-   -if size([$#])>0
+   -if $is_arg>0
       -if $#%3==0
          $=a
-         ccnt=$#/3
-	 ra="" # empty radius vector
-	 ph="" # empty phase vector
-	 av="" # empty angular velocity vector
+         ccnt={$#/3}
+	 ra=''
+	 ph=''
+	 av=''
          -repeat $#,j
             -if $j%3==0 # get radius
     	       rad=${a{1+$j}}
                -check isnum($rad)" && "$rad>=0" && "$rad<=1
-               ra={[[$ra],[$rad]]}}
+	       ra={[[$ra],[$rad]]}
             -elif $j%3==1 # get angle, degrees
                ang=${a{1+$j}}
                -check isnum($ang)" && "$ang>=0" && "$ang<=360
-               ph={[[$ph],[$ang]]}}
+	       ph={[[$ph],[$ang]]}
             -else         # get ω and set spectral coefficient
                sf=${a{1+$j}}
                -check isint($sf)
-               ph={[[$av],[$sf]]}}            
+	       av={[[$av],[$sf]]}
             -fi
          -done
+	 ra={[$ra][1,size([$ra])-1,1]}
+	 ph={[$ph][1,size([$ph])-1,1]}
+	 av={[$av][1,size([$av])-1,1]}
       -else
          -error $emsg
       -fi
-   # No arguments. Make up our own. Fixed at 5 wheelies 
+   # No arguments. Make up our own. Fixed at 5 wheelies, no phase displacement. 
    -else
       ccnt=5
       ra={u(vector$ccnt(1))}
-      ph={u(vector$ccnt(360))}
-      av={">
-             rad=u(k=vector$ccnt(2))-1;
-	     sgn=2*round(rad,1,1)-1};
-	     mag=round(sort(abs(10*rad),1),1,1);
-	     rmag=mag/min(mag);
-	     rmag*sgn"
-	 }
+      ph={vector$ccnt(0)}
+      av={"
+             rad=u(k=vector$ccnt(1.5))-0.75;
+	     sgn=2*round(rad,1,1)-1;
+	     mag=sort(abs(5*rad),1);
+	     rmag=round(mag/min(mag),1,1);
+	     rmag*sgn
+         "}
    -fi
-   300,300,1,4
-   nm. arabesque
-   (0.99^0.94^0.92^0.994)
-   nm. mult
-   [0] nm. back
-   fill[back] lerp([190,240,220,255],[240,200,190,255],y/(h-1))
-   wheelie_anim[arabesque,mult,back] 360,0.5,0,1,0.5,30,-5,0.5,315,-2 rm. o wheelanim.mp4,60,H264
+
+   args={[[$ra][0],[$ph][0],[$av][0]]}
+   +store[multiplier,background] animback
+   -repeat {$ccnt},i
+      -local[arabesque,multiplier,background]
+         -wheelie_anim[arabesque,multiplier,background] $frames,$args
+         acnt={size([$args])}
+         wcnt={$acnt/3}
+	 args={"
+                 eye=get('i',0,0);
+                 AR=get('args',$acnt,0);
+                 RA=get('ra',$ccnt,0);
+                 PH=get('ph',$ccnt,0);
+                 AV=get('av',$ccnt,0);
+                 l=RA[eye+1];
+                 r=1-l;
+                 RL=AR[0,$wcnt,3];
+                 RL=round(RL*r,0.001,0);
+                 NAR=vector$acnt(0);
+                 repeat($wcnt,k,NAR[3*k]=RL[k];NAR[3*k+1]=AR[3*k+1];NAR[3*k+2]=AR[3*k+2]);
+                 [NAR,l,PH[eye+1],AV[eye+1]]
+              "}
+	 -input $animback
+      -endlocal
+   -done
+   -remove[arabesque,multiplier,background]
