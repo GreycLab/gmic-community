@@ -3,11 +3,11 @@
 |                    |                    |                    |                    |                    |                    
 ### Cheat #5: Arrays: Command line and Math Expressions
 __TL;DR:__ Notation to address ordered sequences of things on the command line and in the Math Expression parser, and moving between the two.
-
+= expressrefresh
 ### Brief Refresher on Substitutions
-Command line variables stem from G'MIC's [Substitution Rules](https://gmic.eu/reference/substitution_rules.html#top) Brief refresher:
-| 1.  |Create a substitution|…'twelvesquared=144'…
-| 2.  |Use a substitution|…'echo $twelvesquared'…
+Command line variables stem from G'MIC's [Substitution Rules](https://gmic.eu/reference/substitution_rules.html#top). Brief refresher:
+| 1.  |Create a substitution|… 'twelvesquared=144' …
+| 2.  |Use a substitution|… 'echo $twelvesquared' …
 ~~~
 $ gmic twelvesquared=144 echo $twelvesquared
 [gmic]-0./ Start G'MIC interpreter.
@@ -16,15 +16,15 @@ $ gmic twelvesquared=144 echo $twelvesquared
 [gmic]-0./ End G'MIC interpreter.
 ~~~
 * Equating a lefthand string with a righthand item through a `=` operator sets up a _substitution_.
-* From such a declaration forward, G'MIC substitutes occurences of '$_<lefthand_item>_ with _<righthand_item>_.'
+* From such a declaration forward, G'MIC substitutes occurences of '$ _<lefthand_item>_' with '_<righthand_item>_.'
 * Such substitutions underlie G'MIC _command line variables_. These may have _global_ or _local_ visiblity. A _scope_ constitutes the current, in-progress G'MIC pipeline, along with the substitutions which the command line processor can act upon (i.e., are 'visible') while operating on the current pipeline. See [Debuggery](https://gmic.eu/tutorial/debug_cheat.html#debuggery) for further remarks on how G'MIC _enters_ and _exits_ various _scopes_. 
-** Global: prepend the lefthand string with an underscore character: '_visibleeverywhere=42'. Even when subsequently entering the scopes custom commands, no matter how deep they may be from the declaration scope, G'MIC will substitute occurences of '$_visibleeverywhere' with '42'.
-** Local: 'visibleincurrentscopeonly=26', the default scope when omitting a prepended underscore. Note line two of the shell log. When subsequently entering scopes of custom commands, the definition of '$visibleincurrentscopeonly' disappears from the deeper scope. Similarly, the definition of $visibleincurrentscopeonly disappears when G'MIC exits the scope of its declaration. While it may seem contrary to common sense, the self-effacing nature of local variables is a feature, not a bug. Most variables are meaningful only in the immediate scope and have no business in deeper or shallower ones: that means you may reuse meaningful local variable names other scopes without undue confusion. In contrast, global variables are forever and trip up scripters after their declarations are forgotten, giving rise to subtle, hard-to-detect bugs. Best practice: use global variables only when you really, _really_ have to.
-
+* _Global_: prepend the lefthand string with an underscore character: '_visibleeverywhere=42'. Even when subsequently entering the scopes custom commands, no matter how deep they may be from the declaration, G'MIC will substitute occurences of '$_visibleeverywhere' with '42'.
+* _Local_: 'visibleincurrentscopeonly=26', the default scope when omitting a prepended underscore. Note line two of the shell log. When subsequently entering scopes of custom commands, the definition of '$visibleincurrentscopeonly' disappears from the deeper scope. Similarly, the definition of '$visibleincurrentscopeonly' disappears when G'MIC exits the scope of its declaration. While it may seem contrary to common sense, the self-effacing nature of local variables is a feature, not a bug. Practically, most variables are meaningful only in the immediate scope of their use and have no business in deeper or shallower ones: that means you may reuse meaningful local variable names in other scopes without undue ambiguity. In contrast, global variables are forever and trip up scripters after their declarations are forgotten, giving rise to subtle, hard-to-detect bugs. Best practice: use global variables only when you really, _really_ have to.
+= mathexpjit
 ### Substitutions with the Math Expression JIT processor
 G'MIC performs substitutions very early in the process of analyzing command line items. This has consequence in scripts where math expressions live. 
 ~~~
-$ gmic constantfive=5 count='{V=vector$constantfive(0);fill(V,k,V[k]=k)}' echo '$count'
+$ gmic constantfive=5 count={V=vector$constantfive(0);fill(V,k,V[k]=k)} echo $count
 [gmic]-0./ Start G'MIC interpreter.
 [gmic]-0./ Set local variable 'constantfive=5'.
 [gmic]-0./ Set local variable 'count=0,1,2,3,4'.
@@ -32,17 +32,53 @@ $ gmic constantfive=5 count='{V=vector$constantfive(0);fill(V,k,V[k]=k)}' echo '
 [gmic]-0./ End G'MIC interpreter.
 ~~~
 Awful lot going on here. Let's unpack this.
-| 1.  |We are declaring _two_ substitutions, one for '$constantfive', the second for '$count'
+| 1.  |We are declaring _two_ substitutions, one for '$constantfive', the second for '$count'.
 | 2.  |First item: The declaration for '$constantfive' is easy to digest. _Immediately_ after this declaration, wherever G'MIC "sees" '$constantfive', it substitutes it with '5'. Mark our word: _Immediately_. The first substitution, item one of the pipeline, is for '$constantfive'; it is ready for use by the time G'MIC takes up the second item on the pipeline, the declaration for the substitution 'count'
 | 3.  |In the declaration of 'count', what's going on with the right hand side? Hint: G'MIC already knows how to substitute occurences of '$constantfive' with '5':
 |   a.   |Brackets '{}' signal G'MIC to summon the 'Just In Time' (JIT) math processor to process the intervening string, presumably a properly composed [math expression](https://gmic.eu/reference/mathematical_expressions.html#top) and, barring JIT errors,  to substitute the bracketed string with the results of JIT math processing. That results becomes the right hand side in the declaration for 'count'. 
 |   b.   |Before invoking the math processor, G'MIC scans the math expression for possible substitutions, finds '$constantfive' and replaces it with '5'.
 |   c.   |When G'MIC invokes the math processor, that facility "sees" not 'vector$constantfive' but 'vector5', the math function which creates five element vectors. The math processor is _wholly unaware_ of the substitution. In fact, the math processor is wholly unaware of G'MIC. It leads an uncomplicated life; it just processes the strings it is given, just as they are given to it.
-|   d.   |In conducting its uncomplicated life, the math processor observes the ';' statement separator operator: the math expression consists of two statements. The first statement assigns symbol 'V' a five element vector, all elements '0'. The second statement fills that vector with the ascending sequence '0,1,2,3,4'. See [Specific functions](https://gmic.eu/reference/mathematical_expressions.html#specific_functions) for the care and feeding of 'fill()' and other math processing functions.
+|   d.   |In conducting its uncomplicated life, the math processor observes the ';' statement separator operator: the math expression consists of two statements. The first statement assigns symbol 'V' a five element vector, all elements '0'. The second statement fills that vector with the ascending sequence '0,1,2,3,4'. See [Specific functions](https://gmic.eu/reference/mathematical_expressions.html#specific_functions) and [New useful features in math parser, planned in 2.9.8](https://discuss.pixls.us/t/new-useful-features-in-math-parser-planned-in-2-9-8/24910)for the care and feeding of 'fill()' and other math processing functions.
 |   e.   |The second math processor statement seems to have forgotten to assign anything to anything. It is the way of the math processor to pass whatever the results of the last statement may be to the parent context: the G'MIC command line processor, to wit, a swan song: "I am done. That string you gave me is a valid math expression and the last statement in that expression reduces to a vector '[0,1,2,3,4]' Do with it what you will. I am cleaning up now, deallocating resources, and I am ceasing to exist."
-| 4.  |G'MIC does what it will. Having no innate notion of a vector, G'MIC sees it as a comma separated list of five items, '0,1,2,3,4' This is a right hand side that it can understand; it assigns the list to the left hand name for the substitution. Thereafter, '$count resolves to '0,1,2,3,4' wherever the former may be seen.
+| 4.  |G'MIC does what it will. Having no innate notion of a vector, G'MIC sees it as a comma separated list of five items, '0,1,2,3,4' This is a right hand side that it can understand; it assigns the list to the left hand name for the substitution. Thereafter, '$count' resolves to '0,1,2,3,4' wherever the former may be seen.
 | 5.  |Recall that substitutions are _immediate_. The follow-on command, 'echo' "sees" not '$count', but '0,1,2,3,4', which it duly echos to the G'MIC shell log.
+= constmath
+### Substitution and 'const' math expressions 
+'3b' GMIC preprossessing of math expressions, looking for possible substitutions within such and replacing them with their declared values, is more useful than it first seems.
 
+The math expression processor embodies the the notion of a 'const' symbol:
+~~~
+const fivemetercircumference=5*pi;
+~~~
+So long as the right hand side reduces to a fixed numeric quantity during JIT compilation — a _known value_ at compilation time — then the JIT compiler can readily replace all occurences of symbol 'fivemetercircumference' with the numeric 15.70796 or thereabouts, as the product of five and π, are both known fixed quantities at compilation time. If the math processor establishes that a symbol can be associated with a known numeric that _never changes_ throughout a math expression lifetime, the math processor then essentially replaces the symbol with the numeric, which can simplify and speed up math expression processing.
 
+Well, that is all well and good — until one wants to cheat:
+~~~
+gmic                                                                  \
+   eval "                                                             \
+          for(                                                        \
+               k=2,                                                   \
+               k<7,                                                   \
+               k=k+1,                                                 \
+               V=vector(#k,0);                                        \
+               fill(V,j,V[j]=2*j+3);                                  \
+               … # Do various things with our very own flexi-vector V \
+             )                                                        \
+        "                                                             \
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Evaluate expression '(...)' and assign it to status.
+[gmic]-0./ *** Error *** Command 'eval': Function 'vector()': First argument (of type 'scalar') is not a constant, in expression 'for(
+~~~
+G'MIC big, red letter message is its gentle way of observing that the iterator variable, 'k' can't possibly be a known constant value at compile time; assuredly, the variable changes during iteration in the run-time phase. But the creation function 'vector(# _<size>_,…)' most assuredly _does_ require a constant first argument because, in its current implementation, the math processor needs to establish all of its storage requirements up front, during compile time. So one cannot do dynamic vectors in this way. For that, consider [Dynamic arrays](https://gmic.eu/reference/mathematical_expressions.html#dynamic_arrays) where the math expression parser hijacks an image to furnish backing store for arrays that seem to adjust their sizes as elements are added or removed.
 
-Updated:
+Dynamic arrays aside, one may salvage the broken approach with this:
+~~~
+ gmic                            \
+   -repeat 5,k                   \
+   kay={\$k+1}                   \
+   -eval  "const kayiter = $kay; \
+          V=vector(#kayiter,0);  \
+          fill(V,j,V[j]=2*j+3);  \
+         "                       \
+   -done
+~~~
