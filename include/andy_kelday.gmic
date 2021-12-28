@@ -774,6 +774,42 @@ gcd_blur_texture : skip ${1=1},${2=1}
     j[0] ..,0,0,0,0,1,. k[0]
   endl done
 
+#@gui Undo Unsharp Mask : fx_gcd_undo_unsharp, fx_gcd_undo_unsharp_preview(0)
+#@gui : note = note("<i>Reverse the effect of an unsharp mask</i>"), sep = separator()
+#@gui : Radius = float(3,0,30)
+#@gui : Amount = float(0.5,0,5)
+#@gui : Type = choice(1,"Box","Gaussian")
+#@gui : sep = separator()
+#@gui : Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal",
+#@gui : "Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right",
+#@gui : "Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse")
+#@gui : Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2021/12/19</i>.</small>")
+#@gui : note = note("\n<small><b><u>Notes</u></b></small>")
+#@gui : note = note("<small>Useful for fixing halos due to excessive unsharp mask application.</small>")
+#@gui : note = note("<small>For best results, settings should match the original unsharp filter.</small>")
+#@gui : note = note("<small>This obviously requires estimation if the settings are unknown.</small>")
+fx_gcd_undo_unsharp : skip ${1=3},${2=0.5},${3=1}
+  repeat $! l[$>]
+    split_opacity gcd_reverse_unsharp[0] ${1-3} a c
+  endl done
+
+fx_gcd_undo_unsharp_preview :
+  gui_split_preview "fx_gcd_undo_unsharp ${1-3}",${-3--1}
+
+#@cli gcd_reverse_unsharp : std_deviation>=0[%],_amount>0,_type
+#@cli : Apply a reverse unsharp mask to selected images.
+#@cli : Values will be restricted to input image range.
+#@cli : 'type' can be { 0=boxfilter | 1=gaussian }.
+#@cli : Default values: 'std_deviation=3', 'amount=1' and 'type=1'.
+#@cli : $ image.jpg unsharp 2,3 c 0,255 +gcd_reverse_unsharp 2,3 c 0,255
+gcd_reverse_unsharp : skip ${1=3},${2=1},${3=1}
+  e[^-1] "Apply reverse unsharp on image$?, with std_deviation $1."
+  repeat $! l[$>]
+    if $3 cmd=b else cmd=boxfilter fi
+    m={[im,iM]} +$cmd $1 mul. $2 add div {1+$2} c $m
+  endl done
+
 #@gui LMS Adjustment : gcd_balance_lms, gcd_balance_lms(1)
 #@gui : note = note("<i>Chromatically adapt to a new illuminant</i>"), sep = separator()
 #@gui : Long = float(1,0.5,1.5)
@@ -2231,6 +2267,218 @@ gcd_dither_srgb : check "isint(${1=2}) && $1>=2"
 #@cli : Shuffle vectors of selected images with Fisher-Yates algorithm.
 #@cli : $ uniform_distribution 8,3 gcd_shuffle
 gcd_shuffle : f "<begin(P=whd-2^-14);swap(I[int(u(P--))],I)"
+
+#@cli gcd_primes : limit>=2
+#@cli : Return all primes not greater than the specified limit as a 1xN image.
+#@cli : Default values: 'limit=97'.
+#@cli : $ gcd_primes 1000
+gcd_primes : check "isint(${1=97}) && $1>1"
+  e[^-1] "Compute prime numbers not greater than $1."
+  1,{$1+1},1,1,y
+  eval "i[1]=0;for(N=2,N<=sqrt($1),++N,i[N]?for(P=N*N,P<=$1,P+=N,i[P]=0))"
+  discard. 0
+
+#@cli gcd_mean_transfer_curve :
+#@cli : Calculate mean transfer curve between selected pair of images.
+#@cli : Image values will be indexes to an output map per channel.
+#@cli : Each map contains original and mapped values.
+#@cli : $ image.jpg +negate noise. 50% gcd_mean_transfer_curve dg[^0]
+gcd_mean_transfer_curve :
+  e[0] "Index and calculate mean transfer curve for image$?."
+  if $!!=2 error "Two images are required for $0" fi
+  l[-2,-1]
+    s0={s#0} r. 100%,100%,100%,$s0 s c
+    repeat $s0 l[{[$<,$<+$s0]}]
+      dims={0,[w,h,d]}
+      $dims,3,[x,y,z] r. 1,{0,whd},1,3,-1
+      y[0,1] a c sort +,y $dims,1 1,1,1,2
+      eval "
+      col=I[#0,0];
+      V=col[0]; S=col[1]; N=1;
+      i(#-2,col[2,3])=0;
+
+      for(P=1;Q=0,P<h#0,++P,
+        col=I[#0,P];
+        if(V==col[0],
+          S+=col[1]; N++,
+          da_push([V,S/N]); V=col[0]; S=col[1]; N=1; Q++;
+        );
+        i(#-2,col[2,3])=Q;
+      );
+
+      da_push([V,S/N])"
+      rm[0] z. 0,0,0,{i(0,h-1)-1}
+    endl done a[^50%-100%] c
+  endl
+
+#=============================================
+#************* FILE BROWSER ******************
+#=============================================
+
+#@cli gcd_browse : "commands",_width,_height
+#@cli : Navigate and display images from local storage.
+#@cli : Specified "commands" can be applied while viewing.
+#@cli : All arguments are optional.
+#@cli :
+#@cli : Controls:
+#@cli : * `ESC or Q`     : Exit.
+#@cli : * `Arrow Keys`   : Navigate directories.
+#@cli : * `Page Up/Down` : Navigate images within current directory.
+#@cli : * `Home/End`     : View first/last image in current directory.
+#@cli : * `SPACE`   : Enable/disable specified commands.
+#@cli : * `i`       : Toggle information display.
+#@cli : * `f`       : Toggle fullscreen mode.
+#@cli : * `e`       : Toggle edge filtering.
+#@cli : * `w`       : Toggle wide mode.
+#@cli : * `a or z`  : Move up or down in wide mode.
+gcd_browse : check "isnum(${2=-1}) && isnum(${3=-1})" skip "${1=,}"
+if same(["'$1'"],',')
+  m "_gcd_tmp_cmd : +gcd_std_score_patch 3 compose_channels. add orientation.. mul.. 2 add n 0,255"
+else m "_gcd_tmp_cmd : $1"
+fi
+if ${-is_windows}" || "${-is_macos}
+  filespec={/"*.jpg","*.jpeg","*.png","*.tif","*.tiff"}
+else filespec={/"*.jpg","*.JPG","*.jpeg","*.png","*.tif","*.TIF","*.tiff"}
+fi
+  w,h={[$2>0?$2:{*,u}-1,$3>0?$3:{*,v}]} # get usable screen dimensions
+  cursor[0] 0 font={max(13,sqrt($w*$h)/48)} # font size
+  info,hq,fs,cmdon,refresh,pid,wide,start={[1,0,1,0,1,0,0,0.5]}
+  path_current path=${}
+  gcd_parentdir {``$path} files2img 1,${} nm. dirs
+  gcd_currentdir {``$path} gcd_argnum[dirs] ${}
+  dlim,dpos={dirs,[h,${}]} 0 nm. imgfiles 0 nm. vwimg
+  $w,$h,1,3 nm. screen # screen buffer image
+  1 store. cid # history of subfolder ids
+  1 store. pid # history of parentfolder ids
+  do
+    if $refresh
+      rm[imgfiles]
+      gcd_filelist {``$path},$filespec
+      nm. imgfiles lim,pos={imgfiles,[h,1]}
+      refresh={!$refresh}
+    fi
+    if $lim>0
+      rm[vwimg] gcd_imgarg[imgfiles] $pos i ${}
+      dim={`string(w,'x',h,'x',s)`}
+      details="dim: "$dim"  "{x}": "{b} nm. vwimg
+    else
+      rm[vwimg] 1,1,1,3 nm. vwimg details="no images"
+    fi
+    if $cmdon
+      l[vwimg] _gcd_tmp_cmd
+      if 1!=$! error "Exactly one image must be returned by custom commands" fi
+      nm vwimg
+      endl
+    fi
+    to_rgb[vwimg] gcd_resize_for_fs[vwimg] $w,$h,$hq,$wide
+    f[screen] 0 j[screen] [vwimg],0.5~,$start~
+    if $info
+      if $hq fe="edge " else fe="" fi if $cmdon fe.="cmd " fi
+      0 t. $path,0,0,$font,1,255,255,255 j[screen] .
+      0 t. $dpos"/"$dlim,0,0,{$font*2},1,255,0,255 j[screen] .,0,{h#-2} rm[-2,-1]
+      0 t. $details,0,0,$font,1,255,255,255 j[screen] .,0,{{screen,h}-h} rm.
+      0 t. $fe$pos"/"$lim,0,0,{$font*2},1,0,255,0 j[screen] .,{{screen,w}-w} rm.
+    fi
+    # display and wait/check for keypress
+    w[screen] 100%,100%,0,$fs,"Image Browser" cursor[0] 0 wait
+    if {*,PAGEUP}" && "$pos>1 pos-=1 wait -1 fi
+    if {*,PAGEDOWN}" && "$pos<$lim pos+=1 wait -1 fi
+    if {*,HOME} pos=1 wait -1 elif {*,END} pos=$lim wait -1 fi
+    if {*,E} hq={!$hq} wait -1 elif {*,SPACE} cmdon={!$cmdon} wait -1 fi
+    if {*,F} fs={!$fs} if $fs w[] 100%,100%,0,1 fi wait -1 fi
+    if {*,I} info={!$info} wait -1 fi
+    if {*,W} wide={!$wide} wait -1 fi
+    if {*,Z} start={min($start+0.25,1)} wait -1 fi
+    if {*,A} start={max($start-0.25,0)} wait -1 fi
+    if {*,ARROWLEFT}
+      i $cid eval "da_push("$dpos")" store. cid
+      i $pid eval "S=da_size();V=i[S-1]; S>0?da_remove(); V" nxt=${} store. pid
+      gcd_parentdir {``$path} path=${}
+      rm[dirs] gcd_parentdir {``$path} files2img 1,${} nm. dirs
+      if $nxt==0 gcd_currentdir {``$path} gcd_argnum[dirs] ${} nxt=${} fi
+      dlim,dpos={dirs,[h,max($nxt,1)]}
+      refresh=1 wait -1
+    fi
+    if {*,ARROWRIGHT}" && "$dlim>0
+      files2img 1,{``$path} nm. subdirs
+      if h>0
+        i $pid eval "da_push("$dpos")" store. pid
+        i $cid eval "S=da_size();V=i[S-1]; S>0?da_remove(); V" nxt=${} store. cid
+        rm[dirs] nm[subdirs] dirs
+        dlim,dpos={dirs,[h,max($nxt,1)]}
+        gcd_imgarg[dirs] $dpos path.=${}"/"
+        refresh=1 wait -1
+      else rm[subdirs] fi
+    fi
+    if {*,ARROWUP}" && "$dpos>1
+      1 store. cid # invalidate subfolder history
+      dpos-=1 gcd_parentdir {``$path} path=${}
+      gcd_imgarg[dirs] $dpos path.=${}"/"
+      refresh=1 wait -1
+    fi
+    if {*,ARROWDOWN}" && "$dpos<$dlim
+      1 store. cid # invalidate subfolder history
+      dpos+=1 gcd_parentdir {``$path} path=${}
+      gcd_imgarg[dirs] $dpos path.=${}"/"
+      refresh=1 wait -1
+    fi
+  while {*}" && "!{*,Q}" && "!{*,ESC}
+  um _gcd_tmp_cmd cursor[0] 1 w 0 # restore view and exit
+  e $path e $details rm[dirs,imgfiles,vwimg,screen]
+
+#@cli gcd_imgarg : n>=1
+#@cli : Return the n-th argument of the specified string list image.
+gcd_imgarg : skip ${1=1} u {``{`I[$1-1]`}}
+
+#@cli gcd_argnum : "search_str"
+#@cli : Return the index of the first matching argument in the specified string list image.
+gcd_argnum :
+  num,sz={[0,s]}
+  +l.
+    s y ({'"$1"'}:y) r. 1,$sz,1,1,0 neq[^-1] . rm. discard 0
+    repeat $! if {$>,whds}==0 num={$>+1} break fi done rm
+  endl u $num
+
+#@cli gcd_parentdir : "path"
+#@cli : Return the parent directory path of the specified directory path.
+gcd_parentdir :
+  if size(['"$1"'])<3 u "$1" return fi
+  ('"$1"') replace_str. "\\","/"
+  l.
+    if i[#-1,h-1]!='/' ('/') a[-2,-1] y fi
+    s +,y,47 rm[-2,-1] a y
+  endl u {t} rm.
+
+#@cli gcd_currentdir : "path"
+#@cli : Return the last directory name of the specified directory path.
+gcd_currentdir :
+  if size(['"$1"'])<2 u "/" return fi
+  ('"$1"') replace_str. "\\","/"
+  l. s -,y,47 k. endl u {t} rm.
+
+#@cli gcd_filelist : "path",_arg1,...,_argN
+#@cli : Return the list of files within the specified directory path.
+gcd_filelist :
+  path="$1" globs=${2--1} num={$#-1}
+  repeat $num
+    arg {$>+1},$globs glob=${}
+    files2img 3,{``$path}$glob
+  done a[-$num--1] y
+
+#@cli gcd_resize_for_fs : width,_height,_is_filtered_edge
+#@cli : Resize image for fullscreen display.
+gcd_resize_for_fs : skip ${1=1920},${2=1080},${3=0},${4=0}
+  repeat $! l[$>]
+    w,h={[w,h]} mx={[im,iM]}
+    if $4
+      if $w>=$1" || "$3==0 r2dx $1,3 else gcd_upscale_edge {$1/$w},1 fi
+    else
+      if $h>=$2" || "$3==0 r2dy $2,3 else gcd_upscale_edge {$2/$h},1 fi
+    fi
+    gcd_noalpha c $mx
+  endl done
+
+#=============================================
 
 #@gui _
 

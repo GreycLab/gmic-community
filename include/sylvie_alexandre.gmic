@@ -36,7 +36,7 @@
 #@gui :_=link("https://github.com/dtschump/gmic-community","https://github.com/dtschump/gmic-community")
 #@gui :_=note("Les filtres contenus dans ce répertoire sont majoritairement traduits en français et/ou en cours de développement.")
 #@gui :_=note("The filters included in this directory are mostly translated into French and/or experimental.")
-#@gui :_=note("Version 2021/09/01 GMIC 2.9.9_pre")
+#@gui :_=note("Version 2021/11/27 GMIC 3.0.0_pre")
 
 samj_about :
 
@@ -23648,7 +23648,6 @@ samj_rien_sequences :
 #@gui _
 #@gui <b>Sequences</b>
 
-
 #################################################################################################################################################################################################
 #
 #                                                                                                                                                                                         VARIOUS
@@ -23764,6 +23763,86 @@ samj_rien_various :
 ####     #@gui :_=note("5 \303\275      )
 ####     #@gui :_=note("6 \303\276      )
 ####     #@gui :_=note("7 \303\277   ÿ   )
+
+#################################################
+##                                             ##
+##             samj_resize_screen              ##
+##                                             ##
+#################################################
+
+#@cli samj_resize_screen : expand={ 0 | 1 }
+#@cli : Mettre l'image selon les dimensions de l'écran. / Put the image to the dimensions of the screen.
+#@cli : $ image.jpg samj_resize_screen
+samj_resize_screen :
+	skip ${1=1}
+	Screen_W={*,u}
+	Screen_H={*,v}
+	Image_W={w}
+	Image_H={h}
+	Scr_Rap={$Screen_W/$Screen_H}
+	Img_Rap={$Image_W/$Image_H}
+	if {$Scr_Rap}>{$Img_Rap}
+		resize {$Image_W/$Image_H*$Screen_H},$Screen_H
+		if $1==1 to_a expand_x {{$Screen_W-{w}}/2},0 fi
+	else
+		resize $Screen_W,{$Image_H/$Image_W*$Screen_W}
+		if $1==1 to_a expand_y {{$Screen_H-{h}}/2},0 fi
+	fi
+#################################################
+##                                             ##
+##           FIN samj_resize_screen            ##
+##                                             ##
+#################################################
+
+#################################################
+##                                             ##
+##          samj_full_screen_display           ##
+##                                             ##
+#################################################
+
+#@cli samj_full_screen_display : _monitor={ 0 | 1 },_width>0,_height>0,_time_ms>=0
+#@cli : Affiche une image en plein écran, soit selon les caractéristiques de l'écran ou selon les dimensions de $2 et $3. Possibilité d'activer une temporisation en ms ($4).
+#@cli : L'appui sur une des touches du clavier 'Q', 'Échappement', 'Barre d'espacement' et 'Entrée' permet d'arrêter l'affichage.
+#@cli : Displays a full screen image, depending on the characteristics of the screen or dimensions ($2,$3). Ability to activate a ms delay ($4).
+#@cli : The keyboard keys 'Q', 'Escape', 'Space bar' and 'Enter' allows you to stop the display.
+#@cli : Valeurs par défaut / Default values: 'monitor=1', 'width=800', 'height=600', 'time_ms=5000'.
+#@cli : $ image.jpg +samj_full_screen_display 0,400,300,4000 blur 20 +samj_full_screen_display
+samj_full_screen_display :
+	skip ${1=1},${2=800},${3=600},${4=5000}
+	if $1==1
+		Screen_W={*,u}
+		Screen_H={*,v}
+	else
+		if ["'$2'"]=='' Screen_W=800 else Screen_W=$2 fi
+		if ["'$3'"]=='' Screen_H=600 else Screen_H=$3 fi
+	fi
+	Image_W={w}
+	Image_H={h}
+	Scr_Rap={$Screen_W/$Screen_H}
+	Img_Rap={$Image_W/$Image_H}
+	if {$Scr_Rap}>{$Img_Rap}
+		resize {$Image_W/$Image_H*$Screen_H},$Screen_H
+		expand_x {{$Screen_W-{w}}/2},0
+	else
+		resize $Screen_W,{$Image_H/$Image_W*$Screen_W}
+		expand_y {{$Screen_H-{h}}/2},0
+	fi
+	if $1==1 window $Screen_W,$Screen_H,0,1 else window $Screen_W,$Screen_H,0,0,5%,5%,$Screen_W*$Screen_H fi
+	if $4>0
+		Pre=50 # ms 
+		Bc={$4/$Pre}
+		repeat $Bc
+			if {{*,ESC}||{*,Q}||{*,SPACE}||{*,ENTER}} break fi # Merci à Garagecoder pour l'idée
+			wait $Pre
+		done
+	fi
+	rm
+
+#################################################
+##                                             ##
+##        FIN samj_full_screen_display         ##
+##                                             ##
+#################################################
 
 #################################################
 ##                                             ##
@@ -25131,6 +25210,55 @@ Je_passe_l_hiver_en_Floride :
 ##       FIN Je_passe_l_hiver_en_Floride       ##
 ##                                             ##
 #################################################
+
+#################################################
+##                                             ##
+##                samj_diaporama               ##
+##                                             ##
+#################################################
+# Merci à Garagecoder pour son aide :o)
+#@gui Diaporama - Slideshow : samj_diaporama,gui_no_preview
+#@gui :_=note("Ce filtre démarre un diaporama automatique en mode plein écran.\n<b><span foreground="red"> Paramétrage à faire :\n - Calques en entrée = Tous.\n - Mode de sortie = Nouvelle image.</span></b>")
+#@gui :_=note(" - Delai / Time Secondes = Temps d'affichage de chaque calque.\n - Diaporama Infini / Infinite slideshow = Boucle infinie d'affichage des images.")
+#@gui :_=note("<small>Utilisation du clavier :\n - Barre d'espacement ou Entrée = Image suivante.\n - Échap ou Q = Sortie du diaporama.\n - Page Haut = Image précédente.</small>")
+#@gui :_=separator()
+#@gui :_=note("This filter starts an automatic slideshow in full screen mode.\n<b><span foreground="red"> Important settings to do :\n - Input layers = All.\n - Output mode = New image.</span></b>")
+#@gui :_=note(" - Delai / Time Secondes = Display time of each layer.\n - Diaporama Infini / Infinite slideshow = Infinite image display loop.")
+#@gui :_=note("<small>Using the keyboard :\n - Space bar or Enter = Next image.\n - Esc or Q = Exit.\n - Page UP = Previous image.</small>")
+#@gui :_=separator()
+#@gui : Delai / Time Secondes = int(1,1,300)
+#@gui : Diaporama Infini / Infinite slideshow = bool(0)
+samj_diaporama :
+	if $2==0
+		samj_diapo $1
+	else
+		do
+			if {{*,ESC}||{*,Q}} break fi
+			samj_diapo $1
+		while 1
+	fi
+	rm[-$!--1]
+
+samj_diapo :
+	Delai={$1*1000}
+	Bc=$!
+	do
+		if {{*,ESC}||{*,Q}} break fi
+		if {*,PAGEUP}
+			Bc={$Bc+2}
+			if $Bc>$! Bc=$! fi
+		fi
+		if {*,PAGEDOWN} Bc={$Bc-2} fi
+		+samj_full_screen_display[{$Bc-$!-1}] 1,,,$Delai
+		Bc={$Bc-1}
+	while $Bc>=1
+
+#################################################
+##                                             ##
+##              FIN samj_diaporama             ##
+##                                             ##
+#################################################
+
 #################################################
 ##                                             ##
 ##               samj_Tests_Fill               ##
