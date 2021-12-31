@@ -47,6 +47,461 @@
 #@cli :: Reptorian's CLI Commands
 #
 #-------------------------------
+#@cli +rep_hitomezashi : "str_a","str_b",_upscale_pixel>=1,[colors_a palette],[colors_b stray_palette],_shift_color,_boundary={ 0=Periodic | 1=Continuous },_stray_color_seed,0<=_symmetry_mode<=3,stray_col_a,...stray_col_n,border_size,border_col_a,...,border_col_n,frames : "str_a","str_b",upscale_pixel>=1,colors_a={ hex | value~ },colors_b={ hex | value~ },_shift_color,_boundary={ 0=Periodic | 1=Continuous },_stray_color_seed,0<=_symmetry_mode<=3,border_size,border_col_a,...border_col_n
+#@cli : Create Hitomezashi Stitch Pattern.
+#@cli :
+#@cli : Note: The number of stray_color and number of border color depends on the number of channels to be used. For example, in the case of palette, it depends on number of channels per palette. In case of hex, then it depends on number of characters divided by two. Finally, if you insert wave at the end, there is only one.
+#@cli :
+#@cli : Author : Reptorian.
+#@cli : Default value : '_upscale_pixel=1','colors_a=n/a','colors_b=n/a','_shift_color=0','_boundary=0','_stray_color_seed=n/a','_symmetry_mode=n/a'
++rep_hitomezashi:
+
+skip ${3=1},${4=},${5=},${6=},${7=},${8=},${9=},${10=0},${11=},${12=}
+ 
+$=argpos
+ 
+pixel_size,colors_a,colors_b,shift_colors,boundary,seed,sym_mode,use_remove_image={max(int($3)*100,100)}%,${4-9},1
+use_rescale,_border_size={$pixel_size!=1},{($pixel_size)>1?min(max(0,($pixel_size)-1),abs($10)):0}
+ 
+m "generate_border :
+ if narg($""*)>1 out_color=[$""*]
+ else out_color=$""1
+ fi
+ eval.. \"begin(
+   const pixel_size="$pixel_size";
+   const border_size=$_border_size;
+   const ip=floor(border_size/2);
+   const iq=ceil(border_size/2);
+   color=\"$out_color\";
+   const iex=w#-1-1;
+   const iey=h#-1-1;
+   const bpe=max(0,(border_size-1));
+   const xbpe=w#-1-1-bpe;
+   const ybpe=h#-1-1-bpe;
+  );
+  ix=x*pixel_size-ip;
+  iy=y*pixel_size-ip;
+  sx=(x+1)*pixel_size-ip;
+  sy=(y+1)*pixel_size-ip;
+  ex=(x+1)*pixel_size+max(iq-1,0);
+  ey=(y+1)*pixel_size+max(iq-1,0);
+  if(i!=j(1,0,0,0,0,1),polygon(#-1,4,
+   sx,iy,
+   ex,iy,
+   ex,ey,
+   sx,ey,
+  1,color););
+  if(i!=j(0,1,0,0,0,1),polygon(#-1,4,
+   ix,sy,
+   ex,sy,
+   ex,ey,
+   ix,ey,
+  1,color););
+# end(
+#  polygon(#-1,4,
+#   0,0,
+#   iex,0,
+#   iex,bpe,
+#   0,bpe,
+#   1,color
+#  );
+#  polygon(#-1,4,
+#   0,0,
+#   bpe,0,
+#   bpe,iey,
+#   0,iey,
+#   1,color
+#  );
+#  polygon(#-1,4,
+#   xbpe,0,
+#   iex,0,
+#   iex,iey,
+#   xbpe,iey,
+#   1,color
+#  );
+#  polygon(#-1,4,
+#   ybpe,ybpe,
+#   bpe,ybpe,
+#   bpe,iey,
+#   ybpe,iey,
+#   1,color
+#  );
+# );
+   \""
+   
+m "generate_border_depth :
+ if narg($""*)>1 out_color=[$""*]
+ else out_color=$""1
+ fi
+ eval.. \"begin(
+   const pixel_size="$pixel_size";
+   const border_size=$_border_size;
+   const l_length=(pixel_size+border_size);
+   const depth=d#-1;
+   const length=l_length*border_size*depth*s#-1;
+   const edge_x_length=w#-1*border_size*depth*s#-1;
+   const edge_y_length=h#-1*border_size*depth*s#-1;
+   const ip=floor(border_size/2);
+   const iq=ceil(border_size/2);
+   color=\"$out_color\";
+   const iex=w#-1-1;
+   const iey=h#-1-1;
+   const bpe=max(0,(border_size-1));
+   const xbpe=w#-1-1-bpe;
+   const ybpe=h#-1-1-bpe;
+   vcol=resize(color,length,1,0);
+   edge_x=resize(color,edge_x_length,1,0);
+   edge_y=resize(color,edge_y_length,1,0);
+  );
+  ix=x*pixel_size-ip;
+  iy=y*pixel_size-ip;
+  sx=(x+1)*pixel_size-ip;
+  sy=(y+1)*pixel_size-ip;
+  if(i!=j(1,0,0,0,0,1),draw(#-1,vcol,sx,iy,0,0,border_size,l_length,depth,s#-1,1));
+  if(i!=j(0,1,0,0,0,1),draw(#-1,vcol,ix,sy,0,0,l_length,border_size,depth,s#-1,1));
+  # end(
+  #  draw(#-1,edge_x,0,0,0,0,w#-1,border_size,depth,s#-1,1);
+  #  draw(#-1,edge_y,0,0,0,0,border_size,h#-1,depth,s#-1,1);
+  #  draw(#-1,edge_x,0,h#-1-border_size,0,0,w#-1,border_size,depth,s#-1,1);
+  #  draw(#-1,edge_y,w#-1-border_size,0,0,0,border_size,h#-1,depth,s#-1,1);
+  # );
+  \""
+ 
++rep_binary_hitomezashi "$1","$2"
+ 
+if ${is_image_arg\ $colors_a}||${is_image_arg\ $colors_b}
+ 
+ np=0
+ if narg($colors_a) pass$colors_a 1 np+=1 fi
+ if narg($colors_b) pass$colors_b 1 np+=1 fi
+  
+ if narg(${argpos{10+s#-1}}) _border_size={($pixel_size)>1?min(max(0,($pixel_size)-1),abs(${argpos{10+s#-1}})):0}
+ else _border_size=0
+ fi
+  
+ if narg(${argpos{11+s#-1*2}}) depth=${argpos{11+s#-1*2}}
+ else depth=1
+ fi
+  
+ stray_color=""
+ border_color=""
+ sid={s#-1-1}
+  
+  
+ repeat s#-1,n
+  stray_color.=${argpos{10+$>}}
+  border_color.=${argpos{11+s#-1+$>}}
+  if $n<$sid 
+   stray_color.=,
+   border_color.=,
+  fi
+ done
+  
+ if $np==2
+  
+  +_rep_colorize_binary_hitomezashi... [-2],[-1],$shift_colors,$boundary,$seed,$depth
+  rm[-3,-2]
+  if narg($sym_mode) rep_symmetrize_xy[-2,-1] $sym_mode fi
+  r. {w#-1*$pixel_size},{h#-1*$pixel_size},{d#-1},{s#-1},1
+  
+  if $_border_size
+   if $depth>1 generate_border_depth $border_color
+   else generate_border $border_color
+   fi
+  fi
+   
+ else
+  
+  +_rep_colorize_binary_hitomezashi.. [-1],,$shift_colors,$boundary,$seed,$stray_color,$depth
+  rm..
+  if narg($sym_mode) rep_symmetrize_xy[-2,-1] $sym_mode fi
+  r. {w#-1*$pixel_size},{h#-1*$pixel_size},{d#-1},{s#-1},1
+   
+  if $_border_size
+   if $depth>1 generate_border_depth $border_color
+   else generate_border $border_color
+   fi
+  fi
+   
+ fi
+  
+elif narg($colors_a)||narg($colors_b)
+ if narg($sym_mode) rep_symmetrize_xy. $sym_mode fi
+ 
+ wave_check_a={narg($colors_a)?${rep_contains_wave_at_end\ $colors_a}:0}
+ wave_check_b={narg($colors_b)?${rep_contains_wave_at_end\ $colors_b}:0}
+ wave_mode={$wave_check_a+$wave_check_b}
+  
+ if $wave_mode==2
+  ('$colors_a') r. {w#-1-1} a={t}
+  ('$colors_b') r. {w#-1-1} b={t}
+  rm[-2,-1]
+  +f. i?$b:$a
+   
+  if $use_rescale resize2dx. $pixel_size,1 fi
+   
+  if $border_size
+   v=$11
+   generate_border $v
+  fi
+
+ elif $wave_mode==1 
+  if $wave_check_a ('$colors_a') r. {w#-1-1} a={t} fi
+  if $wave_check_b ('$colors_b') r. {w#-1-1} a={t} fi
+  rm.
+   
+  if $use_rescale {w*$pixel_size},{h*$pixel_size},1,1,$a fi
+
+  if $border_size
+   v=$11
+   generate_border $v
+  fi
+
+ else  
+  
+  na={narg($colors_a)+narg($colors_b)}
+   
+  if $na==2
+   
+   rgb_a=${rep_hex2int8\ $colors_a}
+   rgb_b=${rep_hex2int8\ $colors_b}
+   check narg($rgb_a)==narg($rgb_b)
+   {w},{h},1,{narg($rgb_a)},i#-1?[$rgb_b]:[$rgb_a]
+   if $use_rescale resize2dx. $pixel_size,1 fi
+    
+   if $border_size
+    v=${11--1}
+    generate_border $v    
+   fi
+    
+  elif $na==1
+   
+   if narg($colors_a) rgb=${rep_hex2int8\ $colors_a} fi
+   if narg($colors_b) rgb=${rep_hex2int8\ $colors_b} fi
+   {w*$pixel_size},{h*$pixel_size},1,{narg($rgb)},[$rgb]
+    
+   if $border_size
+    v=${11--1}
+    generate_border $v    
+   fi
+    
+  else
+   
+   use_remove_image=0
+   if narg($sym_mode) rep_symmetrize_xy. $sym_mode fi
+   if $use_rescale resize2dx. $pixel_size,1 fi 
+    
+  fi
+   
+ fi
+  
+fi
+ 
+if $use_remove_image rm.. fi
+
+um generate_border,generate_border_depth
++_rep_colorize_binary_hitomezashi:
+skip "${1=}","${2=}","${3=0}","${4=0}","${5=}","${6=}"
+
+if $!>1 error inv_img_cnt fi
+ 
+ml={norm(w,h)}
+ 
++label.
+ 
+{iM#-1+1},1,1,3,[x,0,0] sh. 1,2
+{w#-2},1,1,1,$ml
+eval[-4] >"
+ i(#-2,i,0,0,0)=i(#-1,i,0,0)=min(norm(x,y),i(#-1,i,0,0));
+ i(#-2,i,0,0,1)++;"
+rm[-2,-1]
+sh. 1 pixelsort.. +,x,[-1] rm.
+ 
+nm. ref_ind
+ 
+sh. 1,2
+ 
+ni=0
+ 
+if ${is_image_arg\ $1}
+ pass$1 1 
+ ni+=1
+else no_pal_available fi
+ 
+if ${is_image_arg\ $2}
+ pass$2 1
+ ni+=1
+fi
+ 
+if $ni==2
+ 
+ if s#-2!=s#-1 error inv_chnl_cnt fi
+  
+ frame_count={narg($6)?$6:1}
+  
+ eval "
+  if(narg($5),srand($5););
+  const length=w#-3;
+  const nc=w#-1;
+  pos=0;
+  t=-1;
+  tv=inf;
+  ind=-1;
+  while(pos<length,
+   i(#-3,pos,0,0,1)==1?(
+    rpos=int(u(0,nc));
+    if(rpos==t,rpos=u(1)<.5?(rpos+1)%nc:(rpos-1)%nc);
+    t=rpos;
+    I(#-3,pos,0,0)=[rpos,0];
+    pos++;
+   ):(
+    if(i(#-3,pos,0,0,0)!=tv,ind++;);
+    tv=i(#-3,pos,0,0,0);
+    I(#-3,pos,0,0)=[ind,1];
+    pos++;
+   );
+  );"
+elif $ni==1
+ 
+ $=frame_arg
+ frame_count={narg(${frame_arg{6+s#-1}})?${frame_arg{6+s#-1}}:1}
+  
+ eval "
+  if(narg($5),srand($5););
+  const length=w#-2;
+  pos=0;
+  tv=inf;
+  ind=-1;
+  while(pos<length,
+   i(#-2,pos,0,0,1)==1?(
+    I(#-2,pos,0,0)=vector(#2,0);
+    pos++;
+   ):(
+    if(i(#-2,pos,0,0,0)!=tv,ind++;);
+    tv=i(#-2,pos,0,0,0);
+    I(#-2,pos,0,0)=[ind,1];
+    pos++;
+   );
+  );"
+else
+ error no_img_arg
+fi
+ 
+rm[{$ni==2?-3:-2}]
+ 
+sh[ref_ind] 0 pixelsort[ref_ind] +,x,[-1] rm. sh[ref_ind] 1,2
+ 
+tf={abs($frame_count)}
+tf_max_id={$tf-1}
+ 
+{w#-1},1,$tf,{s#-2},"begin(
+  const bnd=$4%2+2;
+  $ni==2?(
+   bg_col()=I(#-3,pos+$3+z,0,0,0,bnd);
+   str_col()=I(#-2,pos,0,0);
+  ):(
+   bg_col()=I(#-2,pos+$3+z,0,0,0,bnd);
+   str_col()=vector(#s#-2,${6--1});
+  );
+ );
+ pos=i(#-1,x,0,0,0);
+ pal_mode=i(#-1,x,0,0,1);
+ if(pal_mode,bg_col(),str_col());"
+  
+if abs($frame_count)<=1
+ map[1] [-1] rm[{$ni==2?-5:-4}--1]
+else
+ direction=${arg\ 1+($frame_count>0),$tf_max_id-z,z}
+ {w#1},{h#1},$tf,{s#-1},I(#-1,i(#1,x,y,0,0),0,$direction)
+ rm[1--2]
+fi
+#@cli rep_binary_hitomezashi : string_a,string_b,[_rules]
+#@cli : Create a hitomezashi image. Strings inserted as argument are treated as unicode converted to binary based on rules. Rules has been pre-defined already.
+#@cli :
+#@cli : Note : Original Source Code is at found at the spreadsheet link within this link - https://aperiodical.com/2020/12/mobile-numbers-hitomezashi-stitching/
+#@cli :
+#@cli : Author: Reptorian.
++rep_binary_hitomezashi:
+skip "${3=}" #If there is no 3rd argument, then $3 is treated as null. So therefore, 2 arguments.
+
+(1,0,0,0,0,0,1,1,1,1,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,1,0,0,1,0,0,1,0,0,0,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,0,0,0,0,0,0,0,0,1,1,1,0,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,0,1,0,1,1,1,0,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1,0,1,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,1) # rules
+
+('"$1"') # Get array of unicode value of input 1
+('"$2"') # Get array of unicode value of input 2
+
+f[-2,-1] i(#-3,i) # Convert unicode image/array to binary with rules.
+
+echo {1-crop(#-1)}
+
+{w#-1},1,1,1,>begin(v=0;);v=x?(j(#-1,-1)+v)%2:0; rm.. # Process first column. Creates auxilatory surface and then remove reference surface.
+
+{w#-2},{w#-1},1,1 # Create a 2D surface to write on
+
+eval.. "
+ v=i(#-1,0,x)=i;
+ row=x+1;
+ repeat(w#-3-1,p,
+  v=i(#-1,p+1,x)=sum(v,i(#-3,p,0),row,1)%2;
+ );" #Generate value from spreadsheet rule.
+
+rm[-4--2] # Keep only the Hitomezashi Pattern
+rep_cellular_automata:
+skip ${2=}
+
+channels 0
+
+rule_decimal,min_arr_size=${1-2}
+
+dec2bin $1 ('${}') -. 48 # Create Binary Array From Decimal Input
+nm. rules
+
+if narg($min_arr_size)
+ if w<$min_arr_size
+  r. $2,1,1,1,0,0,1
+ fi
+fi
+
+repeat $!-1 l[$>,-1]
+ ow,oh={w#0},{h#0}
+ 
+ unroll[0] x
+ iter={ceil(w#0/w#-1)}
+ 
+ $ow,1,1,1,int(u(0,2))
+ 
+ repeat $iter,p
+ 
+  pos={$p*w}
+  
+  if !iv#-1 f. int(u(0,2)) fi
+  
+  {w},1,1,1,"begin(
+   state(n)=i(#-1,n,0,0,0);
+  );
+  k=4*state((x-1+w)%w)+2*state(x)+state((x+1)%w);
+  i(#-2,k,0,0,0);"
+  
+  j[0] [-1],$pos,0
+  
+  rm..
+  
+ done
+ 
+ r[0] $ow,$oh,1,1,-1
+ rm.
+ 
+endl done
+
+rm.
+#@cli rep_contains_wave_at_end : "str"
+#@cli : Return whether it contains a wave at end.
+#@cli : Author: Reptorian.
+rep_contains_wave_at_end: skip "${1=}" if narg($1) u {a=['$1'];(a)[size(a)-1]==126} else u 0 fi
+#@cli rep_random_binary: num_of_chars
+#@cli : Return randomly generated binary number based on number of characters.
+#@cli :
+#@cli : Author : Reptorian.
+rep_random_binary: {max(2,abs($1))},1,1,1,int(u(0,2))+48 u {t} rm.
 #@cli rep_sym_xy: eq. to 'rep_symmetrize_xy'. : (+)
 rep_sym_xy: rep_symmetrize_xy $1
 #@cli rep_symmetrize_xy: 0<=mode<=3
