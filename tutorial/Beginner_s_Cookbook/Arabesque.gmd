@@ -54,131 +54,141 @@ That's the game — and our play. All we have to do is code.
 
 ??? wheelie.gmic
 ~~~
-  1wheelie :
-  2
-  3   # wheelie: a circle of a particular (1) radius, (2) phase angle
-  4   # (orientation) and (3) discrete angular velocity - a relative integral
-  5   # number of revolutions per however long one revolution takes. Wheelies
-  6   # chain together, the center of one situated at 0° on the rim of its
-  7   # predecessor. The first wheelie of the chain centers at the origin and
-  8   # the last has, instead of another wheelie, an attached marking
-  9   # pen. Thus, the entire ensemble draws an "arabesque" as the individual
- 10   # wheelies rotate at their respective angular velocities from their
- 11   # initial orientations.
- 12   #   
- 13   # Fetch an arbitrarily long argument list to $a0, $a1, …, $an
- 14
- 15   $=a
- 16
- 17   # Expect data triplets: radius, phase angle, angular velocity.
- 18
- 19   -check "isint($a1) && !(($#-1)%3)"
- 20
- 21   # Initial argument: side width (sw)
- 22
- 23   sw={$a1/2}
- 24
- 25   # Argument image: For each wheelie, compose radius and phase
- 26   # arguments into a transformation matrix. In the generation loop, we
- 27   # compose this with the angle resulting from one angular velocity
- 28   # step.
- 29
- 30   ccnt={int($#-1/3)}
- 31   -input $ccnt,1,1,12
- 32   -name  args
- 33
- 34   # Iterate over argument vector. For each triplet – representing a
- 35   # wheelie – Fetch radius (rad), phase angle (ang) and angular
- 36   # velocity (sf) parameters.
- 37
- 38   -repeat $#-1,j
- 39      -if   $j%3==0 # get radius
- 40         rad=${a{2+$j}}
- 41         -check isnum($rad)" && "$rad>=0" && "$rad<=1
- 42         -set[args] $rad,{round($j/3,1,-1)},0,0,0
- 43      -elif $j%3==1 # get angle, degrees
- 44         ang=${a{2+$j}}
- 45         -check isnum($ang)" && "$ang>=0" && "$ang<=360
- 46         -set[args] $ang,{round($j/3,1,-1)},0,0,1
- 47      -else         # get ω and set spectral coefficient
- 48         sf=${a{2+$j}}
- 49         -check isint($sf)" && "abs($sf)<=0.1*$sw
- 50         -set[args] $sf,{round($j/3,1,-1)},0,0,2
- 51      -fi
- 52   -done
- 53
- 54   # Iterate over argument image, each 12 channel pixel representing
- 55   # one wheelie. The first three channels contain wheelie radius,
- 56   # phase angle and radial velocity. Compose a matrix transforming
- 57   # the origin to the tip of the wheelie, a radial translation and
- 58   # phase rotation. Populate the nine remaining channels with this
- 59   # matrix.
- 60
- 61   -fill[args] ">
- 62                  CPX=I;
- 63                  orot=rot([0,0,1],deg2rad(CPX[1])); # phase rotation
- 64                  xlat=eye(3);
- 65                  xlat[2]=CPX[0];                    # translation origin-to-rim
- 66                  FIN=[CPX[0,3,1],mul(orot,xlat,3)]; # phase rotation & translation
- 67                  FIN                                # store above in 12-channel pixel
- 68               "
- 69   -permute[args] cyzx
- 70   -store[args] circles
- 71
- 72   # Screenspace transform.
- 73   ssxfrm={specw=get('sw',1,0);id=eye(3);id[0]=0;id[1]=specw[0]/2;id[2]=specw[0];id[3]=-specw[0]/2;id[4]=0;id[5]=specw[0];id}
- 74
- 75   # Draw arabesques on this image
- 76   -input {2*$sw},{2*$sw},1,1
- 77   -name. canvas
- 78
- 79   atk=0
- 80   lastpt={vector3([0,0,1])}
- 81   firstpt={vector3([0,0,1])}
- 82   -repeat 3*$sw,k
- 83       # For each wheelie:
- 84       #    increment by angular velocity
- 85       #    find corresponding rotation matrix
- 86       #    compose with radial argument image, compose
- 87       #    with screenspace transform and plot via polygon().
- 88
- 89       -eval ">
- 90                const cc=$ccnt;
- 91                fpt=get('firstpt',3,0);
- 92                ik=get('k',0,0);
- 93                lpt=get('lastpt',3,0);
- 94                omega=get('atk',0,0);
- 95                specw=get('sw',0,0);
- 96                circs=get('circles',12*cc,0);
- 97                const VLEN=3*cc+1;
- 98                pp=vectorVLEN([0,0,1]);
- 99                repeat(
-100                         cc,k,
-101                         idx=cc-k-1;
-102                         rbradx=mul(
-103                                     rot([0,0,1],circs[12*idx+2]*omega),
-104                                     circs[12*idx+3,9,1],
-105                                     3
-106                                   );
-107                         repeat(
-108                                 k+1,j,
-109                                 px=rbradx*pp[3*(k-j),3];
-110                                 pp[3*(k-j)]=px[0];
-111                                 pp[3*(k-j)+1]=px[1];
-112                                 pp[3*(k-j)+2]=px[2];
-113                               )
-114                      );
-115               ssx=get('ssxfrm',9,0);
-116               plt=ssx*pp[0,3];
-117               ik>0?
-118                   polygon(#-1,-2,[plt[0,2],lpt[0,2]],1,0xffffffff,255):
-119                   store(plt,'firstpt',3,1,1,1);
-120               store(plt,'lastpt',3,1,1,1);
-121               ik==(3*specw-1)?
-122                   polygon(#-1,-2,[fpt[0,2],plt[0,2]],1,0xffffffff,255)
-123              "
-124       atk={2*pi*($k/(3*$sw-1))}
-125   -done
+   1	wheelie :
+   2	   # wheelie: a circle of a particular (1) radius, (2) phase angle
+   3	   # (orientation) and (3) discrete angular velocity - a relative
+   4	   # integral number of revolutions per however long one revolution
+   5	   # takes. Wheelies chain together, the center of one situated at 0°
+   6	   # on the rim of its predecessor. The first wheelie of the chain
+   7	   # centers at the origin and the last has, instead of another
+   8	   # wheelie, an attached marking pen. Thus, the entire ensemble draws an
+   9	   # "arabesque" as the individual wheelies rotate at their respective
+  10	   # angular velocities from their initial orientations. This script
+  11	   # animates such.
+  12	
+  13	   # Fetch an arbitrarily long argument list to $a0, $a1, …, $an
+  14	
+  15	   $=a
+  16	
+  17	   # Expect data triplets: radius, phase angle, angular velocity.
+  18	
+  19	   -check "isint($a1) && !(($#-1)%3)"
+  20	
+  21	   # Initial argument: side width (sw)
+  22	
+  23	   sw={$a1/2}
+  24	
+  25	   # Argument image: For each wheelie, compose radius and phase
+  26	   # arguments into a transformation matrix. In the generation loop, we
+  27	   # compose this with the angle resulting from one angular velocity
+  28	   # step.
+  29	
+  30	   ccnt={int(($#-1)/3)}
+  31	   -input $ccnt,1,1,12
+  32	   -name  args
+  33	
+  34	   # Iterate over argument vector. For each triplet – representing a
+  35	   # wheelie – Fetch radius (rad), phase angle (ang) and angular
+  36	   # velocity (sf) parameters.
+  37	
+  38	   -repeat $#-1,j
+  39	      -if   $j%3==0 # get radius
+  40	         rad=${a{2+$j}}
+  41	         -check isnum($rad)" && "$rad>=0" && "$rad<=1
+  42	         -set[args] $rad,{round($j/3,1,-1)},0,0,0
+  43	      -elif $j%3==1 # get angle, degrees
+  44	         ang=${a{2+$j}}
+  45	         -check isnum($ang)" && "$ang>=0" && "$ang<=360
+  46	         -set[args] $ang,{round($j/3,1,-1)},0,0,1
+  47	      -else         # get ω and set spectral coefficient
+  48	         sf=${a{2+$j}}
+  49	         -check isint($sf)" && "abs($sf)<=0.1*$sw
+  50	         -set[args] $sf,{round($j/3,1,-1)},0,0,2
+  51	      -fi
+  52	   -done
+  53	
+  54	   # Iterate over argument image, each 12 channel pixel representing
+  55	   # one wheelie. The first three channels contain wheelie radius,
+  56	   # phase angle and radial velocity. Compose a matrix transforming
+  57	   # the origin to the tip of the wheelie, a radial translation and
+  58	   # phase rotation. Populate the nine remaining channels with this
+  59	   # matrix.
+  60	
+  61	   -fill[args] ">
+  62	                  CPX=I;
+  63	                  orot=rot([0,0,1],deg2rad(CPX[1])); # phase rotation
+  64	                  xlat=eye(3);
+  65	                  xlat[2]=CPX[0];                    # translation origin-to-rim
+  66	                  FIN=[CPX[0,3,1],mul(orot,xlat,3)]; # args+"RADX" i.e. 'rotation & xlation'
+  67	                  FIN                                # store above in 12-channel pixel
+  68	               "
+  69	   -permute[args] cyzx
+  70	   -store[args] circles
+  71	
+  72	   # Screenspace transform.
+  73	   ssxfrm={"
+  74	            specw=get('sw',0,0);
+  75	            id=eye(3);
+  76	            id[0]=0;
+  77	            id[1]=specw/2;
+  78	            id[2]=specw;
+  79	            id[3]=-specw/2;
+  80	            id[4]=0;
+  81	            id[5]=specw;
+  82	            id
+  83	           "}
+  84	
+  85	   # Draw arabesques on this image
+  86	   -input {2*$sw},{2*$sw},1,1
+  87	   -name. canvas
+  88	
+  89	   atk=0
+  90	   lastpt={vector3([0,0,1])}
+  91	   firstpt={vector3([0,0,1])}
+  92	   -repeat 3*$sw,k
+  93	       # For each wheelie:
+  94	       #    increment by angular velocity
+  95	       #    find corresponding rotation matrix
+  96	       #    compose with radial argument image, compose
+  97	       #    with screenspace transform and plot via polygon().
+  98	
+  99	       -eval ">
+ 100	                const cc=$ccnt;
+ 101	                fpt=get('firstpt',3,0);
+ 102	                ik=get('k',0,0);
+ 103	                lpt=get('lastpt',3,0);
+ 104	                omega=get('atk',0,0);
+ 105	                specw=get('sw',0,0);
+ 106	                circs=get('circles',12*cc,0);
+ 107	                const VLEN=3*cc+1;
+ 108	                pp=vectorVLEN([0,0,1]);
+ 109	                repeat(
+ 110	                         cc,k,
+ 111	                         idx=cc-k-1;
+ 112	                         rbradx=mul(
+ 113	                                     rot([0,0,1],circs[12*idx+2]*omega),
+ 114	                                     circs[12*idx+3,9,1],
+ 115	                                     3
+ 116	                                   );
+ 117	                         repeat(
+ 118	                                 k+1,j,
+ 119	                                 px=rbradx*pp[3*(k-j),3];
+ 120	                                 pp[3*(k-j)]=px[0];
+ 121	                                 pp[3*(k-j)+1]=px[1];
+ 122	                                 pp[3*(k-j)+2]=px[2];
+ 123	                               )
+ 124	                      );
+ 125	               ssx=get('ssxfrm',9,0);
+ 126	               plt=ssx*pp[0,3];
+ 127	               ik>0?
+ 128	                   polygon(#-1,-2,[plt[0,2],lpt[0,2]],1,0xffffffff,255):
+ 129	                   store(plt,'firstpt',3,1,1,1);
+ 130	               store(plt,'lastpt',3,1,1,1);
+ 131	               ik==(3*specw-1)?
+ 132	                   polygon(#-1,-2,[fpt[0,2],plt[0,2]],1,0xffffffff,255)
+ 133	              "
+ 134	       atk={2*pi*($k/(3*$sw-1))}
+ 135	   -done
 ~~~
 ???
 = annotations
@@ -190,10 +200,10 @@ For those of you wishing to go into the weeds, here are the weeds:
 |  **19** |Sanity-check the arguments. 'wheelie' expects '$a1' to specify the length of one side of a square drawing canvas, so anticipates that the first argument is an integer. '$#' is another _'$-expression'_; this one resolves to the number of comma-separated arguments given 'wheelie'. Wheelie specifications occur in groups of three, _r_, _θ_ and _±ω_ so '!(($#-1)%3)' enforces arguments in triplets; it is *False* if the number of arguments, less the first, is not evenly divisable by three. Thus, the user specifies the image size with the first argument and employs triplets of successive arguments to specify wheelies, one triplet for each. Order matters. The first triplet specifies the root wheelie, the last designates the terminal marker wheelie.
 |  **23,30** |Curly brace pairs indicate a number of possible substitutions, see [Substitution Rules](https://gmic.eu/reference/substitution_rules.html#top), and if the contents of curley braces cannot be attributed to requests for some image feature, it bottoms out to a math expression. For those new to math expressions, the encounter is a bit like falling into a rabbit hole, left-and-right curley braces ideographic of the impending cavity. Take a deep breath, grasp something solid, and remember that, above all, some kind of substitution is going on, and the source of it is the results of the math computation. In the present cases, they are the right hand sides of assignment operators that initialize pipeline variables. [Mathematical Expressions](https://gmic.eu/reference/mathematical_expressions.html#top) furnishes a complete, if terse, set of objects that make up mathematical expressions. Of the present cases, the first sets a resolution metric. '$sw' associates one unit of distance in the computation space of wheelies to a particular number of pixels, thus anchoring our relative lengths to something definite: the screen space of pixels. This resolution metric figures in a number of sizing tasks, such as scaling the number of plots necessary to draw an arabesque. Not so many for small pixel dimensions; a lot otherwise. The second derives 'circle count' – aka, the number of wheelies specified in the argument list. This is just the number of arguments dedicated to wheelie specifications, '$#-1', divided by three, because each wheelie consists of three arguments.
 |  **30-53** |The 'args' image is not for display; it is an argument database. each pixel specifies aspects of one wheelie. Channels 0-2 hold _r_, _θ_ and _±ω_ and this first 'repeat'…'done' loop saves them for future reference, channels 3-11 are reserved for the wheelie-specific affine transforms, but these are not computed here. See the following annotations.
-|  **54-71** |'fill' iterates over the 'args' image, computing "stage 1" affine transformations for each wheelie. Storage for each wheelie occupies a twelve channel pixel of the image; In each step in the fill, the current pixel, 'I', represents all that is known about one wheelie '**62**' aliases 'I' to 'CPX' for convenience. At present, these pixel vectors only hold  _r_, _θ_ and _±ω_. In this fill iteration, we compute and store a pre-computed "stage 1" matrix, the static transform encapulating only _r_, the wheelie length translation, and  _θ_, its rotation about the origin. Downstream, in the arabesque drawing loop, we do "stage 2": composite each "static" wheelie transform with an additional pure rotation derived from _±ωt_, accounting for the time-varying change in orientation. When done with filling this wheelie database, we harness [store](https://gmic.eu/tutorial/store.html) to make it accessible to the math expression parser. Math parsers downstream access the database through the 'circles' _image storage variable_.
+|  **54-71** |'fill' iterates over the 'args' image, computing "stage 1" affine transformations for each wheelie. Storage for each wheelie occupies a twelve channel pixel of the image; In each step of the fill, the current pixel, 'I', represents all that is known about one wheelie '**62**' aliases 'I' to 'CPX' for convenience. At the outset, these pixel vectors just hold  _r_, _θ_ and _±ω_. Over the course of iteration, we compute and store a pre-computed "stage 1" transform matrix, the static transform encapulating only _r_, the wheelie length translation, and  _θ_, its rotation about the origin. Downstream, in the arabesque drawing loop, we compute a "stage 2" matrix, to wit: we composite each stage 1 wheelie transform with an additional pure rotation derived from _±ωt_, applying the time-varying change to wheelie orientation. When done with filling this "wheelie database", we harness [store](https://gmic.eu/tutorial/store.html) to make the wheelie vectors accessible to the math expression parser; it may do so through the 'circles' _image storage variable_. The permutation prior to 'store' is for convenience. The reorganizing of the 'args' image through this permutation leaves wheelie components arrayed along the 'arg' image 'x' axis instead of along its spectral axis. The wheelie vectors contiguous along the 'x' axis make for more straightforward access in the arabesque loop.
 |  **63** | 'rot()' generates pure rotational matrices: 2 × 2 for two dimensional work and 3 × 3 for three dimensional. In the latter form, one provides the axis of rotation to complete the specification. That we are operating in three dimensions may give one reason to pause. Recall our preference for working with homogeneous points, inhabitants of a three dimensional projective space, so that we can encapsulate both rotation and translation in one transform — as well as diambiguate points from vectors. In this case, the axis of choice is the z axis, perpendicular to the canvas, so that when we rotate points they stay in the canvas. The first use of this function gives us 'orot', _origin rotation_ derived from _θ_, inhabiting the second channel of the database image 'args'. 'deg2rad()' conveniently converts degree-based data into radians.   
 |  **64,65** |We compose the translation matrix, 'xlat' by starting with the 3 × 3 identity matrix, as furnished by 'eye()'. Elements two and five of this matrix embodies translations. Curiously, we set only an _x_ translation, this the length of the wheelie occupying channel zero of the database pixel 'CPX'. What of _y_? Recall from the main discussion that we view individual wheelies in a relative way, so it suits us to build up the local wheelie transform where the wheelie itself is in a standard orientation, to wit: of zero degrees orientation with the wheelie length aligned to the _x_ axis. 
-|  **66,67** |Overall, we re-compose the current pixel in a new 12 channel vector comprised of two fields. The first field, comprised of channels 0 - 2, is a copy of _r_, _θ_ and _±ω_ unchanged. This copy operation makes use of the _accessor_ operator, a pair of open-and-close square brackets, which takes as many as three arguments: \[ < _starting index_ >, < _subvector length_ >, < _stride_ > ]; the accessor operator extracts subvectors from source vectors. The first argument marks the index in the source vector where the subvector starts. It is the only required argument and, used in isolation, simply extracts a single element from the source vector. The second argument, if present, sets the length of the subvector. Thus V=[0,1,2,3,4,5,6,7,8,9]; SV=V[5,3] sets SV to [5,6,7], the three element subvector beginning at index=5. The third argument, if present, sets the _stride_, and defaults to increments of one element. Thus V=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];V[0,4,4] retrieves the subvector [0,4,8,12], the four element subvector starting at index 0 in the source and consisting of every fourth element. Accessing a subvector through the square bracket operator is a read-only operation; one cannot use it on the left hand side of an assignment operator and expect to set the values of left hand side subvectors. For that, use 'copy()', which can copy a subvector to a source.\n\nThe second field harnesses 'mul()' to compose two matrices: 'orot', the rotation component generated by  _θ_, and 'xlat' the translation component generated by _r_. The right-to-left multiplication, or _composition_, of the pure translation and rotation matrices produces the matrix that transforms the origin of the wheelie to the tip. This matrix reflects the combined operation of sliding a point positioned at the origin along the _x_ axis by a distance equal to the length of the wheelie, _r_, then rotating the position, now radially displaced from the origin, by _θ_. Care must be taken at this juncture, for the right-to-left composition of a translation and a rotation is not the same as a left-to-right composition of a rotation and a translation. With the latter, a matrix arises that reflects the combined operation of rotating a point at the origin, and _then_ translating it. The rotation is an operation of no consequence, as a point rotating around itself changes nothing at all. The translation simply carries the origin five units along the _x_ axis, the only consequece of this left-to-right composition. It is not mathematically "wrong"; it simply does not reflect the wheelie model we have in mind: a rotation of some point after a prior translation. The non-communicative quality of matrix multiplation is a source of many an interesting bug — amusing after the fact; annoying during its commission.\n\nWe form a new vector, FIN (final). FIN contains, front-to-back, the three- and nine-element fields consisting of the wheelie triplet and its allied affine transform. FIN by itself on the final line of the math expression is an implicit assignment to the current pixel in the iteration that the [fill]()          
+|  **66,67** |Overall, we re-compose the current pixel in a new 12 channel vector comprised of two fields. The first field, comprised of channels 0 - 2, is a copy of _r_, _θ_ and _±ω_ unchanged. This copy operation makes use of the _accessor_ operator, a pair of open-and-close square brackets, which takes as many as three arguments: _`[<starting index>, <subvector length>, <stride> ]`_; the accessor operator extracts subvectors from source vectors. The first argument marks the index in the source vector where the subvector starts. It is the only required argument and, used in isolation, simply extracts a single element from the source vector. The second argument, if present, sets the length of the subvector. Thus `V=[0,1,2,3,4,5,6,7,8,9]`; `SV=V[5,3]` sets `SV` to `[5,6,7]`, the three element subvector beginning at index=5. The third argument, if present, sets the _stride_, and defaults to increments of one element. Thus `V=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];V[0,4,4]` retrieves the subvector `[0,4,8,12]`, the four element subvector starting at index 0 in the source and consisting of every fourth element. Accessing a subvector through the square bracket operator is a read-only operation; one cannot use it on the left hand side of an assignment operator and expect to set the values of left hand side subvectors. For that, use 'copy()', which can copy a subvector to a source.\n\nThe second field harnesses 'mul()' to compose two matrices: 'orot', the rotation component generated by  _θ_, and 'xlat' the translation component generated by _r_. The right-to-left multiplication, or _composition_, of the pure translation and rotation matrices produces the matrix that transforms the origin of the wheelie to the tip. This matrix reflects the combined operation of sliding a point positioned at the origin along the _x_ axis by a distance equal to the length of the wheelie, _r_, then rotating the position, now radially displaced from the origin, by _θ_. Care must be taken at this juncture, for the right-to-left composition of a translation and a rotation is not the same as a left-to-right composition of a rotation and a translation. With the latter, a matrix arises that reflects the combined operation of rotating a point at the origin, and _then_ translating it. The rotation is an operation of no consequence, as a point rotating around itself changes nothing at all. The translation simply carries the origin five units along the _x_ axis, the only consequece of this left-to-right composition. It is not mathematically "wrong"; it simply does not reflect the wheelie model we have in mind: a rotation of some point after a prior translation. The non-communicative quality of matrix multiplation is a source of many an interesting bug — amusing after the fact; annoying during its commission.\n\nWe form a new vector, FIN (final). FIN contains, front-to-back, the three- and nine-element fields consisting of the wheelie triplet and its allied affine transform. FIN by itself on the final line of the math expression is an implicit assignment to a "target." What that target may be depends on command line context in which the math expression was invoke. In the context of the [fill](https://gmic.eu/tutorial/fill.html) command, that target is thecurrent pixel in the iteration over the image.            
 |  **80-124** |The arabesque drawing loop operates once for each _±ωΔt_ angle tick, and, among other chores, it performs the "stage 2" matrix compositions. These, when complete, locate the marker position in relation to the origin. To peform this composition, the arabesque drawing loop first retrieves the pre-computed static wheelie transforms from 'circles' database, **97**: ' and applies the loop-specific _±ωΔt_ rotations to them. 
 
 ???
