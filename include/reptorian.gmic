@@ -47,7 +47,7 @@
 #@cli :: Reptorian's CLI Commands
 #
 #-------------------------------
-#@cli +rep_hitomezashi : "str_a","str_b",_upscale_pixel>=1,[colors_a palette],[colors_b stray_palette],_shift_color,_boundary={ 0=Periodic | 1=Continuous },_stray_color_seed,0<=_symmetry_mode<=3,stray_col_a,...stray_col_n,border_size,border_col_a,...,border_col_n,frames : "str_a","str_b",upscale_pixel>=1,colors_a={ hex | value~ },colors_b={ hex | value~ },_shift_color,_boundary={ 0=Periodic | 1=Continuous },_stray_color_seed,0<=_symmetry_mode<=3,border_size,border_col_a,...border_col_n
+#@cli +rep_hitomezashi : "str_a","str_b",_upscale_pixel>=1,[colors_a palette],[colors_b stray_palette],_shift_color,_boundary={ 0=Periodic | 1=Continuous },0<=_symmetry_mode<=3,_stray_color_seed,stray_col_a,...stray_col_n,border_size,border_col_a,...,border_col_n,frames : "str_a","str_b",upscale_pixel>=1,colors_a={ hex | value~ },colors_b={ hex | value~ },0<=_symmetry_mode<=3,border_size,border_col_a,...border_col_n
 #@cli : Create Hitomezashi Stitch Pattern.
 #@cli :
 #@cli : Note: The number of stray_color and number of border color depends on the number of channels to be used. For example, in the case of palette, it depends on number of channels per palette. In case of hex, then it depends on number of characters divided by two. Finally, if you insert wave at the end, there is only one.
@@ -56,18 +56,18 @@
 #@cli : Default value : '_upscale_pixel=1','colors_a=n/a','colors_b=n/a','_shift_color=0','_boundary=0','_stray_color_seed=n/a','_symmetry_mode=n/a'
 +rep_hitomezashi:
 
-skip ${3=1},${4=},${5=},${6=},${7=},${8=},${9=},${10=0},${11=},${12=}
+skip ${3=1},"${4=}","${5=}","${6=}","${7=}","${8=}","${9=}"
  
 $=argpos
  
-pixel_size,colors_a,colors_b,shift_colors,boundary,seed,sym_mode,use_remove_image={max(int($3)*100,100)}%,${4-9},1
-use_rescale,_border_size={$pixel_size!=1},{($pixel_size)>1?min(max(0,($pixel_size)-1),abs($10)):0}
- 
+pixel_size,colors_a,colors_b,use_remove_image={max(int($3)*100,100)}%,${4-5},1
+use_rescale={$pixel_size!=1}
+
 m "generate_border :
  if narg($""*)>1 out_color=[$""*]
  else out_color=$""1
  fi
- eval.. \"begin(
+ eval.. :\"begin(
    const pixel_size="$pixel_size";
    const border_size=$_border_size;
    const ip=floor(border_size/2);
@@ -133,7 +133,7 @@ m "generate_border_depth :
  if narg($""*)>1 out_color=[$""*]
  else out_color=$""1
  fi
- eval.. \"begin(
+ eval.. :\"begin(
    const pixel_size="$pixel_size";
    const border_size=$_border_size;
    const l_length=(pixel_size+border_size);
@@ -170,6 +170,8 @@ m "generate_border_depth :
 +rep_binary_hitomezashi "$1","$2"
  
 if ${is_image_arg\ $colors_a}||${is_image_arg\ $colors_b}
+ 
+ shift_colors,boundary,sym_mode,seed=${6-9}
  
  np=0
  if narg($colors_a) pass$colors_a 1 np+=1 fi
@@ -226,6 +228,8 @@ if ${is_image_arg\ $colors_a}||${is_image_arg\ $colors_b}
  fi
   
 elif narg($colors_a)||narg($colors_b)
+ sym_mode,_border_size=$6,{($pixel_size)>1?min(max(0,($pixel_size)-1),abs($7)):0}
+
  if narg($sym_mode) rep_symmetrize_xy. $sym_mode fi
  
  wave_check_a={narg($colors_a)?${rep_contains_wave_at_end\ $colors_a}:0}
@@ -240,8 +244,8 @@ elif narg($colors_a)||narg($colors_b)
    
   if $use_rescale resize2dx. $pixel_size,1 fi
    
-  if $border_size
-   v=$11
+  if $_border_size
+   v=$8
    generate_border $v
   fi
 
@@ -252,12 +256,12 @@ elif narg($colors_a)||narg($colors_b)
    
   if $use_rescale {w*$pixel_size},{h*$pixel_size},1,1,$a fi
 
-  if $border_size
-   v=$11
+  if $_border_size
+   v=$8
    generate_border $v
   fi
 
- else  
+ else
   
   na={narg($colors_a)+narg($colors_b)}
    
@@ -269,9 +273,9 @@ elif narg($colors_a)||narg($colors_b)
    {w},{h},1,{narg($rgb_a)},i#-1?[$rgb_b]:[$rgb_a]
    if $use_rescale resize2dx. $pixel_size,1 fi
     
-   if $border_size
-    v=${11--1}
-    generate_border $v    
+   if $_border_size
+    vc=${8--1}
+    generate_border $vc   
    fi
     
   elif $na==1
@@ -280,9 +284,9 @@ elif narg($colors_a)||narg($colors_b)
    if narg($colors_b) rgb=${rep_hex2int8\ $colors_b} fi
    {w*$pixel_size},{h*$pixel_size},1,{narg($rgb)},[$rgb]
     
-   if $border_size
-    v=${11--1}
-    generate_border $v    
+   if $_border_size
+    vc=${8--1}
+    generate_border $vc 
    fi
     
   else
@@ -311,10 +315,11 @@ ml={norm(w,h)}
  
 {iM#-1+1},1,1,3,[x,0,0] sh. 1,2
 {w#-2},1,1,1,$ml
-eval[-4] >"
+eval[-4] "
  i(#-2,i,0,0,0)=i(#-1,i,0,0)=min(norm(x,y),i(#-1,i,0,0));
  i(#-2,i,0,0,1)++;"
 rm[-2,-1]
+
 sh. 1 pixelsort.. +,x,[-1] rm.
  
 nm. ref_ind
@@ -361,6 +366,7 @@ if $ni==2
     pos++;
    );
   );"
+  
 elif $ni==1
  
  $=frame_arg
@@ -445,54 +451,6 @@ eval.. "
  );" #Generate value from spreadsheet rule.
 
 rm[-4--2] # Keep only the Hitomezashi Pattern
-rep_cellular_automata:
-skip ${2=}
-
-channels 0
-
-rule_decimal,min_arr_size=${1-2}
-
-dec2bin $1 ('${}') -. 48 # Create Binary Array From Decimal Input
-nm. rules
-
-if narg($min_arr_size)
- if w<$min_arr_size
-  r. $2,1,1,1,0,0,1
- fi
-fi
-
-repeat $!-1 l[$>,-1]
- ow,oh={w#0},{h#0}
- 
- unroll[0] x
- iter={ceil(w#0/w#-1)}
- 
- $ow,1,1,1,int(u(0,2))
- 
- repeat $iter,p
- 
-  pos={$p*w}
-  
-  if !iv#-1 f. int(u(0,2)) fi
-  
-  {w},1,1,1,"begin(
-   state(n)=i(#-1,n,0,0,0);
-  );
-  k=4*state((x-1+w)%w)+2*state(x)+state((x+1)%w);
-  i(#-2,k,0,0,0);"
-  
-  j[0] [-1],$pos,0
-  
-  rm..
-  
- done
- 
- r[0] $ow,$oh,1,1,-1
- rm.
- 
-endl done
-
-rm.
 #@cli rep_contains_wave_at_end : "str"
 #@cli : Return whether it contains a wave at end.
 #@cli : Author: Reptorian.
@@ -608,6 +566,56 @@ mirror. x j[-2] [-1],0,.5~
 mirror. y j[-3] [-1],.5~
 
 rm[0,-2,-1]
+#@cli rep_cellular_automata : int_rule,_min_arr_size
+#@cli : Default values: '_min_arr_size=n/a'
+rep_cellular_automata:
+skip ${2=}
+
+channels 0
+
+rule_decimal,min_arr_size=${1-2}
+
+dec2bin $1 ('${}') -. 48 # Create Binary Array From Decimal Input
+nm. rules
+
+if narg($min_arr_size)
+ if w<$min_arr_size
+  r. $2,1,1,1,0,0,1
+ fi
+fi
+
+repeat $!-1 l[$>,-1]
+ ow,oh={w#0},{h#0}
+ 
+ unroll[0] x
+ iter={ceil(w#0/w#-1)}
+ 
+ $ow,1,1,1,int(u(0,2))
+ 
+ repeat $iter,p
+ 
+  pos={$p*w}
+  
+  if !iv#-1 f. int(u(0,2)) fi
+  
+  {w},1,1,1,"begin(
+   state(n)=i(#-1,n,0,0,0);
+  );
+  k=4*state((x-1+w)%w)+2*state(x)+state((x+1)%w);
+  i(#-2,k,0,0,0);"
+  
+  j[0] [-1],$pos,0
+  
+  rm..
+  
+ done
+ 
+ r[0] $ow,$oh,1,1,-1
+ rm.
+ 
+endl done
+
+rm.
 #@cli rep_er : eq. to 'rep_emboss_relief' : (+)
 rep_er : rep_emboss_relief $*
 #@cli rep_emboss_relief : int_radius>=4,-360>=_ang>=360,_sigma>0,_scale>0,_output={ 0=emboss | 1=relief },_color_out={ 0=gray | 1=color },_bias>0
@@ -17005,6 +17013,300 @@ $ow,$oh,1,3,"*begin(
  ):(
   radial_gradient>.5?ev_light:ev_dark;
  );"
+#@gui Hitomezashi: fx_rep_hitomezashi,fx_rep_hitomezashi_preview(0)
+#@gui :_=note("Some bugs on the preview are just not fixable at this time. Please apply on canvas.\n\nFor Paint.NET users, you're going to have to wait until they become fixable.")
+#@gui :_=note("<b>Initial</b>"),_=separator()
+#@gui :Mode=choice(0,"One String","Two Strings"),
+#@gui :Pixel Size=int(1,1,10)
+#@gui :Symmetry=choice(0,"None","Symmetry A","Symmetry B","Symmetry C","Symmetry D")
+#@gui :Output=choice(0,"Inside","Resized")
+#@gui :_=note("\n\n<i>String</i>"),_=separator()
+#@gui :String=text("")
+#@gui :String A=text("")
+#@gui :String B=text("")
+#@gui :⠀Randomize String⠀=button()
+#@gui :Randomize String A=button()
+#@gui :Randomize String B=button()
+#@gui :⠀⠀Randomize Both⠀⠀=button()
+#@gui :_=note("\nNote : Randomize has been programmed to generate binary as characters are converted as binary in the end.\n\n")
+#@gui :_=note("<b>Coloring and Shading</b>"),_=separator()
+#@gui :Mode=choice(0,"Base Binary","Grayscale","Monotone","Duotone","Palette")
+#@gui :Gray A=float(0,0,255)
+#@gui :Gray B=float(255,0,255)
+#@gui :Background Color=color(128,128,128)
+#@gui :Color A=color(241,255,85)
+#@gui :Color B=color(159,26,157)
+#@gui :Overall Coloring Palette=choice(0,"Pre-defined Palettes","Random","Random Split-Gradients")
+#@gui :Overall Color Space=choice(0,"RGB","HSL")
+#@gui :Overall Palette Collection=choice(0,"256 Colors Collection","Pixel Art Palettes")
+#@gui :Overall Palette=choice(44,"Default","HSV","Lines","Hot","Cool","Jet","Flag","Cube","Rainbow","Parula","Spring","Summer","Autumn","Winter","Bone","Copper","Pink","Vga","Algae","Amp","Balance","Curl","Deep","Delta","Dense","Diff","Gray","Haline","Ice","Matter","Oxy","Phase","Rain","Solar","Speed","Tarn","Tempo","Thermal","Topo","Turbid","Aurora","Hocus Pocus","SRB2","Uzebox","Amiga 7800","Amiga7800 MESS","Fornax Void I")
+#@gui :Overall Palette=choice(10,"BW-{2}","RGB-{3}","B-RGB-{4}","BW-RGB-{5}","CMY-{3}","CMYK-{4}","W-CMYK-{5}","RGBCMY-{6}","1-Bit-RGB-{8}","Aurora-{256}","PLAYPAL-{249}","Sonic Robo Blast 2-{256}","Famicube-{64}","Andrew Kensler - 16","Andrew Kensler - 32","Andrew Kensler - 54","AAP-Micro 12","AAP-16","AAP-64","AAP-SPLENDOR128","DB8","DB16","DB32","DB-ISO22","DimWiddy 17","DimWiddy 23","Endesga-4","Endesga-8","Endesga-16","Endesga-32","Endesga-36","Endesga-64","Juicy-32","Juicy-56","XAIUE-22","15P-DX","20P-DX","24P-DX","Cabana-64","Fantasy 16","Fantasy 24","Tranquil Fantasy 23","Tranquility Plus 39","Faraway 48","Fleja Master Palette-{33}","Koni32","Linear Color Palette Basic-{31}","Vines Flexible Linear Ramps-{38}","Arcade Standard 29","ARQ16","BLK 36","BLK-NEO-{46}","Broken Facility-{40}","Bubblegum-16","Cade 15","Calder 8-{11}","Chromatic16","CD-BAC-{16}","CG Arne-{16}","CPC BOY-{32}","Dinoknight 16","||||-22","FZT Ethereal 16","GZXP-{11}","Indecision-{17}","Island Joy 16","Journey-{64}","Juicy 17","Oak21","Nature's Embrace 55","Nauris-16","Pear 36","Peachy Pop 16-{16}","Pineapple 32","Resurrect 32-{32}","Rosy 42","SLSO-CLR17","Softy 15","SPEC12","Starmancer-{52}","Superb 8","SuperFuture25","Sweetie 16","Taffy 16","Todayland Palette V2-{25}","Vivid-17","Voodo34","Zughy 32","ENOS16","Undertones-17","Equpix 15","Night 16","Star 29","Star 34","Still-Life-{14}","SimpleJPC-16","Acid 15","Battery 24","Clumpy 18","Cthulhu-{16}","Crimso 11","Copper-Tech-{16}","DRZ15A","Eggy 15","Eroge-Copper","Europa 16-{16}","GreyT-bit-{8}","Jewel-{15}","Polar 11","Sheltzy 32","Rube-Goldberg-{9}","BoomBoom-{7}","Generic-8","Matriax8c","NT1H-{26}","Autum 15","Autum 15 [Yellow]","JerryPie 22","Naji 16","Blessing-{5}","Crayola Blind-{9}","Easter Island-{16}","Fairy Tales-{8}","Fuzzy Four-{4}","0xdb-01-{17}","Ocaso-{17}","Pastel-{15}","17 Pastels","Pollen-8","Nopal-12","Sy17","Syz15","TUI-15","Cave-{8}","Psygnosia-{16}","MarshMellow32","Rabbit 7","Finlal 11","Vinik 24","YKB-22","Graveyard-21","Steam Lords-{16}","AAP-RadiantXV-{15}","AAP-Majesty XVII-{17}","Daruda 22","Rust-6","XAIUE-Radiant-{22}","Firestorm-{9}","SuperNova 7","NYX8","OIL6","SGM-Palette 2-{17}","Fornax Void I-{256}","Fornax Void II-{128}","Pixelwave-{12}","Spacey Easter-{17}","Moonlit-39","Petite-8","Petite-8 Afterdark","Autochrome 3","Autochrome 5","GB Default #1-{4}","GB Default #2-{4}","GB Andrade-{4}","GB Blue Seni-{4}","GB Blackzone-{4}","GB Crimson-{4}","GB Didi-{4}","GB Dirty-{4}","GB Arne-{4}","GB Easy-{4}","GB Forest-{4}","GB Harsh Green-{4}","GB Light Green-{4}","GB Nostalgia-{4}","GB Platinum-{4}","GB Kirokaze-{4}","GB PJ-{4}","GB Cyber-{4}","GB Wish-{4}","GB Grapefruit-{4}","GB Ice Cream-{4}","GB Red_Blue-{4}","GB Spacehaze-{4}","GB Chocolate-{4}","GB Purple Dawn-{4}","GB Gray-{4}","ARNE4","HallowPumpkin-{4}","Amiga 2600 NTSC-{128}","Amiga 2600 PAL-{104}","Amiga 2600 SECAM-{8}","Amiga 7800 M.E.S.S-{256}","Amiga 7800-{256}","Amstrad CPC-{27}","Apple II-{15}","CGA-{16}","CGA Mode 0 [Low]-{4}","CGA Mode 0 [High]-{4}","CGA Mode 1 [Low]-{4}","CGA Mode 1 [High]-{4}","CGA Mode 2 [Low]-{4}","CGA Mode 2 [High]-{4}","Commodore 64 [Pepto Interpretation]-{16}","Commodore 64 [Colodore Interpretation]-{16}","Commodore VIC-20-{16}","Colecovision-{15}","Japanese Machine Palette-{16}","Macintosh II-{16}","NES-{52}","PICO-8-{16}","RISC OS-{16}","SAM Coupe-{128}","Thomson MO5-{16}","VGA-{244}","ZX Spectrum-{15}","GNOME 32-{32}","Electronic Crayon 22","Chip16","MSX-{15}","Deluxe Paint-{222}","Legacy Paint-{16}","XP Paint-{28}","Vista Paint-{28}")
+#@gui :Overall Number of Colors=int(8,2,255)
+#@gui :Overall Number of Split-Colors=int(5,1,10)
+#@gui :Overall Number of Colors Per Split=int(4,2,10)
+#@gui :Overall Seed=int(0,0,200000)
+#@gui :Overall Seed=int(0,0,200000)
+#@gui :Overall Randomize Seed=button()
+#@gui :Overall Boundary=choice(0,"Periodic","Continuous")
+#@gui :Overall Shift Colors(%)=float(0,0,100)
+#@gui :Overall Reverse Internal=bool(0)
+#@gui :Overall Reverse Entire=bool(0)
+#@gui :Overall Reverse=bool(0)
+#@gui :Stray Coloring Palette=choice(0,"Single","Pre-defined Palette","Random")
+#@gui :Stray Color=color(0,0,0)
+#@gui :Stray Palette=choice(10,"BW-{2}","RGB-{3}","B-RGB-{4}","BW-RGB-{5}","CMY-{3}","CMYK-{4}","W-CMYK-{5}","RGBCMY-{6}","1-Bit-RGB-{8}","Aurora-{256}","PLAYPAL-{249}","Sonic Robo Blast 2-{256}","Famicube-{64}","Andrew Kensler - 16","Andrew Kensler - 32","Andrew Kensler - 54","AAP-Micro 12","AAP-16","AAP-64","AAP-SPLENDOR128","DB8","DB16","DB32","DB-ISO22","DimWiddy 17","DimWiddy 23","Endesga-4","Endesga-8","Endesga-16","Endesga-32","Endesga-36","Endesga-64","Juicy-32","Juicy-56","XAIUE-22","15P-DX","20P-DX","24P-DX","Cabana-64","Fantasy 16","Fantasy 24","Tranquil Fantasy 23","Tranquility Plus 39","Faraway 48","Fleja Master Palette-{33}","Koni32","Linear Color Palette Basic-{31}","Vines Flexible Linear Ramps-{38}","Arcade Standard 29","ARQ16","BLK 36","BLK-NEO-{46}","Broken Facility-{40}","Bubblegum-16","Cade 15","Calder 8-{11}","Chromatic16","CD-BAC-{16}","CG Arne-{16}","CPC BOY-{32}","Dinoknight 16","||||-22","FZT Ethereal 16","GZXP-{11}","Indecision-{17}","Island Joy 16","Journey-{64}","Juicy 17","Oak21","Nature's Embrace 55","Nauris-16","Pear 36","Peachy Pop 16-{16}","Pineapple 32","Resurrect 32-{32}","Rosy 42","SLSO-CLR17","Softy 15","SPEC12","Starmancer-{52}","Superb 8","SuperFuture25","Sweetie 16","Taffy 16","Todayland Palette V2-{25}","Vivid-17","Voodo34","Zughy 32","ENOS16","Undertones-17","Equpix 15","Night 16","Star 29","Star 34","Still-Life-{14}","SimpleJPC-16","Acid 15","Battery 24","Clumpy 18","Cthulhu-{16}","Crimso 11","Copper-Tech-{16}","DRZ15A","Eggy 15","Eroge-Copper","Europa 16-{16}","GreyT-bit-{8}","Jewel-{15}","Polar 11","Sheltzy 32","Rube-Goldberg-{9}","BoomBoom-{7}","Generic-8","Matriax8c","NT1H-{26}","Autum 15","Autum 15 [Yellow]","JerryPie 22","Naji 16","Blessing-{5}","Crayola Blind-{9}","Easter Island-{16}","Fairy Tales-{8}","Fuzzy Four-{4}","0xdb-01-{17}","Ocaso-{17}","Pastel-{15}","17 Pastels","Pollen-8","Nopal-12","Sy17","Syz15","TUI-15","Cave-{8}","Psygnosia-{16}","MarshMellow32","Rabbit 7","Finlal 11","Vinik 24","YKB-22","Graveyard-21","Steam Lords-{16}","AAP-RadiantXV-{15}","AAP-Majesty XVII-{17}","Daruda 22","Rust-6","XAIUE-Radiant-{22}","Firestorm-{9}","SuperNova 7","NYX8","OIL6","SGM-Palette 2-{17}","Fornax Void I-{256}","Fornax Void II-{128}","Pixelwave-{12}","Spacey Easter-{17}","Moonlit-39","Petite-8","Petite-8 Afterdark","Autochrome 3","Autochrome 5","GB Default #1-{4}","GB Default #2-{4}","GB Andrade-{4}","GB Blue Seni-{4}","GB Blackzone-{4}","GB Crimson-{4}","GB Didi-{4}","GB Dirty-{4}","GB Arne-{4}","GB Easy-{4}","GB Forest-{4}","GB Harsh Green-{4}","GB Light Green-{4}","GB Nostalgia-{4}","GB Platinum-{4}","GB Kirokaze-{4}","GB PJ-{4}","GB Cyber-{4}","GB Wish-{4}","GB Grapefruit-{4}","GB Ice Cream-{4}","GB Red_Blue-{4}","GB Spacehaze-{4}","GB Chocolate-{4}","GB Purple Dawn-{4}","GB Gray-{4}","ARNE4","HallowPumpkin-{4}","Amiga 2600 NTSC-{128}","Amiga 2600 PAL-{104}","Amiga 2600 SECAM-{8}","Amiga 7800 M.E.S.S-{256}","Amiga 7800-{256}","Amstrad CPC-{27}","Apple II-{15}","CGA-{16}","CGA Mode 0 [Low]-{4}","CGA Mode 0 [High]-{4}","CGA Mode 1 [Low]-{4}","CGA Mode 1 [High]-{4}","CGA Mode 2 [Low]-{4}","CGA Mode 2 [High]-{4}","Commodore 64 [Pepto Interpretation]-{16}","Commodore 64 [Colodore Interpretation]-{16}","Commodore VIC-20-{16}","Colecovision-{15}","Japanese Machine Palette-{16}","Macintosh II-{16}","NES-{52}","PICO-8-{16}","RISC OS-{16}","SAM Coupe-{128}","Thomson MO5-{16}","VGA-{244}","ZX Spectrum-{15}","GNOME 32-{32}","Electronic Crayon 22","Chip16","MSX-{15}","Deluxe Paint-{222}","Legacy Paint-{16}","XP Paint-{28}","Vista Paint-{28}")
+#@gui :Stray Number of Colors=int(8,2,20)
+#@gui :Stray Seed=int(0,0,200000)
+#@gui :Stray Randomize Seed=button()
+#@gui :Stray Reverse=bool(0)
+#@gui :_=note("<b>Border</b>"),_=separator()
+#@gui :Border Size(%)=float(0,0,100)
+#@gui :Border Value=float(128,0,255)
+#@gui :Border Color=color(0,0,0)
+fx_rep_hitomezashi:
+skip "${5=}","${6=}","${7=}"
+
+if $3
+ if $4
+  length_w={ceil((w-$2)/($2*2))}
+  length_h={ceil((h-$2)/($2*2))}
+ else
+  length_w={floor((w-$2)/($2*2))}
+  length_h={floor((h-$2)/($2*2))}
+ fi
+else
+ if $4
+  length_w={ceil(w/$2)}
+  length_h={ceil(h/$2)}
+ else
+  length_w={floor(w/$2)}
+  length_h={floor(h/$2)}
+ fi
+fi
+
+if $1
+
+ if !$9&&!$11
+  if narg($6)
+   if size('$6')<=2
+    ('$6') 
+    r. $length_w,1,1,1,0,2
+    bin_str_a={t}
+    rm.
+   else
+    bin_str_a=$6
+   fi
+  else
+   bin_str_a=${rep_random_binary\ $length_w}
+  fi
+ else
+  bin_str_a=${rep_random_binary\ $length_w}
+ fi
+ 
+ if !$10&&!$11
+  if narg($7)
+   if size('$7')<=2
+    ('$7') 
+    r. $length_h,1,1,1,0,2
+    bin_str_b={t}
+    rm.
+   else
+    bin_str_b=$7
+   fi
+  else
+   bin_str_b=${rep_random_binary\ $length_h}
+  fi
+ else
+  bin_str_b=${rep_random_binary\ $length_h}
+ fi
+ 
+ if !$4
+  ('$bin_str_a')
+  r. $length_w,100%,100%,100%,0,2
+  bin_a={t}
+  rm.
+ 
+  ('$bin_str_b')
+  r. $length_h,100%,100%,100%,0,2
+  bin_b={t}
+  rm.
+ else
+  bin_a=$bin_str_a
+  bin_b=$bin_str_b
+ fi
+ 
+else
+
+ max_length={max($length_w,$length_h)}
+ 
+ if !$8
+ 
+  if narg($5)
+   if size('$5')<=2
+    ('$5') 
+    r. $max_length,1,1,1,0,2
+    bin_str_0={t}
+    rm.
+   else
+    bin_str_0=$5
+   fi
+  else
+   bin_str_0=${rep_random_binary\ $max_length}
+  fi
+  
+ else
+  bin_str_0=${rep_random_binary\ $max_length}
+ fi
+ 
+ if !$4
+  ('$bin_str_0')
+  r. $length_w,100%,100%,100%,0,2
+  bin_a={t}
+  rm.
+ 
+  ('$bin_str_0')
+  r. $length_h,100%,100%,100%,0,2
+  bin_b={t}
+  rm.
+ else
+  bin_a=$bin_str_0
+  bin_b=$bin_str_0
+ fi
+ 
+fi
+
+if $12==4
+ if $24==2
+  if $25 col=[u(360),u(1),u(1)]
+  else col=[u(255),u(255),u(255)] fi
+  $29,1,1,3
+  if $34 seed_b={int(u(0,200001))}
+  else seed_b=$33
+  fi
+  l.
+   if $30>1 s x,$30 fi
+   f begin(length=(w-1)/$31;);x/length
+   $31,1,1,3
+   repeat $30,k
+    f. begin(srand($seed_b+$k););$col
+    if $37 mirror. x fi
+    rep_cubic_map[$>] [-1],2
+   done
+   rm.
+   a x
+   if $25 hsl2rgb. fi
+   if $38 mirror. x fi
+  endl
+ elif $24==1
+  if $34 seed_a={int(u(0,200001))}
+  else seed_a=$32
+  fi
+  if $25 $29,1,1,3,begin(srand($seed_a););[u(360),u(1),u(1)] hsl2rgb.
+  else $29,1,1,3,begin(srand($seed_a););[u(255),u(255),u(255)]
+  fi
+  if $39 mirror. x fi
+ else
+  if $26 pal $28
+  else palette $27
+  fi
+  if $39 mirror. x fi
+ fi
+ 
+ if $40
+ 
+  if $40==2
+   $45,1,1,3,begin(srand($46););[u(255),u(255),u(255)]
+  else
+   pal $44
+  fi
+  
+  if $48 mirror. x fi
+  
+  if $3 +rep_hitomezashi $bin_a,$bin_b,$2,[-2],[-1],{int($36/100*(w#-1+w#-2))},$35,{$3-1},$46,${41-43},{round($49/100*$2)},${51-53}
+  else +rep_hitomezashi $bin_a,$bin_b,$2,[-2],[-1],int($36/100*(w#-1+w#-2))},$35,,$46,${41-43},{round($49/100*$2)},${51-53}
+  fi
+  
+  rm[-3,-2]
+  
+ else
+  if $3 +rep_hitomezashi $bin_a,$bin_b,$2,[-1],,{int($36/100*w#-1)},$35,{$3-1},$46,${41-43},{round($49/100*$2)},${51-53}
+  else +rep_hitomezashi $bin_a,$bin_b,$2,[-1],,{int($36/100*w#-1)},$35,,$46,${41-43},{round($49/100*$2)},${51-53}
+  fi
+  rm..
+ fi
+ 
+elif $12==3
+ color_a=${rep_int82hex\ ${18-20}}
+ color_b=${rep_int82hex\ ${21-23}}
+ if $3 +rep_hitomezashi $bin_a,$bin_b,$2,$color_a,$color_b,{$3-1},{round($49/100*$2)},${51-53}
+ else +rep_hitomezashi $bin_a,$bin_b,$2,$color_a,$color_b,,{round($49/100*$2)},${51-53}
+ fi
+elif $12==2
+ bgcol=${rep_int82hex\ ${15-17}}
+ if $3 +rep_hitomezashi $bin_a,$bin_b,$2,$bgcol,,{$3-1},{round($49/100*$2)},${51-53}
+ else +rep_hitomezashi $bin_a,$bin_b,$2,$bgcol,,,{round($49/100*$2)},${51-53}
+ fi
+elif $12==1
+ if $3 +rep_hitomezashi $bin_a,$bin_b,$2,$13~,$14~,{$3-1},{round($49/100*$2)},$50
+ else +rep_hitomezashi $bin_a,$bin_b,$2,$13~,$14~,,{round($49/100*$2)},$50
+ fi
+else
+ if $3 +rep_hitomezashi $bin_a,$bin_b,$2,,,{$3-1}
+ else +rep_hitomezashi $bin_a,$bin_b,$2
+ fi
+ *. 255
+fi
+
+k.
+u $bin_str_0,$bin_str_a,$bin_str_b,$seed_a,$seed_b
+fx_rep_hitomezashi_preview:
+ow,oh={w},{h}
+skip "${5=}","${6=}","${7=}"
+fx_rep_hitomezashi $* r. $ow,$oh,100%,100%,0,0,.5,.5
+bin_str_0,bin_str_a,bin_str_b,seed_a,seed_b=${}
+u "{$1}"\
+"{$2}"\
+"{$3}"\
+"{$4}"\
+"{"$bin_str_0"}"_{!$1?2}\
+"{"$bin_str_a"}"_{$1?2}\
+"{"$bin_str_b"}"_{$1?2}\
+"{0}"_{!$1?2}\
+"{0}"_{$1?2}\
+"{0}"_{$1?2}\
+"{0}"_{$1?2}\
+"{$12}"\
+"{$13}"_{$12==1?2}\
+"{$14}"_{$12==1?2}\
+"{$15,$16,$17}"_{$12==2?2}\
+"{$18,$19,$20}"_{$12==3?2}\
+"{$21,$22,$23}"_{$12==3?2}\
+"{$24}"_{$12==4?2}\
+"{$25}"_{$12==4?($24?2)}\
+"{$26}"_{$12==4?(!$24?2)}\
+"{$27}"_{$12==4?(!$24?!$26?2)}\
+"{$28}"_{$12==4?(!$24?$26?2)}\
+"{$29}"_{$12==4?2}\
+"{$30}"_{$12==4?($24==2?2)}\
+"{$31}"_{$12==4?($24==2?2)}\
+"{"$seed_a"}"_{$12==4?($24==1?2)}\
+"{"$seed_b"}"_{$12==4?($24==2?2)}\
+"{0}"_{$12==4?($24?2)}\
+"{$35}"_{$12==4?2}\
+"{$36}"_{$12==4?2}\
+"{$37}"_{$12==4?($24==2?2)}\
+"{$38}"_{$12==4?($24==2?2)}\
+"{$39}"_{$12==4?($24==1?2)}\
+"{$40}"_{$12==4?2}\
+"{$41,42,43}"_{$12==4?(!$40?2)}\
+"{$44}"_{$12==4?($40==1?2)}\
+"{$45}"_{$12==4?($40==2?2)}\
+"{$46}"_{$12==4?($40?2)}\
+"{$47}"_{$12==4?($40?2)}\
+"{$48}"_{$12==4?($40?2)}\
+"{$49}"_{$12?2}\
+"{$50}"_{$12==1?2}\
+"{$51,$52,$53}"_{$12>1?2}\
 ######################
 
 # Local Variables:
