@@ -47,42 +47,52 @@
 #@cli :: Reptorian's CLI Commands
 #
 #-------------------------------
-#@cli rep_split_gradients : number_of_colors,splits,colors_per_split,seed,_reverse_internal,reverse_all,min_value_a...,maxvalue_a...
-rep_split_gradients:
-skip ${4=},${5=0},${6=0}
+#@cli +rep_split_gradient : number_of_colors,splits,colors_per_split,_axis,_seed,_reverse_internal,_reverse_all,min_value_a...,maxvalue_a...
+#@cli : Create split gradients
+#@cli : Author : Reptorian.
+#@cli : Default values: '_axis=x','_seed=n/a','_reverse_internal=0','_reverse_all=0'
++rep_split_gradient:
+skip ${4=0},${5=},${6=0},${7=0}
 $=p
 
-ncol,u_string={narg(${7--1})/2},""
+if isnum($4) axis={$4%3}
+else axis={'$4'-120}
+fi
+
+dir_axis=${arg\ $axis+1,x,y,z}
+len_axis=${arg\ $axis+1,w,h,d}
+
+ncol,u_string={narg(${8--1})/2},""
 
 if $ncol>1 u_string.=[ fi
 
 repeat $ncol,k
- u_string.=u(${p{7+$k}},
- u_string.=${p{7+$k+1}})
+ u_string.=u(${p{8+$k}},
+ u_string.=${p{8+$k+1}})
  if $k<($ncol-1) u_string.=, fi
 done
 
 if $ncol>1 u_string.=] fi
 
-$1,1,1,$ncol
+{arg($axis+1,[$1,1,1],[1,$1,1],[1,1,$1])},$ncol
 
-s x,$2
+s. $dir_axis,$2
 
-f[-$2--1] "begin(const scale=(w#"-$2"-1)/($3-1););x/scale"
+f[-$2--1] "begin(const scale=("$len_axis"#"-$2"-1)/($3-1););"$dir_axis"/scale"
 
 $3,1,1,$ncol
 
 repeat $2,q
- f. begin(if(narg($4),srand($4+$q);););[$u_string]
- if $5 mirror. x fi
+ f. begin(if(narg($5),srand($5+$q);););[$u_string]
+ if $6 mirror. $dir_axis fi
  rep_cubic_map[-{2+$q}] [-1],2 
 done
 
 rm.
 
-a[-$2--1] x
+a[-$2--1] $dir_axis
 
-if $6 mirror. x fi
+if $7 mirror. $dir_axis fi
 #@cli +rep_hitomezashi : "str_a","str_b",_upscale_pixel>=1,[colors_a palette],[colors_b stray_palette],_shift_color,_boundary={ 0=Periodic | 1=Continuous },0<=_symmetry_mode<=3,_stray_color_seed,stray_col_a,...stray_col_n,border_size,border_col_a,...,border_col_n,frames : "str_a","str_b",upscale_pixel>=1,colors_a={ hex | value~ },colors_b={ hex | value~ },0<=_symmetry_mode<=3,border_size,border_col_a,...border_col_n
 #@cli : Create Hitomezashi Stitch Pattern.
 #@cli :
@@ -264,7 +274,7 @@ if ${is_image_arg\ $colors_a}||${is_image_arg\ $colors_b}
  fi
   
 elif narg($colors_a)||narg($colors_b)
- sym_mode,_border_size=$6,{($pixel_size)>1?min(max(0,($pixel_size)-1),abs($7)):0}
+ sym_mode,_border_size=$6,{($pixel_size)>1?min(max(0,($pixel_size)-1),(narg($7)?abs($7))):0}
 
  if narg($sym_mode) rep_symmetrize_xy. $sym_mode fi
  
@@ -17055,7 +17065,7 @@ $ow,$oh,1,3,"*begin(
 #@gui :_=note("Some bugs on the preview are just not fixable at this time. Please apply on canvas.\n\nFor Paint.NET users, you're going to have to wait until they become fixable.")
 #@gui :_=note("<b>Initial</b>"),_=separator()
 #@gui :Mode=choice(0,"One String","Two Strings"),
-#@gui :Pixel Size=int(1,1,10)
+#@gui :Pixel Size=int(5,1,20)
 #@gui :Symmetry=choice(0,"None","Symmetry A","Symmetry B","Symmetry C","Symmetry D")
 #@gui :Output=choice(1,"Inside","Resized")
 #@gui :_=note("\n\n<i>String</i>"),_=separator()
@@ -17068,7 +17078,7 @@ $ow,$oh,1,3,"*begin(
 #@gui :⠀⠀Randomize Both⠀⠀=button()
 #@gui :_=note("\nNote : Randomize has been programmed to generate binary as characters are converted as binary in the end.\n\n")
 #@gui :_=note("<b>Coloring and Shading</b>"),_=separator()
-#@gui :Mode=choice(2,"Base Binary","Grayscale","Monotone","Duotone","Palette")
+#@gui :Mode=choice(3,"Base Binary","Grayscale","Monotone","Duotone","Palette")
 #@gui :Gray A=float(0,0,255)
 #@gui :Gray B=float(255,0,255)
 #@gui :Background Color=color(128,128,128)
@@ -17098,9 +17108,10 @@ $ow,$oh,1,3,"*begin(
 #@gui :Stray Randomize Seed=button()
 #@gui :Stray Reverse=bool(0)
 #@gui :_=note("<b>Border</b>"),_=separator()
-#@gui :Border Size(%)=float(0,0,100)
+#@gui :Border Size(%)=float(10,0,100)
 #@gui :Border Value=float(128,0,255)
 #@gui :Border Color=color(0,0,0)
+#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2022/01/10</i>.</small>")
 fx_rep_hitomezashi:
 skip "${5=}","${6=}","${7=}"
 
@@ -17125,14 +17136,14 @@ fi
 if $1
 
  if !$9&&!$11
-  if narg($6)
-   if size('$6')<=2
-    ('$6') 
+  if narg('"$6"')
+   if size('"$6"')<=2
+    ('"$6"') 
     r. $length_w,1,1,1,0,2
     bin_str_a={t}
     rm.
    else
-    bin_str_a=$6
+    bin_str_a="$6"
    fi
   else
    bin_str_a=${rep_random_binary\ $length_w}
@@ -17142,14 +17153,14 @@ if $1
  fi
  
  if !$10&&!$11
-  if narg($7)
-   if size('$7')<=2
-    ('$7') 
+  if narg('"$7"')
+   if size('"$7"')<=2
+    ('"$7"') 
     r. $length_h,1,1,1,0,2
     bin_str_b={t}
     rm.
    else
-    bin_str_b=$7
+    bin_str_b="$7"
    fi
   else
    bin_str_b=${rep_random_binary\ $length_h}
@@ -17179,14 +17190,14 @@ else
  
  if !$8
  
-  if narg($5)
-   if size('$5')<=2
-    ('$5') 
+  if narg('"$5"')
+   if size('"$5"')<=2
+    ('"$5"') 
     r. $max_length,1,1,1,0,2
     bin_str_0={t}
     rm.
    else
-    bin_str_0=$5
+    bin_str_0="$5"
    fi
   else
    bin_str_0=${rep_random_binary\ $max_length}
@@ -17300,7 +17311,7 @@ u $bin_str_0,$bin_str_a,$bin_str_b,$seed_a,$seed_b
 fx_rep_hitomezashi_preview:
 ow,oh={w},{h}
 skip "${5=}","${6=}","${7=}"
-fx_rep_hitomezashi $* r. $ow,$oh,100%,100%,0,0,.5,.5
+fx_rep_hitomezashi $"*" r. $ow,$oh,100%,100%,0,0,.5,.5
 bin_str_0,bin_str_a,bin_str_b,seed_a,seed_b=${}
 u "{$1}"\
 "{$2}"\
@@ -17344,7 +17355,7 @@ u "{$1}"\
 "{$48}"_{$12==4?($40?2)}\
 "{$49}"_{$12?2}\
 "{$50}"_{$12==1?2}\
-"{$51,$52,$53}"_{$12>1?2}\
+"{$51,$52,$53}"_{$12>1?2}
 ######################
 
 # Local Variables:
