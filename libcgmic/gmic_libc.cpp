@@ -40,6 +40,8 @@
  #
 */
 
+#include <string>
+#include "CImg.h"
 #include "gmic_libc.h"
 #include "gmic.h"
 
