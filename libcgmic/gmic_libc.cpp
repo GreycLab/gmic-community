@@ -40,8 +40,10 @@
  #
 */
 
-#include "gmic_libc.h"
+#include <string>
+#include "CImg.h"
 #include "gmic.h"
+#include "gmic_libc.h"
 
 GMIC_DLLINTERFACE int GMIC_CALLCONV gmic_delete_external(float* p) {
   delete[] p;
