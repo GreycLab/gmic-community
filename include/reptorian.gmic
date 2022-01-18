@@ -47,6 +47,111 @@
 #@cli :: Reptorian's CLI Commands
 #
 #-------------------------------
+#@cli rep_output_pdn_pal: filename
+#@cli : Output selected images as Paint.Net Palette
+rep_output_pdn_pal:
+ e[^-1] "Output palettes$? as Paint.NET palette file(s).(.txt)"
+ header="; paint.net Palette File:"
+ 
+ repeat $!
+  if $!>1 filename=${"filename \"$1\",$>"} else filename="$1" fi
+  
+  0 nm. $filename rm.
+  
+  folder,num_of_cols,palname={f},{whd#0},{0,n}
+  
+  if $num_of_cols>96 continue fi
+  
+  start_header=$header$palname
+  start_header.=\n"; Colors: "$num_of_cols
+  
+  pal_info="\n"
+  mp={$num_of_cols-1}
+  
+  to_rgba[0]
+  permute[0] cxyz
+  unroll[0] x
+  
+  repeat 96,p
+   if $p<$num_of_cols
+    rgba={crop(#0,$>*4,0,0,0,4,1,1,1)}
+    rgb={([$rgba])[0,3]}
+    alp={([$rgba])[3]}
+    rgba=$alp,$rgb
+    hex_rgba=${rep_int82hex\ $rgba}
+    struppercase $hex_rgba
+    pal_info.=${}    
+   else
+    pal_info.=00000000
+   fi
+   if $p<95 pal_info.="\n" fi
+  done
+  
+  ('$start_header$pal_info')
+  
+  o. raw:$folder$filename.txt,uchar
+  
+  rm[0,-1]
+ done
+ 
+ rm
+#@cli rep_output_gpl : filename
+#@cli : Output selected images as GIMP Palette
+rep_output_gpl:
+ e[^-1] "Output palettes$? as GIMP palette file(s).(.gpl)"
+ 
+ (71,73,77,80,32,80,97,108,101,116,116,101,10,35,80,97,108,101,116,116,101,32,78,97,109,101,58,32)
+ 
+ init_header={t} rm.
+ 
+ (10,35,67,111,108,111,114,115,58,32)
+ 
+ init_colors_info={t} rm.
+ 
+ repeat $!
+  if $!>1 filename=${"filename \"$1\",$>"} else filename="$1" fi
+  0 nm. $filename rm.
+  
+  folder,num_of_cols,palname,ss={f},{whd#0},{0,n},{s#0}
+  
+  header_info=$init_header$palname
+  colors_info=$init_colors_info$num_of_cols
+  start_header=$header_info$colors_info
+  pal_info="\n"
+  mp={$num_of_cols-1}
+  
+  permute[0] cxyz unroll[0] x
+  
+  if $ss==3||$ss==4
+   repeat $num_of_cols,p
+    rgb={(crop(#0,$>*$ss,0,0,0,$ss,1,1,1))[0,3]}
+    hex_rgb=${rep_int82hex\ $rgb}
+    r={([$rgb])[0]}
+    g={([$rgb])[1]}
+    b={([$rgb])[2]}
+    pal_info.=$r"	"$g"	"$b"	"$hex_rgb
+    if $p<$mp pal_info.="\n" fi
+   done
+  elif s#0<3
+   repeat $num_of_col,p
+    gray={(crop(#0,$>*$ss,0,0,0,$ss,1,1,1))[0]}
+    hex_rgb=${rep_int82hex\ vector3($gray)}
+    r,g,b=$gray
+    pal_info.=$r"	"$g"	"$b"	"$hex_rgb
+    if $p<$mp pal_info.="\n" fi
+   done
+  else
+   e[^-1] "Invalid channels, skipping!"
+   rm[0] continue
+  fi
+  
+  ('$start_header$pal_info')
+  
+  o. raw:$folder$filename.gpl,uchar
+  
+  rm[0,-1]
+  
+ done
 #@cli +rep_split_gradient : number_of_colors,splits,colors_per_split,_axis,_seed,_reverse_internal,_reverse_all,min_value_a...,maxvalue_a...
 #@cli : Create split gradients
 #@cli : Author : Reptorian.
