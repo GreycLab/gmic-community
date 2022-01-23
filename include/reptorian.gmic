@@ -47,6 +47,111 @@
 #@cli :: Reptorian's CLI Commands
 #
 #-------------------------------
+#@cli rep_output_pdn_pal: filename
+#@cli : Output selected images as Paint.NET palette file(s).(.txt)
+rep_output_pdn_pal:
+ e[^-1] "Output palettes$? as Paint.NET palette file(s).(.txt)"
+ header="; paint.net Palette File: "
+ 
+ repeat $!
+  if $!>1 filename=${"filename \"$1\",$>"} else filename="$1" fi
+  
+  0 nm. $filename rm.
+  
+  folder,num_of_cols,palname={f},{whd#0},{0,n}
+  
+  if $num_of_cols>96 continue fi
+  
+  start_header=$header$palname
+  start_header.=\n"; Color Format - AARRGGBB"\n"; Colors: "$num_of_cols
+  
+  pal_info="\n"
+  mp={$num_of_cols-1}
+  
+  to_rgba[0]
+  permute[0] cxyz
+  unroll[0] x
+  
+  repeat 96,p
+   if $p<$num_of_cols
+    rgba={crop(#0,$>*4,0,0,0,4,1,1,1)}
+    rgb={([$rgba])[0,3]}
+    alp={([$rgba])[3]}
+    rgba=$alp,$rgb
+    hex_rgba=${rep_int82hex\ $rgba}
+    struppercase $hex_rgba
+    pal_info.=${}    
+   else
+    pal_info.=00808080
+   fi
+   if $p<95 pal_info.="\n" fi
+  done
+  
+  ('$start_header$pal_info')
+  
+  o. raw:$folder$filename.txt,uchar
+  
+  rm[0,-1]
+ done
+ 
+ rm
+#@cli rep_output_gpl: filename
+#@cli : Output selected images as GIMP palette file(s).(.gpl)
+rep_output_gpl:
+ e[^-1] "Output palettes$? as GIMP palette file(s).(.gpl)"
+ 
+ (71,73,77,80,32,80,97,108,101,116,116,101,10,35,80,97,108,101,116,116,101,32,78,97,109,101,58,32)
+ 
+ init_header={t} rm.
+ 
+ (10,35,67,111,108,111,114,115,58,32)
+ 
+ init_colors_info={t} rm.
+ 
+ repeat $!
+  if $!>1 filename=${"filename \"$1\",$>"} else filename="$1" fi
+  0 nm. $filename rm.
+  
+  folder,num_of_cols,palname,ss={f},{whd#0},{0,n},{s#0}
+  
+  header_info=$init_header$palname
+  colors_info=$init_colors_info$num_of_cols
+  start_header=$header_info$colors_info
+  pal_info="\n"
+  mp={$num_of_cols-1}
+  
+  permute[0] cxyz unroll[0] x
+  
+  if $ss==3||$ss==4
+   repeat $num_of_cols,p
+    rgb={(crop(#0,$>*$ss,0,0,0,$ss,1,1,1))[0,3]}
+    hex_rgb=${rep_int82hex\ $rgb}
+    r={([$rgb])[0]}
+    g={([$rgb])[1]}
+    b={([$rgb])[2]}
+    pal_info.=$r"	"$g"	"$b"	"$hex_rgb
+    if $p<$mp pal_info.="\n" fi
+   done
+  elif s#0<3
+   repeat $num_of_col,p
+    gray={(crop(#0,$>*$ss,0,0,0,$ss,1,1,1))[0]}
+    hex_rgb=${rep_int82hex\ vector3($gray)}
+    r,g,b=$gray
+    pal_info.=$r"	"$g"	"$b"	"$hex_rgb
+    if $p<$mp pal_info.="\n" fi
+   done
+  else
+   e[^-1] "Invalid channels, skipping!"
+   rm[0] continue
+  fi
+  
+  ('$start_header$pal_info')
+  
+  o. raw:$folder$filename.gpl,uchar
+  
+  rm[0,-1]
+  
+ done
 #@cli +rep_split_gradient : number_of_colors,splits,colors_per_split,_axis,_seed,_reverse_internal,_reverse_all,min_value_a...,maxvalue_a...
 #@cli : Create split gradients
 #@cli : Author : Reptorian.
@@ -9886,7 +9991,8 @@ endl a c
 #@cli : +pal 220 = +pal deluxepaint -- Deluxe Paint
 #@cli : +pal 221 = +pal lms -- Legacy Paint
 #@cli : +pal 222 = +pal msxp -- XP Paint
-#@cli : +pal 223 = +pal vis -- Vista Paint\n
+#@cli : +pal 223 = +pal vis -- Vista Paint
+#@cli :
 #@cli : Author: Reptorian.
 +pal:
 v - _gmic_s=$? v +
@@ -9900,7 +10006,7 @@ repeat $na,p
  mode=${val{$>+1}}
  if isnum($mode) if isint($mode)
  if $mode!=abs($mode) mode="i" else
- mode=${arg\ 1+$mode,bw,rgb,b_rgb,bw_rgb,cmy,cmyk,wcmyk,rgbcmy,1bitrgb,aurora,playpal,srb2,famicube,kens16,kens32,kens54,aap12,aap16,aap64,aap128,db8,db16,db32,db_iso22,dimwid17,dimwid23,edg4,edg8,edg16,edg32,edg36,edg64,juicy32,juicy56,xaiue,15pdx,20pdx,24pdx,cabana64,fant16,fant24,tf23,tfp39,faraway48,fleja_m,koni32,linearbasic,vinelinear,arcade29,arq16,blk36,blkneo,brokefac,bubblegum,cade15,calder8,chrom16,cdbac,cgarne,cpcboy,dino,4l,fzteth16,gzxp,indc,island16,journey,juice,oak,nature55,nauris16,pear36,peach,pineapple32,resurrect,rosy42,slso,softy15,spec12,starmancer,sup8,superfuture,sweetie16,taffy16,todayland,vivid17,voodo,zu32,enos16,undertones,equpix15,night16,star29,star34,stilllife,simjpc16,acid15,battery24,clump18,cthul,crimso11,coptec,drz15,eggy15,eroge,europa,greyt,jewel,polar11,sheltzy,rube_goldberg,boomboom,g8,matriax8c,nt1h,au15,au15y,jerrypie22,naji16,blessing,crayola,easter,fairy,fuzz4,xdb_01,ocaso,pastel,pastel17,pollen8,nopal,sy17,syz15,tui15,cave,psygnosia,marshmellow32,rabbit7,finlal11,vinik24,ykb22,graveyard,steamlords,aaprad,aapmaj,daruda,rust6,xaiue_rad,firestorm,supernova7,nyx8,oil6,sgm,fornaxvoid1,fornaxvoid2,pixelwave,spaceyeaster,moon39,pet8,pet8d,autochrome3,autochrome5,gb_d_1,gb_d_2,gb_andrade,gb_blue,gb_bz,gb_crimson,gb_didi,gb_dirty,gb_arne,gb_easy,gb_forest,gb_hg,gb_lg,gb_nostalgia,gb_platinum,gb_kirokaze,gb_pj,gb_cyber,gb_wish,gb_grapefruit,gb_ice_cream,gb_rb,gb_space,gb_choco,gb_purpdawn,gb_gray,arne4,hal4,amiga2600ntsc,amiga2600pal,amiga2600secam,amiga7800mess,amiga7800,amstrad_cpc,apple2,cga,cga00,cga01,cga10,cga11,cga20,cga21,c64_pepto,c64_colodore,com_vic_20,colecovision,jmp,mac2,nes,pico_8,risc,samcoupe,mo5,vga,zx,gnome32,elc22,chip16,msx,deluxepaint,lms,msxp,vis}
+ mode=${arg\ 1+$mode,bw,rgb,b_rgb,bw_rgb,cmy,cmyk,wcmyk,rgbcmy,1bitrgb,aurora,playpal,srb2,famicube,kens16,kens32,kens54,aap12,aap16,aap64,aap128,db8,db16,db32,db_iso22,dimwid17,dimwid23,edg4,edg8,edg16,edg32,edg36,edg64,juicy32,juicy56,xaiue,15pdx,20pdx,24pdx,cabana64,fant16,fant24,tf23,tfp39,faraway48,fleja_m,koni32,linearbasic,vinelinear,arcade29,arq16,blk36,blkneo,brokefac,bubblegum,cade15,calder8,chrom16,cdbac,cgarne,cpcboy,dino,4l,fzteth16,gzxp,indc,island16,journey,juicy,oak,nature55,nauris16,pear36,peach,pineapple32,resurrect,rosy42,slso,softy15,spec12,starmancer,sup8,superfuture,sweetie16,taffy16,todayland,vivid17,voodo,zu32,enos16,undertones,equpix15,night16,star29,star34,stilllife,simjpc16,acid15,battery24,clump18,cthul,crimso11,coptec,drz15,eggy15,eroge,europa,greyt,jewel,polar11,sheltzy,rube_goldberg,boomboom,g8,matriax8c,nt1h,au15,au15y,jerrypie22,naji16,blessing,crayola,easter,fairy,fuzz4,xdb_01,ocaso,pastel,pastel17,pollen8,nopal,sy17,syz15,tui15,cave,psygnosia,marshmellow32,rabbit7,finlal11,vinik24,ykb22,graveyard,steamlords,aaprad,aapmaj,daruda,rust6,xaiue_rad,firestorm,supernova7,nyx8,oil6,sgm,fornaxvoid1,fornaxvoid2,pixelwave,spaceyeaster,moon39,pet8,pet8d,autochrome3,autochrome5,gb_d_1,gb_d_2,gb_andrade,gb_blue,gb_bz,gb_crimson,gb_didi,gb_dirty,gb_arne,gb_easy,gb_forest,gb_hg,gb_lg,gb_nostalgia,gb_platinum,gb_kirokaze,gb_pj,gb_cyber,gb_wish,gb_grapefruit,gb_ice_cream,gb_rb,gb_space,gb_choco,gb_purpdawn,gb_gray,arne4,hal4,amiga2600ntsc,amiga2600pal,amiga2600secam,amiga7800mess,amiga7800,amstrad_cpc,apple2,cga,cga00,cga01,cga10,cga11,cga20,cga21,c64_pepto,c64_colodore,com_vic_20,colecovision,jmp,mac2,nes,pico_8,risc,samcoupe,mo5,vga,zx,gnome32,elc22,chip16,msx,deluxepaint,lms,msxp,vis}
  fi fi fi
  v + e[^-1] "Create palette '"$mode"'." v -
  +_pal_$mode 
@@ -9977,7 +10083,7 @@ um palname
 +_pal_indc:(255,143,68,40,47,75,69,242,212,227,148,87,156,209,180,109,44^244,204,148,87,43,59,124,182,110,66,53,37,101,180,186,140,27^224,203,137,99,92,156,214,61,51,98,61,59,108,140,71,50,46)
 +_pal_island16:(13,79,130,197,240,251,255,190,123,116,65,50,42,125,193,232^8,43,91,145,189,223,249,187,178,173,128,83,35,56,108,153^13,36,49,84,119,155,228,178,78,187,160,95,73,64,91,115)
 +_pal_journey:(5,17,59,105,156,212,245,255,255,255,214,148,66,34,16,37,61,115,189,237,255,255,198,119,66,44,21,5,14,12,3,20,72,120,176,250,199,146,91,57,36,14,19,26,16,40,61,248,240,207,143,82,15,53,100,155,212,237,255,212,156,105,69,45^9,5,6,23,50,100,161,207,122,65,26,0,0,0,7,8,17,38,64,123,184,245,216,176,144,100,60,33,4,11,39,68,139,215,255,255,212,143,83,41,20,15,34,70,144,192,255,255,194,150,87,41,2,0,0,14,30,76,151,102,52,27,12,0^20,36,58,73,71,83,93,142,125,125,136,122,78,41,38,44,50,61,53,57,74,64,49,42,88,94,74,55,33,66,105,145,212,255,241,255,225,184,125,70,44,44,67,107,142,116,110,184,151,140,101,75,46,59,76,62,60,64,87,47,26,34,40,46)
-+_pal_juice:(225,37,84,55,60,99,215,160,163,130,114,198,209,233,215,117,72^246,34,180,79,114,228,233,113,172,132,89,148,198,157,80,78,216^210,44,60,122,82,116,91,77,166,132,151,168,170,70,60,59,206)
++_pal_juicy:(225,37,84,55,60,99,215,160,163,130,114,198,209,233,215,117,72^246,34,180,79,114,228,233,113,172,132,89,148,198,157,80,78,216^210,44,60,122,82,116,91,77,166,132,151,168,170,70,60,59,206)
 +_pal_oak:(248,179,98,174,238,255,177,82,24,32,37,116,86,62,56,129,163,69,110,175,255^135,73,26,57,141,244,211,127,40,67,118,241,149,76,18,74,119,75,120,188,255^61,91,142,172,255,159,110,85,58,74,119,235,217,146,50,84,95,78,128,197,255)
 +_pal_nature55:(27,254,226,168,105,255,231,190,122,208,151,90,255,235,205,104,37,27,123,56,41,37,94,32,38,48,163,120,84,239,182,116,67,255,234,175,117,235,177,227,177,116,62,223,156,97,42,184,117,82,253,204,145,93,56^20,147,83,36,27,191,130,83,50,128,78,48,201,138,224,178,125,78,236,170,119,68,215,150,98,51,204,141,88,161,108,68,47,178,109,64,34,113,65,196,142,100,63,221,170,123,78,216,157,106,245,193,134,91,56^30,90,34,36,40,137,90,64,28,88,73,63,92,6,66,41,44,68,191,145,126,108,239,205,171,134,255,222,192,206,190,141,101,178,157,127,74,113,92,176,142,127,100,154,116,71,50,209,169,152,241,190,146,110,76)
 +_pal_nauris16:(140,88,62,154,215,245,192,100,228,157,210,112,126,52,23,31^143,69,33,99,155,237,199,125,148,48,100,55,196,133,67,14^174,99,55,72,125,186,65,52,58,59,113,127,193,157,75,28)
@@ -10134,230 +10240,230 @@ um palname
 +_pal_lms:(0,126,190,255,126,254,4,6,255,126,0,0,126,254,4,6^0,126,190,255,0,0,126,255,255,126,0,0,0,0,126,255^0,126,190,255,0,0,0,4,4,0,126,255,126,255,126,255)
 +_pal_msxp:(0,128,192,255,128,255,128,255,0,0,0,0,0,0,128,255,128,255,0,0,0,128,0,128,128,255,128,255^0,128,192,255,0,0,128,255,128,255,128,255,0,0,0,0,128,255,64,255,128,255,64,128,0,0,64,128^0,128,192,255,0,0,0,0,0,0,128,255,128,255,128,255,64,128,64,128,255,255,128,255,255,128,0,64)
 +_pal_vis:(0,70,120,180,220,255,153,156,237,255,255,229,255,245,255,255,168,211,34,157,0,153,77,112,47,84,111,181^0,70,120,180,220,255,0,90,28,163,126,170,194,228,242,249,230,249,177,187,183,217,109,154,54,109,49,165^0,70,120,180,220,255,48,60,36,177,0,122,14,156,0,189,29,188,76,97,239,234,243,209,153,142,152,213)
-palname_bw: u "Black & White"
-palname_rgb: u "Red-Green-Blue"
-palname_b_rgb: u "Black with Red-Green-Blue"
-palname_bw_rgb: u "Black & White with Red-Green-Blue"
-palname_cmy: u "Cyan-Magenta-Yellow"
-palname_cmyk: u "Cyan-Magenta-Yellow-Black"
-palname_wcmyk: u "White-Cyan-Magenta-Yellow-Black"
-palname_rgbcmy: u "Red-Green-Blue with Cyan-Magenta-Yellow"
-palname_1bitrgb: u "1-Bit RGB"
-palname_aurora: u "Aurora by GrafxKid"
-palname_playpal: u "PLAYPAL by id Tech 1 | DOOM Engine"
-palname_srb2: u "Sonic Robo Blast 2"
-palname_famicube: u "Famicube by Arne"
-palname_kens16: u "Andrew Kensler - 16 by Andrew Kensler"
-palname_kens32: u "Andrew Kensler - 32 by Andrew Kensler"
-palname_kens54: u "Andrew Kensler - 54 by Andrew Kensler"
-palname_aap12: u "AAP-Micro 12 by Adigun A. Polack"
-palname_aap16: u "AAP-16 by Adigun A. Polack"
-palname_aap64: u "AAP-64 by Adigun A. Polack"
-palname_aap128: u "AAP-SPLENDOR128 by Adigun A. Polack"
-palname_db8: u "DB8 by DawnBringer"
-palname_db16: u "DB16 by DawnBringer"
-palname_db32: u "DB32 by DawnBringer"
-palname_db_iso22: u "DB-ISO22 by DawnBringer"
-palname_dimwid17: u "DimWiddy 17 by DimWiddy"
-palname_dimwid23: u "DimWiddy 23 by DimWiddy"
-palname_edg4: u "Endesga-4 by Endesga"
-palname_edg8: u "Endesga-8 by Endesga"
-palname_edg16: u "Endesga-16 by Endesga"
-palname_edg32: u "Endesga-32 by Endesga"
-palname_edg36: u "Endesga-36 by Endesga"
-palname_edg64: u "Endesga-64 by Endesga"
-palname_juicy32: u "Juicy-32 by Real Juice"
-palname_juicy56: u "Juicy-56 by Real Juice"
-palname_xaiue: u "XAIUE-22 by xaiue"
-palname_15pdx: u "15P-DX by GrafxKid"
-palname_20pdx: u "20P-DX by GrafxKid"
-palname_24pdx: u "24P-DX by GrafxKid"
-palname_cabana64: u "Cabana-64 by Crabby"
-palname_fant16: u "Fantasy 16 by Brettybooop"
-palname_fant24: u "Fantasy 24 by Gabriel C."
-palname_tf23: u "Tranquil Fantasy 23 by windfall.apples"
-palname_tfp39: u "Tranquility Plus 39 by windfall.apples"
-palname_faraway48: u "Faraway 48 by Igor Ferreira."
-palname_fleja_m: u "Fleja Master Palette by Fleja"
-palname_32: u "Koni32 by Konic"
-palname_linearbasic: u "Linear Color Palette Basic by GrafxKid"
-palname_vinelinear: u "Vines Flexible Linear Ramps by Vine 2D"
-palname_arcade29: u "Arcade Standard 29 by GrafxKid"
-palname_arq16: u "ARQ16 by Endesga"
-palname_blk36: u "BLK 36 by BlackedIRL."
-palname_blkneo: u "BLK-NEO by BlackedIRL."
-palname_brokefac: u "Broken Facility by telepathic-melon"
-palname_bubblegum: u "Bubblegum-16 by PineTreePizza"
-palname_cade15: u "Cade 15 by MonstersGoBoom"
-palname_calder8: u "Calder 8 by Philip Dodderige"
-palname_chrom16: u "Chromatic16 by DragonDePlatino"
-palname_cdbac: u "CD-BAC by DimWiddy"
-palname_cgarne: u "CG Arne by Arne Niklas Jansson"
-palname_cpcboy: u "CPC BOY by Arne Niklas Jansson"
-palname_dino: u "Dinoknight 16 by Retrospec"
-palname_4l: u "||||-22 by ||||"
-palname_ftzeth16: u "FZT Ethereal 16 by Fusionnist"
-palname_gzxp: u "GZXP by GrafxKid"
-palname_indc: u "Indecision by Nelson SMG"
-palname_island16: u "Island Joy 16 by Kerrie Lake"
-palname_journey: u "Journey by PineTreePizza"
-palname_juicy: u "Juicy 17 by JerryPie"
-palname_oak: u "Oak21 by Dan Oak"
-palname_nature55: u "Nature's Embrace 55 by GrafxKid"
-palname_nauris16: u "Nauris-16 by Nauris"
-palname_pear36: u "Pear 36 by PineTreePizza"
-palname_peach: u "Peachy Pop 16 by Kerrie Lake"
-palname_pineapple32: u "Pineapple 32 by PineTreePizza"
-palname_resurrect: u "Resurrect 32 by Kerrie Lake"
-palname_rosy42: u "Rosy 42 by PineTreePizza"
-palname_slso: u "SLSO-CLR17 by Luis Miguel Maldonado"
-palname_softy15: u "Softy 15 by Eggy"
-palname_spec12: u "SPEC12 by Smalls"
-palname_starmancer: u "Starmancer by Ominux Games"
-palname_sup8: u "Superb 8 by BigPotato"
-palname_superfuture: u "SuperFuture25 by Endesga"
-palname_sweetie16: u "Sweetie 16 by GrafxKid"
-palname_taffy16: u "Taffy 16 by PineTreePizza"
-palname_todayland: u "Todayland Palette V2 by GrafxKid"
-palname_vivid17: u "Vivid-17 by Irenaart"
-palname_voodo: u "Voodo34 by Shamaboy"
-palname_zu32: u "Zughy 32 by Zughy"
-palname_enos16: u "ENOS16 by Endesga"
-palname_undertones: u "Undertones-17 by Irenaart"
-palname_equpix15: u "Equpix 15 by Night"
-palname_night16: u "Night 16 by Night"
-palname_star29: u "Star 29 by Starlane"
-palname_star34: u "Star 34 by Starlane"
-palname_stilllife: u "Still-Life by cure"
-palname_simjpc16: u "SimpleJPC-16 by Adigun A. Polack"
-palname_acid15: u "Acid 15 by pyrometal"
-palname_battery24: u "Battery 24 by Battery Jellyfish"
-palname_clump18: u "Clumpy 18 by windfall.apples"
-palname_cthul: u "Cthulhu by Starlane"
-palname_crimso11: u "Crimso 11 by Crimso"
-palname_coptec: u "Copper-Tech by Arne Niklas Jansson"
-palname_drz15: u "DRZ15A by Drazille"
-palname_eggy15: u "Eggy 15 by Eggy"
-palname_eroge: u "Eroge-Copper by Arne Niklas Jansson"
-palname_europa: u "Europa 16 by Starlane"
-palname_greyt: u "GreyT-bit by Sam Keddy"
-palname_jewel: u "Jewel by AprilSundae"
-palname_polar11: u "Polar 11 by Smalls"
-palname_sheltzy: u "Sheltzy 32 by Please Check - NatTorpedia"
-palname_rube-goldberg: u "Rube-Goldberg"
-palname_boomboom: u "BoomBoom by Salman_Shh"
-palname_g8: u "Generic-8 by GrafxKid"
-palname_matriax8c: u "Matriax8c by Davit Masia"
-palname_nt1h: u "NT1H by NatTorpedia"
-palname_au15: u "Autum 15 by jok"
-palname_au15y: u "Autum 15 [Yellow] by jok"
-palname_jerrypie22: u "JerryPie 22 by JerryPie"
-palname_naji16: u "Naji 16 by Naji"
-palname_blessing: u "Blessing by Maruki"
-palname_crayola: u "Crayola Blind"
-palname_easter: u "Easter Island by skamocore"
-palname_fairy: u "Fairy Tales by lollige"
-palname_fuzz4: u "Fuzzy Four by P-Tux7"
-palname_xdb_01: u "0xdb-01 by 0xDB"
-palname_ocaso: u "Ocaso by Minord"
-palname_pastel: u "Oh Hell, Pastel by StarlitSunset"
-palname_pastel17: u "17 Pastels by Irenaart"
-palname_pollen8: u "Pollen-8 by Conker"
-palname_nopal: u "Nopal-12 by BlackedIRL."
-palname_sy17: u "Sy17 by xaiue"
-palname_syz15: u "Syz15 by Fusionnist"
-palname_tui15: u "TUI-15 by Jeremy"
-palname_cave: u "Cave by PineTreePizza"
-palname_psygnosia: u "Psygnosia by Arne Niklas Jansson"
-palname_marshmellow32: u "MarshMellow32 by FormalPrejudice"
-palname_rabbit7: u "Rabbit 7 by GrafxKid"
-palname_finlal11: u "Finlal 11 by Finlal"
-palname_vinik24: u "Vinik 24 by Vinik"
-palname_ykb22: u "YKB-22 by yahkehbu"
-palname_graveyard: u "Graveyard-21 by AprilSundae"
-palname_steamlords: u "Steam Lords by Slynyrd"
-palname_aaprad: u "AAP-RadiantXV by Adigun A. Polack"
-palname_aapmaj: u "AAP-Majesty XVII by Adigun A. Polack"
-palname_daruda: u "Daruda 22 by daruda"
-palname_rust6: u "Rust-6 by Blue Phoenix"
-palname_xaiue_rad: u "XAIUE-Radiant by xaiue"
-palname_firestorm: u "Firestorm by theartistjulian"
-palname_supernova7: u "SuperNova 7 by Blue Phoenix"
-palname_nyx8: u "NYX8 by Javier Guerrero"
-palname_oil6: u "OIL6 by GrafxKid"
-palname_sgm: u "SGM-Palette 2 by s.g.m"
-palname_fornaxvoid1: u "Fornax Void I by Fornax Void"
-palname_fornaxvoid2: u "Fornax Void II by Fornax Void"
-palname_pixelwave: u "Pixelwave by Reptorian"
-palname_spaceyeaster: u "Spacey Easter by Spark Norris"
-palname_moon39: u "Moonlit-39 by theartistjulian"
-palname_pet8: u "Petite-8 by Adigun A. Polack"
-palname_pet8d: u "Petite-8 Afterdark by Adigun A. Polack"
-palname_autochrome: u "Autochrome 3 by Reptorian"
-palname_autochrome5: u "Autochrome 5 by Reptorian"
-palname_gb_d_1: u "GB Default 1"
-palname_gb_d_2: u "GB Default 2"
-palname_gb_andrade: u "GB Andrade by Andrade"
-palname_gb_blue: u "GB Blue Seni by WildLeoKnight"
-palname_gb_bz: u "GB Blackzone"
-palname_gb_crimson: u "GB Crimson by WildLeoKnight"
-palname_gb_didi: u "GB Didi by DidiGameboy"
-palname_gb_dirty: u "GB Dirty by WildLeoKnight"
-palname_gb_arne: u "GB Arne by Arne"
-palname_gb_easy: u "GB Easy by GrafxKid"
-palname_gb_forest: u "GB Forest"
-palname_gb_hg: u "GB Harsh Green by WildLeoKnight"
-palname_gb_lg: u "GB Light Green by WildLeoKnight"
-palname_gb_nostalgia: u "GB Nostalgia by WildLeoKnight"
-palname_gb_platinum: u "GB Platinum by WildLeoKnight"
-palname_gb_kirokaze: u "GB Kirokaze by Kirokaze"
-palname_gb_pj: u "GB PJ"
-palname_gb_cyber: u "GB Cyber"
-palname_gb_wish: u "GB Wish by Kerrie Lake"
-palname_gb_grapefruit: u "GB Grapefruit by GrafxKid"
-palname_gb_ice_cream: u "GB Ice Cream by Kerrie Lake"
-palname_gb_rb: u "GB Red_Blue"
-palname_gb_space: u "GB Spacehaze by WildLeoKnight"
-palname_gb_choco: u "GB Chocolate by GrafxKid"
-palname_gb_purpdawn: u "GB Purple Dawn by WildLeoKnight"
-palname_gb_gray: u "GB Gray by GrafxKid"
-palname_arne4: u "ARNE4 by Arne"
-palname_hal4: u "HallowPumpkin by WildLeoKnight"
-palname_amiga2600ntsc: u "Amiga 2600 NTSC"
-palname_amiga2600pal: u "Amiga 2600 PAL"
-palname_amiga2600secam: u "Amiga 2600 SECAM"
-palname_amiga7800mess: u "Amiga 7800 M.E.S.S by Nabuko78"
-palname_amiga7800: u "Amiga 7800"
-palname_amstrad_cpc: u "Amstrad CPC"
-palname_apple2: u "Apple II"
-palname_cga: u "CGA"
-palname_cga00: u "CGA Mode 0 [Low]"
-palname_cga01: u "CGA Mode 0 [High]"
-palname_cga10: u "CGA Mode 1 [Low]"
-palname_cga11: u "CGA Mode 1 [High]"
-palname_cga20: u "CGA Mode 2 [Low]"
-palname_cga21: u "CGA Mode 2 [High]"
-palname_c64_pepto: u "Commodore 64 - Pepto"
-palname_c64_colodore: u "Commodore 64 - Colodore"
-palname_com_vic_20: u "Commodore VIC-20"
-palname_colecovision: u "Colecovision"
-palname_jmp: u "Japanese Machine Palette by Arne Niklas Jansson"
-palname_mac2: u "Macintosh II"
-palname_nes: u "NES"
-palname_pico_8: u "PICO-8 by Lexaloffle Games"
-palname_risc: u "RISC OS"
-palname_samcoupe: u "SAM Coupe"
-palname_mo5: u "Thomson MO5"
-palname_vga: u "VGA"
-palname_zx: u "ZX Spectrum"
-palname_gnome32: u "GNOME 32"
-palname_elc22: u "Electronic Crayon 22"
-palname_chip16: u "Chip16"
-palname_msx: u "MSX"
-palname_deluxepaint: u "Deluxe Paint"
-palname_lms: u "Legacy Paint"
-palname_msxp: u "XP Paint"
-palname_vis: u "Vista Paint"
+palname_bw:u "Black & White"
+palname_rgb:u "Red-Green-Blue"
+palname_b_rgb:u "Black with Red-Green-Blue"
+palname_bw_rgb:u "Black & White with Red-Green-Blue"
+palname_cmy:u "Cyan-Magenta-Yellow"
+palname_cmyk:u "Cyan-Magenta-Yellow-Black"
+palname_wcmyk:u "White-Cyan-Magenta-Yellow-Black"
+palname_rgbcmy:u "Red-Green-Blue with Cyan-Magenta-Yellow"
+palname_1bitrgb:u "1-Bit RGB"
+palname_aurora:u "Aurora by GrafxKid"
+palname_playpal:u "PLAYPAL by id Tech 1 | DOOM Engine"
+palname_srb2:u "Sonic Robo Blast 2"
+palname_famicube:u "Famicube by Arne"
+palname_kens16:u "Andrew Kensler - 16 by Andrew Kensler"
+palname_kens32:u "Andrew Kensler - 32 by Andrew Kensler"
+palname_kens54:u "Andrew Kensler - 54 by Andrew Kensler"
+palname_aap12:u "AAP-Micro 12 by Adigun A. Polack"
+palname_aap16:u "AAP-16 by Adigun A. Polack"
+palname_aap64:u "AAP-64 by Adigun A. Polack"
+palname_aap128:u "AAP-SPLENDOR128 by Adigun A. Polack"
+palname_db8:u "DB8 by DawnBringer"
+palname_db16:u "DB16 by DawnBringer"
+palname_db32:u "DB32 by DawnBringer"
+palname_db_iso22:u "DB-ISO22 by DawnBringer"
+palname_dimwid17:u "DimWiddy 17 by DimWiddy"
+palname_dimwid23:u "DimWiddy 23 by DimWiddy"
+palname_edg4:u "Endesga-4 by Endesga"
+palname_edg8:u "Endesga-8 by Endesga"
+palname_edg16:u "Endesga-16 by Endesga"
+palname_edg32:u "Endesga-32 by Endesga"
+palname_edg36:u "Endesga-36 by Endesga"
+palname_edg64:u "Endesga-64 by Endesga"
+palname_juicy32:u "Juicy-32 by Real Juice"
+palname_juicy56:u "Juicy-56 by Real Juice"
+palname_xaiue:u "XAIUE-22 by xaiue"
+palname_15pdx:u "15P-DX by GrafxKid"
+palname_20pdx:u "20P-DX by GrafxKid"
+palname_24pdx:u "24P-DX by GrafxKid"
+palname_cabana64:u "Cabana-64 by Crabby"
+palname_fant16:u "Fantasy 16 by Brettybooop"
+palname_fant24:u "Fantasy 24 by Gabriel C."
+palname_tf23:u "Tranquil Fantasy 23 by windfall.apples"
+palname_tfp39:u "Tranquility Plus 39 by windfall.apples"
+palname_faraway48:u "Faraway 48 by Igor Ferreira."
+palname_fleja_m:u "Fleja Master Palette by Fleja"
+palname_koni32:u "Koni32 by Konic"
+palname_linearbasic:u "Linear Color Palette Basic by GrafxKid"
+palname_vinelinear:u "Vines Flexible Linear Ramps by Vine 2D"
+palname_arcade29:u "Arcade Standard 29 by GrafxKid"
+palname_arq16:u "ARQ16 by Endesga"
+palname_blk36:u "BLK 36 by BlackedIRL."
+palname_blkneo:u "BLK-NEO by BlackedIRL."
+palname_brokefac:u "Broken Facility by telepathic-melon"
+palname_bubblegum:u "Bubblegum-16 by PineTreePizza"
+palname_cade15:u "Cade 15 by MonstersGoBoom"
+palname_calder8:u "Calder 8 by Philip Dodderige"
+palname_chrom16:u "Chromatic16 by DragonDePlatino"
+palname_cdbac:u "CD-BAC by DimWiddy"
+palname_cgarne:u "CG Arne by Arne Niklas Jansson"
+palname_cpcboy:u "CPC BOY by Arne Niklas Jansson"
+palname_dino:u "Dinoknight 16 by Retrospec"
+palname_4l:u "||||-22 by ||||"
+palname_fzteth16:u "FZT Ethereal 16 by Fusionnist"
+palname_gzxp:u "GZXP by GrafxKid"
+palname_indc:u "Indecision by Nelson SMG"
+palname_island16:u "Island Joy 16 by Kerrie Lake"
+palname_journey:u "Journey by PineTreePizza"
+palname_juicy:u "Juicy 17 by JerryPie"
+palname_oak:u "Oak21 by Dan Oak"
+palname_nature55:u "Nature's Embrace 55 by GrafxKid"
+palname_nauris16:u "Nauris-16 by Nauris"
+palname_pear36:u "Pear 36 by PineTreePizza"
+palname_peach:u "Peachy Pop 16 by Kerrie Lake"
+palname_pineapple32:u "Pineapple 32 by PineTreePizza"
+palname_resurrect:u "Resurrect 32 by Kerrie Lake"
+palname_rosy42:u "Rosy 42 by PineTreePizza"
+palname_slso:u "SLSO-CLR17 by Luis Miguel Maldonado"
+palname_softy15:u "Softy 15 by Eggy"
+palname_spec12:u "SPEC12 by Smalls"
+palname_starmancer:u "Starmancer by Ominux Games"
+palname_sup8:u "Superb 8 by BigPotato"
+palname_superfuture:u "SuperFuture25 by Endesga"
+palname_sweetie16:u "Sweetie 16 by GrafxKid"
+palname_taffy16:u "Taffy 16 by PineTreePizza"
+palname_todayland:u "Todayland Palette V2 by GrafxKid"
+palname_vivid17:u "Vivid-17 by Irenaart"
+palname_voodo:u "Voodo34 by Shamaboy"
+palname_zu32:u "Zughy 32 by Zughy"
+palname_enos16:u "ENOS16 by Endesga"
+palname_undertones:u "Undertones-17 by Irenaart"
+palname_equpix15:u "Equpix 15 by Night"
+palname_night16:u "Night 16 by Night"
+palname_star29:u "Star 29 by Starlane"
+palname_star34:u "Star 34 by Starlane"
+palname_stilllife:u "Still-Life by cure"
+palname_simjpc16:u "SimpleJPC-16 by Adigun A. Polack"
+palname_acid15:u "Acid 15 by pyrometal"
+palname_battery24:u "Battery 24 by Battery Jellyfish"
+palname_clump18:u "Clumpy 18 by windfall.apples"
+palname_cthul:u "Cthulhu by Starlane"
+palname_crimso11:u "Crimso 11 by Crimso"
+palname_coptec:u "Copper-Tech by Arne Niklas Jansson"
+palname_drz15:u "DRZ15A by Drazille"
+palname_eggy15:u "Eggy 15 by Eggy"
+palname_eroge:u "Eroge-Copper by Arne Niklas Jansson"
+palname_europa:u "Europa 16 by Starlane"
+palname_greyt:u "GreyT-bit by Sam Keddy"
+palname_jewel:u "Jewel by AprilSundae"
+palname_polar11:u "Polar 11 by Smalls"
+palname_sheltzy:u "Sheltzy 32 by Please Check - NatTorpedia"
+palname_rube_goldberg:u "Rube-Goldberg"
+palname_boomboom:u "BoomBoom by Salman_Shh"
+palname_g8:u "Generic-8 by GrafxKid"
+palname_matriax8c:u "Matriax8c by Davit Masia"
+palname_nt1h:u "NT1H by NatTorpedia"
+palname_au15:u "Autum 15 by jok"
+palname_au15y:u "Autum 15 [Yellow] by jok"
+palname_jerrypie22:u "JerryPie 22 by JerryPie"
+palname_naji16:u "Naji 16 by Naji"
+palname_blessing:u "Blessing by Maruki"
+palname_crayola:u "Crayola Blind"
+palname_easter:u "Easter Island by skamocore"
+palname_fairy:u "Fairy Tales by lollige"
+palname_fuzz4:u "Fuzzy Four by P-Tux7"
+palname_xdb_01:u "0xdb-01 by 0xDB"
+palname_ocaso:u "Ocaso by Minord"
+palname_pastel:u "Oh Hell, Pastel by StarlitSunset"
+palname_pastel17:u "17 Pastels by Irenaart"
+palname_pollen8:u "Pollen-8 by Conker"
+palname_nopal:u "Nopal-12 by BlackedIRL."
+palname_sy17:u "Sy17 by xaiue"
+palname_syz15:u "Syz15 by Fusionnist"
+palname_tui15:u "TUI-15 by Jeremy"
+palname_cave:u "Cave by PineTreePizza"
+palname_psygnosia:u "Psygnosia by Arne Niklas Jansson"
+palname_marshmellow32:u "MarshMellow32 by FormalPrejudice"
+palname_rabbit7:u "Rabbit 7 by GrafxKid"
+palname_finlal11:u "Finlal 11 by Finlal"
+palname_vinik24:u "Vinik 24 by Vinik"
+palname_ykb22:u "YKB-22 by yahkehbu"
+palname_graveyard:u "Graveyard-21 by AprilSundae"
+palname_steamlords:u "Steam Lords by Slynyrd"
+palname_aaprad:u "AAP-RadiantXV by Adigun A. Polack"
+palname_aapmaj:u "AAP-Majesty XVII by Adigun A. Polack"
+palname_daruda:u "Daruda 22 by daruda"
+palname_rust6:u "Rust-6 by Blue Phoenix"
+palname_xaiue_rad:u "XAIUE-Radiant by xaiue"
+palname_firestorm:u "Firestorm by theartistjulian"
+palname_supernova7:u "SuperNova 7 by Blue Phoenix"
+palname_nyx8:u "NYX8 by Javier Guerrero"
+palname_oil6:u "OIL6 by GrafxKid"
+palname_sgm:u "SGM-Palette 2 by s.g.m"
+palname_fornaxvoid1:u "Fornax Void I by Fornax Void"
+palname_fornaxvoid2:u "Fornax Void II by Fornax Void"
+palname_pixelwave:u "Pixelwave by Reptorian"
+palname_spaceyeaster:u "Spacey Easter by Spark Norris"
+palname_moon39:u "Moonlit-39 by theartistjulian"
+palname_pet8:u "Petite-8 by Adigun A. Polack"
+palname_pet8d:u "Petite-8 Afterdark by Adigun A. Polack"
+palname_autochrome3:u "Autochrome 3 by Reptorian"
+palname_autochrome5:u "Autochrome 5 by Reptorian"
+palname_gb_d_1:u "GB Default 1"
+palname_gb_d_2:u "GB Default 2"
+palname_gb_andrade:u "GB Andrade by Andrade"
+palname_gb_blue:u "GB Blue Seni by WildLeoKnight"
+palname_gb_bz:u "GB Blackzone"
+palname_gb_crimson:u "GB Crimson by WildLeoKnight"
+palname_gb_didi:u "GB Didi by DidiGameboy"
+palname_gb_dirty:u "GB Dirty by WildLeoKnight"
+palname_gb_arne:u "GB Arne by Arne"
+palname_gb_easy:u "GB Easy by GrafxKid"
+palname_gb_forest:u "GB Forest"
+palname_gb_hg:u "GB Harsh Green by WildLeoKnight"
+palname_gb_lg:u "GB Light Green by WildLeoKnight"
+palname_gb_nostalgia:u "GB Nostalgia by WildLeoKnight"
+palname_gb_platinum:u "GB Platinum by WildLeoKnight"
+palname_gb_kirokaze:u "GB Kirokaze by Kirokaze"
+palname_gb_pj:u "GB PJ"
+palname_gb_cyber:u "GB Cyber"
+palname_gb_wish:u "GB Wish by Kerrie Lake"
+palname_gb_grapefruit:u "GB Grapefruit by GrafxKid"
+palname_gb_ice_cream:u "GB Ice Cream by Kerrie Lake"
+palname_gb_rb:u "GB Red_Blue"
+palname_gb_space:u "GB Spacehaze by WildLeoKnight"
+palname_gb_choco:u "GB Chocolate by GrafxKid"
+palname_gb_purpdawn:u "GB Purple Dawn by WildLeoKnight"
+palname_gb_gray:u "GB Gray by GrafxKid"
+palname_arne4:u "ARNE4 by Arne"
+palname_hal4:u "HallowPumpkin by WildLeoKnight"
+palname_amiga2600ntsc:u "Amiga 2600 NTSC"
+palname_amiga2600pal:u "Amiga 2600 PAL"
+palname_amiga2600secam:u "Amiga 2600 SECAM"
+palname_amiga7800mess:u "Amiga 7800 M.E.S.S by Nabuko78"
+palname_amiga7800:u "Amiga 7800"
+palname_amstrad_cpc:u "Amstrad CPC"
+palname_apple2:u "Apple II"
+palname_cga:u "CGA"
+palname_cga00:u "CGA Mode 0 [Low]"
+palname_cga01:u "CGA Mode 0 [High]"
+palname_cga10:u "CGA Mode 1 [Low]"
+palname_cga11:u "CGA Mode 1 [High]"
+palname_cga20:u "CGA Mode 2 [Low]"
+palname_cga21:u "CGA Mode 2 [High]"
+palname_c64_pepto:u "Commodore 64 - Pepto"
+palname_c64_colodore:u "Commodore 64 - Colodore"
+palname_com_vic_20:u "Commodore VIC-20"
+palname_colecovision:u "Colecovision"
+palname_jmp:u "Japanese Machine Palette by Arne Niklas Jansson"
+palname_mac2:u "Macintosh II"
+palname_nes:u "NES"
+palname_pico_8:u "PICO-8 by Lexaloffle Games"
+palname_risc:u "RISC OS"
+palname_samcoupe:u "SAM Coupe"
+palname_mo5:u "Thomson MO5"
+palname_vga:u "VGA"
+palname_zx:u "ZX Spectrum"
+palname_gnome32:u "GNOME 32"
+palname_elc22:u "Electronic Crayon 22"
+palname_chip16:u "Chip16"
+palname_msx:u "MSX"
+palname_deluxepaint:u "Deluxe Paint"
+palname_lms:u "Legacy Paint"
+palname_msxp:u "XP Paint"
+palname_vis:u "Vista Paint"
 #@cli pal_t : eq. to 'palette_transfer'. : (+)
 pal_t: palette_transfer $*
 #@cli palette_transfer : 0<=_palette_id<=142,0<=_indexing_style<=4,0<=_color_dithering[%]<=1,_transfer_rgb={0=No | 1=Yes },0<=_alpha_count,0<=_alpha_dithering<=1,_special_effect_factor>=0,0<=_initial_resize_method<=5,_activate_upscaling_stimulation={ 0=Does not activate | 1=Activate Upscale},_pixel_width>=1,_pixel_height>=1,_activate_hardware_stimulation={ 0=Does not activate | 1= Stimulate hardware restriction },1<=_color_section_of_hardware_restriction_precision_factor,_hardware_restriction_by_tile_width>0,_hardware_restriction_by_tile_height>0,_hardware_color_precision>2,_hardware_color_mapping_method={0=Median Cut | Median Cut and K-Means},alpha_precion_factor>2,alpha_mapping_method_for_hardware_stimulation={0=Median Cut | Median Cut and K-Means}
