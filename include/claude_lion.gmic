@@ -60,7 +60,13 @@
 #@gui : Saturation Increase = int(20,0,50)
 #@gui : Final Flattening (bilateral) = int(6,0,10)
 #@gui : Lines Antialias = int(15,0,100)
-#@gui : Colors to Black or White = bool(0)
+#@gui : Color Effect = choice(0, "None", "Deep Black", "Colorful")
+#@gui : Flat Color Effect = choice(0, "None", "Rainbow", "Hard Rainbow", "Posterize Softly", "Super Flat")
+#@gui : Colors to Black or White = choice(0, "No", "Soft Threshold", "Threshold with Soft Antialias", "Lines and Black")
+#@gui : sep = separator()
+#@gui : Relief Effect = choice(0, "None", "Groove", "Bump")
+#@gui : sep = separator()
+#@gui : Final Antialias = bool(0)
 #@gui : sep = separator()
 #@gui : Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal",
 #@gui : "Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right",
@@ -68,7 +74,8 @@
 #@gui : Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui : sep = separator()
 #@gui : url = link("Filter discussed here","http://gimpchat.com/viewtopic.php?f=11&t=19335&p=266517#p266512")
-#@gui : note = note("<small>Author: <i>Claude Lion</i>.      Latest Update: <i>2021/07/31</i>.</small>")
+#@gui : note = note("<small>Author: <i>Claude Lion</i>.      Latest Update: <i>2022/01/26</i>.</small>")
+#@gui : note = note("<small>Use filters of David Tschumperlé and a few filters of Jérôme Boulanger.</small>")
 cl_comic :
 	repeat $! l[$>]
 
@@ -83,7 +90,11 @@ cl_comic :
 	augmSat=$9
 	nbBilatFin=$10
 	antialias=$11
-	bw=$12
+	colorEffect=$12
+	flatColorEffect=$13
+	bw=$14
+	reliefEffect=$15
+	finalAntialias=$16
 
 	if $simplif==2
 		fx_smooth_antialias. 100,0,2.5,0,50,50
@@ -138,13 +149,98 @@ cl_comic :
 		mul[-2,-1]
 		n. 0,255
 		fx_smooth_bilateral. 10,7,$nbBilatFin,0,0
+		
+		
+		
+		if $colorEffect==1
+			fx_custom_transform. "i","if(i<64,0, sqrt((i-64)/(256-64))*256  )","i","i","i","i",0
+		elif $colorEffect==2
+			remove_opacity.
+			rgb2hsv. split. c nm. val nm.. sat nm... hue
+			+mul[val] [sat] nm. ref
+			sqrt[ref]
+			+sub[ref] 1 nm. subRef
+			sub[val] 1 *[val] [subRef] negate[val]
+			sub[sat] 1 *[sat] [subRef] negate[sat]
+			rm[ref] rm[subRef]
+			append[-3--1] c
+			hsv2rgb.
+			#n. 0,255
+		fi
+
+		if $flatColorEffect==1
+			(255,0,0,0,0,0,0,0,0,0,0,64,128,192,255,255,255,255,255,255,255,255,255,192,128,64^255,0,0,64,128,192,255,255,255,255,255,255,255,255,255,192,128,64,0,0,0,0,0,0,0,0^255,0,255,255,255,255,255,192,128,64,0,0,0,0,0,0,0,0,0,64,128,192,255,255,255,255)
+			remove_opacity..
+			index.. [-1],0,1
+			rm.
+			fx_smooth_antialias. 15,0,1,0,50,50
+		elif $flatColorEffect==2
+			otsu. 256 n. 0,255
+			fx_smooth_antialias. 15,0,1,0,50,50
+		elif $flatColorEffect==3
+			fx_posterize. 150,30,1,32,0,0,0,0,50,50
+			fx_custom_transform. "i","if(i<64,0, sqrt((i-64)/(256-64))*256  )","i","i","i","i",0
+		elif $flatColorEffect==4
+			if s==4 split_opacity. rm. fi
+			+colormap. 8
+			index.. [-1],0,1
+			rm.
+			rgb2hsl. split. c
+			n. 0,1
+			append c hsl2rgb
+		fi
+
+		
+		
+		
 		if $bw==1
-			fx_curves_interactive 7,0,1,"7","0,0,16,100,100,100,-1,0,0,100,0,-1,0,0,100,100,-1,0,0,100,100,-1"
+			fx_curves_interactive. 7,0,1,"7","0,0,16,100,100,100,-1,0,0,100,0,-1,0,0,100,100,-1,0,0,100,100,-1"
+		elif $bw==2
+			fx_blackandwhite. 0.299,0,0.587,0,0.114,0,0,0,0,0,0,0,0,0,2,0,0,0,16,4,0,0,0,50,50
+			threshold. 33% n 0,255
+			fx_smooth_antialias. 100,0.5,5,0,50,50
+			fx_smooth_antialias. 100,0.5,5,0,50,50
+		elif $bw==3
+			fx_blackandwhite. 0.299,0,0.587,0,0.114,0,0,0,0,0,0,0,0,0,2,0,0,0,16,4,0,0,0,50,50
+			otsu 4
+			n 0,255
 		fi
 	else
 		remove[-1]
 	fi
 
+	if $reliefEffect==1
+		# inspired by emboss_image of Reptorian
+		+fx_curves_interactive. 7,0,1,"7","0,0,16,100,100,100,-1,0,0,100,0,-1,0,0,100,100,-1,0,0,100,100,-1"
+		l.
+			b. 3
+			gradient2rgb. 0 n. 0,255
+			[-1]
+			rgb2hsv[-2,-1] split[-2,-1] c
+
+			l[-3--1] +[-3] {315} %[-3] 360 endl
+			l[-6--4] +[-3] {135} %[-3] 360 endl
+			l[-3--1] a c hsv2rgb s c endl
+			l[-6--4] a c hsv2rgb s c endl
+			rm[^-6,-3]
+			negate..
+			/ 2
+			+. 128
+			blend grainmerge,1
+		endl
+		to_rgb
+		blend grainmerge,1
+	elif $reliefEffect==2
+		fx_frame. 0,100,0,100,0,0,255,255,255,255,2,0,0,0,255
+		fx_custom_transform. "i","if(i<64,0, sqrt((i-64)/(256-64))*256  )","i","i","i","i",0
+		fx_illuminate_shape2d. 0,0,0,0,0,255,1,1,4,0,0,3,1,1,4,10,75,30,40,40,80,0.2,1,0,0,-2,-2,2,0,0,0
+		crop. 2,2,{w-4},{h-4}
+	fi
+	
+	if $finalAntialias==1
+		fx_smooth_antialias 50,50,2.5,0,50,50
+	fi
+	
 	endl done
 
 cl_comic_preview :
