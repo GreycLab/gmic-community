@@ -1,18 +1,63 @@
 
-#@cli svg2plots : "file",_resolution,_wheeliecount
-svg2wheelie:
+#@cli svg2wheelie : "file",_resolution,_wheeliecount
+svg2wheelie:	
    check "isfile('${1}') && isint(${2=10}) && ${2}>0 && isint(${3=16}) && ${3}>2"
    fname=$1
    res=$2
    wcnt=$3
    normdiv=1
-   svg2plots $fname,$res 
+   svg2plots $fname,$res
+   split. x
+   fft[-2,-1]
+   append[-2,-1] c
    name. spectral
+   makewheelielist[spectral] $wcnt
+   wlist=${}
+   
+
+#@cli mkwheelielist : wheelie_count
+mkwheelielist :
+   name. spectral
+   check isint(${1=16})" && "${1}>2
+   wcnt=$1
    set[spectral] 0,0,0,0,0
-   set[spectral] 0,0,0,0,1 -d
-   div[spectral] {h} -d
-   fill[spectral] ">begin(maxn=0);nm=norm2(I);maxn<nm?maxn=nm;nm<0.5?[0,0]:I;end(set(maxn,'normdiv'))" -d
-   fill[spectral] ">begin(nm=get('normdiv',0,0));I/nm"
+   set[spectral] 0,0,0,0,1
+   div[spectral] {w#$spectral}
+   wheelie={">
+                const wc="$wcnt";
+                W=vector(#6*wc,0);
+                sz=0;
+                repeat(2*wc,m,
+                         if(
+                             m%2==0,
+                             j=int(m/2)+1;
+                             o=j,
+                             j=w#$spectral-(int(m/2)+1);
+                             o=-(int(m/2)+1)
+                           );
+                       rad=norm2(I(#$spectral,j,0));
+                      if(rad<=0.01,continue(),
+                             ang=atan2(i(#$spectral,j,0,0,1),i(#$spectral,j,0,0,0));
+                             ang=rad2deg(ang);
+                             ang<0?ang=ang+360;
+                             copy(W[3*sz],[rad,ang,o],3,1,1);
+                             sz=sz+1
+                        )
+                     );
+                set(sz,'wcnt');
+                U=vector(#3,0);
+                V=vector(#3,0);
+            
+                repeat(sz-1,k,
+                             copy(V,W[3*(sz-1-k)],3,1,1);print(V);
+                             copy(U,W[3*(sz-2-k)],3,1,1);print(U);
+                             ang=V[1]-U[1];
+                             ang<0?ang=ang+360;
+                             copy(W[3*(sz-1-k)],[V[0],ang,V[2]-U[2]],3,1,1);
+                      );
+                W
+           "}
+       status {W=[$wheelie];W[0,3*$wcnt,1]}
 
 #@cli svg2plots : "file",_resolution
 svg2plots:
@@ -20,14 +65,11 @@ svg2plots:
    file_rand outfile=${}
    fname=$1
    res=$2
-   helpercommand="python svghelper.py --density "$res" --output "$outfile" "$fname 
+   helpercommand="/usr/bin/python svghelper.py --normalize --density "$res" --output "$outfile" "$fname
    exec $helpercommand
    if !isfile('$outfile')
       error "Could not process "$outfile"!"
    fi
    input_csv $outfile,0
    delete $outfile
-   split. x
-   fft[-2,-1]
-   append[-2,-1] c
-   
+   permute. yxzc
