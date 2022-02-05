@@ -2272,6 +2272,35 @@ gcd_inpaint_boxlocal : check ${"is_image_arg $1"}
     +eq. 0 add[-2,-1] div
   endl done
 
+#@cli gcd_inpaint_pyramid : [mask]
+#@cli : Inpaint selected images by specified mask.
+#@cli : $ image.jpg 100%,100% circle. 50%,50%,50,1,1 gcd_inpaint_pyramid.. .
+gcd_inpaint_pyramid : check ${"is_image_arg $1"}
+  pass$1 0 ge. 1 store. msk
+  repeat $! l[$>]
+    L,D,X,Y,W,H={\
+        L=ceil(log(max(w,h))/log(2));\
+        D=2^L;\
+        X=ceil((D-w)/2);\
+        Y=ceil((D-h)/2);\
+        [L,2^L,X,Y,w,h]\
+      } # L = number of levels
+    i $msk z {[-$X,-$Y,$D-$X-1,$D-$Y-1]},1 # force 2^n dimensions
+    eq. 0 mul.. .
+    repeat $L
+      +r[-2,-1] 50%,50%,100%,100%,2
+      +eq. 0 add. .. div[-3,-1] gt. 0
+    done
+    i[0] (0.0625,0.125,0.0625;0.125,0.25,0.125;0.0625,0.125,0.0625)
+    repeat $L
+      l[0,-4--1] rm.
+        r. [1],[1],[1],[1],1 convolve. [0]
+        eq[2] 0 j[1] .,0,0,0,0,1,[2] rm.
+      endl
+    done
+    rm[0,-1] z {[$X,$Y,$X+$W-1,$Y+$H-1]},1 # restore dimensions
+  endl done
+
 #@cli gcd_dither_srgb : _nb_levels>=2
 #@cli : Dither selected sRGB images.
 #@cli : Default values: 'nb_levels=2'.
