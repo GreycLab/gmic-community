@@ -47,6 +47,755 @@
 #@cli :: Reptorian's CLI Commands
 #
 #-------------------------------
+#@cli rep_mitchell_concatenation: startnum_a,startnum_b,_base,_base_2,_method_a={ 0=sub | 1=add | 2=mul},_method_b={ 0=sub | 1=add | 2=mul},_pixel_size,[palette],[palette],_auto_resize_pal,_shape_id,_shape_ratio,_shape_angle,shape_dir,shape_repeat_mode,shape_fit,_shape_sub,_shape_option_1..._shape_option_n
+#@cli : Generates Kerry Mitchell Concatenation Art. Detailed explanation can be found at - http://www.kerrymitchell.art/spacefilling-blog/2013/11/concatenations.html
+#@cli : Default values: '_int_base=10','_method_a=0','_method_b=1','_palette=n/a','hex_bg_col=n/a','_shape=n/a'
+rep_mitchell_concatenation:
+skip ${1=},${2=},${3=},${4=},${5=},${6=},${7=1},${8=},${9=},${10=1},${11=},${12=1},${13=0},${14=0},${15=0},${16=1},${17=1},${18=}
+
+if narg($1)&&narg($2)
+ startnum_a,startnum_b={max(1,int(abs($1)))},{max(1,int(abs($2)))}
+elif narg($1)||narg($2)
+ if narg($1)
+  startnum_a,startnum_b={max(1,int(abs($1)))},{max(1,int(abs($1)))}
+ else
+  startnum_a,startnum_b={max(1,int(abs($2)))},{max(1,int(abs($2)))}
+ fi
+else
+ startnum_a,startnum_b=1,1
+fi
+
+if narg($3)&&narg($4)
+ base_a,base_b={max(2,int(abs($3)))},{max(2,int(abs($4)))}
+elif narg($3)||narg($4)
+ if narg($3)
+  base_a,base_b={max(2,int(abs($3)))}
+ else
+  base_b,base_b={max(2,int(abs($4)))}
+ fi
+else
+ base_a,base_b=10
+fi
+
+if narg($5)&&narg($6)
+ method_a,method_b={abs(int($5))},{abs(int($6))}
+elif narg($5)||narg($6)
+ if narg($5)
+  method_a,method_b={abs(int($5))}
+ else
+  method_a,method_b={abs(int($6))}
+ fi
+else
+ method_a,method_b=1,1
+fi
+
+startnum_diff,base_diff,method_diff,shape_size={$startnum_a!=$startnum_b},{$base_a!=$base_b},{$method_a!=$method_b},{max(1,int(abs($7)))}
+
+use_shape,double_concatenation_mode,use_different_dimensions,num_of_images={narg($11)?($shape_size>=4?1:0):0},{$startnum_diff||$base_diff||$method_diff},{$!>1?(use_diff=0;start_dim=[w#0,h#0];repeat($!-1,p,q=p+1;if([w#q,h#q]!=start_dim,use_diff=1;break();););use_diff;):0},{$!}
+
+if $use_different_dimensions dim_list=[{expr('p=int(x/2);x%2?ceil(h#p/$shape_size)*$shape_size:ceil(w#p/$shape_size)*$shape_size',$!*2,1,1,1)}] fi
+
+width,height=${-max_w},${-max_h} rm
+
+{ceil($width/$shape_size)},{ceil($height/$shape_size)},1,2,vector(#2,-1)
+
+if $use_shape
+
+ ratio:=cut(abs($12),0,1)
+ 
+ if $ratio
+ 
+  shape_ang,mirror,tile_boundary,fit_size=$13,{$14%3},{$15%4},$17
+
+  if ${is_image_arg\ $11}
+ 
+   pass$11 0
+  
+   if s<=4&&s>1
+    if s==3 to_gray.
+    else
+     s. c,{arg(int(s/2,-3,-1)}
+    fi
+   elif s==5
+    s. c,-4 cmyk2rgb.. to_gray.. *[-2,-1]
+   elif s>5 error inv_chans_count
+   fi
+ 
+  else
+ 
+   shape_sub:=abs($16)+1
+   sid="$11"
+  
+   if isnum($11) if isint($11)
+    sid=${"-arg "1+$sid"","australia,barbedwire,circle,crosshair,cupid,diamond,dragon,dragonfly,fern,flip,gear,gumleaf,heart,information,kookaburra,mail,mapleleaf,paint_splat,paw,phone,polygon,rooster,shopping_cart,snowflake,star"}
+   fi fi
+  
+   if $#>17 shape_$sid {$shape_size*$shape_sub},${18--1}
+   else shape_$sid {$shape_size*$shape_sub}
+   fi
+  
+   r. {ceil(w/$shape_size)*$shape_size},{ceil(h/$shape_size)*$shape_size},100%,100%,0,0,.5,.5
+  
+  fi
+ 
+  if $shape_ang-360*floor($shape_ang/360) rotate. $shape_ang fi
+  
+  if $mirror==1 mirror. x
+  elif $mirror==2 mirror. y
+  fi
+  
+  n. 0,1 autocrop. 0
+  
+  if $fit_size
+   shape_image_ratio={w#-1/h#-1}
+   resize_width={1>$shape_image_ratio?w#-1*($shape_size/h#-1):$shape_size}
+   resize_height={1>$shape_image_ratio?$shape_size:h#-1*($shape_size/w#-1)}
+   r. {$resize_width*$ratio},{$resize_height*$ratio},1,1,5,0,.5,.5
+   r. $shape_size,$shape_size,1,1,0,0,.5,.5
+  else
+   r. {w#-1*(1/$ratio)},{h#-1*(1/$ratio)},1,1,0,0,.5,.5
+   r. $shape_size,$shape_size,1,1,5,0,.5,.5
+  fi
+  
+  cut. 0,1 n. 0,1
+  
+  avgc={avg(crop(#-1))}
+  
+  if $tile_boundary
+   if $tile_boundary==1
+    +mirror. x
+    a[-2,-1] z
+   elif $tile_boundary==2
+    +mirror. y
+    a[-2,-1] z
+   else
+    +mirror. x
+    +mirror.. y
+    +mirror. x
+    a[-4--1] z
+   fi
+  fi
+  
+  store. shape
+  
+ fi
+ 
+fi
+
+# End of Initialization
+
+if $double_concatenation_mode
+
+ if $base_b!=10 rep_concat_conset_fill_alt_base $startnum_b,$base_b
+ else rep_concat_conset_fill $startnum_b
+ fi
+ if $base_a!=10 +rep_concat_conset_fill_alt_base. $startnum_a,$base_a
+ else +rep_concat_conset_fill $startnum_a
+ fi
+ 
+ out_method_a=${arg\ $method_a+1,sub_concat_conset,add_concat_conset,mul_concat_conset}
+ out_method_b=${arg\ $method_b+1,sub_concat_conset,add_concat_conset,mul_concat_conset}
+ 
+ rep_index_based_$out_method_a[-2] $startnum_a,$base_a
+ rep_index_based_$out_method_b[-1] $startnum_b,$base_b
+ 
+ a[-2,-1] z
+ 
+ if ${is_image_arg\ $8} 
+  pass$8 0
+  if h#-1>1||d#-1>1
+   num_of_chans={s#-1}
+   permute. cxyz
+   unroll. x
+   {w#-1/$num_of_chans},1,1,$num_of_chans,crop(#-1,x*$num_of_chans,0,0,0,$num_of_chans,1,1,1)
+   rm..
+  elif w#-1==1 error inv_dims
+  fi
+  if $10 r. $base_a,1,1,100%,5 fi
+ fi
+ 
+ if ${is_image_arg\ $9} 
+  pass$9 0
+  if h#-1>1||d#-1>1
+   num_of_chans={s#-1}
+   permute. cxyz
+   unroll. x
+   {w#-1/$num_of_chans},1,1,$num_of_chans,crop(#-1,x*$num_of_chans,0,0,0,$num_of_chans,1,1,1)
+   rm..
+  elif w#-1==1 error inv_dims
+  fi
+  if $10 r. $base_b,1,1,100%,5 fi
+ fi
+ 
+ if $use_shape
+
+  $shape
+ 
+  {w#0*$shape_size},{h#0*$shape_size},1,{s#-2+1}
+  
+  img_count={$!}
+  
+  {w#0},{h#0},1,1,"begin(
+    const shape_size=$shape_size;
+    const tile_boundary=$tile_boundary;
+    const num_chan=s#1;
+    const tchan=num_chan+1;
+    const alpha_size=sqr(shape_size);
+    const tile_size=alpha_size*num_chan;
+    empty_vec=[-1,-1];
+    filled_alpha=vector(#alpha_size,255);
+    find_tile_mode()=(sv[0]>-1)&&(sv[1]>-1);
+    $img_count==5?(
+     generate_color_a()=I(#1,i(#0,x,y,0,0),0,0,0,2);
+     generate_color_b()=I(#2,i(#0,x,y,1,0),0,0,0,2);
+    ):
+    $img_count==4?(
+     generate_color_a()=I(#1,i(#0,x,y,0,0),0,0,0,2);
+     generate_color_b()=I(#1,i(#0,x,y,1,0),0,0,0,2);
+    ):(
+     generate_color_a()=[sv[0]];
+     generate_color_b()=[sv[1]];
+    );
+    tile_boundary==3?(
+    
+     shape_0=crop(#-2,0,0,0,0,shape_size,shape_size,1,1);
+     shape_1=crop(#-2,0,0,1,0,shape_size,shape_size,1,1);
+     shape_2=crop(#-2,0,0,2,0,shape_size,shape_size,1,1);
+     shape_3=crop(#-2,0,0,3,0,shape_size,shape_size,1,1);
+     tile_v0=resize(shape_0,tile_size,0,2);
+     tile_v1=resize(shape_1,tile_size,0,2);
+     tile_v2=resize(shape_2,tile_size,0,2);
+     tile_v3=resize(shape_3,tile_size,0,2);
+     
+     const mx=w-1;
+     const my=h-1;
+     const startnum=$startnum_a;
+     find_pos()=1+sum((mx-x)%2,2*((my-y+startnum)%2));
+     
+     generate_tile_b()=(
+      shape_alp=arg(find_pos(),tile_v0,tile_v1,tile_v2,tile_v3);
+      color_tile=vc_0+vc_1*shape_alp;
+      tile=[color_tile,filled_alpha];
+      draw(#-1,tile,x*shape_size,y*shape_size,0,0,shape_size,shape_size,1,tchan);
+     );
+     
+     generate_tile_a()=(
+      shape_alp=arg(find_pos(),shape_0,shape_1,shape_2,shape_3);
+      sv[0]>=0?(
+       color=generate_color_a();
+       color_tile=resize(color,tile_size,1,0);
+       tile=[color_tile,shape_alp*255];
+       draw(#-1,tile,x*shape_size,y*shape_size,0,0,shape_size,shape_size,1,tchan);
+      ):(
+       color=generate_color_b();
+       color_tile=resize(color,tile_size,1,0);
+       tile=[color_tile,(1-shape_alp)*255];
+       draw(#-1,tile,x*shape_size,y*shape_size,0,0,shape_size,shape_size,1,tchan);
+      );
+     );
+     
+    ):
+    tile_boundary?(
+     shape_0=crop(#-2,0,0,0,0,shape_size,shape_size,1,1);
+     shape_1=crop(#-2,0,0,1,0,shape_size,shape_size,1,1);
+     tile_v0=resize(shape_0,tile_size,0,2);
+     tile_v1=resize(shape_1,tile_size,0,2);
+     
+     const max_index=(tile_boundary%2)?w-1:h-1;
+     
+     tile_boundary%2?(
+      find_pos()=(max_index-x)%2;
+     ):(
+      const startnum=$startnum_a;
+      find_pos()=(max_index-y+startnum)%2;
+     );
+     
+     generate_tile_b()=(
+      shape_alp=find_pos?tile_v1:tile_v0;
+      color_tile=vc_0+vc_1*shape_alp;
+      tile=[color_tile,filled_alpha];
+      draw(#-1,tile,x*shape_size,y*shape_size,0,0,shape_size,shape_size,1,tchan);
+     );
+     
+     generate_tile_a()=(
+      shape_alp=find_pos?shape_1:shape_0;
+      sv[0]>=0?(
+       color=generate_color_a();
+       color_tile=resize(color,tile_size,1,0);
+       tile=[color_tile,shape_alp*255];
+       draw(#-1,tile,x*shape_size,y*shape_size,0,0,shape_size,shape_size,1,tchan);
+      ):(
+       color=generate_color_b();
+       color_tile=resize(color,tile_size,1,0);
+       tile=[color_tile,(1-shape_alp)*255];
+       draw(#-1,tile,x*shape_size,y*shape_size,0,0,shape_size,shape_size,1,tchan);
+      );
+     );
+     
+    ):(
+     shape_alp=crop(#-2,0,0,0,0,shape_size,shape_size,1,1);
+     alp_tile=resize(shape_alp,tile_size,0,2);
+     generate_tile_b()=(
+      color_tile=vc_0+vc_1*alp_tile;
+      tile=[color_tile,filled_alpha];
+      draw(#-1,tile,x*shape_size,y*shape_size,0,0,shape_size,shape_size,1,tchan);
+     );
+     generate_tile_a()=(
+      sv[0]>=0?(
+       color=generate_color_a();
+       color_tile=resize(color,tile_size,1,0);
+       tile=[color_tile,shape_alp*255];
+       draw(#-1,tile,x*shape_size,y*shape_size,0,0,shape_size,shape_size,1,tchan);
+      ):(
+       color=generate_color_b();
+       color_tile=resize(color,tile_size,1,0);
+       tile=[color_tile,(1-shape_alp)*255];
+       draw(#-1,tile,x*shape_size,y*shape_size,0,0,shape_size,shape_size,1,tchan);
+      );
+     );
+    );
+   );
+   sv=[i(#0,x,y,0,0),i(#0,x,y,1,0)];
+   if(sv!=empty_vec,
+    find_tile_mode()?(
+     c0=generate_color_b();
+     c1=generate_color_a();
+     diff=c1-c0;
+     vc_0=resize(c0,tile_size,1,0);
+     vc_1=resize(diff,tile_size,1,0);
+     generate_tile_b();
+    ):(
+     generate_tile_a();
+    );
+   );
+   "
+  k..
+   
+  if $num_of_images>1
+   r. 100%,100%,$num_of_digits,100%,1
+  fi
+   
+  if $num_of_images>1 s. z fi
+ 
+  if $use_different_dimensions
+   repeat $num_of_images
+    new_width_height:=($dim_list)[$>*2,2]
+    r[$>] $new_width_height,1,100%,0,0,1,1
+   done
+  fi
+  
+ else
+ 
+  if $!==2
+   {w#-2},{h#-2},2,{s#-1+1},"v=i(#-2,x,y,z,0);
+    v>=0?[I(#-1,v,0,0,2,1),255]:vector(#s,0);"
+    rm[-3,-2]
+  elif $!==3
+   {w#-3},{h#-3},2,{s#-1+1},"v=i(#-3,x,y,z,0);
+    z?(v>=0?[I(#-2,v,0,0,2,1),255]:vector(#s,0);):
+    (v>=0?[I(#-1,v,0,0,2,1),255]:vector(#s,0););"
+    rm[0,-3,-2]
+    display
+  elif $!>3 error only_one_pal
+  fi
+  
+  if ($shape_size>1)||($num_of_images>1)
+   r. {w#-1*$shape_size},{h#-1*$shape_size},{2*$num_of_images},100%,1
+  fi
+  
+  if $num_of_images s. z,-2 fi
+  
+  if $use_different_dimensions
+   repeat $num_of_images
+    new_width_height:=($dim_list)[$>*2,2]
+    r[$>] $new_width_height,2,100%,0,0,1,1
+   done
+  fi
+ 
+ fi
+ 
+else
+
+ if $base_a!=10 rep_concat_conset_fill_alt_base $startnum_a,$base_a
+ else rep_concat_conset_fill $startnum_a
+ fi
+ 
+ out_method=${arg\ $method_a+1,sub_concat_conset,add_concat_conset,mul_concat_conset}
+ 
+ rep_index_based_$out_method $startnum_a,$base_a
+ 
+ if ${is_image_arg\ $8} 
+  pass$8 0
+  if h#-1>1||d#-1>1
+   num_of_chans={s#-1}
+   permute. cxyz
+   unroll. x
+   {w#-1/$num_of_chans},1,1,$num_of_chans,crop(#-1,x*$num_of_chans,0,0,0,$num_of_chans,1,1,1)
+   rm..
+  elif w#-1==1 error inv_dims
+  fi
+  if $10 r. $base_a,1,1,100%,5 fi
+ fi
+ 
+ if ${is_image_arg\ $9} 
+  pass$9 0
+  if h#-1>1||d#-1>1
+   num_of_chans={s#-1}
+   permute. cxyz
+   unroll. x
+   {w#-1/$num_of_chans},1,1,$num_of_chans,crop(#-1,x*$num_of_chans,0,0,0,$num_of_chans,1,1,1)
+   rm..
+  elif w#-1==1 error inv_dims
+  fi
+  if $10 r. $base_a,1,1,100%,5 fi
+ fi
+ 
+ if $use_shape
+  $shape
+  if $!>3 error only_one_pal
+  else
+  
+   {w#0*$shape_size},{h#0*$shape_size},1,{s#-2+1}
+   
+   img_count={$!}
+   
+   eval[0] :"begin(
+     const shape_size=$shape_size;
+     const tile_boundary=$tile_boundary;
+     const num_chan=s#1;
+     const tchan=num_chan+1;
+     const tile_size=sqr(shape_size)*num_chan;
+     $img_count==4?(
+      generate_color()=I(#-3,i,0,0,0,2);
+     ):(
+      generate_color()=[i];
+     );
+     tile_boundary==3?(
+      alpha_0=crop(#-2,0,0,0,0,shape_size,shape_size,1,1)*255;
+      alpha_1=crop(#-2,0,0,1,0,shape_size,shape_size,1,1)*255;
+      alpha_2=crop(#-2,0,0,2,0,shape_size,shape_size,1,1)*255;
+      alpha_3=crop(#-2,0,0,3,0,shape_size,shape_size,1,1)*255;
+      const mx=w-1;
+      const my=h-1;
+      const startnum=$startnum_a;
+      find_pos()=1+sum((mx-x)%2,2*((my-y+startnum)%2));
+      generate_tile()=(
+       alpha=arg(find_pos(),alpha_0,alpha_1,alpha_2,alpha_3);
+       color=generate_color();
+       color_tile=resize(color,tile_size,1);
+       tile=[color_tile,alpha];
+       draw(#-1,tile,x*shape_size,y*shape_size,0,0,shape_size,shape_size,1,tchan); 
+      );
+     ):
+     tile_boundary?(
+      alpha_0=crop(#-2,0,0,0,0,shape_size,shape_size,1,1)*255;
+      alpha_1=crop(#-2,0,0,1,0,shape_size,shape_size,1,1)*255;
+      const max_index=(tile_boundary%2)?w-1:h-1;
+      tile_boundary%2?(
+       find_pos()=(max_index-x)%2;
+      ):(
+       const startnum=$startnum_a;
+       find_pos()=(max_index-y+startnum)%2;
+      );
+      generate_tile()=(
+       alpha=find_pos()?alpha_1:alpha_0;
+       color=generate_color();
+       color_tile=resize(color,tile_size,1);
+       tile=[color_tile,alpha];
+       draw(#-1,tile,x*shape_size,y*shape_size,0,0,shape_size,shape_size,1,tchan);      
+      );
+     ):(
+      alpha=crop(#-2,0,0,0,0,shape_size,shape_size,1,1)*255;
+      generate_tile()=(
+       color=generate_color();
+       color_tile=resize(color,tile_size,1);
+       tile=[color_tile,alpha];
+       draw(#-1,tile,x*shape_size,y*shape_size,0,0,shape_size,shape_size,1,tchan);
+      );
+     );
+    );
+    if(i>=0,generate_tile(););"
+    
+  fi
+  k.
+  
+ else
+ 
+  if $!==2
+   {w#-2},{h#-2},1,{s#-1+1},"v=i(#-2,x,y,z,0);
+    v>=0?[I(#-1,v,0,0,2,1),255]:vector(#s,0);"
+   rm[-3,-2]
+  elif $!>2 error only_one_pal
+  fi
+ 
+  if ($shape_size>1)||($num_of_images>1) 
+   r. {w#-1*$shape_size},{h#-1*$shape_size},$num_of_images,100%,1 
+  fi
+
+ fi
+ 
+ if $num_of_images>1 s. z fi
+ 
+ if $use_different_dimensions
+  repeat $num_of_images
+   new_width_height:=($dim_list)[$>*2,2]
+   r[$>] $new_width_height,1,100%,0,0,1,1
+  done
+ fi
+ 
+fi
+rep_index_based_mul_concat_conset:
+skip ${2=10}
++channels 0
+1,{h},1,1,"begin(
+  const length=w#-1;
+  const hh=h#-1-1;
+  const startnum=int(abs($1));
+  const start_x=length-1;
+  const start_pos=start_x-1;
+  const base=int(abs($2));
+  logb(n)=log(n)/log(base);
+  concat_consec_digits_count(n)=n>=base?(t=floor(logb(n));n+(n+1)*t+(base*(1-base^t))/(base-1)):n;   
+ );
+
+ N=hh-y+startnum;
+ num_of_digits=concat_consec_digits_count(N);
+ tx=max(0,length-num_of_digits);
+
+ for(p=start_pos,p>=tx,p--,
+ 
+  multiplier=i(#-2,p,y,0,1);
+  off=0;
+  carry_over=0;
+  secondary_carry_over=0;
+ 
+  multiplier?(
+   for(q=start_x,q>=tx,q--,
+    partial_result=multiplier*i(#-2,q,y,0,0)+carry_over;
+    remainder=partial_result%base;
+    carry_over=int(partial_result/base);
+    new_num=max(0,i(#-1,p-off,y,0,0))+remainder+secondary_carry_over;
+    secondary_remainder=new_num%base;
+    secondary_carry_over=int(new_num/base);
+    i(#-1,p-off,y,0,0)=secondary_remainder;
+    off++;
+    if((p-off)<0,continue(););
+   );
+  ):(continue(););
+  
+  if(secondary_carry_over&&(q!=0),
+   new_num=max(0,i(#-1,p-off,y,0,0))+secondary_remainder+secondary_carry_over;
+   secondary_carry_over=int(new_num/base);
+   secondary_remainder=new_num%base;
+   i(#-1,p-off,y,0,0)=secondary_remainder;
+  );
+  
+  if(p==tx&&(partial_result>base)&&(tx!=0),i(#-1,p-off,y,0,0)=int(partial_result/base););
+
+ );"
+rm[-3,-1]
+rep_index_based_sub_concat_conset:
+skip ${2=10}
+{w},{h},1,1,-1
+1,{h},1,1,"begin(
+  const length=w#-1;
+  const hh=h#-1-1;
+  const startnum=int(abs($1));
+  const start_x=length-1;
+  const base=int(abs($2));
+  logb(n)=log(n)/log(base);
+  concat_consec_digits_count(n)=n>=base?(t=floor(logb(n));n+(n+1)*t+(base*(1-base^t))/(base-1)):n;
+  zero_fill=vector(#length,0);
+ );
+ N=hh-y+startnum;
+ num_of_digits=concat_consec_digits_count(N);
+ tx=max(0,length-num_of_digits);
+ minuend=-1;
+ if(num_of_digits>1,
+  ux=tx;
+  repeat(length,
+   vd=I(#-2,ux,y);
+   if(vd[1]>vd[0],minuend=1;break(););
+   if(vd[0]>vd[1],minuend=0;break(););
+   ux++;
+  );
+  if(minuend!=-1,
+   subtrahend=1-minuend;
+   ix=start_x;
+   repeat(num_of_digits,
+    vd=I(#-2,ix,y);
+    if(ix==tx,if(vd[minuend]==vd[subtrahend],break();););
+    if(vd[minuend]<vd[subtrahend],
+     vd[minuend]+=base;
+     sx=ix;
+     repeat(inf,
+      sx--;
+      if(sx<=tx,break(););
+      if(i(#-2,sx,y,0,minuend),(i(#-2,sx,y,0,minuend)--;break();),i(#-2,sx,y,0,minuend)=base-1;);
+     );
+    );
+    i(#-1,ix,y,0,0)=vd[minuend]-vd[subtrahend];
+    ix--;
+   );
+  ,draw(#-1,zero_fill,0,y,0,0,length,1,1,1);0;
+  );
+ ,i(#-1,start_x,y,0,0)=0;
+ );"
+rm[-1,-3]
+rep_index_based_add_concat_conset:
+skip ${2=10}
+{w},{h},1,1,-1
+1,{h},1,1,:"begin(
+  const length=w#-1;
+  const hh=h#-1-1;
+  const start_x=length-1;
+  const startnum=int(abs($1));
+  const base=int(abs($2));
+  const s_size=s#-2;
+  const ds_size=s_size-1;
+  vz=vector(#s_size,0);
+  logb(n)=log(n)/log(base);
+  concat_consec_digits_count(n)=n>=base?(t=floor(logb(n));n+(n+1)*t+(base*(1-base^t))/(base-1)):n;
+ );
+ ix=start_x;
+ carry_over=0;
+ loop_break=0;
+ N=hh-y+startnum;
+ num_of_digits=concat_consec_digits_count(N);
+ tx=max(0,length-num_of_digits);
+ repeat(min(length,num_of_digits+ds_size),
+  init_num_vec=I(#-2,ix,y);
+  if(ix<tx,
+   repeat(s_size,p,
+    if(init_num_vec[p]<0,loop_break=1;break(););
+    );
+   if(!carry_over&&loop_break,break(););
+  );
+  num=sum(vmax(init_num_vec,vz))+carry_over;
+  carry_over=int(num/base);
+  i(#-1,ix,y)=num%base;
+  if(loop_break,break(););
+  ix--;
+ );"
+rm[-3,-1]
+rep_concat_conset_fill:
+
+check $!==1
+
+startnum={max(abs($1),1)}
+maxnum_a,maxnum_b,string_a,string_b=$startnum,{$startnum+(h-1)},"",""
+
+repeat inf
+ string_a.=$maxnum_a
+ maxnum_a-=1
+ if $maxnum_a==1||size('$string_a')>=w#0
+  startnum,string_a={max($maxnum_a,1)},""
+  break
+ fi
+done
+
+repeat inf
+ string_a..=$maxnum_b
+ ({size('$maxnum_b')})
+ if $> a[-2,-1] x fi
+ maxnum_b-=1
+ if $maxnum_b<$startnum break fi
+done
+
+ts,digits={is#-1},0
+
+repeat inf
+ string_b..={$>+1}
+ digits+={size('{$>+1}')}
+ if $digits>=$ts||$digits>w#0 break fi
+done
+
+('$string_a') ('$string_b') -[-2,-1] 48
+
+repeat h#0
+ ns={w#-2-i(#-3,$>)}
+ if w#-2>w#-1
+  j[0] [-2],1~,$>,0,0
+  j[0] [-1],1~,$>,0,1
+ else
+  r. {w#-2},100%,100%,100%,0,0,1
+  j[0] [-2],1~,$>,0,0
+  j[0] [-1],1~,$>,0,1
+ fi
+ if $ns r.. $ns,100%,100%,100%,-1 
+ else break 
+ fi
+done
+
+rm[-3--1]
+rep_concat_conset_fill_alt_base:
+
+check $!==1
+
+startnum={max(abs($1),1)}
+maxnum_a,maxnum_b=$startnum,{$startnum+(h-1)}
+
+repeat inf
+ +rep_num2altbase $maxnum_a,$2
+ if $> a[-2,-1] x fi
+ maxnum_a-=1
+ if $maxnum_a<=1||w#-1>=w#0
+  startnum={max($maxnum_a,1)}
+  rm.
+  break
+ fi
+done
+
+repeat inf
+ +rep_num2altbase $maxnum_b,$2
+ nv={w#-1}
+ if $> rv[-3,-1] a[-3,-1] x fi
+ ($nv)
+ if $> a[-2,-1] x fi
+ maxnum_b-=1
+ if $maxnum_b<$startnum break fi
+done
+
+ts={is#-1}
+
+repeat inf
+ +rep_num2altbase {$>+1},$2
+ if $> rv[-2,-1] a[-2,-1] x fi
+ if w#-1>=$ts||w#-1>w#0 break fi
+done
+
+repeat h#0
+ ns={w#-3-i(#-2,$>)}
+ if w#-3>w#-1
+  j[0] [-3],1~,$>,0,0
+  j[0] [-1],1~,$>,0,1
+ else
+  r. {w#-3},100%,100%,100%,0,0,1
+  j[0] [-3],1~,$>,0,0
+  j[0] [-1],1~,$>,0,1
+ fi
+ if $ns r... $ns,100%,100%,100%,-1 
+ else break 
+ fi
+done
+
+rm[-3--1]
+#@cli +rep_num2altbase: abs_num,base,start_num
+#@cli : Insert number in bases other than 10. Each digit is represented by the character at ASCII codepoint (start_num)+(digit value).
++rep_num2altbase:
+
+num,base={abs($1)},{abs($2)}
+digits={1+int(log($num)/log($base))}
+
+repeat $digits
+ rem={$num%$base}
+ num/=$base
+ ({int($rem)})
+ if $>
+  rv[-2,-1]
+  a[-2,-1] x
+ fi
+done
 #@cli rep_int2roman: 1<=num<=3999
 #@cli : Return Integer as Roman Numberal
 rep_int2roman:
@@ -17734,6 +18483,456 @@ u "{$1}"\
 "{$49}"_{$12?2}\
 "{$50}"_{$12==1?2}\
 "{$51,$52,$53}"_{$12>1?2}
+#@gui Mitchell Concatenation: fx_rep_mitchell_concatenation
+#@gui :_=note("This filter is a recreation of Kerry's Mitchell Concatenation.\n\nWarning: Make sure of the options being applied!"),_=separator()
+#@gui :_=note("<b>Initial</b>")
+#@gui :Mode=choice(0,"Singular","Dual")
+#@gui :Pixel Size(%)=float(0,0,50)
+#@gui :Output=choice(0,"New Dimension","Old Dimension")
+#@gui :_=separator(),_=note("<b>Starting Point</b>")
+#@gui :Start=int(1,1,2000000)
+#@gui :Start A=int(1,1,2000000)
+#@gui :Start B=int(1,1,2000000)
+#@gui :Link Start Numbers?=bool(0)
+#@gui :_=separator(),_=note("<b>Base System</b>")
+#@gui :Base=int(10,2,1000)
+#@gui :Base A=int(10,2,1000)
+#@gui :Base B=int(10,2,1000)
+#@gui :Link Bases?=bool(0)
+#@gui :_=separator(),_=note("<b>Method</b>")
+#@gui :Method=choice(0,"Subtraction","Addition","Multiplication")
+#@gui :Method A=choice(0,"Subtraction","Addition","Multiplication")
+#@gui :Method B=choice(1,"Subtraction","Addition","Multiplication")
+#@gui :Link Method?=bool(0)
+#@gui :_=separator(),_=note("<b>Palette</b>")
+#@gui :Mode=choice(1,"Singular","Dual")
+#@gui :Set=choice(0,"Foreground","Background")
+#@gui :Color 1=color(255,255,255)
+#@gui :Color 2=color(243,235,227)
+#@gui :Color 3=color(200,200,136)
+#@gui :Color 4=color(124,143,91)
+#@gui :Color 5=color(53,74,67)
+#@gui :Color 6=color(34,23,36)
+#@gui :Color 7=color(0,0,0)
+#@gui :Color 1=color(206,206,206)
+#@gui :Color 2=color(198,186,182)
+#@gui :Color 3=color(166,135,182)
+#@gui :Color 4=color(120,105,70)
+#@gui :Color 5=color(55,69,48)
+#@gui :Color 6=color(37,33,47)
+#@gui :Color 7=color(24,24,24)
+#@gui :Color 1=color(255,255,255)
+#@gui :Color 2=color(243,236,227)
+#@gui :Color 3=color(186,200,136)
+#@gui :Color 4=color(102,143,91)
+#@gui :Color 5=color(55,53,74)
+#@gui :Color 6=color(36,23,25)
+#@gui :Color 7=color(0,0,0)
+#@gui :Link Color Palettes?=bool(0)
+#@gui :_=separator(),_=note("<b>Shape</b>")
+#@gui :Use Shape=bool(1)
+#@gui :Tiled Shape=choice(2,"Australia","Barbedwire","Circle","Crosshair","Cupid","Diamond","Dragon Curve-[D]","Dragonfly","Fern-[D]","Flip","Gear-[D]","Gumleaf","Heart","Information","Kookaburra","Mail","Mapleleaf","Paint Splat","Paw","Phone","Polygon-[D]","Rooster","Shopping Cart","Snowflake-[D]","Star-[D]")
+#@gui :Use Image as shape?=bool(0)
+#@gui :Ratio(%)=float(100,.1,100)
+#@gui :Angle=float(0,-180,180)
+#@gui :Direction=choice(0,"None","Mirror X","Mirror Y")
+#@gui :Tile Boundary=choice(0,"Periodic","Mirror - X","Mirror - Y","Mirror - XY")
+#@gui :Fit Tile?=bool(1)
+#@gui :Dragon Curve Recursion=int(10,0,30)
+#@gui :Dragon Curve Rotation=float(0,-180,180)
+#@gui :Fern Type=choice("Asplenium Adiantum-Nigrum","Thelypteridaceae")
+#@gui :Fern Density (%)=float(100,0,300)
+#@gui :Gear Teeth Count=int(8,3,32)
+#@gui :Gear Height (%)=float(25,0.1,100)
+#@gui :Gear Offset Teeth (%)=float(0,0,100)
+#@gui :Gear Inner Ratio (%)=float(50,0.1,100)
+#@gui :Polygon Vertices=int(5,3,100)
+#@gui :Snowflake Recursion=int(5,1,6)
+#@gui :Star Branches=int(3,5,100)
+#@gui :Star Thickness (%)=float(38,.1,100)
+#@gui :_=separator(),_=note("<b>Misc</b>")
+#@gui :Position=choice(0,"10","100","1000","10000","100000")
+#@gui :Position A=choice(0,"10","100","1000","10000","100000")
+#@gui :Position B=choice(0,"10","100","1000","10000","100000")
+#@gui :Push into Start Number=button()
+#@gui :Push into Start A=button()
+#@gui :Push into Start B=button()
+#@gui :Push into Both=button()
+#@gui :Start A=int(1,1,2000000)_0
+#@gui :Start B=int(1,1,2000000)_0
+#@gui :Base A=int(10,2,1000)_0
+#@gui :Base B=int(10,2,1000)_0
+#@gui :Method A=choice(0,"Subtraction","Addition","Multiplication")_0
+#@gui :Method B=choice(0,"Subtraction","Addition","Multiplication")_0
+#@gui :Color 1=color(255,255,255)_0
+#@gui :Color 2=color(243,235,227)_0
+#@gui :Color 3=color(200,200,136)_0
+#@gui :Color 4=color(124,143,91)_0
+#@gui :Color 5=color(53,74,67)_0
+#@gui :Color 6=color(34,23,36)_0
+#@gui :Color 7=color(0,0,0)_0
+#@gui :Color 1=color(206,206,206)_0
+#@gui :Color 2=color(198,186,182)_0
+#@gui :Color 3=color(166,135,182)_0
+#@gui :Color 4=color(120,105,70)_0
+#@gui :Color 5=color(55,69,48)_0
+#@gui :Color 6=color(37,33,47)_0
+#@gui :Color 7=color(24,24,24)_0
+#@gui :Color 1=color(255,255,255)_0
+#@gui :Color 2=color(243,236,227)_0
+#@gui :Color 3=color(186,200,136)_0
+#@gui :Color 4=color(102,143,91)_0
+#@gui :Color 5=color(55,53,74)_0
+#@gui :Color 6=color(36,23,25)_0
+#@gui :Color 7=color(0,0,0)_0
+fx_rep_mitchell_concatenation:
+
+original_dimension:=[w,h]
+multiple_images:=$!>1
+pixels:=max(1,round(h*$2%))
+enabl_mode_double_concatenation:=$pixels>=4
+ini_double_concatenation_mode:=$enabl_mode_double_concatenation?$1
+double_concatenation_mode=0
+start_0=$4
+
+if $105
+ start_0:=max(1,($8^($102+1))-int(h/($pixels*2)))
+fi
+
+start_a,start_b=${5-6}
+if $7&&$ini_double_concatenation_mode
+ if $5!=$109 start_a,start_b=$5 fi
+ if $6!=$110 start_a,start_b=$6 fi
+fi
+
+base_a,base_b=${9-10}
+if $11&&$ini_double_concatenation_mode
+ if $9!=$111 base_a,base_b=$9 fi
+ if $10!=$112 base_a,base_b=$10 fi
+fi
+
+method_a,method_b=${13-14}
+if $15&&$ini_double_concatenation_mode
+ if $13!=$113 method_a,method_b=$13 fi
+ if $14!=$114 method_a,method_b=$14 fi
+fi
+
+if $ini_double_concatenation_mode
+ double_concatenation_mode:=(($start_a!=$start_b)||($base_a!=$base_b)||($method_a!=$method_b))?1
+fi
+
+if $double_concatenation_mode
+ diff:=int(h/($pixels*2))
+ if $106||$108
+  start_a:=max(1,($base_a^($103+1))-$diff)
+ fi
+ if $107||$108
+  start_b:=max(1,($base_b^($104+1))-$diff)
+ fi
+ if $ini_double_concatenation_mode
+  double_concatenation_mode:=(($start_a!=$start_b)||($base_a!=$base_b)||($method_a!=$method_b))?1
+ fi
+fi
+
+if $81
+ if $double_concatenation_mode&&$16
+  if sum(abs([${39-59}]-[${136-153}]))?1
+   col_0_r_0,col_0_g_0,col_0_b_0,\
+   col_0_r_1,col_0_g_1,col_0_b_1,\
+   col_0_r_2,col_0_g_2,col_0_b_2,\
+   col_0_r_3,col_0_g_3,col_0_b_3,\
+   col_0_r_4,col_0_g_4,col_0_b_4,\
+   col_0_r_5,col_0_g_5,col_0_b_5,\
+   col_0_r_6,col_0_g_6,col_0_b_6\
+   =${39-59}
+   col_a_r_0,col_a_g_0,col_a_b_0,\
+   col_a_r_1,col_a_g_1,col_a_b_1,\
+   col_a_r_2,col_a_g_2,col_a_b_2,\
+   col_a_r_3,col_a_g_3,col_a_b_3,\
+   col_a_r_4,col_a_g_4,col_a_b_4,\
+   col_a_r_5,col_a_g_5,col_a_b_5,\
+   col_a_r_6,col_a_g_6,col_a_b_6\
+   =${39-59}
+   col_b_r_0,col_b_g_0,col_b_b_0,\
+   col_b_r_1,col_b_g_1,col_b_b_1,\
+   col_b_r_2,col_b_g_2,col_b_b_2,\
+   col_b_r_3,col_b_g_3,col_b_b_3,\
+   col_b_r_4,col_b_g_4,col_b_b_4,\
+   col_b_r_5,col_b_g_5,col_b_b_5,\
+   col_b_r_6,col_b_g_6,col_b_b_6\
+   =${39-59}
+  fi
+  if sum(abs([${60-80}]-[${154-177}]))?1
+   col_0_r_0,col_0_g_0,col_0_b_0,\
+   col_0_r_1,col_0_g_1,col_0_b_1,\
+   col_0_r_2,col_0_g_2,col_0_b_2,\
+   col_0_r_3,col_0_g_3,col_0_b_3,\
+   col_0_r_4,col_0_g_4,col_0_b_4,\
+   col_0_r_5,col_0_g_5,col_0_b_5,\
+   col_0_r_6,col_0_g_6,col_0_b_6\
+   =${60-80}
+   col_a_r_0,col_a_g_0,col_a_b_0,\
+   col_a_r_1,col_a_g_1,col_a_b_1,\
+   col_a_r_2,col_a_g_2,col_a_b_2,\
+   col_a_r_3,col_a_g_3,col_a_b_3,\
+   col_a_r_4,col_a_g_4,col_a_b_4,\
+   col_a_r_5,col_a_g_5,col_a_b_5,\
+   col_a_r_6,col_a_g_6,col_a_b_6\
+   =${60-80}
+   col_b_r_0,col_b_g_0,col_b_b_0,\
+   col_b_r_1,col_b_g_1,col_b_b_1,\
+   col_b_r_2,col_b_g_2,col_b_b_2,\
+   col_b_r_3,col_b_g_3,col_b_b_3,\
+   col_b_r_4,col_b_g_4,col_b_b_4,\
+   col_b_r_5,col_b_g_5,col_b_b_5,\
+   col_b_r_6,col_b_g_6,col_b_b_6\
+   =${60-80}
+  fi
+ else
+  if sum(abs([${18-38}]-[${115-135}]))?1
+   col_0_r_0,col_0_g_0,col_0_b_0,\
+   col_0_r_1,col_0_g_1,col_0_b_1,\
+   col_0_r_2,col_0_g_2,col_0_b_2,\
+   col_0_r_3,col_0_g_3,col_0_b_3,\
+   col_0_r_4,col_0_g_4,col_0_b_4,\
+   col_0_r_5,col_0_g_5,col_0_b_5,\
+   col_0_r_6,col_0_g_6,col_0_b_6\
+   =${18-38}
+   col_a_r_0,col_a_g_0,col_a_b_0,\
+   col_a_r_1,col_a_g_1,col_a_b_1,\
+   col_a_r_2,col_a_g_2,col_a_b_2,\
+   col_a_r_3,col_a_g_3,col_a_b_3,\
+   col_a_r_4,col_a_g_4,col_a_b_4,\
+   col_a_r_5,col_a_g_5,col_a_b_5,\
+   col_a_r_6,col_a_g_6,col_a_b_6\
+   =${18-38}
+   col_b_r_0,col_b_g_0,col_b_b_0,\
+   col_b_r_1,col_b_g_1,col_b_b_1,\
+   col_b_r_2,col_b_g_2,col_b_b_2,\
+   col_b_r_3,col_b_g_3,col_b_b_3,\
+   col_b_r_4,col_b_g_4,col_b_b_4,\
+   col_b_r_5,col_b_g_5,col_b_b_5,\
+   col_b_r_6,col_b_g_6,col_b_b_6\
+   =${18-38}
+  fi
+ fi
+else
+ col_0_r_0,col_0_g_0,col_0_b_0,\
+ col_0_r_1,col_0_g_1,col_0_b_1,\
+ col_0_r_2,col_0_g_2,col_0_b_2,\
+ col_0_r_3,col_0_g_3,col_0_b_3,\
+ col_0_r_4,col_0_g_4,col_0_b_4,\
+ col_0_r_5,col_0_g_5,col_0_b_5,\
+ col_0_r_6,col_0_g_6,col_0_b_6\
+ =${18-38}
+ col_a_r_0,col_a_g_0,col_a_b_0,\
+ col_a_r_1,col_a_g_1,col_a_b_1,\
+ col_a_r_2,col_a_g_2,col_a_b_2,\
+ col_a_r_3,col_a_g_3,col_a_b_3,\
+ col_a_r_4,col_a_g_4,col_a_b_4,\
+ col_a_r_5,col_a_g_5,col_a_b_5,\
+ col_a_r_6,col_a_g_6,col_a_b_6\
+ =${39-59}
+ col_b_r_0,col_b_g_0,col_b_b_0,\
+ col_b_r_1,col_b_g_1,col_b_b_1,\
+ col_b_r_2,col_b_g_2,col_b_b_2,\
+ col_b_r_3,col_b_g_3,col_b_b_3,\
+ col_b_r_4,col_b_g_4,col_b_b_4,\
+ col_b_r_5,col_b_g_5,col_b_b_5,\
+ col_b_r_6,col_b_g_6,col_b_b_6\
+ =${60-80}
+fi
+
+if $double_concatenation_mode
+ if $16
+  dyn_single_palette,dyn_dual_palette=0,2
+  ($col_a_r_0,$col_a_g_0,$col_a_b_0)
+  ($col_a_r_1,$col_a_g_1,$col_a_b_1)
+  ($col_a_r_2,$col_a_g_2,$col_a_b_2)
+  ($col_a_r_3,$col_a_g_3,$col_a_b_3)
+  ($col_a_r_4,$col_a_g_4,$col_a_b_4)
+  ($col_a_r_5,$col_a_g_5,$col_a_b_5)
+  ($col_a_r_6,$col_a_g_6,$col_a_b_6)
+  a[-7--1] y permute. cyzx rotate. 90
+  ($col_b_r_0,$col_b_g_0,$col_b_b_0)
+  ($col_b_r_1,$col_b_g_1,$col_b_b_1)
+  ($col_b_r_2,$col_b_g_2,$col_b_b_2)
+  ($col_b_r_3,$col_b_g_3,$col_b_b_3)
+  ($col_b_r_4,$col_b_g_4,$col_b_b_4)
+  ($col_b_r_5,$col_b_g_5,$col_b_b_5)
+  ($col_b_r_6,$col_b_g_6,$col_b_b_6)
+  a[-7--1] y permute. cyzx rotate. 90
+  if $84&&$multiple_images
+   use_shape=1
+   rep_mitchell_concatenation[0--4] $start_a,$start_b,$base_a,$base_b,$method_a,$method_b,$pixels,[-2],[-1],1,[-3],${85-89},1
+  else
+   use_shape=2
+   set_arg=1
+   if $83==6 set_arg.=,${90-91}
+   elif $83==8 set_arg.=,$93%,0,1,$92
+   elif $83==10 set_arg.=,${94-97}
+   elif $83==20 set_arg.=,$98
+   elif $83==23 set_arg.=,$99
+   elif $83==24 set_arg.=,$100,{$101/100}
+   fi
+   rep_mitchell_concatenation[0--3] $start_a,$start_b,$base_a,$base_b,$method_a,$method_b,$pixels,[-2],[-1],1,$83,${85-89},$set_arg
+  fi
+  rm[-2,-1]
+ else
+  dyn_single_palette,dyn_dual_palette=2,0
+  ($col_0_r_0,$col_0_g_0,$col_0_b_0)
+  ($col_0_r_1,$col_0_g_1,$col_0_b_1)
+  ($col_0_r_2,$col_0_g_2,$col_0_b_2)
+  ($col_0_r_3,$col_0_g_3,$col_0_b_3)
+  ($col_0_r_4,$col_0_g_4,$col_0_b_4)
+  ($col_0_r_5,$col_0_g_5,$col_0_b_5)
+  ($col_0_r_6,$col_0_g_6,$col_0_b_6)
+  a[-7--1] y permute. cyzx rotate. 90
+  if $84&&$multiple_images
+   use_shape=1
+   rep_mitchell_concatenation[0--3] $start_a,$start_b,$base_a,$base_b,$method_a,$method_b,$pixels,[-1],,1,[-2],${85-89},1
+  else
+   use_shape=2
+   set_arg=1
+   if $83==6 set_arg.=,${90-91}
+   elif $83==8 set_arg.=,$93%,0,1,$92
+   elif $83==10 set_arg.=,${94-97}
+   elif $83==20 set_arg.=,$98
+   elif $83==23 set_arg.=,$99
+   elif $83==24 set_arg.=,$100,{$101/100}
+   fi
+   rep_mitchell_concatenation[0--2] $start_a,$start_b,$base_a,$base_b,$method_a,$method_b,$pixels,[-1],,1,$83,${85-89},$set_arg
+  fi
+  rm.
+ fi
+else
+ dyn_single_palette,dyn_dual_palette=2,0
+ ($col_0_r_0,$col_0_g_0,$col_0_b_0)
+ ($col_0_r_1,$col_0_g_1,$col_0_b_1)
+ ($col_0_r_2,$col_0_g_2,$col_0_b_2)
+ ($col_0_r_3,$col_0_g_3,$col_0_b_3)
+ ($col_0_r_4,$col_0_g_4,$col_0_b_4)
+ ($col_0_r_5,$col_0_g_5,$col_0_b_5)
+ ($col_0_r_6,$col_0_g_6,$col_0_b_6)
+ a[-7--1] y permute. cyzx rotate. 90
+ if $82
+  if $84&&$multiple_images
+   use_shape=1
+   rep_mitchell_concatenation[0--3] $start_0,$start_0,$8,$8,$12,$12,$pixels,[-1],,1,[-2],${85-89},1
+  else
+   use_shape=2
+   set_arg=1
+   if $83==6 set_arg.=,${90-91}
+   elif $83==8 set_arg.=,$93%,0,1,$92
+   elif $83==10 set_arg.=,${94-97}
+   elif $83==20 set_arg.=,$98
+   elif $83==23 set_arg.=,$99
+   elif $83==24 set_arg.=,$100,{$101/100}
+   fi
+   rep_mitchell_concatenation[0--2] $start_0,$start_0,$8,$8,$12,$12,$pixels,[-1],,1,$83,${85-89},$set_arg
+  fi
+ else
+  use_shape=0
+  rep_mitchell_concatenation[0--2] $start_0,$start_0,$8,$8,$12,$12,$pixels,[-1]
+ fi
+ rm.
+fi
+
+if $3 r $original_dimension,100%,100%,0,0,.5,.5 fi
+
+u "{$1}"\
+"{$2}"\
+"{$3}"\
+"{"$start_0"}_"{!$ini_double_concatenation_mode?2}\
+"{"$start_a"}_"{$ini_double_concatenation_mode?2}\
+"{"$start_b"}_"{$ini_double_concatenation_mode?2}\
+"{$7}_"{$ini_double_concatenation_mode?2}\
+"{$8}_"{!$ini_double_concatenation_mode?2}\
+"{"$base_a"}_"{$ini_double_concatenation_mode?2}\
+"{"$base_b"}_"{$ini_double_concatenation_mode?2}\
+"{$11}_"{$ini_double_concatenation_mode?2}\
+"{$12}_"{!$ini_double_concatenation_mode?2}\
+"{"$method_a"}_"{$ini_double_concatenation_mode?2}\
+"{"$method_b"}_"{$ini_double_concatenation_mode?2}\
+"{$15}_"{$ini_double_concatenation_mode?2}\
+"{$16}_"{$double_concatenation_mode?2}\
+"{$17}_"$dyn_dual_palette\
+"{"$col_0_r_0","$col_0_g_0","$col_0_b_0"}_"$dyn_single_palette\
+"{"$col_0_r_1","$col_0_g_1","$col_0_b_1"}_"$dyn_single_palette\
+"{"$col_0_r_2","$col_0_g_2","$col_0_b_2"}_"$dyn_single_palette\
+"{"$col_0_r_3","$col_0_g_3","$col_0_b_3"}_"$dyn_single_palette\
+"{"$col_0_r_4","$col_0_g_4","$col_0_b_4"}_"$dyn_single_palette\
+"{"$col_0_r_5","$col_0_g_5","$col_0_b_5"}_"$dyn_single_palette\
+"{"$col_0_r_6","$col_0_g_6","$col_0_b_6"}_"$dyn_single_palette\
+"{"$col_a_r_0","$col_a_g_0","$col_a_b_0"}_"{$dyn_dual_palette?(!$17?2)}\
+"{"$col_a_r_1","$col_a_g_1","$col_a_b_1"}_"{$dyn_dual_palette?(!$17?2)}\
+"{"$col_a_r_2","$col_a_g_2","$col_a_b_2"}_"{$dyn_dual_palette?(!$17?2)}\
+"{"$col_a_r_3","$col_a_g_3","$col_a_b_3"}_"{$dyn_dual_palette?(!$17?2)}\
+"{"$col_a_r_4","$col_a_g_4","$col_a_b_4"}_"{$dyn_dual_palette?(!$17?2)}\
+"{"$col_a_r_5","$col_a_g_5","$col_a_b_5"}_"{$dyn_dual_palette?(!$17?2)}\
+"{"$col_a_r_6","$col_a_g_6","$col_a_b_6"}_"{$dyn_dual_palette?(!$17?2)}\
+"{"$col_b_r_0","$col_b_g_0","$col_b_b_0"}_"{$dyn_dual_palette?($17?2)}\
+"{"$col_b_r_1","$col_b_g_1","$col_b_b_1"}_"{$dyn_dual_palette?($17?2)}\
+"{"$col_b_r_2","$col_b_g_2","$col_b_b_2"}_"{$dyn_dual_palette?($17?2)}\
+"{"$col_b_r_3","$col_b_g_3","$col_b_b_3"}_"{$dyn_dual_palette?($17?2)}\
+"{"$col_b_r_4","$col_b_g_4","$col_b_b_4"}_"{$dyn_dual_palette?($17?2)}\
+"{"$col_b_r_5","$col_b_g_5","$col_b_b_5"}_"{$dyn_dual_palette?($17?2)}\
+"{"$col_b_r_6","$col_b_g_6","$col_b_b_6"}_"{$dyn_dual_palette?($17?2)}\
+"{$81}_"$dyn_dual_palette\
+"{$82}_"{!$double_concatenation_mode?2}\
+"{$83}_"$use_shape\
+"{$84}_"{$multiple_images?2}\
+"{$85}_"{$use_shape?2}\
+"{$86}_"{$use_shape?2}\
+"{$87}_"{$use_shape?2}\
+"{$88}_"{$use_shape?2}\
+"{$89}_"{$use_shape?2}\
+"{$90}_"{$use_shape==2?$83==6?2}\
+"{$91}_"{$use_shape==2?$83==6?2}\
+"{$92}_"{$use_shape==2?$83==8?2}\
+"{$93}_"{$use_shape==2?$83==8?2}\
+"{$94}_"{$use_shape==2?$83==10?2}\
+"{$95}_"{$use_shape==2?$83==10?2}\
+"{$96}_"{$use_shape==2?$83==10?2}\
+"{$97}_"{$use_shape==2?$83==10?2}\
+"{$98}_"{$use_shape==2?$83==20?2}\
+"{$99}_"{$use_shape==2?$83==23?2}\
+"{$100}_"{$use_shape==2?$83==24?2}\
+"{$101}_"{$use_shape==2?$83==24?2}\
+"{$102}_"{!$double_concatenation_mode?2}\
+"{$103}_"{$double_concatenation_mode?2}\
+"{$104}_"{$double_concatenation_mode?2}\
+"{0}_"{!$double_concatenation_mode?2}\
+"{0}_"{$double_concatenation_mode?2}\
+"{0}_"{$double_concatenation_mode?2}\
+"{0}_"{$double_concatenation_mode?2}\
+"{"$start_a"}"\
+"{"$start_b"}"\
+"{"$base_a"}"\
+"{"$base_b"}"\
+"{"$method_a"}"\
+"{"$method_b"}"\
+"{"$col_0_r_0","$col_0_g_0","$col_0_b_0"}"\
+"{"$col_0_r_1","$col_0_g_1","$col_0_b_1"}"\
+"{"$col_0_r_2","$col_0_g_2","$col_0_b_2"}"\
+"{"$col_0_r_3","$col_0_g_3","$col_0_b_3"}"\
+"{"$col_0_r_4","$col_0_g_4","$col_0_b_4"}"\
+"{"$col_0_r_5","$col_0_g_5","$col_0_b_5"}"\
+"{"$col_0_r_6","$col_0_g_6","$col_0_b_6"}"\
+"{"$col_a_r_0","$col_a_g_0","$col_a_b_0"}"\
+"{"$col_a_r_1","$col_a_g_1","$col_a_b_1"}"\
+"{"$col_a_r_2","$col_a_g_2","$col_a_b_2"}"\
+"{"$col_a_r_3","$col_a_g_3","$col_a_b_3"}"\
+"{"$col_a_r_4","$col_a_g_4","$col_a_b_4"}"\
+"{"$col_a_r_5","$col_a_g_5","$col_a_b_5"}"\
+"{"$col_a_r_6","$col_a_g_6","$col_a_b_6"}"\
+"{"$col_b_r_0","$col_b_g_0","$col_b_b_0"}"\
+"{"$col_b_r_1","$col_b_g_1","$col_b_b_1"}"\
+"{"$col_b_r_2","$col_b_g_2","$col_b_b_2"}"\
+"{"$col_b_r_3","$col_b_g_3","$col_b_b_3"}"\
+"{"$col_b_r_4","$col_b_g_4","$col_b_b_4"}"\
+"{"$col_b_r_5","$col_b_g_5","$col_b_b_5"}"\
+"{"$col_b_r_6","$col_b_g_6","$col_b_b_6"}"
 ######################
 
 # Local Variables:
