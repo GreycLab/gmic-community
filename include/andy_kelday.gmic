@@ -905,9 +905,16 @@ gcd_upscale_edge : skip ${1=2},${2=0}
 gcd_resize_vw : skip ${2=100%},${3=100%}
   e[^-1] "Resize image$? to $1x$2x$3, with variance weighted bilinear interpolation."
   repeat $! l[$>]
-    [0]x2 sqr.. boxfilter[-2,-1] 2 sqr. -[-2,-1] max. 0
-    r. 100%,100%,100%,1,2 add. 1e-6 ^. -1
-    mul.. . r $1,$2,$3,100%,3 /
+    if d==1
+      (0.0625,0.125,0.0625;0.125,0.25,0.125;0.0625,0.125,0.0625)
+    else # volumetric
+      (0.015625,0.03125,0.015625;0.03125,0.0625,0.03125;0.015625,0.03125,0.015625/\
+      0.03125,0.0625,0.03125;0.0625,0.125,0.0625;0.03125,0.0625,0.03125/\
+      0.015625,0.03125,0.015625;0.03125,0.0625,0.03125;0.015625,0.03125,0.015625)
+    fi
+    [0]x2 sqr.. convolve[-2,-1] [1] rm[1] sqr. -[-2,-1] max. 0
+    compose_channels. + /. 3 +. 1e-6 ^. -1
+    *.. . r $1,$2,$3,100%,3 /
   endl done
 
 #@cli gcd_smooth_variance : size>=0[%],_tolerance>=0
@@ -2263,6 +2270,35 @@ gcd_inpaint_boxlocal : check ${"is_image_arg $1"}
     i $msk mul.. . +distance. 1 mul. 2
     gcd_boxfilter_local_hp[0,1] . rm.
     +eq. 0 add[-2,-1] div
+  endl done
+
+#@cli gcd_inpaint_pyramid : [mask]
+#@cli : Inpaint selected images by specified mask.
+#@cli : $ image.jpg 100%,100% circle. 50%,50%,50,1,1 gcd_inpaint_pyramid.. .
+gcd_inpaint_pyramid : check ${"is_image_arg $1"}
+  pass$1 0 ge. 1 store. msk
+  repeat $! l[$>]
+    L,D,X,Y,W,H={\
+        L=ceil(log(max(w,h))/log(2));\
+        D=2^L;\
+        X=ceil((D-w)/2);\
+        Y=ceil((D-h)/2);\
+        [L,2^L,X,Y,w,h]\
+      } # L = number of levels
+    i $msk z {[-$X,-$Y,$D-$X-1,$D-$Y-1]},1 # force 2^n dimensions
+    eq. 0 mul.. .
+    repeat $L
+      +r[-2,-1] 50%,50%,100%,100%,2
+      +eq. 0 add. .. div[-3,-1] gt. 0
+    done
+    i[0] (0.0625,0.125,0.0625;0.125,0.25,0.125;0.0625,0.125,0.0625)
+    repeat $L
+      l[0,-4--1] rm.
+        r. [1],[1],[1],[1],1 convolve. [0]
+        eq[2] 0 j[1] .,0,0,0,0,1,[2] rm.
+      endl
+    done
+    rm[0,-1] z {[$X,$Y,$X+$W-1,$Y+$H-1]},1 # restore dimensions
   endl done
 
 #@cli gcd_dither_srgb : _nb_levels>=2
