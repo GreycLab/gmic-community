@@ -52,11 +52,11 @@
 #endif
 
 #if defined(WIN32) || defined(_WIN32)
-	#ifdef gmic_build
+	#ifdef gmic_core
 		#define GMIC_DLLINTERFACE __declspec(dllexport)
-	#else // #ifdef gmic_build
+	#else // #ifdef gmic_core
 		#define GMIC_DLLINTERFACE __declspec(dllimport)
-	#endif // #ifdef gmic_build
+	#endif // #ifdef gmic_core
 	#define GMIC_CALLCONV __stdcall
 #else // #if defined(WIN32) || defined(_WIN32)
 	#define GMIC_DLLINTERFACE
