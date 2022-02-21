@@ -1,19 +1,19 @@
 
 #@cli svg2wheelie : "file",_resolution,_wheeliecount
-svg2wheelie:	
+svg2wheelie:
    check "isfile('${1}') && isint(${2=10}) && ${2}>0 && isint(${3=16}) && ${3}>2"
    fname=$1
    res=$2
    wcnt=$3
    normdiv=1
    svg2plots $fname,$res
-   split. x
+   split. y
    fft[-2,-1]
    append[-2,-1] c
    name. spectral
-   makewheelielist[spectral] $wcnt
+   div[spectral] {w#$spectral} -d
+   mkwheelielist[spectral] $wcnt
    wlist=${}
-   
 
 #@cli mkwheelielist : wheelie_count
 mkwheelielist :
@@ -22,21 +22,21 @@ mkwheelielist :
    wcnt=$1
    set[spectral] 0,0,0,0,0
    set[spectral] 0,0,0,0,1
-   div[spectral] {w#$spectral}
    wheelie={">
                 const wc="$wcnt";
                 W=vector(#6*wc,0);
                 sz=0;
                 repeat(2*wc,m,
+                         sw=w#$spectral;
                          if(
                              m%2==0,
                              j=int(m/2)+1;
                              o=j,
-                             j=w#$spectral-(int(m/2)+1);
+                             j=sw-(int(m/2)+1);
                              o=-(int(m/2)+1)
                            );
                        rad=norm2(I(#$spectral,j,0));
-                      if(rad<=0.01,continue(),
+                      if(rad<=0.0001*sw,continue(),
                              ang=atan2(i(#$spectral,j,0,0,1),i(#$spectral,j,0,0,0));
                              ang=rad2deg(ang);
                              ang<0?ang=ang+360;
@@ -49,8 +49,8 @@ mkwheelielist :
                 V=vector(#3,0);
             
                 repeat(sz-1,k,
-                             copy(V,W[3*(sz-1-k)],3,1,1);print(V);
-                             copy(U,W[3*(sz-2-k)],3,1,1);print(U);
+                             copy(V,W[3*(sz-1-k)],3,1,1);
+                             copy(U,W[3*(sz-2-k)],3,1,1);
                              ang=V[1]-U[1];
                              ang<0?ang=ang+360;
                              copy(W[3*(sz-1-k)],[V[0],ang,V[2]-U[2]],3,1,1);
@@ -65,7 +65,7 @@ svg2plots:
    file_rand outfile=${}
    fname=$1
    res=$2
-   helpercommand="/usr/bin/python svghelper.py --normalize --density "$res" --output "$outfile" "$fname
+   helpercommand="svghelper.py --normalize --density "$res" --output "$outfile" "$fname
    exec $helpercommand
    if !isfile('$outfile')
       error "Could not process "$outfile"!"
