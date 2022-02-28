@@ -6454,8 +6454,8 @@ resize[0] 100%,{h+($tile_size-h%$tile_size)},1,{s},0,1
 endif
 h_tiles={w/$tile_size}
 v_tiles={h/$tile_size}
-repeat $v_tiles,v_count
-repeat $h_tiles,h_count
+repeat $v_tiles v_count=$>
+repeat $h_tiles h_count=$>
 
 +crop[0] {($h_count*$tile_size)-$overlap},{($v_count*$tile_size)-$overlap},{($h_count*$tile_size)+($tile_size+$overlap-1)},{($v_count*$tile_size)+($tile_size+$overlap-1)},1
 
@@ -6549,8 +6549,8 @@ resize[0] 100%,{h+($tile_size-h%$tile_size)},1,{s},0,1
 endif
 h_tiles={w/$tile_size}
 v_tiles={h/$tile_size}
-repeat $v_tiles,v_count
-repeat $h_tiles,h_count
+repeat $v_tiles v_count=$>
+repeat $h_tiles h_count=$>
 
 +crop[0] {($h_count*$tile_size)-$overlap},{($v_count*$tile_size)-$overlap},{($h_count*$tile_size)+($tile_size+$overlap-1)},{($v_count*$tile_size)+($tile_size+$overlap-1)},1
 
@@ -10301,13 +10301,13 @@ smoothness3=2
 
 # demosaic channels independantly (choice of demosiacing affects results)
 	#detect pattern
-	+crop 0,0,500,500 
+	+crop 0,0,500,500
 	sum={is}
 
-	+rgb2bayer[1] 0,1 b_sum0={is} -rm[-1] +rgb2bayer[1] 1,1 b_sum1={is} -rm[-1] +rgb2bayer[1] 2,1 b_sum2={is} -rm[-1] +rgb2bayer[1] 3,1 b_sum3={is} -rm[-1] 
+	+rgb2bayer[1] 0,1 b_sum0={is} -rm[-1] +rgb2bayer[1] 1,1 b_sum1={is} -rm[-1] +rgb2bayer[1] 2,1 b_sum2={is} -rm[-1] +rgb2bayer[1] 3,1 b_sum3={is} -rm[-1]
 	-if {$sum==$b_sum0} b_pat=0 -elif {$sum==$b_sum1} b_pat=1 -elif {$sum==$b_sum2} b_pat=2 -elif {$sum==$b_sum3} b_pat=3 -endif
 	-k[0]
-	
+
 	rgb2bayer $b_pat,1
 	-split c
 
@@ -10357,8 +10357,8 @@ smoothness3=2
 	-endl
 
 	-append c
- 
-# End demosaic 
+
+# End demosaic
 -cut 0,255
 
 
@@ -10367,7 +10367,7 @@ smoothness3=2
 
 	+local # create a new grey refernce image
 
-	# sort pixel values 
+	# sort pixel values
 	+min[0,1,2] # creates new image for minimum of RGB values
 	+blend_median[0,1,2] #creates new image for median of RGB values
 	+max[0,1,2] #creates new image for median of RGB values
@@ -10376,8 +10376,8 @@ smoothness3=2
 # highlight synthesis
 	-l[0]
 
-		-repeat 4 
-		
+		-repeat 4
+
 		# replace clipped pixels by predications
 		# process pixels seqentially
 		+fill[0] >"
@@ -10396,24 +10396,24 @@ smoothness3=2
 		-rotate[3] -180
 		-rotate[4] 90
 		# find minimum of predictions
-		 -min[-1,-2,-3,-4] 
+		 -min[-1,-2,-3,-4]
 
 
 	+gt[0] 254 # find clipped area
 	-distance[-1] 0 # calculate distance from edge of clipped area
 
 	-cut[-1] 0,50 # restrict max distance to 50
-	
+
 		# blur predicted area by the distance from the edge of the clipped area
-		
-		-repeat $smoothness 
+
+		-repeat $smoothness
 		-gcd_boxfilter_local[1] [2] # use garagecoder's algorthm for bluring
 		-sub[2] 0.25 # reduce blur radius a little bit for each repeat
 		-cut[2] 0,50 # clip to stop negative values
 		-done
-		
+
 	-cut[1] 0,{255*(2^2)} # max 2 stops of prediction
-	-keep[1] 
+	-keep[1]
 
 	-endl
 
@@ -10423,62 +10423,62 @@ smoothness3=2
 
 # Instead of using the reference image we have just created from the minimum RGB values, use all RGB channels for the grey reference by restoring the clipped areas of the median and max RGB images and combining them together
 
-	#  find smoothest parts of the image to propegated information from 
+	#  find smoothest parts of the image to propegated information from
 
 	+blur[0] 0.5 -laplacian[-1] -abs[-1]
-	
-	# overwrite pixels on the edge of the images so they are ignored 
+
+	# overwrite pixels on the edge of the images so they are ignored
 	-line[-1] 0,0,100%,0,1,500
 	-line[-1] 0,0,0,100%,1,500
 	-line[-1] 100%,0,100%,100%,1,500
 	-line[-1] 0,100%,100%,100%,1,500
 
-	-negate[-1] 
-	-blur[-1] 0.5 
+	-negate[-1]
+	-blur[-1] 0.5
 
 	# fill clipped areas of median and max images
-	
+
 	+lt[1] 254 #create mask with unclipped area
-	-erode[-1] 3 # shrink mask to by 1 pixel 
+	-erode[-1] 3 # shrink mask to by 1 pixel
 	-sub[1] [0] # find difference between reference
 	+mul[1] [-1] # create new image with clipped area as black by multiplying by mask
-	
+
 	-watershed[-1] [3] # use watershed function, guided by image smoothness to propegated values into clipped area.
-	
-	
+
+
 	# blur propegated values by the distance from the edge of the mask
-	+distance[-2] 1 
+	+distance[-2] 1
 	-erode[-1] 3
 	-c[-1] 0,20
 		-repeat $smoothness2
 		-gcd_boxfilter_local[-2] [-1]
 		-done
 	-rm[-1]
-	
-	
+
+
 
 	#combine newly progated values with difference image
 	-mul[1] [-2]
-	-negate[-2] 
+	-negate[-2]
 	-mul[-1,-2]
 	-add[1,-1]
-	
+
 	# add referance to difference iamge
 	-add[1] [0]
-	
+
 	# average refernce median image
 	-add[0,1]
 	-mul[0] 0.5
-	
+
 	#repeat propegation procedure for maxium image
-	
-	
+
+
 	+lt[1] 254
 	-erode[-1] 3
 	-sub[1] [0]
 	+mul[1] [-1]
 	-watershed[-1] [2]
-	
+
 		+distance[-2] 1
 	-erode[-1] 3
 	-c[-1] 0,20
@@ -10486,18 +10486,18 @@ smoothness3=2
 		-gcd_boxfilter_local[-2] [-1]
 		-done
 -rm[-1]
-	
+
 	-mul[1] [-2]
-	-negate[-2] 
+	-negate[-2]
 	-mul[-1,-2]
 	-add[1,-1]
 	-add[1] [0]
-	
+
 	# combine min,median and max images so the result is the average of all three
 	-mul[1] 0.5
 	-add[0,1]
 	-mul[0] {1/1.5}
-	
+
 	-remove[-1] # remove smoothness image
 
 	-endl
@@ -10515,25 +10515,25 @@ smoothness3=2
 	-line[-1] 100%,0,100%,100%,1,500
 	-line[-1] 0,100%,100%,100%,1,500
 
-	-negate[-1] 
-	-blur[-1] 0.5 
+	-negate[-1]
+	-blur[-1] 0.5
 
 # red channel
 
-+lt[0] 254 
--erode[-1] 3 
++lt[0] 254
+-erode[-1] 3
 
 -mul[0] $red_wb  # apply white balance mulitplier to ensure correct proportions between channels
 
 
 -sub[0] [3]
 
-+add[0] 1000 # offset differnce image because  "watershed" will might comfused 
++add[0] 1000 # offset differnce image because  "watershed" will might comfused
 
 -mul[-1] [-2]
 -watershed[-1] [4]
 
-+distance[-2] 1 
++distance[-2] 1
 	-erode[-1] 3
 	-c[-1] 0,20
 		-repeat $smoothness2
@@ -10544,7 +10544,7 @@ smoothness3=2
 -sub[-1] 1000
 
 -mul[0] [-2]
--negate[-2] 
+-negate[-2]
 -mul[-1,-2]
 -add[0,-1]
 -add[0] [3]
@@ -10552,19 +10552,19 @@ smoothness3=2
 
 # green channel
 
-+lt[1] 254 
--erode[-1] 3 
++lt[1] 254
+-erode[-1] 3
 
 -mul[1] $green_wb  # apply white balance mulitplier
 
 -sub[1] [3]
 
-+add[1] 1000 # offset differnce image because  "watershed" will might comfused 
++add[1] 1000 # offset differnce image because  "watershed" will might comfused
 
 -mul[-1] [-2]
 -watershed[-1] [4]
 
-+distance[-2] 1 
++distance[-2] 1
 	-erode[-1] 3
 	-c[-1] 0,20
 		-repeat $smoothness2
@@ -10575,7 +10575,7 @@ smoothness3=2
 -sub[-1] 1000
 
 -mul[1] [-2]
--negate[-2] 
+-negate[-2]
 -mul[-1,-2]
 -add[1,-1]
 
@@ -10583,20 +10583,20 @@ smoothness3=2
 
 # blue channel
 
-+lt[2] 254 
--erode[-1] 3 
++lt[2] 254
+-erode[-1] 3
 
 -mul[2] $blue_wb  # apply white balance mulitplier to ensure correct proportions between channels
 
 
 -sub[2] [3]
 
-+add[2] 1000 # offset differnce image because  "watershed" will might comfused 
++add[2] 1000 # offset differnce image because  "watershed" will might comfused
 
 -mul[-1] [-2]
 -watershed[-1] [4]
 
-+distance[-2] 1 
++distance[-2] 1
 	-erode[-1] 3
 	-c[-1] 0,20
 		-repeat $smoothness2
@@ -10607,7 +10607,7 @@ smoothness3=2
 -sub[-1] 1000
 
 -mul[2] [-2]
--negate[-2] 
+-negate[-2]
 -mul[-1,-2]
 -add[2,-1]
 -add[2,3]
