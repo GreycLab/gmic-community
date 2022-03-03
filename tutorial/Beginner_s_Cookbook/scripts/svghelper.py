@@ -47,7 +47,7 @@ if __name__ == '__main__':
     paths, attrs = svgpathtools.svg2paths(args.fname[0])
     path_0       = paths[0]
     scale        = 1.0/(fresolv-1)
-    dset         = [path_0.point(k) for k in [scale*j for j in range(fresolv)]]
+    dset         = [path_0.point(k).conjugate() for k in [scale*j for j in range(fresolv)]]
     if type(args.normalize) == type('y') and args.normalize == 'y':
         normalize(dset)
     fd           = open(args.output, 'w', encoding='UTF-8')
