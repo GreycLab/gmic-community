@@ -47,6 +47,106 @@
 #@cli :: Reptorian's CLI Commands
 #
 #-------------------------------
+rep_sercirc: rep_serendipitous_circle $*
+#@cli rep_serendipitous_circle: points>1,num_of_repeats>1,_muldiv_coeff_a,_muldiv_coeff_b,_muldiv_oper_a={ 0=mul | 1=div},muldiv_oper_b={ 0=mul | 1=mul},use_old_x={ 0=false | 1=true },_sublevel>=0,_seed,auto_norm,_sym_mode={0=mode_0 | 1=mode_1}
+#@cli : Generates Circle Fractal. Serendipitous Circle was originally written in 6800 assembly by William F. Galway in December 1976.
+#@cli : Note: The output of this command is 2 channel. The first channel is value from the Serendipitous Circle, and the second channel is the alpha value ranging from 0-1.
+#@cli : Default values: '_sublevel=0','_seed=n/a'
+rep_serendipitous_circle:
+skip ${3=2},${4=2},${5=1},${6=1},${7=0},${8=0},${9=},${10=0},${11=1}
+
+pts,num_of_repeats,muldiv_coeff_a,muldiv_coeff_b,muldiv_oper_a,muldiv_oper_b,use_old_x,sublevel,seed,_auto_norm,sym_mode=${1-4},{$5%2},{$6%2},{$7%2},{abs($8)+1},$9,{int(abs($10))},{($11%2)*3}
+
+m "rep_sercirc_autonorm: +erode. $_auto_norm +dilate.. $_auto_norm cut[-3] {iM#-2},{im#-1} rm[-2,-1]"
+
+pts*=$sublevel
+
+if $muldiv_coeff_a!=0
+ if $muldiv_oper_a
+  if $muldiv_coeff_a<0
+   calc_xn_part=+yi/{abs($muldiv_coeff_a)}
+  else
+   calc_xn_part=-yi/$muldiv_coeff_a
+  fi
+ else
+  if $muldiv_coeff_a<0
+   calc_xn_part=+yi*{abs($muldiv_coeff_a)}
+  else
+   calc_xn_part=-yi*$muldiv_coeff_a
+  fi
+ fi
+else
+ if ('$muldiv_coeff_a')[0]==45
+  calc_xn_part=+yi
+ else
+  calc_xn_part=-yi
+ fi
+fi
+
+if $use_old_x
+ old_x_expr=xo=xi;
+ yn_part=xo
+else
+ yn_part=xn
+fi
+
+if $muldiv_coeff_b!=0
+ if $muldiv_oper_b
+  if $muldiv_coeff_b<0
+   calc_yn_part=-$yn_part/{abs($muldiv_coeff_b)}
+  else
+   calc_yn_part=+$yn_part/$muldiv_coeff_b
+  fi
+ else
+  if $muldiv_coeff_b<0
+   calc_yn_part=-$yn_part*{abs($muldiv_coeff_b)}
+  else
+   calc_yn_part=+$yn_part*$muldiv_coeff_b
+  fi
+ fi
+else
+ if ('$muldiv_coeff_b')[0]==45
+  calc_yn_part=-$yn_part
+ else
+  calc_yn_part=+$yn_part
+ fi
+fi
+
+{ceil((w+1)/2)*$sublevel},{ceil((h+1)/2)*$sublevel},1,2 rm..
+
+ratio={max(w,h)/min(w,h)}
+
+$pts,1,1,1,:"begin_t(
+  if(narg($seed),srand($seed+t););
+  const ratio=$ratio;
+  const sqr_ratio=sqr(ratio);
+  const inv_ratio=1/ratio;
+  const max_dimension=max(w#-1,h#-1)*ratio;
+ );
+ point=[int(u(0,max_dimension)),int(u(0,max_dimension))];
+ xi=point[0];
+ yi=point[1];
+ repeat($num_of_repeats,
+  i(#-1,int(xi/sqr_ratio),int(yi/sqr_ratio),0,0)++;
+  i(#-1,int(xi/sqr_ratio),int(yi/sqr_ratio),0,1)=1;
+  "$old_x_expr"
+  xn=(xi"$calc_xn_part")%max_dimension;
+  yn=(yi"$calc_yn_part")%max_dimension;
+  xi=xn;
+  yi=yn;
+ );"
+ 
+rm. s. c
+ 
+r.. {ceil(w/$sublevel)},{ceil(h/$sublevel)},1,1,2
+r. {w#-2},{h#-2},1,1,5
+f.. i/(i#-1?i#-1:1)
+
+if $auto_norm rep_sercirc_autonorm.. fi
+
+a[-2,-1] c
+
+rep_symmetrize_xy. $sym_mode
 #@cli rep_generate_concat_func: _max_var_count>=2
 #@cli : Return series of concat() function for use in math evaluators.
 #@cli :
@@ -19039,6 +19139,100 @@ u "{$1}_"$enabl_duo_opt\
 "{"$col_b_r_4","$col_b_g_4","$col_b_b_4"}"\
 "{"$col_b_r_5","$col_b_g_5","$col_b_b_5"}"\
 "{"$col_b_r_6","$col_b_g_6","$col_b_b_6"}"
+#@gui Serendipitous Circle: fx_rep_serendipitous_circle
+#@gui :_=note("<b>Iterations</b>"),_=separator()
+#@gui :Points=int(1000,10,100000)
+#@gui :Repeats=int(500,10,20000)
+#@gui :_=note("<b>Coefficient</b>"),_=separator()
+#@gui :Coefficient A=float(2,-100,100)
+#@gui :Coefficient B=float(2,-100,100)
+#@gui :Use -0 for Coefficient A?=bool(0)
+#@gui :Use -0 for Coefficient B?=bool(0)
+#@gui :Coefficient A to 0=button()
+#@gui :Coefficient B to 0=button()
+#@gui :Coefficients to 0=button()
+#@gui :Linked Coefficient?=bool(0)
+#@gui :_=note("<b>Operators</b>"),_=separator()
+#@gui :Mode A=choice(1,"Multiplication","Division")
+#@gui :Mode B=choice(1,"Multiplication","Division")
+#@gui :_=note("<b>Variable</b>"),_=separator()
+#@gui :Use Old Mode=bool(0)
+#@gui :_=note("<b>Rendering</b>"),_=separator()
+#@gui :Sublevel=float(1,0,10)
+#@gui :Symmetry Mode=choice(1,"Mode 0","Mode 1")
+#@gui :Seed=int(0,0,1000000)
+#@gui :Randomize Seed=button()
+#@gui :Normalization Convolution=int(0,1,500)
+#@gui :Use Exponential-Sigmoid Adjustment?=bool(1)
+#@gui :Mid-Point Shift=float(.25,-1,1)
+#@gui :Sigmoid-Shift=float(0,-100,100)
+#@gui :Value-Shift=float(0,-1,1)
+#@gui :Coefficient A=float(2,-100,100)_0
+#@gui :Coefficient B=float(2,-100,100)_0
+#@gui :_=separator(),_=note("<small>Author: <i>Reptorian</i> Latest update: <i>2022/03/09</i>.</small>")
+fx_rep_serendipitous_circle:
+ow,oh={w},{h}
+
+if $10
+ coeff_a,coeff_b=${3-4}
+ if !$7
+  if $3!=$-2 coeff_a,coeff_b=$3 fi
+  if $4!=$-1 coeff_a,coeff_b=$4 fi
+ else
+  coeff_a,coeff_b=0
+ fi
+else
+ coeff_a,coeff_b=${3-4}
+ if $3!=$16 coeff_a=$3 fi
+ if $4!=$17 coeff_b=$4 fi
+ if $7 coeff_a=0 fi
+ if $8 coeff_b=0 fi
+fi
+
+if $coeff_a==0 if $5 coeff_a..=- fi fi
+if $coeff_b==0 if $6 coeff_b..=- fi fi
+
+seed={$17?round(u(0,1000000)):$16}
+
+rep_serendipitous_circle ${1-2},$coeff_a,$coeff_b,${11-14},$seed,$18,$15
+
+sh. 0 sh.. 1 
+
+if $19
+ rep_exp_sig_adj.. ${20-22},-255
+ n. 0,255
+else
+ n[-2,-1] 0,255 
+fi
+
+rm[-2,-1]
+
+r. $ow,$oh,100%,100%,0,0,.5,.5
+
+u "{$1}"\
+"{$2}"\
+"{"$coeff_a"}"\
+"{"$coeff_b"}"\
+"{$5}_"{$coeff_a?1:2}\
+"{$6}_"{$coeff_b?1:2}\
+"{0}_"{!$10?2}\
+"{0}_"{!$10?2}\
+"{0}_"{$10?2}\
+"{$10}"\
+"{$11}"\
+"{$12}"\
+"{$13}"\
+"{$14}"\
+"{$15}"\
+"{"$seed"}"\
+"{0}"\
+"{$18}"\
+"{$19}"\
+"{$20}_"{$19?2:1}\
+"{$21}_"{$19?2:1}\
+"{$22}_"{$19?2:1}\
+"{"$coeff_a"}"\
+"{"$coeff_b"}"
 ######################
 
 # Local Variables:
