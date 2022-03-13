@@ -23,42 +23,46 @@ mkwheelielist :
    wcnt=$1
    -set[spectral] 0,0,0,0,0
    -set[spectral] 0,0,0,0,1
-   -input 0 :: coefficients -d
-   -eval ">
-           wc=get('wcnt',0,0);
-           sz=0;
-           repeat(2*wc,m,
-                    sw=w#$spectral;
-                    if(
-                        m%2==0,
-                        j=int(m/2)+1;
-                        o=j,
-                        j=sw-(int(m/2)+1);
-                        o=-(int(m/2)+1)
-                      );
-                    rad=norm2(I(#$spectral,j,0));
-                    if(rad>0,
-                          ang=atan2(i(#$spectral,j,0,0,1),i(#$spectral,j,0,0,0));
-                          ang=rad2deg(ang);
-                          ang<0?ang=ang+360;
-                          da_push(#$coefficients,[rad,ang,o])
-		      );
-                 );
-	   sz=da_size(#$coefficients);
-           repeat(sz-1,k,
-                        I[#$coefficients,sz-1-k]=[
-                                                  i(#$coefficients,0,sz-1-k,0,0),
-                                                  i(#$coefficients,0,sz-2-k,0,1)-i(#$coefficients,0,sz-1-k,0,1),
-                                                  i(#$coefficients,0,sz-2-k,0,2)-i(#$coefficients,0,sz-1-k,0,2)
-                                                 ];
-                        if(i(#$coefficients,0,sz-1-k,0,1)<0,i(#$coefficients,0,sz-1-k,0,1)+=360);
-                        print(I[#$coefficients,sz-1-k])
-                 );
-           print(I[#$coefficients,0])
-         "	
+   -input 0 :: coefficients
+   wfound={">
+              wc=get('wcnt',0,0);
+              sz=0;
+              repeat(2*wc,m,
+                       sw=w#$spectral;
+                       if(
+                             m%2==0,
+                             j=int(m/2)+1;
+                             o=j,
+                             j=sw-(int(m/2)+1);
+                             o=-(int(m/2)+1)
+                         );
+                       rad=norm2(I(#$spectral,j,0));
+                       if(rad>0,
+                             ang=atan2(i(#$spectral,j,0,0,1),i(#$spectral,j,0,0,0));
+                             ang=rad2deg(ang);
+                             ang<0?ang=ang+360;
+                             da_push(#$coefficients,[rad,ang,o])
+                         );
+                    );
+              da_size(#$coefficients)
+	   "}
+   -if $wfound
+      -crop[coefficients] 0,0,0,{$wfound-1}
+      -fill[coefficients] "<
+                             y==0?I:
+                             [
+                              i(0,y,0,0),
+                              i(0,y,0,1)-i(0,y-1,0,1),
+                              i(0,y,0,2)-i(0,y-1,0,2)
+                             ]
+                          "
+      -fill[coefficients] ">if(c==1,if(i<0,i+360,i),i)"
+   -fi
    # Caller obtains the argument list for a wheelie command from
    # the return string vector .
-   -d
+   permute[coefficients] xczy
+   wheelie={crop(#$coefficients)}
+   rm[coefficients]
    -status $wheelie
 
 #@cli svg2plots : "file",_resolution
