@@ -1,5 +1,17 @@
 #@cli svg2wheelie : "file",_resolution,_wheeliecount
+#@cli : Generate wheelie triplets from samples of an SVG path. Requires
+#@cli : Python 3.x and python module svgpathtools by Andrew Port
+#@cli : (mathandy) et al. https://github.com/mathandy/svgpathtools.
 svg2wheelie:
+# Sample a closed Structured Vector Graphics (SVG) path at regular
+# intervals and from that, estimate the orientations, revolutions and
+# radii of a chain of wheelies, a.k.a. "epicycles" required to trace
+# that path. (1) path to an SVG file. Currently expects one defined
+# path, others are ignored. (2) Resolution sets the number of samples at
+# powers of two. Resolution → 8 → 2⁸ → 256 samples. Defaults to 10
+# (1,204 samples) (3) Limit the number of wheelies to the given
+# number. Defaults to 16.
+
    check "isfile('${1}') &&
           isint(${2=10}) &&
           ${2}>0         &&      
@@ -21,14 +33,46 @@ svg2wheelie:
    rm.
 
 #@cli mkwheelielist : wheelie_count
+#@cli : Selected image is a 2n,1,1,2 frequency domain map
+#@cli : ('spectral') for a Nyquist Sampling rate of n, a
+#@cli : count of pixels. Image from an inverse discrete
+#@cli : Fourier transform of path samples (ifft) with real
+#@cli : occupying channel 0 and imaginary occupying
+#@cli : channel 1. (1) wheelie_count: Limit the number of
+#@cli : wheelies to the given number. Defaults to 16.
 mkwheelielist :
    name. spectral
    check isint(${1=16})" && "${1}>2
    wcnt=$1
+   
+# Clear zero frequency, eliding any offset from
+# the origin in the Argand plane. As a
+# consequence, the root wheelie originates at the
+# origin.
+
    -set[spectral] 0,0,0,0,0
    -set[spectral] 0,0,0,0,1
+
+   # Image for dynamic array (da) storage of frequency
+   # domain ordinals
+
    -input 0
    -name. coefficients
+
+   # Scan spectral image for non-zero ordinals, as many
+   # can be zero-length and have no bearing on the
+   # arabesque. Setting wfound to the count of
+   # non-zero, meaningful coeffiecients; the
+   # coefficient image acquires the meaningful
+   # coefficients, in polar form. Scan alternately down
+   # the counterclockwise (m%2==0) and clockwise
+   # (m%2!=0) portions of the frequency axis, toward
+   # the Nyquist Sampling Rate mid-point. 'o' obtains
+   # the rotational rate in each loop; 'j' is the index
+   # to the currently assayed ordinal — it alternates
+   # between clockwise and counterclockwise indices;
+   # 'm' is the loopcounter.
+
    wfound={">
             wc=get('wcnt',0,0);
             sz=0;
@@ -55,6 +99,20 @@ mkwheelielist :
             da_size(#$coefficients)
            "}
    -if $wfound
+
+   # The coefficient image may be manipulated as an
+   # image as well as a dynamic array; crop the
+   # penultimate and last pixel, containing the array
+   # length counter. The remainder of the array
+   # contains a permutation of non-zero
+   # coefficients. In this fill operation, we pair-wise
+   # difference them to separate out wheelies. By
+   # virtue of our "ends-to-the-middle" scan, we have
+   # prepared a permutation from which the slowest
+   # rotating wheelies are on the root end of the
+   # chain, alternating clockwise and counterclockwise
+   # rotating wheelies.
+
       -crop[coefficients] 0,0,0,{$wfound-1}
       -fill[coefficients] "<
                              y==0?I:
@@ -64,28 +122,36 @@ mkwheelielist :
                               i(0,y,0,2)-i(0,y-1,0,2)
                              ]
                           "
-      -fill[coefficients] ">if(c==1,if(i<0,i+360,i),i)"
+
+   # Turn negative angle orientations 360° to situate
+   # them between zero and three-sixty degrees.
+
+   -fill[coefficients] ">if(c==1,if(i<0,i+360,i),i)"
    -fi
    
-   # Caller obtains the argument list for a wheelie
-   # command from the return string vector .
+   # Permute coefficient image in such a way as to
+   # order the data stream in magnitude, orientation
+   # and rotational rate triplets, as expected by
+   # wheelie plotters. Returned as a status string.
+
    permute[coefficients] xczy
 
    wheelie={crop(#$coefficients)}
-   rm[coefficients]
+   -remove[coefficients]
    -status $wheelie
 
 #@cli svg2plots : "file",_resolution
-#@cli Retrieve the first path in the SVG 1.1 $file
-#@cli argument and render it at the indicated
+#@cli (1) Retrieve the first path in the SVG 1.1 $file
+#@cli argument and render it (2) at the indicated
 #@cli resolution, a power of 2: $_resolution = 8 → 2⁸ → 256.
-#@cli Resolution defaults to 8; paths are plotted
-#@cli with 256 points.
+#@cli Resolution defaults to 10; paths are plotted
+#@cli with 1,204 points.
 svg2plots:
    check "isfile('${1}') && isint(${2=10}) && ${2}>0"
 
    # Python helper writes plots to a text file.
-   # We furnish a temporary.
+   # We furnish a temporary file to receive its
+   # output.
 
    -file_rand
    outfile=${}
