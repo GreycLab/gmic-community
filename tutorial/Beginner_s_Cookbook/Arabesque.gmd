@@ -311,94 +311,125 @@ The arabesque itself appears by copying the oscillatory ordinals out of the temp
 Spectralarabesque.gmic realizes this scheme:
 ??? spectralarabesque.gmic
 ~~~
- 1 # spectral_width,radius_0,angle_0,angular_velocity_0
- 2 # [,radius_1,angle_1,angular_velocity_1],…
- 3 fwheelie :
- 4    $=a
- 5
- 6    # Expect data triplets
- 7    -check {!(($#-1)%3)}
- 8
- 9   sw={$a1/2}
-10    -if $sw%2==0
-11       sw+=1
-12    -fi
-13
-14    # carray: Two row vectors for real and imaginary
-15    # frequency domain samples. Size from first argument
-16
-17    -input $sw,1,1,2
-18    -name. carray
-19
-20    # Fetch and check diameter, phase angle and angular
-21    # velocity parameters.
-22
-23    accsf=0
-24    acca=0
-25
-26    # Iterate over argument vector.
-27
-28    -repeat $#-1 j=$>
-29       -if   $j%3==0 # get radius
-30          rad=${a{2+$j}}
-31          -check isnum($rad)" && "$rad>=0
-32       -elif $j%3==1 # get angle, degrees
-33          ang=${a{2+$j}}
-34          -check isnum($ang)" && "$ang>=0" && "$ang<=360
-35          acca+=$ang
-36       -else         # get ω and set spectral coefficient
-37          sf=${a{2+$j}}
-38
-39          accsf+=$sf
-40          -if $accsf<0
-41             sf={($sw+$accsf)%$sw}
-42          -elif $accsf>=0
-43             sf=$accsf
-44          -fi
-45
-46          rr={$rad*cos(deg2rad($acca))}
-47          ir={$rad*sin(deg2rad($acca))}
-48          -set[carray] {$rr+i(#0,$sf,0,0,0)},$sf,0,0,0
-49          -set[carray] {$ir+i(#0,$sf,0,0,1)},$sf,0,0,1
-50       -fi
-51    -done
-52    -mul[carray] $sw
-53
-54 specplot :
-55    # Frequency domain → time domain
-56    -name. carray
-57    -split[carray] c
-58    -ifft[-2,-1]
-59    -append[-2,-1] c
-60    -name. temporal
-61    sw={w#$temporal}
-62
-63    # Screenspace transform.
-64    -fill[temporal] ">
-65                     begin(
-66                            specw=w#$temporal;
-67                            id=eye(3);
-68                            id[0]=specw;
-69                            id[2]=specw;
-70                            id[4]=-specw;
-71                            id[5]=specw;
-72                          );
-73                     (id*[I(x,y),1])[0,2];
-74                   "
-75    -permute[temporal] cyzx
-76    -input {2*$sw},{2*$sw},1,1
-77    -name. canvas
-78    -eval[canvas] "begin(
-79                          PV=crop(#$temporal);
-80                          polygon(
-81                                  #$canvas,-s#$temporal,
-82                                  PV,
-83                                  1,
-84                                  0xffffffff,
-85                                  255
-86                                 )
-87                        )"
-88    -keep[canvas]
+  1 #@cli fwheelie : spectral_width,radius_0,angle_0,angular_velocity_0…
+  2 #@cli : Plot a two channel image of the discrete frequency domain
+  3 #@cli : that generates the arabesque corresponding to the supplied
+  4 #@cli : wheelie parameters, r, θ and ±ω triplet(s) on the command
+  5 #@cli : line. (1) width and height of the Argand Diagram portraying
+  6 #@cli : the wheelie (2...) r, θ, ±ω triplets, length, degrees
+  7 #@cli : orientation and revolutions +ω (counterclockwise) or -ω
+  8 #@cli : (clockwise); one triplet for each wheelie. Fwheelie leaves a
+  9 #@cli : ½(spectral_width+spectral_width%2?0:1),1,1,2 image on the
+ 10 #@cli : list with plotted wheelie sums as complex frequency domain
+ 11 #@cli : ordinals; channel 0 real and channel 1 imaginary. Image
+ 12 #@cli : suitable as a specplot selection, which generates the Argand
+ 13 #@cli : Diagram.
+ 14 
+ 15 fwheelie :
+ 16    # Pseudo assignment expands to command line arguments
+ 17    $=a
+ 18 
+ 19    # Expect data triplets $a1,$a2,$a3…
+ 20 
+ 21    -check {!(($#-1)%3)}
+ 22 
+ 23    # Argand diagram is 2*$sw × 2*$sw for mapping to
+ 24    # [-1…1] on a side in the complex plane; force $sw odd.
+ 25 
+ 26    sw={$a1/2}
+ 27    -if $sw%2==0
+ 28       sw+=1
+ 29    -fi
+ 30 
+ 31    # carray: Two row vectors for real and imaginary
+ 32    # frequency domain ordinals. Size from first argument.
+ 33 
+ 34    -input $sw,1,1,2
+ 35    -name. carray
+ 36 
+ 37    # Fetch and check diameter, phase angle and angular
+ 38    # velocity parameters. Aggregate Σω -> $accsf; Σθ → $acca
+ 39 
+ 40    accsf=0
+ 41    acca=0
+ 42 
+ 43    # Iterate over arguments; populate carray and aggregate.
+ 44 
+ 45    -repeat $#-1 j=$>
+ 46       -if   $j%3==0 # get radius r
+ 47          rad=${a{2+$j}}
+ 48          -check isnum($rad)" && "$rad>=0
+ 49       -elif $j%3==1 # get angle, θ, degrees
+ 50          ang=${a{2+$j}}
+ 51          -check isnum($ang)" && "$ang>=0" && "$ang<=360
+ 52          acca+=$ang
+ 53       -else         # get ω, revolutions
+ 54          sf=${a{2+$j}}
+ 55 
+ 56          accsf+=$sf
+ 57          -if $accsf<0
+ 58             sf={($sw+$accsf)%$sw}
+ 59          -elif $accsf>=0
+ 60             sf=$accsf
+ 61          -fi
+ 62          # Ordinal components via Σθ, then populate freq. dom.
+ 63          rr={$rad*cos(deg2rad($acca))}
+ 64          ir={$rad*sin(deg2rad($acca))}
+ 65          -set[carray] {$rr+i(#0,$sf,0,0,0)},$sf,0,0,0
+ 66          -set[carray] {$ir+i(#0,$sf,0,0,1)},$sf,0,0,1
+ 67       -fi
+ 68    -done
+ 69 
+ 70    # Scale freq. dom. by dom. length - for ifft.
+ 71    # carray: frequency domain image generated from
+ 72    # the given wheelie chain.
+ 73    
+ 74    -mul[carray] $sw
+ 75 
+ 76 #@cli specplot : 
+ 77 #@cli : Generate an Argand diagram from the selected frequency
+ 78 #@cli : domain image.
+ 79 
+ 80 specplot :
+ 81    -foreach
+ 82      {
+ 83         # Frequency domain → time domain
+ 84         -name. carray
+ 85         -split[carray] c
+ 86         -ifft[-2,-1]
+ 87         -append[-2,-1] c
+ 88         -name. temporal
+ 89         sw={w#$temporal}
+ 90      
+ 91         # Screenspace transform.
+ 92         -fill[temporal] ">
+ 93                          begin(
+ 94                                 specw=w#$temporal;
+ 95                                 id=eye(3);
+ 96                                 id[0]=specw;
+ 97                                 id[2]=specw;
+ 98                                 id[4]=-specw;
+ 99                                 id[5]=specw;
+100                               );
+101                          (id*[I(x,y),1])[0,2];
+102                        "
+103         -permute[temporal] cyzx
+104         -input {2*$sw},{2*$sw},1,1
+105         -name. canvas
+106         -eval[canvas] "begin(
+107                               PV=crop(#$temporal);
+108                               polygon(
+109                                        #$canvas,
+110                                        -int(size(PV)/2),
+111                                        PV,
+112                                        1,
+113                                        0xffffffff,
+114                                        255
+115                                      )
+116                             )"
+117         -keep[canvas]
+118      }
+
 ~~~
 ???
 
@@ -407,7 +438,7 @@ Spectralarabesque.gmic realizes this scheme:
 
 ??? Weeds, for those close to the ground.
 |  __Line__  |  __Remark__  
-|  **4-50** | Command line management, **20-50**, largely follows from wheelie.gmic; see remarks there. Modularization distinguishes this implementation from that of wheelie.gmic. The plotting of the frequency domain with wheelie sums has been isolated to 'fwheelie'. The frequency domain transforming of the  domain and the subsequent rendering of the arabesque has been isolated to 'specplot.' The two may be invoked independently of one another, convenient for separating parsing from rendering. Emulation of the original 'wheelie' command becomes, then, a two-step affair:
+|  **17-61** | Command line management, **34-61**, largely follows from wheelie.gmic; see remarks there. Modularization distinguishes this implementation from that of wheelie.gmic. The plotting of the frequency domain with wheelie sums has been isolated to 'fwheelie'. The frequency domain transforming of the  domain and the subsequent rendering of the arabesque has been isolated to 'specplot.' The two may be invoked independently of one another, convenient for separating parsing from rendering. Emulation of the original 'wheelie' command becomes, then, a two-step affair:
 
 ~~~
 $ gmic                                                             \
@@ -417,10 +448,10 @@ $ gmic                                                             \
    …
 ~~~
 
-|  | 'fwheelie' plots wheelie sums in the spectral domain, leaving its image on the list, while 'specplot' transforms and renders the arabesque.
-|  **14-18** |'carray' is the implementation of the 1-D, finite, circular and discrete frequency domain parameter space. The '-repeat' … '-done' loop, spanning **28,51,** parses wheelie specifications from the command line and and plots them in accordance to [Mapping Wheelies to the Frequency Domain](#mapwheelies); see the main text.
-|  **28-51** |'acca' implements _Σθ_; 'accsf' implements _Σω_; '$sf' is a convenient pointer into the 'carray' buffer. We plot values via '-set', **48,49**. As noted in the prècis, we do not set the ordinate at abscissa coordinate '$sf'; we add to what is already there, for in light of wrap-around arithmetic we may visit a frequency coordinate any number of times.
-|  **54-87** |Producing arabesque plot points is a two-step affair. The first step encompasses the transformation of the frequency domain image into its temporal counterpart; that is the nub of **55-61**; '-ifft' effects the inverse discrete Fourier transformation. This leaves temporal complex ordinals plotted along a temporal abscissa: the arabesque — but not in presentation form. The second step, **64-74,** makes it so. We harness the '-fill' command to rescale the ordinalss to display dimensions based upon the pixel dimensional scaler '$sw'. '-fill' takes a math expression argument which executes on every pixel. The math expression itself has two parts. The math expression function 'begin()' schedules run-once expressions before per-pixel iterations, ideal for setup. It has a counterpart, 'end()' which similarly schedules run-once expressions after per-pixel iterations, ideal for clean up. In this case, 'begin()' formulates a [homogeneous transform](https://gmic.eu/tutorial/tiled_art.html#affinetransform) for projecting ordinals into a display square. The body of the expression, **73**, applies this matrix to every pixel in the 'temporal' image, which, hitherto, were suitable for a 2 × 2 image centered on the complex plane origin; they are translated and scaled to plot on a '2·$sw' × '2·$sw' range with the coordinate in the upper left corner. Expression '(id*[I(x,y),1])[0,2]' may leave a first-time reader breathless. Within parentheses, matrix 'id', defined in the 'begin()' function, operates on homogeneous position coordinates, which have three elements. Trailing the parentheses, an accessor operator. This accessor extracts the first two elements of the three-element homogeneous position. The last line in the math expression, the '-fill' operator assigns this 2-vector to the current pixel, by the last statement returns values convention.
+|  | 'fwheelie' plots wheelie sums in the spectral domain, leaving its image on the list, while 'specplot' transforms and renders the arabesque in an Argand Diagram.
+|  **31-61** |'carray' is the implementation of the 1-D, finite, circular and discrete frequency domain parameter space. The '-repeat' … '-done' loop, spanning **45,68,** parses wheelie specifications from the command line and and plots them in accordance to [Mapping Wheelies to the Frequency Domain](#mapwheelies); see the main text. 'carray' is the main product of 'fwheelie' and is left on the image list. Typically, 'specplot' uses 'carray' to plot the arabesque in an Argand Diagram. 
+|  **45-68** |'acca' implements _Σθ_; 'accsf' implements _Σω_; 'sf' is a convenient pointer into 'carray', the frequency domain buffer. We plot ordinals via '-set', **65,66**. As noted in the prècis, we do not set the ordinate at abscissa coordinate '$sf'; we add to what is already there, for in light of wrap-around arithmetic we may visit a frequency coordinate any number of times.
+|  **80-118** |specplot: Producing arabesque plot points is a two-step affair. The first step encompasses the transformation of the frequency domain image into its temporal counterpart; that is the nub of **83-89**; '-ifft' effects the inverse discrete Fourier transformation. This leaves temporal complex ordinals plotted along a temporal abscissa: this is the arabesque — but not in presentation form. The second step, **92-102,** makes it so. We harness the '-fill' command to rescale the ordinals to display dimensions based upon the pixel dimensional scaler '$sw'. [-fill](https://gmic.eu/tutorial/fill.html#math_expressions) takes a math expression argument which executes on every pixel. The math expression itself has two parts. The math expression function 'begin()' schedules run-once expressions before per-pixel iterations, ideal for setup. It has a counterpart, 'end()' which similarly schedules run-once expressions after per-pixel iterations, ideal for clean up. In this case, 'begin()' formulates a [homogeneous transform](https://gmic.eu/tutorial/tiled_art.html#affinetransform) for projecting ordinals into a display square. The body of the expression, **101**, applies this matrix to every pixel in the 'temporal' image, which, hitherto, were suitable for a 2 × 2 image centered on the complex plane origin; they are translated and scaled to plot on a '2·$sw' × '2·$sw' range with the coordinate in the upper left corner. Expression '(id*[I(x,y),1])[0,2]' may leave a first-time reader breathless. Within parentheses, matrix 'id', defined in the 'begin()' function, operates on homogeneous position coordinates, which have three elements. Trailing the parentheses, an accessor operator. This accessor extracts the first two elements of the three-element homogeneous position. The last line in the math expression, the '-fill' operator assigns this 2-vector to the current pixel, by the last statement returns values convention.
 |  **75-87** |This final set of expressions renders the scaled and translated arabesque on a complex plane, 'canvas'.
 |  **75** | Arabesque plots are permuted to lie along the spectral axis so that when they are imported into a math expression vector, the layout can be directly used by 'polygon()' See **79**.
 |  **76-77** |'canvas' represents a 2·$sw × 2·$sw drawing space for 'polygon()'.
