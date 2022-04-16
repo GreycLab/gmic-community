@@ -13546,13 +13546,13 @@ f "begin(
  i(vx,vy,z,c,$17,($16?3:2));"
 
 if $11 shift 50%,50%,0,0,3,1 fi
-#@cli rep_stitch: offset>0,{ thickness[%]>=0% | thickness>=0 },_modulo,_interpolation={ 0=nearest | 1=average | 2=linear | 3=bicubic | 4=lanczos },_boundary={ 0=none | 1=dirichlet | 2=periodic | 3=mirror },_sublevel>=0,_offset_iter_rand={ 0=single | 1= multiple },_strip_iter_rand={ 0=none | 1=single | 2=multiple },_seed_offset,_seed_strip,angle_0...angle_inf
+#@cli rep_stitch: offset>0,{ thickness[%]>=0% | thickness>=0 },_modulo,_offset_iter_rand={ 0=single | 1= multiple },_strip_iter_rand={ 0=none | 1=single | 2=multiple },_seed_offset,_seed_strip,_boundary={ 0=none | 1=dirichlet | 2=periodic | 3=mirror },_sublevel>=0,_interpolation={ 0=nearest | 1=average | 2=linear | 3=bicubic | 4=lanczos },angle_0...angle_inf
 #@cli : Stitches images.
-#@cli : Author: Reptorian.
+#@cli : $ sp rep_stitch 15%,1%,,,,,,,,,45,135
 rep_stitch:
-skip ${3=0},${4=2},${5=3},${6=1},${7=0},${8=0},${9=},${10=}
+skip ${3=0},${4=0},${5=0},${6=},${7=},${8=3},${9=1},${10=2}
 
-modulo_mode,interpolation,boundary,sublevel,random_offset_mode,random_strip_mode,seed_off,seed_strip,diff_dim_mode,timg,max_img_ind={int($3)},{v=abs($4)+1;v==4?++v:v;},{$5%4},{abs($6)+1},{$7%2},{$8%3},${9-10},0,{$!},{$!-1}
+modulo_mode,random_offset_mode,random_strip_mode,seed_off,seed_strip,boundary,sublevel,interpolation,diff_dim_mode,timg,max_img_ind={int($3)},{$4%2},{$5%3},${6-7},{$8%4},{abs($9)+1},{v=abs($10)+1;v==4?++v:v;},0,{$!},{$!-1}
 
 if ${is_percent\ $1} use_perc_off=1
 else 
@@ -13562,7 +13562,7 @@ fi
 
 if ${is_percent\ $2} use_perc_thk=1
 else 
- use_perc_thk,thickness=0,{max(1,abs($2)*$sublevel)}
+ use_perc_thk,thickness=0,{max(1,int(abs($2)*$sublevel))}
 fi
 
 modulo,modulo_mode={abs($modulo_mode)},{abs($modulo_mode)==2||$modulo_mode>-1}
@@ -13601,13 +13601,15 @@ repeat $diff_dim_mode?$!-1:1
  
  ow,oh={[w#$>,h#$>]}
  
- if $diff_dim_mode r[$>] {$ow*$sublevel},{$oh*$sublevel},100%,100%,1
- else r[0--2] {w#0*$sublevel},{h#0*$sublevel},100%,100%,1
+ if $diff_dim_mode r[$>] {round($ow*$sublevel)},{round($oh*$sublevel)},100%,100%,1
+ else r[0--2] {round(w#0*$sublevel)},{round(h#0*$sublevel)},100%,100%,1
  fi
  
- length={norm($ow,$oh)/2}
+ nw,nh={[w#$>,h#$>]}
+ 
+ length={norm($nw,$nh)/2}
  if $use_perc_off offset={$length*$1} fi
- if $use_perc_thk thickness={max($sublevel,int($length*$2))} fi 
+ if $use_perc_thk thickness={max($sublevel,round($length*$2))} fi 
 
  if $offset
   
@@ -13620,16 +13622,19 @@ repeat $diff_dim_mode?$!-1:1
     const modulo=$modulo;
     const hpi=pi/2;
     
+    const nw=$nw;
+    const nh=$nh;
+    
     modulo?(
-     const img_width=$ow*sublevel;
-     const img_height=$oh*sublevel;
+     const img_width=nw;
+     const img_height=nh;
      const hypotenuse=sqrt(img_width^2+img_height^2);
      const pt_0=atan2(img_height,img_width);
      const pt_1=atan2(img_width,img_height);
-     calc_nbars(v)=min(modulo,int((v/thickness)));
+     calc_nbars(v)=min( modulo, int((v+half_thickness)/thickness) );
     ):(
-     const cx=($ow*sublevel-1)/2;
-     const cy=($oh*sublevel-1)/2;
+     const cx=(nw-1)/2;
+     const cy=(nh-1)/2;
      const hypotenuse=sqrt(cx^2+cy^2);
      const pt_0=atan2(cy,cx);
      const pt_1=atan2(cx,cy);
@@ -13763,6 +13768,8 @@ repeat $diff_dim_mode?$!-1:1
     const half_thickness=thickness>>1;
     
     nbars=crop(#$number_of_bars);
+    const strip_length=w#-1;
+    const max_nbar_arr=$max_nbar;
     
     angs=crop(#$rad_ang);
     cos_ang=cos(angs);
@@ -13781,14 +13788,14 @@ repeat $diff_dim_mode?$!-1:1
        offset_pos[p]=t+=offset_pos[p];
       );
       find_offset(bar_pos)=(
-       offset=offset_strip[bar_pos+offset_pos[ind]];
+       offset=offset_strip[(bar_pos+offset_pos[ind])%strip_length];
        off_x=cos_ang[ind]*offset;
        off_y=sin_ang[ind]*offset;
        [off_x,off_y];
       );      
      ):(
       find_offset(bar_pos)=(
-       offset=offset_strip[bar_pos];
+       offset=offset_strip[bar_pos%strip_length];
        off_x=cos_ang[ind]*offset;
        off_y=sin_ang[ind]*offset;
        [off_x,off_y];
@@ -13807,14 +13814,14 @@ repeat $diff_dim_mode?$!-1:1
        offset_pos[p]=t+=offset_pos[p];
       );
       find_offset(bar_pos)=(
-       offset=bar_pos>=0?pos_off[bar_pos+offset_pos[ind]]:neg_off[abs(bar_pos)+offset_pos[ind]];
+       offset=bar_pos>=0?pos_off[(bar_pos+offset_pos[ind])%strip_length]:neg_off[(abs(bar_pos)+offset_pos[ind])%strip_length];
        off_x=cos_ang[ind]*offset;
        off_y=sin_ang[ind]*offset;
        [off_x,off_y];
       );
      ):(
       find_offset(bar_pos)=(
-       offset=bar_pos>=0?pos_off[bar_pos]:neg_off[abs(bar_pos)];
+       offset=bar_pos>=0?pos_off[bar_pos%strip_length]:neg_off[abs(bar_pos)%strip_length];
        off_x=cos_ang[ind]*offset;
        off_y=sin_ang[ind]*offset;
        [off_x,off_y];
@@ -13916,7 +13923,6 @@ repeat $diff_dim_mode?$!-1:1
     ):
     random_strip_mode==1?(
      modulo?(
-      const max_nbar_arr=$max_nbar;
       rand_v=expr('begin(const ina=$num_angs+1);int(u(0,ina));',$total_number_of_bars);
       
       num_angs>1?(
@@ -13936,7 +13942,6 @@ repeat $diff_dim_mode?$!-1:1
        off_out(v)=rand_v[v];
       );
      ):(
-      const max_nbar_arr=$max_nbar;
       neg_v=expr('<begin(if(narg($seed_strip),srand($seed_strip-1););const ina=$num_angs+1;);int(u(0,ina));',max_nbar_arr);
       pos_v=expr('>begin(if(narg($seed_strip),srand($seed_strip+1););const ina=$num_angs+1;);int(u(0,ina));',max_nbar_arr);
       middle=int(u(0,num_angs+1));
@@ -16466,17 +16471,19 @@ rep_sqrlogpindis $1,{(($2/100)-.5)*2},{(($3/100)-.5)*-2},{(($4/100)-.5)*2},{(($5
 rep_sqrlogpindis_gui_preview:
 gui_split_preview "rep_sqrlogpindis_gui $*",${-3--1}
 #@gui Stitch: fx_rep_stitch,fx_rep_stitch_preview
-#@gui :Modulo=int(0,0,32)
+#@gui :_=separator(),_=note("<b>Main</b>")
 #@gui :Offset by Half-Image-Diagonal(%)=float(5,0,100)
-#@gui :Strip Thickness(%)=float(1,0,60)
-#@gui :Interpolation=choice(4,"Nearest","Average","Linear","Bicubic","Lanczos")
-#@gui :Image Boundary=choice(3,"None","Neumann","Periodic","Mirror")
+#@gui :Strip Thickness(%)=float(1,0,75)
+#@gui :Modulo=int(0,0,32)
 #@gui :Modulo Boundary=choice(0,"Periodic","Continuous")
+#@gui :Image Boundary=choice(3,"None","Neumann","Periodic","Mirror")
 #@gui :Offset Mode=choice(0,"Single Iteration of Randomization","Multiple Iteration of Randomization")
 #@gui :Strip Mode=choice(0,"None","Single Iteration of Randomization","Multiple Iteration of Randomization")
 #@gui :Offset Seed=int(128,0,255)
 #@gui :Strip Seed=int(128,0,255)
+#@gui :_=separator(),_=note("<b>Rendering</b>")
 #@gui :Subpixel Processing Level=float(1,0,2)
+#@gui :Interpolation=choice(4,"Nearest","Average","Linear","Bicubic","Lanczos")
 #@gui :_=separator(),_=note("<b>Angles</b>")
 #@gui :Angles Mode=choice(0,"Non-Symmetrical","Symmetrical")
 #@gui :Start Angle=float(0,-180,180)
@@ -16500,7 +16507,7 @@ fx_rep_stitch:
 if $12 angles={expr('$13+x/w*180',$14);}
 else angles={([${16-27}])[0,$15]}
 fi
-cli_args=$2%,$3%,{$1?($6?-$1:$1)},${4-5},$11,${7-10},$angles
+cli_args=$1%,$2%,{$3>1?($4?-$3:$3)},${6-9},$5,${10-11},$angles
 rep_stitch $cli_args
 u "rep_stitch "$cli_args
 fx_rep_stitch_preview:
@@ -16510,14 +16517,14 @@ activate_sym:=!$activate_nonsym*2
 u "{$1}"\
 "{$2}"\
 "{$3}"\
-"{$4}_"{($11?1)+1}\
+"{$4}_"{($3>1)+1}\
 "{$5}"\
-"{$6}_"{($1?1)+1}\
+"{$6}"\
 "{$7}"\
 "{$8}"\
 "{$9}"\
 "{$10}"\
-"{$11}"\
+"{$11}_"{($10?1)+1}\
 "{$12}"\
 "{$13}_"$activate_nonsym\
 "{$14}_"$activate_nonsym\
