@@ -45,7 +45,7 @@
 #@gui : note = note("<b>Note</b>: Photo to cartoon")
 #@gui : sep = separator()
 #@gui : note = note(" ")
-#@gui : Simplification = choice(0, "None", "Light", "Light Antialias", "Strong Antialias", "Median", "Iuwt", "Thin Brush")
+#@gui : Simplification = choice(0, "None", "Light", "Light Antialias", "Strong Antialias", "Median", "Iuwt", "Thin Brush", "Mean Curvature")
 #@gui : sep = separator()
 #@gui : note = note("<b>For edges:</b>")
 #@gui : Flattening for Edge (bilateral) = int(2,0,5)
@@ -53,14 +53,14 @@
 #@gui : Edge Desaturation Method = choice(1, "Lightness", "MaxRGB", "MinRGB")
 #@gui : Line Thickness = float(1,0.5,2)
 #@gui : Line Strength = float(15,0,19)
+#@gui : Line Antialias = int(15,0,100)
 #@gui : sep = separator()
 #@gui : Add Colors = bool(1)
 #@gui : note = note("<b>For colors:</b>")
 #@gui : Luminosity Increase = int(10,0,50)
 #@gui : Saturation Increase = int(20,0,50)
 #@gui : Final Flattening (bilateral) = int(6,0,10)
-#@gui : Lines Antialias = int(15,0,100)
-#@gui : Color Effect = choice(0, "None", "Deep Black", "Colorful")
+#@gui : Color Effect = choice(0, "None", "Deep Black", "Local Contrast Enhancement", "Colorful")
 #@gui : Flat Color Effect = choice(0, "None", "Rainbow", "Hard Rainbow", "Posterize Softly", "Super Flat")
 #@gui : Colors to Black or White = choice(0, "No", "Soft Threshold", "Threshold with Soft Antialias", "Lines and Black")
 #@gui : sep = separator()
@@ -74,10 +74,10 @@
 #@gui : Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui : sep = separator()
 #@gui : url = link("Filter discussed here","http://gimpchat.com/viewtopic.php?f=11&t=19335&p=266517#p266512")
-#@gui : note = note("<small>Author: <i>Claude Lion</i>.      Latest Update: <i>2022/01/26</i>.</small>")
-#@gui : note = note("<small>Use filters of David Tschumperlé and a few filters of Jérôme Boulanger.</small>")
+#@gui : note = note("<small>Author: <i>Claude Lion</i>.      Latest Update: <i>2022/05/02</i>.</small>")
+#@gui : note = note("<small>It uses filters of David Tschumperlé and a few filters of Jérôme Boulanger.</small>")
 cl_comic :
-	repeat $! l[$>]
+	foreach {
 
 	simplif=$1
 	nbBilatBord=$2
@@ -85,11 +85,11 @@ cl_comic :
 	methDesat=$4
 	lineThick=$5
 	forceTrait=$6
-	addColors=$7
-	augmLum=$8
-	augmSat=$9
-	nbBilatFin=$10
-	antialias=$11
+	antialias=$7
+	addColors=$8
+	augmLum=$9
+	augmSat=$10
+	nbBilatFin=$11
 	colorEffect=$12
 	flatColorEffect=$13
 	bw=$14
@@ -107,6 +107,8 @@ cl_comic :
 		jeje_denoise_iuwt. 3,4,2,0
 	elif $simplif==6
 		fx_smooth_anisotropic. 60,0.9,0.64,3.1,1.1,0.8,30,2,0,1,1,0,0,24
+	elif $simplif==7
+		meancurvature_flow. 20
 	fi
 
 	curv="0,0,"{50-$augmLum}","{50+$augmLum}",100,100,-1,0,0,"{50-$augmSat}","{50+$augmSat}",100,100,-1,0,0,100,100,-1,0,0,100,100,-1"
@@ -155,6 +157,8 @@ cl_comic :
 		if $colorEffect==1
 			fx_custom_transform. "i","if(i<64,0, sqrt((i-64)/(256-64))*256  )","i","i","i","i",0
 		elif $colorEffect==2
+			fx_LCE. 80,0.5,1,1,0,0
+		elif $colorEffect==3
 			remove_opacity.
 			rgb2hsv. split. c nm. val nm.. sat nm... hue
 			+mul[val] [sat] nm. ref
@@ -241,7 +245,7 @@ cl_comic :
 		fx_smooth_antialias 50,50,2.5,0,50,50
 	fi
 
-	done done
+	}
 
 cl_comic_preview :
   gui_split_preview "cl_comic $*",${-3--1}
@@ -258,16 +262,16 @@ cl_comic_preview :
 #@gui : Flattening for Edge (bilateral) = int(2,0,5)
 #@gui : Line Thickness = float(1,0.5,2)
 #@gui : Line Strength = float(15,0,19)
+#@gui : Lines Antialias = int(15,0,100)
 #@gui : sep = separator()
 #@gui : Add Black or Gray = bool(1)
 #@gui : note = note("<b>For black and grays:</b>")
 #@gui : Luminosity Increase = int(0,0,40)
 #@gui : Final Flattening (bilateral) = int(6,0,10)
-#@gui : Lines Antialias = int(15,0,100)
 #@gui : Type = choice(2, "Soft Threshold", "Gray Patches", "Lines and Black", "Black and Lines")
 #@gui : sep = separator()
 #@gui : Final Antialias = choice(2, "None", "Light Simple", "Simple", "Very Strong")
-#@gui : Pen Drawing = bool(0)
+#@gui : Pen Drawing = choice(0, "None", "Simple", "Undoing Patterns")
 #@gui : sep = separator()
 #@gui : Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal",
 #@gui : "Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right",
@@ -275,7 +279,7 @@ cl_comic_preview :
 #@gui : Preview Split = point(50,50,0,0,200,200,200,0,10)_0
 #@gui : sep = separator()
 #@gui : url = link("Filter discussed here","http://gimpchat.com/viewtopic.php?f=15&t=5328&start=20#p272779")
-#@gui : note = note("<small>Author: <i>Claude Lion</i>.      Latest Update: <i>2022/04/06</i>.</small>")
+#@gui : note = note("<small>Author: <i>Claude Lion</i>.      Latest Update: <i>2022/05/02</i>.</small>")
 #@gui : note = note("<small>It uses filters of David Tschumperlé and a few filters of Jérôme Boulanger.</small>")
 #@gui : note = note("<small>Type='Lines and Black' is a shortcut of 'Black and Lines' with 'Local Contrast Enhancement = 1' and 'Luminosity Increase = 40'. In this case, 'Local Contrast Enhancement' and 'Luminosity Increase' cursors have no effect.</small>")
 
@@ -285,10 +289,10 @@ cl_lineart:
 	nbBilatBord=$3
 	lineThick=$4
 	forceTrait=$5
-	addGrays=$6
-	augmLum=$7
-	nbBilatFin=$8
-	antialias=$9
+	antialias=$6
+	addGrays=$7
+	augmLum=$8
+	nbBilatFin=$9
 	type=$10
 	finalAntialias=$11
 	penDrawing=$12
@@ -298,6 +302,10 @@ cl_lineart:
 		if $type==2
 			locContEnh=1
 			augmLum=40
+		fi
+
+		if $penDrawing==2
+			fx_smooth_anisotropic. 60,0.9,0.64,3.1,1.1,0.8,30,2,0,1,1,0,0,24
 		fi
 
 		fx_LCE. 80,{$locContEnh/2},1,1,0,0
@@ -362,7 +370,7 @@ cl_lineart:
 			fx_smooth_antialias. 100,0.5,5,0,50,50
 		fi
 
-		if $penDrawing==1
+		if $penDrawing>=1
 			fx_pen_drawing. 10,0,50,50
 			n 0,255
 			otsu 4
