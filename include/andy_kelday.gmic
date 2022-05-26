@@ -1555,6 +1555,47 @@ gcd_stereo_vid_preview : skip "${1=}","${2=}"
 gcd_add0 :
   ({'"$1"'}) if w<$2 {$2-w},1,1,1,48 rv[-2,-1] a[-2,-1] x fi u {t} rm.
 
+#@gui Target Color Spot : gcd_color_target, gcd_color_target(1)
+#@gui : note = note("<i>Use color curves to make the selected point match the target</i>"), sep = separator()
+#@gui : Coordinates = point(50,50,0,1,40,250,60,200,10)_0
+#@gui : Target Color = color(175,175,175)
+#@gui : Chromacity Range = choice("Global","Wide","Narrow")
+#@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2022/05/24</i>.</small>")
+#@gui : note = note("\n<small><b><u>Notes</u></b></small>")
+#@gui : note = note("<small>Set the target to the desired color for the spot you selected.</small>")
+#@gui : note = note("<small>Reduce chromacity range to limit the affected regions.</small>")
+#@gui : note = note("<small>sRGB D65 input is assumed.</small>")
+gcd_color_target :
+  foreach {
+    split_opacity +l[0] {
+      m={iM} repeat {0,s} { sh $> n. 0,$m rm. }
+      1,1,1,3,"I(#0,$1/100*w#0,$2/100*h#0)" ($3^$4^$5)
+      mix_channels (0,0.5,0.5;0.5,0,0.5;0.5,0.5,0)
+      srgb2rgb / $m  +*[1,2] -[1,2] . rm. /[1,2]
+      repeat {0,s} {
+        A:=i[$>] sh[0] $> +*. {1-$A} +. $A /[-2,-1] rm.
+      }
+      k[0] * $m rgb2srgb
+      mix_channels (-1,1,1;1,-1,1;1,1,-1) c 0,$m
+    }
+    if $6
+      1,1,1,3,"I(#0,$1/100*w#0,$2/100*h#0)"
+      +_gcd_chromacity_distance[0] . rm.. *. -1 +. 1
+      if $6>1 equalize. 256 fi
+      j[0] ..,0,0,0,0,1,. rm[-2,-1]
+    else j[0] . rm. fi
+    a c
+  }
+
+_gcd_chromacity_distance :
+  if ${"is_image_arg $1"} pass$1 1 else i ${^0} fi
+  +mix_channels. (0,0.5,0.5;0.5,0,0.5;0.5,0.5,0) -[-2,-1] store. cmp
+  foreach {
+    +mix_channels (0,0.5,0.5;0.5,0,0.5;0.5,0.5,0)
+    - i $cmp repeat {0,s} { sh[0] $> -. {-2,i[$>]} rm. } rm.
+    sqr r 100%,100%,100%,1,2 sqrt n 0,1
+  }
+
 #@gui Temperature Balance: gcd_temp_balance, gcd_temp_balance(1)
 #@gui : note = note("<i>Auto-detect lighting and adjust color temperature</i>"), sep = separator()
 #@gui : Saturation = float(0,-1,1)

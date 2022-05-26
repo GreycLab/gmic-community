@@ -2425,12 +2425,13 @@ check "$8!=0"
    yp=oscil_b(yp,txp);
   );
   norm(xp,yp);"
-#@cli +rep_find_permutation: init_num,_add_1
-#@cli : Return all the permutation of set of numbers as a image.
+#@cli +rep_find_permutations: init_num,_add_1,_output
+#@cli : Return all the permutations of set of numbers as a image.
+#@cli : _output defines whether it is a function to be used onto a variable. This is used to generate a permutation of a set of number.
 #@cli :
 #@cli : Source of Base Code: https://www.techiedelight.com/find-permutations-string-cpp-java-iterative/
 #@cli : Default values: '_add_1=0','_output=0'
-+rep_find_permutation:
++rep_find_permutations:
 skip ${2=0}
 
 check "inrange($1,1,10,1,1)&&isint($1)"
@@ -2441,36 +2442,106 @@ if $2 +. 1 fi
 {fact($1)},1,1,$1
 
 eval "
- s=crop(#-2);
+ const tv=$1-1;
+ t=crop(#-2);
  iter=0;
  revert(q)=(
-  a=s;
-  n=$1-1;
+  a=t;
+  n=tv;
   for(p=q,p<$1,++p,
-   a[p]=s[n];
+   a[p]=t[n];
    --n;
   );
   a;
  );
  m=0;
  while(1,
-  I(#-1,iter)=s;
-  i=$1-1;
-  while(s[i-1]>=s[i],
-   --i;
-   if(!i,m=1;break(););
+  I(#-1,iter)=t;
+  k=tv;
+  while(t[k-1]>=t[k],
+   --k;
+   if(!k,m=1;break(););
   );
   m?break();
-  j=$1-1;
-  while(j>i && s[j] <= s[i-1],
-   --j;
+  b=tv;
+  while(b>k && t[b] <= t[k-1],
+   --b;
   );
-  swap(s[i-1],s[j]);
-  s=revert(i);
+  swap(t[k-1],t[b]);
+  t=revert(k);
   ++iter;
  );"
 
 rm..
+#@cli rep_extract_permutation_order: number_of_item,permutation_number
+#@cli : Return permutation order at index permutation_number.
+rep_extract_permutation_order:
+
+num_of_items={max(1,int(abs($1)))}
+
+if $num_of_items==1 u 0
+else
+
+ permutation_number={$2%fact($num_of_items)}
+ 
+ 1
+ 
+ eval "
+  const num_of_items=$num_of_items;
+  
+  da_push(#-1,"{expr('x',$num_of_items)}");
+  new_arr=vector(#num_of_items,0);
+ 
+  fn=num_of_items-1;
+  
+  permutation_position=$permutation_number;
+ 
+  repeat(fn,iter,
+   division_number=fact(fn);
+   pos=int(permutation_position/division_number);
+   new_arr_num=i[#-1,pos];
+   new_arr[iter]=new_arr_num;
+   da_remove(#-1,pos);
+   permutation_position%=division_number;
+   --fn;
+  );
+  
+  new_arr[iter]=i[#-1,0];
+  
+  new_arr;"
+  
+  rm.
+ 
+fi
+#@cli rep_find_permutation_lexicographic_index: number_list
+#@cli : Return the lexicographic index in which this permutation is found within a list of all possible permutation.
+#@cli :
+#@cli : number_list must be in the form of 0,1,2,3.... , but can be in any order.
+rep_find_permutation_lexicographic_index:
+if $#>1
+ if sort([$*])==expr('x',$#)
+  if [$*]==expr('x',$#) u 0
+  else
+   eval "
+    const fn=$#-1;
+    iv=[$*];  
+    p=0;
+    repeat(fn,k,
+     v=iv[k];
+     repeat(k,m,
+      if(iv[m]<iv[k], --v);
+     );
+     p+=v*fact(fn-k);
+    );
+    p;
+    "
+  fi
+ else
+  error inv_args
+ fi
+else
+ u 0
+fi
 #@cli rep_rrd: eq. to 'rep_random_rectangular_division' : (+)
 rep_rrd: rep_random_rectangular_division $*
 #@cli rep_random_rectangular_division: split>1,_additional_thickness>=0,_max_iter>=2,_probability[%]>0,_loop_limit>1,0<=_border[%]>=100%,_seed,_normalize,border_color,palette_mode
@@ -7009,37 +7080,41 @@ do
 while {*}" && "!{*,ESC}
 
 um pass2endimage k[-1]
-#@cli rep_jr_bps : eq. to 'rep_jr_bitplane_shuffler' : (+)
-rep_jr_bps: rep_jr_bitplane_shuffler $*
-#@cli rep_jr_bitplane_shuffler: _seed,_binary_swap={ 0=reverse | 1=forward },_bitdepth
-#@cli : Apply bit plane swapping per pixels.
-#@cli : (eq. to 'rep_jr_bps')\n
-#@cli : Note: You can apply negative number to _binary_swap to use reverse effect.\n
-#@cli : Default values: '_seed=?','_binary_swap=1','_bitdepth=8',
-rep_jr_bitplane_shuffler:
-skip ${1=u(0,1000000)},${2=1},${3=8}
-foreach {
- repeat s {
+#@cli rep_bitplane_shuffle: direction={ 0=backward | 1=forward },index_0...index_inf
+#@cli : Bitplane shuffle according to the order of index specified by user.
+rep_bitplane_shuffle:
+num_of_ind,direction={$#-1},{$1%2}
 
-  sh. $>
+if $#==2 error insuf_args fi
+if sort([${2--1}])!=expr('x',$num_of_ind) error inv_ind_args fi
 
-  f. "begin(
-    const bits=$3;
-    const mb=2^bits;
-    srand(mb*$1);
-    shuf=index=vectorbits(0);
-    repeat(bits,n,shuf[n]=index[n]=n);
-    repeat(bits,n,m=int(u(0,mb))%bits;swap(shuf[m],shuf[n]);srand(m+n+1));
-    ($2>0)?(swap(shuf,index));
-   );
-   val=0;
-   repeat(bits,n,(int(i/(2^index[n]))%2)?(val+=(2^shuf[n])));
-   val;"
-
-  rm.
-
- }
-}
+f ":begin(
+  const direction=$direction;
+  const n_bits=$num_of_ind;
+  const max_val=(1<<n_bits)-1;
+  order=[${2--1}];
+  direction?(
+   start_int2binarr()=bits[order[p]]=n%2;
+   end_binarr2int()=n+=bits[p]*b;
+  ):(
+   start_int2binarr()=bits[p]=n%2;
+   end_binarr2int()=n+=bits[order[p]]*b;
+  );
+ );
+ n=i;
+ inrange(n,0,max_val,0,0)?(
+  bits=vector(#n_bits,0);
+  repeat(n_bits,p,
+   start_int2binarr();
+   n>>=1;
+  );
+  b=1;
+  repeat(n_bits,p,
+   end_binarr2int();
+   b<<=1;
+  );
+  n;
+ ):(n);"
 #@cli rep_edgefade: radius>0,_exponential_factor>0 : radius>0,_exponential_factor>0,_nl_amplitude>0,0<_n_smooth<=1,0<_a_smooth<=1
 #@cli : Fade edges on alpha. Only applicable for images with 2 channels or 4+ channels. The last channel is the alpha channel.\n
 #@cli : Note: Execute 'gmic h normalize_local' for more information on '_nl_amplitude','_n_smooth', and '_a_smooth'. nl is short for normalize_local.\n
@@ -17939,18 +18014,191 @@ u "{$1}_"{!$3?2}\
 "{$7}_"{$5?2:1}\
 "{$8}"\
 "{$9,$10}"
-#@gui Bit Plane Shuffler: fx_rep_jr_bps,fx_rep_jr_bps_preview(0)
-#@gui :Depth=choice(0,"8-Bit","16-Bit")
+#@gui Bit-Plane Shuffler: fx_rep_bitplane_shuffle
 #@gui :Direction=choice(0,"Forward","Backward")
-#@gui :Seed=int(5,0,15)
-#@gui :_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"), Preview Split = point(50,50,0,0,200,200,200,0,10)_0
-#@gui :_=separator(),_=note("<small>Author: Reptorian.,Joan Rake Latest Update: <i>2020/7/18</i>.</small>")
-fx_rep_jr_bps:
-if $1 * 257 fi
-rep_jr_bitplane_shuffler $3,!$2,{($1*8)+8}
-if $1 / 257 fi
-fx_rep_jr_bps_preview:
-gui_split_preview "fx_rep_jr_bps ${1-3}",${-3--1}
+#@gui :Depth=choice(0,"8-Bit","16-Bit")
+#@gui :Index=int(1,1,40320)
+#@gui :Plane A=int(1,1,8)
+#@gui :Plane B=int(2,1,8)
+#@gui :Plane C=int(3,1,8)
+#@gui :Plane D=int(4,1,8)
+#@gui :Plane E=int(5,1,8)
+#@gui :Plane F=int(6,1,8)
+#@gui :Plane G=int(7,1,8)
+#@gui :Plane H=int(8,1,8)
+#@gui :Plane A=int(1,1,8)_0
+#@gui :Plane B=int(2,1,8)_0
+#@gui :Plane C=int(3,1,8)_0
+#@gui :Plane D=int(4,1,8)_0
+#@gui :Plane E=int(5,1,8)_0
+#@gui :Plane F=int(6,1,8)_0
+#@gui :Plane G=int(7,1,8)_0
+#@gui :Plane H=int(8,1,8)_0
+#@gui :Randomize Index=button()
+#@gui :Index=int(1,1,40320)_0
+#@gui :Plane A=int(1,1,16)
+#@gui :Plane B=int(2,1,16)
+#@gui :Plane C=int(3,1,16)
+#@gui :Plane D=int(4,1,16)
+#@gui :Plane E=int(5,1,16)
+#@gui :Plane F=int(6,1,16)
+#@gui :Plane G=int(7,1,16)
+#@gui :Plane H=int(8,1,16)
+#@gui :Plane I=int(9,1,16)
+#@gui :Plane J=int(10,1,16)
+#@gui :Plane K=int(11,1,16)
+#@gui :Plane L=int(12,1,16)
+#@gui :Plane M=int(13,1,16)
+#@gui :Plane N=int(14,1,16)
+#@gui :Plane O=int(15,1,16)
+#@gui :Plane P=int(16,1,16)
+#@gui :Plane A=int(1,1,16)_0
+#@gui :Plane B=int(2,1,16)_0
+#@gui :Plane C=int(3,1,16)_0
+#@gui :Plane D=int(4,1,16)_0
+#@gui :Plane E=int(5,1,16)_0
+#@gui :Plane F=int(6,1,16)_0
+#@gui :Plane G=int(7,1,16)_0
+#@gui :Plane H=int(8,1,16)_0
+#@gui :Plane I=int(9,1,16)_0
+#@gui :Plane J=int(10,1,16)_0
+#@gui :Plane K=int(11,1,16)_0
+#@gui :Plane L=int(12,1,16)_0
+#@gui :Plane M=int(13,1,16)_0
+#@gui :Plane N=int(14,1,16)_0
+#@gui :Plane O=int(15,1,16)_0
+#@gui :Plane P=int(16,1,16)_0
+#@gui :Randomize Order=button()
+#@gui :_=separator(),_=note("<small>Author: <i>Reptorian</i> Latest update: <i>2022/05/26</i>.</small>")
+fx_rep_bitplane_shuffle:
+index_8bit,\
+plane_8bit_a,plane_8bit_b,plane_8bit_c,plane_8bit_d,plane_8bit_e,plane_8bit_f,plane_8bit_g,plane_8bit_h,\
+plane_16bit_a,plane_16bit_b,plane_16bit_c,plane_16bit_d,plane_16bit_e,plane_16bit_f,plane_16bit_g,plane_16bit_h,plane_16bit_i,plane_16bit_j,plane_16bit_k,plane_16bit_l,plane_16bit_m,plane_16bit_n,plane_16bit_o,plane_16bit_p\
+=${3-11},${22-37}
+
+if $3!=$21
+ ni={$3-1}
+ plane_8bit_a,plane_8bit_b,plane_8bit_c,plane_8bit_d,plane_8bit_e,plane_8bit_f,plane_8bit_g,plane_8bit_h={[${rep_extract_permutation_order\ 8,$ni}]+1}
+fi
+
+if $20
+ rd={int(u(0,40320))}
+ plane_8bit_a,plane_8bit_b,plane_8bit_c,plane_8bit_d,plane_8bit_e,plane_8bit_f,plane_8bit_g,plane_8bit_h={[${rep_extract_permutation_order\ 8,$rd}]+1}
+ index_8bit={$rd+1}
+fi
+
+if [${4-11}]!=[${12-19}]
+
+ eval "
+  v0=[${4-11}];
+  v1=[${12-19}];
+  diff_ind=!(v1-v0);
+  n0_pos=find(diff_ind,0,0,1); 
+  n0=v0[n0_pos];
+  v0[n0_pos]=-1;
+  n1_pos=find(v0,n0,0,1);
+  swap(v1[n0_pos],v1[n1_pos]);
+  v1;
+  "
+  
+ plane_8bit_a,plane_8bit_b,plane_8bit_c,plane_8bit_d,plane_8bit_e,plane_8bit_f,plane_8bit_g,plane_8bit_h=${}
+ 
+ index_8bit={${rep_find_permutation_lexicographic_index\ {[${}]-1}}+1}
+ 
+ wait 200
+fi
+
+if $54
+ rd={int(u(0,20922789888000))}
+ plane_16bit_a,plane_16bit_b,plane_16bit_c,plane_16bit_d,plane_16bit_e,plane_16bit_f,plane_16bit_g,plane_16bit_h,plane_16bit_i,plane_16bit_j,plane_16bit_k,plane_16bit_l,plane_16bit_m,plane_16bit_n,plane_16bit_o,plane_16bit_p={[${rep_extract_permutation_order\ 16,$rd}]+1}
+fi
+
+if [${22-37}]!=[${38-53}]
+ eval "
+  v0=[${22-37}];
+  v1=[${38-53}];
+  diff_ind=!(v1-v0);
+  n0_pos=find(diff_ind,0,0,1); 
+  n0=v0[n0_pos];
+  v0[n0_pos]=-1;
+  n1_pos=find(v0,n0,0,1);
+  swap(v1[n0_pos],v1[n1_pos]);
+  v1;
+  "
+  
+ plane_16bit_a,plane_16bit_b,plane_16bit_c,plane_16bit_d,plane_16bit_e,plane_16bit_f,plane_16bit_g,plane_16bit_h,plane_16bit_i,plane_16bit_j,plane_16bit_k,plane_16bit_l,plane_16bit_m,plane_16bit_n,plane_16bit_o,plane_16bit_p=${}
+  
+ wait 200
+  
+fi
+
+if $2
+ * 257
+ round 0
+ rep_bitplane_shuffle {!$1},{[$plane_16bit_a,$plane_16bit_b,$plane_16bit_c,$plane_16bit_d,$plane_16bit_e,$plane_16bit_f,$plane_16bit_g,$plane_16bit_h,$plane_16bit_i,$plane_16bit_j,$plane_16bit_k,$plane_16bit_l,$plane_16bit_m,$plane_16bit_n,$plane_16bit_o,$plane_16bit_p]-1}
+ / 257
+ else
+  round 0
+  rep_bitplane_shuffle {!$1},{[$plane_8bit_a,$plane_8bit_b,$plane_8bit_c,$plane_8bit_d,$plane_8bit_e,$plane_8bit_f,$plane_8bit_g,$plane_8bit_h]-1}
+fi
+
+use_8_bits={!$2?2}
+use_16_bits={$2?2}
+
+u "{$1}"\ # Direction
+"{$2}"\ # Depth
+"{"$index_8bit"}_"$use_8_bits\
+"{"$plane_8bit_a"}_"$use_8_bits\
+"{"$plane_8bit_b"}_"$use_8_bits\
+"{"$plane_8bit_c"}_"$use_8_bits\
+"{"$plane_8bit_d"}_"$use_8_bits\
+"{"$plane_8bit_e"}_"$use_8_bits\
+"{"$plane_8bit_f"}_"$use_8_bits\
+"{"$plane_8bit_g"}_"$use_8_bits\
+"{"$plane_8bit_h"}_"$use_8_bits\
+"{"$plane_8bit_a"}"\
+"{"$plane_8bit_b"}"\
+"{"$plane_8bit_c"}"\
+"{"$plane_8bit_d"}"\
+"{"$plane_8bit_e"}"\
+"{"$plane_8bit_f"}"\
+"{"$plane_8bit_g"}"\
+"{"$plane_8bit_h"}"\
+"{0}_"$use_8_bits\
+"{"$index_8bit"}"\
+"{"$plane_16bit_a"}_"$use_16_bits\
+"{"$plane_16bit_b"}_"$use_16_bits\
+"{"$plane_16bit_c"}_"$use_16_bits\
+"{"$plane_16bit_d"}_"$use_16_bits\
+"{"$plane_16bit_e"}_"$use_16_bits\
+"{"$plane_16bit_f"}_"$use_16_bits\
+"{"$plane_16bit_g"}_"$use_16_bits\
+"{"$plane_16bit_h"}_"$use_16_bits\
+"{"$plane_16bit_i"}_"$use_16_bits\
+"{"$plane_16bit_j"}_"$use_16_bits\
+"{"$plane_16bit_k"}_"$use_16_bits\
+"{"$plane_16bit_l"}_"$use_16_bits\
+"{"$plane_16bit_m"}_"$use_16_bits\
+"{"$plane_16bit_n"}_"$use_16_bits\
+"{"$plane_16bit_o"}_"$use_16_bits\
+"{"$plane_16bit_p"}_"$use_16_bits\
+"{"$plane_16bit_a"}"\
+"{"$plane_16bit_b"}"\
+"{"$plane_16bit_c"}"\
+"{"$plane_16bit_d"}"\
+"{"$plane_16bit_e"}"\
+"{"$plane_16bit_f"}"\
+"{"$plane_16bit_g"}"\
+"{"$plane_16bit_h"}"\
+"{"$plane_16bit_i"}"\
+"{"$plane_16bit_j"}"\
+"{"$plane_16bit_k"}"\
+"{"$plane_16bit_l"}"\
+"{"$plane_16bit_m"}"\
+"{"$plane_16bit_n"}"\
+"{"$plane_16bit_o"}"\
+"{"$plane_16bit_p"}"\
+"{0}_"$use_16_bits
 #@gui Graphical Tiling Glitch (Interactive): fx_rep_x_graphical_tiling,fx_rep_x_graphical_tiling_preview(0)
 #@gui :_=note("Launch the interactive graphical tiling window.\n\nDetails: The main purpose of this filter is to stimulate graphical tiling glitch observed in Microsoft Windows XP Operating System. However, you can also use it to tile images by hand to artistic purpose.\n\n<u>Please Read Instruction Below!</b>")
 #@gui :_=separator(),_=note("<b>Main</b>)
