@@ -48,48 +48,78 @@
 #
 #-------------------------------
 
-#@cli rep_split_it: _string
-#@cli : Split images based on unicode values.
-#@cli : Default values: '_string=\n'
-rep_split_it:
-skip ${1=\n}
+#@cli rep_import_pdn_txt: file_a...file_z...,_discard_alpha={ 0=keep | 1=discard_alpha | 2=auto }
+#@cli : Import PDN Palette (.txt)
+#@cli : There can be as many files. This import file relative to your current directory.
+#@cli : Default values: '_discard_alpha=2'
++rep_import_pdn_txt:
+if narg($-1)&&$#>1 alpha_mode={$-1%3}
+else alpha_mode=2
+fi
 
-('"$1"')
+0 # Empty Image of size 0x0x0x0
 
-split_string=[{crop(#-1)}]
-size_arr={w#-1}
-use_horizontal_mode=0
+newline,commentary={'\n'},{';'}
 
-rm.
+local[-1] {
 
-foreach {
+ if $#>1 it ${1--2} else it $1 fi
 
- pos=0
+ rm[0]
 
- if w#-1>1&&h==1 rotate 90 use_horizontal_mode=1 fi
+ foreach {
 
- repeat inf {
+  split -,$newline
 
-  pos:=find(crop(#0),$split_string,0,1)
+  foreach {
 
-  if $pos==-1 break fi
+   if i==$commentary
 
+    rm
 
-  if $pos
-   +crop[0] 0,0,0,{$pos-1}
-   crop[0] 0,{$pos+$size_arr},0,{h#0-1}
-  else
-   crop[0] 0,{$pos+$size_arr},0,{h#0-1}
+   else
+
+    if h<8 rm continue fi
+
+    eval "
+     o=-1;
+     repeat(w#-1,p,
+      v=i(#-1,0,p);
+      inrange(v,48,57,1,1)||inrange(v,97,102,1,1)||inrange(v,65,70,1,1)?(
+       o=p;
+       break();
+      );
+     );
+     o;"
+
+     if ${}==-1
+      rm
+     else
+      crop 0,${},0,{${}+7}
+      1,1,1,4,[${rep_hex2int8\ {t}}]
+      rm..
+     fi
+
+   fi
+
+  }
+
+  remove_duplicates
+
+  a x
+
+  shift 0,0,0,-1,2,0
+
+  if $alpha_mode
+   if $alpha_mode==2
+    sh. 3
+    if !iv#-1 rm. channels 0,2 else rm. fi
+   else
+    channels 0,2
+   fi
   fi
 
  }
-
- if whd#0==1 rm[0] fi
-
- if $use_horizontal_mode
-  rv
-  use_horizontal_mode=0
- fi
 
 }
 #@cli rep_correct_exp_ne: string
