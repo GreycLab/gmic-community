@@ -1585,7 +1585,7 @@ gcd_add0 :
 
 #@gui Target Color Spot : fx_gcd_color_target, fx_gcd_color_target(1)
 #@gui : note = note("<i>Use color curves to make the selected point match the target</i>"), sep = separator()
-#@gui : Coordinates = point(50,50,0,1,40,250,60,200,10)_0
+#@gui : Coordinates = point(50,50,0,1,40,250,60,128,2%)_0
 #@gui : Target Color = color(175,175,175)
 #@gui : Chromacity Range = choice("Global","Wide","Narrow")
 #@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2022/06/15</i>.</small>")
@@ -1630,6 +1630,51 @@ gcd_srgb_curve_target : skip ${1=128},${2=128},${3=128},${4=128},${5=128},${6=12
     k[0] * $m rgb2srgb
     mix_channels (-1,1,1;1,-1,1;1,1,-1) c 0,$m
   }
+
+#@gui Transfer Colors [Curves] : fx_gcd_color_spot_matching, fx_gcd_color_spot_matching_preview(1)
+#@gui : note = note("<i>Use color curves to match the target to the source</i>"), sep = separator()
+#@gui : Source = point(75,75,0,1,0,150,250,128,2%)
+#@gui : Target = point(25,25,0,1,250,250,0,128,2%)
+#@gui : Chromacity Range = choice(1,"Global","Wide","Narrow")
+#@gui : Preview = choice(0,"Vertical","Horizontal","Layers")
+#@gui : Swap layers = bool(0)
+#@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2022/06/15</i>.</small>")
+#@gui : note = note("\n<small><b><u>Notes</u></b></small>")
+#@gui : note = note("<small>Ensure the layer dimensions match for best results.</small>")
+#@gui : note = note("<small>Reduce chromacity range to limit the affected regions.</small>")
+#@gui : note = note("<small>sRGB D65 input is assumed.</small>")
+fx_gcd_color_spot_matching : skip ${1=50},${2=50},${3=50},${4=60},${5=1},${6=0},${7=0}
+if 2!=$! error "This filter requires two input layers to function" fi
+if $7 rv fi
+  l[0,1] {
+    if $6>1
+      x0:=$3/100*w#0 y0:=$4/100*h#0
+      x1:=$1/100*w#1 y1:=$2/100*h#1
+    elif $6>0
+      p:=(w#0+w#1) q:=max(h#0,h#1)
+      x0:=min($3/100*$p,w#0) y0:=min($4/100*$q,h#0)
+      x1:=max($1/100*$p-w#0,0) y1:=min($2/100*$q,h#1)
+    else
+      p:=max(w#0,w#1) q:=(h#0+h#1)
+      x0:=min($3/100*$p,w#0) y0:=min($4/100*$q,h#0)
+      x1:=min($1/100*$p,w#1) y1:=max($2/100*$q-h#0,0)
+    fi
+    to_a nm[0] T nm[1] S split_opacity
+    l[T,S] {
+      trg:=I(#0,$x0,$y0) src:=I(#1,$x1,$y1)
+      +gcd_srgb_curve_target[0] $src,$trg
+      if $5
+        +_gcd_chromacity_distance[0] $trg *. -1 +. 1
+        if $5>1 pow. 3 fi
+        j[0] ..,0,0,0,0,1,. rm[-2,-1]
+      else j[0] . rm. fi
+    }
+    a[0,1] c a[-2,-1] c
+  }
+
+fx_gcd_color_spot_matching_preview :
+  fx_gcd_color_spot_matching $*
+  if $6>1 rv blend alpha elif $6>0 a x else a y fi
 
 #@gui Temperature Balance: gcd_temp_balance, gcd_temp_balance(1)
 #@gui : note = note("<i>Auto-detect lighting and adjust color temperature</i>"), sep = separator()
