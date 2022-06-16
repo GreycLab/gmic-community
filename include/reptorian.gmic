@@ -2511,6 +2511,123 @@ check "$8!=0"
    yp=oscil_b(yp,txp);
   );
   norm(xp,yp);"
+#@cli rep_ncr_combinations: number_of_items>0,choices>0,_axis={x,y,z} : choices>0, number_of_items>0,_axis={x,y,z}
+#@cli : Generates all combinations that fits nCr. The algorithm used for this is based on Algorithm 515 (Buckles and Lybanon 1977) which allows index-based generation of combinations.
+#@cli :
+#@cli : Code has been adapted from sleeepjack's Python 2 code executing Algorithm 515 - https://github.com/sleeepyjack/alg515/blob/master/python/alg515.py
+#@cli :
+#@cli : Note: If $2 is greater than $1, then $2 is number of items and $1 is choices. Only positive integer numbers are accepted!
+#@cli : Default values: '_axis=x'
++rep_ncr_combinations:
+skip ${3=x}
+check "($1>0&&$2>0)&&(isint($1)&&isint($2))&&inrange(('$3')[0],120,122,1,1)"
+
+if $1==$2 ({expr('x',$1)}) return fi
+
+if $1>$2 n_items,choices=$1,$2
+else n_items,choices=$2,$1
+fi
+
+num_combs,axis={permut($choices,$n_items,0)},{'$3'-120}
+
+if $axis==2   out_dim=1,1,$num_combs
+elif $axis==1 out_dim=1,$num_combs,1
+else          out_dim=$num_combs,1,1
+fi
+
+$out_dim,$choices,"
+ begin(
+  const n_items=$n_items;
+  const axis=$axis;
+  const choices=s;
+  axis==2?(index()=z;):
+  axis==1?(index()=y;):
+           index()=x;
+ );
+ 
+ index=index();
+ 
+ comb=vector(#choices,0);
+ V=1;
+ R=permut(choices-1,n_items-V,0);
+ K=R;
+ 
+ while(K<=index,
+  ++V;
+  R=permut(choices-1,n_items-V,0);
+  K+=R;
+ );
+ K-=R;
+ comb[0]=V-1;
+ 
+ for(p=2,p<choices,++p,
+  ++V;
+  R=permut(choices-p,n_items-V,0);
+  K+=R;
+  while(K<=index,
+   ++V;
+   R=permut(choices-p,n_items-V,0);
+   K+=R;
+  );
+  K-=R;
+  comb[p-1]=V-1;
+ );
+ 
+ comb[choices-1]=V+index-K;
+ 
+ comb;"
+#@cli rep_extract_ncr_combination: number_of_items,choices,index : choices, number_of_items,index
+#@cli : Return ncr combination at index. The algorithm used for this is based on Algorithm 515 (Buckles and Lybanon 1977) which allows index-based generation of combinations.
+#@cli :
+#@cli : Code has been adapted from sleeepjack's Python 2 code executing Algorithm 515 - https://github.com/sleeepyjack/alg515/blob/master/python/alg515.py
+#@cli :
+#@cli : Note: If $2 is greater than $1, then $2 is number of items and $1 is choices. Only positive integer numbers are accepted!
+rep_extract_ncr_combination:
+check "($1>0&&$2>0)&&(isint($1)&&isint($2))"
+
+if $1==$2 u {expr('x',$1)} return fi
+
+if $1>$2 n_items,choices=$1,$2
+else n_items,choices=$2,$1
+fi
+
+num_combs={permut($choices,$n_items,0)}
+index={$3%$num_combs}
+
+eval "
+ const n_items=$n_items;
+ const choices=$choices;
+ const index=$index;
+ 
+ comb=vector(#choices,0);
+ V=1;
+ R=permut(choices-1,n_items-V,0);
+ K=R;
+ 
+ while(K<=index,
+  ++V;
+  R=permut(choices-1,n_items-V,0);
+  K+=R;
+ );
+ K-=R;
+ comb[0]=V-1;
+ 
+ for(p=2,p<choices,++p,
+  ++V;
+  R=permut(choices-p,n_items-V,0);
+  K+=R;
+  while(K<=index,
+   ++V;
+   R=permut(choices-p,n_items-V,0);
+   K+=R;
+  );
+  K-=R;
+  comb[p-1]=V-1;
+ );
+ 
+ comb[choices-1]=V+index-K;
+ 
+ comb;"
 #@cli rep_full_combinations: 0<=number_of_items<9,_axis={x|y|z}
 #@cli : Generates all combinations that are equal to size of input.
 #@cli : Default values:'_axis=x'
