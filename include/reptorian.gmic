@@ -2511,13 +2511,166 @@ check "$8!=0"
    yp=oscil_b(yp,txp);
   );
   norm(xp,yp);"
+#@cli rep_ncr_combinations: number_of_items>0,choices>0,_axis={x,y,z} : choices>0, number_of_items>0,_axis={x,y,z}
+#@cli : Generates all combinations that fits nCr. The algorithm used for this is based on Algorithm 515 (Buckles and Lybanon 1977) which allows index-based generation of combinations.
+#@cli :
+#@cli : Code has been adapted from sleeepjack's Python 2 code executing Algorithm 515 - https://github.com/sleeepyjack/alg515/blob/master/python/alg515.py
+#@cli :
+#@cli : Note: If $2 is greater than $1, then $2 is number of items and $1 is choices. Only positive integer numbers are accepted!
+#@cli : Default values: '_axis=x'
++rep_ncr_combinations:
+skip ${3=x}
+
+check "($1>0&&$2>0)&&(isint($1)&&isint($2))&&inrange(('$3')[0],120,122,1,1)"
+
+if $1==$2 ({expr('x',$1)}) return fi
+
+if $1>$2 n_items,choices=$1,$2
+else n_items,choices=$2,$1
+fi
+
+num_combs,axis={permut($choices,$n_items,0)},{'$3'-120}
+
+if $num_combs>16777216 error excess_combs fi
+
+if $axis==2   out_dim=1,1,$num_combs
+elif $axis==1 out_dim=1,$num_combs,1
+else          out_dim=$num_combs,1,1
+fi
+
+if $num_combs>256 mode=:
+else mode=>
+fi
+
+$out_dim,$choices,$mode"
+ begin(
+  const n_items=$n_items;
+  const axis=$axis;
+  const choices=s;
+  axis==2?(index()=z;):
+  axis==1?(index()=y;):
+           index()=x;
+ );
+ 
+ index=index();
+ 
+ comb=vector(#choices,0);
+ V=1;
+ R=permut(choices-1,n_items-V,0);
+ K=R;
+ 
+ while(K<=index,
+  ++V;
+  R=permut(choices-1,n_items-V,0);
+  K+=R;
+ );
+ K-=R;
+ comb[0]=V-1;
+ 
+ for(p=2,p<choices,++p,
+  ++V;
+  R=permut(choices-p,n_items-V,0);
+  K+=R;
+  while(K<=index,
+   ++V;
+   R=permut(choices-p,n_items-V,0);
+   K+=R;
+  );
+  K-=R;
+  comb[p-1]=V-1;
+ );
+ 
+ comb[choices-1]=V+index-K;
+ 
+ comb;"
+#@cli rep_extract_ncr_combination: number_of_items,choices,index : choices, number_of_items,index
+#@cli : Return ncr combination at index. The algorithm used for this is based on Algorithm 515 (Buckles and Lybanon 1977) which allows index-based generation of combinations.
+#@cli :
+#@cli : Code has been adapted from sleeepjack's Python 2 code executing Algorithm 515 - https://github.com/sleeepyjack/alg515/blob/master/python/alg515.py
+#@cli :
+#@cli : Note: If $2 is greater than $1, then $2 is number of items and $1 is choices. Only positive integer numbers are accepted!
+rep_extract_ncr_combination:
+check "($1>0&&$2>0)&&(isint($1)&&isint($2))"
+
+if $1==$2 u {expr('x',$1)} return fi
+
+if $1>$2 n_items,choices=$1,$2
+else n_items,choices=$2,$1
+fi
+
+num_combs={permut($choices,$n_items,0)}
+index={$3%$num_combs}
+
+eval "
+ const n_items=$n_items;
+ const choices=$choices;
+ const index=$index;
+ 
+ comb=vector(#choices,0);
+ V=1;
+ R=permut(choices-1,n_items-V,0);
+ K=R;
+ 
+ while(K<=index,
+  ++V;
+  R=permut(choices-1,n_items-V,0);
+  K+=R;
+ );
+ K-=R;
+ comb[0]=V-1;
+ 
+ for(p=2,p<choices,++p,
+  ++V;
+  R=permut(choices-p,n_items-V,0);
+  K+=R;
+  while(K<=index,
+   ++V;
+   R=permut(choices-p,n_items-V,0);
+   K+=R;
+  );
+  K-=R;
+  comb[p-1]=V-1;
+ );
+ 
+ comb[choices-1]=V+index-K;
+ 
+ comb;"
+#@cli rep_find_ncr_lexicographic_index: number_items,position_a...position_n
+#@cli : Return the lexicographic index in which this ncr combination is found within a list of all possible ncr combination. Code is based off a theorem and commentary in this source -> https://math.stackexchange.com/questions/1363239/fast-way-to-get-a-position-of-combination-without-repetitions/1364041#1364041
+#@cli :
+#@cli : position(s) variable(s) must not have repeating number. Order does not matter.
+rep_find_ncr_lexicographic_index:
+pos_args={$#-1}
+
+eval "
+ const number_of_items=int(abs($1));
+ const v_size=min(number_of_items,$pos_args);
+ v_pos_args=vector(#v_size,${2--1})%number_of_items;
+ v_test=vector(#number_of_items,0);
+ pos_index=0;
+ pos=0;
+ k=1;
+ 
+ repeat(v_size,p,
+  pos=v_pos_args[p];
+  if(!v_test[pos],v_test[pos]++;,run('error dup_args'););
+ );
+ 
+ v_pos_args=reverse(sort(v_pos_args));
+ 
+ repeat(v_size,p,
+  pos_index+=permut(k,v_pos_args[p],0);
+  ++k;
+ );
+ 
+ pos_index;"
 #@cli rep_full_combinations: 0<=number_of_items<9,_axis={x|y|z}
 #@cli : Generates all combinations that are equal to size of input.
 #@cli : Default values:'_axis=x'
 +rep_full_combinations:
 skip ${2=x}
 
-check "inrange($1,0,8,1,1)&&$1==int($1)"
+check "inrange($1,0,8,1,1)&&$1==int($1)&&inrange(('$2')[0],120,122,1,1)"
 
 if !$1||$1==1 1 return fi
 
@@ -2610,25 +2763,32 @@ if $#>1
 else
  u 0
 fi
-#@cli rep_find_permutations: init_num,_add_1,_output
+#@cli rep_find_permutations: init_num,_axis={x,y,z}
 #@cli : Return all the permutations of set of numbers as a image.
-#@cli : _output defines whether it is a function to be used onto a variable. This is used to generate a permutation of a set of number.
 #@cli :
-#@cli : Source of Base Code: https://www.techiedelight.com/find-permutations-string-cpp-java-iterative/
+#@cli : Adapted code from code in this link -> https://www.techiedelight.com/find-permutations-string-cpp-java-iterative/
 #@cli : Default values: '_add_1=0','_output=0'
 +rep_find_permutations:
-skip ${2=0}
+skip ${2=x}
 
-check "inrange($1,1,10,1,1)&&isint($1)"
+check "inrange($1,0,8,1,1)&&$1==int($1)&&inrange(('$2')[0],120,122,1,1)"
 
-$1,1,1,1,x
-if $2 +. 1 fi
+axis,fact_size={'$2'-120},{fact($1)}
 
-{fact($1)},1,1,$1
+if $axis==2 out_dim=1,1,$fact_size
+elif $axis==1 out_dim=1,$fact_size,1
+else out_dim=$fact_size,1,1
+fi
+
+$out_dim,$1
 
 eval "
+ const axis=$axis;
+ axis==2?(append2img()=I(#-1,0,0,iter)=t;):
+ axis==1?(append2img()=I(#-1,0,iter,0)=t;):
+          append2img()=I(#-1,iter,0,0)=t;
  const tv=$1-1;
- t=crop(#-2);
+ t=expr('x',$1);
  iter=0;
  revert(q)=(
   a=t;
@@ -2641,7 +2801,7 @@ eval "
  );
  m=0;
  while(1,
-  I(#-1,iter)=t;
+  append2img();
   k=tv;
   while(t[k-1]>=t[k],
    --k;
@@ -2656,8 +2816,6 @@ eval "
   t=revert(k);
   ++iter;
  );"
-
-rm..
 #@cli rep_extract_permutation_order: number_of_item,permutation_number
 #@cli : Return permutation order at index permutation_number.
 rep_extract_permutation_order:
