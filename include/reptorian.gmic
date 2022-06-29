@@ -47,7 +47,35 @@
 #@cli :: Reptorian's CLI Commands
 #
 #-------------------------------
-
+#@cli rep_ych_vibrance: 0<vibrance<=1
+#@cli : Increase Chroma of Image with minimal to no impact on high-chroma areas. Based on Darktable YCH "Vibrance" code.
+rep_ych_vibrance:
+vibrance={cut(abs($1),0,1)}
+if !$vibrance return fi
+foreach {
+ if s<3||s>4 continue fi
+ if s==4 sh. 0,2 fi
+ rgb2yuv.
+ sh. 1,2
+ f. "
+  V=I;
+  [norm(V),atan2(V[1],V[0])];"
+ sh. 0
+ f. "begin(
+   const vibrance=$vibrance;
+  );
+  v=vibrance*(1-i^vibrance);
+  chroma_factor=max(0,1+vibrance);
+  i*chroma_factor;"
+ f.. "
+  polar_coordinates=I;
+  r=polar_coordinates[0];
+  ang=polar_coordinates[1];
+  [r*cos(ang),r*sin(ang)];
+  "
+ k[0]
+ yuv2rgb
+}
 #@cli rep_import_pdn_txt: file_a...file_z...,_discard_alpha={ 0=keep | 1=discard_alpha | 2=auto }
 #@cli : Import PDN Palette (.txt)
 #@cli : There can be as many files. This import file relative to your current directory.
@@ -22361,6 +22389,14 @@ u "{$1}"\
 "{$22}_"{$19?2:1}\
 "{"$coeff_a"}"\
 "{"$coeff_b"}"
+#@gui YCH Vibrance: fx_rep_ych_vibrance,fx_rep_ych_vibrance_preview
+#@gui :Vibrance=float(0,0,100)
+#@gui :_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"),Preview Split=point(50,50,0,0,200,200,200,0,10)_0
+#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2022/06/28</i>.</small>")
+fx_rep_ych_vibrance:
+rep_ych_vibrance {$1/100}
+fx_rep_ych_vibrance_preview:
+gui_split_preview "fx_rep_ych_vibrance $1",${-3--1}
 ######################
 
 # Local Variables:
