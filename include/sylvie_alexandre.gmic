@@ -39,7 +39,7 @@
 #@gui :_=note("<b>Nettoyage du code/Cleaning the code :</b>)
 #@gui :_=note("Thank RepTorian1125 for modernizing the source code of these filters for GMIC 3.1.0")
 #@gui :_=note("Merci Reptorian1125 pour avoir modernisé le code source de ces filtres pour GMIC 3.1.0")
-#@gui :_=note("Version 2022/05/01 GMIC 3.1.1_pre")
+#@gui :_=note("Version 2022/07/02 GMIC 3.1.5")
 
 samj_about :
  Dim=1024
@@ -23996,6 +23996,110 @@ samj_rien_various :
 ####     #@gui :_=note("6 \303\276      )
 ####     #@gui :_=note("7 \303\277   ÿ   )
 
+#################################################
+##                                             ##
+##     samj_Test_Liste_Points_TSP_Splines      ##
+##                                             ##
+#################################################
+# 20220701  https://samjcreations.blogspot.com/2022/07/samuser-avec-les-splines-de-gmic.html  Pour mémoire sans intérêt. samj_Test_Liste_Points_TSP_Splines 2,,,,,,,0
+
+samj_Test_Liste_Points_TSP_Splines :
+skip ${1=0.5},${2=2.1},${3=1200},${4=0},${5=0},${6=0},${7=2},${8=1},${9=0}
+# 1 Echelle Points TSP, 2 Deformation Splines , 3 Taille max , 4 R , 5 V , 6 B , 7 Grosseur trait , 8 Type de Blanc , 9 Cubic Hermite Splines vs Courbes de Bézier
+
+Echelle=$1 # 0.5 de 0.01 à 4
+Deformation=$2  # 2 +- 0.5 pour les splines
+Blanc=$8
+if w>h
+ resize. $3,{h/w*$3}
+else
+ resize. {w/h*$3},$3
+fi
+Wf={w}
+Hf={h}
+if $Blanc==1
+ samj_Masques_Noir_Et_Blanc. 3,50
+ blend alpha
+ to_gray.
+ negate.
+ if $9==1 dilate. 4 else dilate_circ. 15 fi # S vs B
+else
+ to_gray.
+ autoindex.  2
+ variance_patch. 2
+ dilate. 6
+fi
+pointcloud. 3
+channels. 0,1
+resize. $Echelle%,1
+tsp. 200
+Iter={{w}-2}
+$Wf,$Hf,1,3
+fill_color. 255,255,255
+rv
+Index=0
+if $9==1 # Cubic Hermite Splines
+ +crop. {$Index},0,{$Index+1},0
+ Xd={i0}
+ Yd={i1}
+ rm.
+ +crop. {$Index+1},0,{$Index+2},0
+ Xu={i0}
+ Yu={i1}
+ rm.
+ +crop. {$Index+2},0,{$Index+3},0
+ Xt={i0}
+ Yt={i1}
+ rm.
+ repeat $Iter
+  +crop. {$Index+3},0,{$Index+4},0
+  Xq={i0}
+  Yq={i1}
+  rm.
+  Xds={$Xu+$Xu-{$Xd*$Deformation}}
+  Yds={$Yu+$Yu-{$Yd*$Deformation}}
+  Xqs={$Xt+$Xt-{$Xq*$Deformation}}
+  Yqs={$Yt+$Yt-{$Yq*$Deformation}}
+  spline.. $Xu,$Yu,$Xds,$Yds,$Xt,$Yt,$Xqs,$Yqs,1,$4,$5,$6
+  Index+=1
+  Xd=$Xu
+  Yd=$Yu
+  Xu=$Xt
+  Yu=$Yt
+  Xt=$Xq
+  Yt=$Yq
+ done
+else # Courbes de Bézier
+ Segments=round({{$Wf+$Hf}/200})
+ repeat {$Iter/3}
+  +crop. {$Index},0,{$Index+1},0
+  Xu={i0}
+  Yu={i1}
+  rm.
+  +crop. {$Index+1},0,{$Index+2},0
+  Xd={i0}
+  Yd={i1}
+  rm.
+  +crop. {$Index+2},0,{$Index+3},0
+  Xt={i0}
+  Yt={i1}
+  rm.
+  +crop. {$Index+3},0,{$Index+4},0
+  Xq={i0}
+  Yq={i1}
+  rm.
+  samj_Bezier_Quatre_Points.. $Xu,$Yu,$Xd,$Yd,$Xt,$Yt,$Xq,$Yq,$Segments,$4,$5,$6,255
+  Index+=3
+done
+fi
+rm.
+erode. $7
+
+#################################################
+##                                             ##
+##   FIN samj_Test_Liste_Points_TSP_Splines    ##
+##                                             ##
+#################################################
 
 #################################################
 ##                                             ##
