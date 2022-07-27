@@ -13484,59 +13484,877 @@ palname_madjikhsv:u "HSV Palette by MadJik"
 palname_st24_christmas:u "ST24 Christmas by Skiller Thomson"
 palname_ladybugreds:u "Reds by Ladybug"
 palname_dullish_rainbow:u "Dullish Rainbow by Jayden Bowman"
-#@cli pal_t : eq. to 'palette_transfer'. : (+)
-pal_t: palette_transfer $*
-#@cli palette_transfer : 0<=_palette_id<=142,0<=_indexing_style<=4,0<=_color_dithering[%]<=1,_transfer_rgb={0=No | 1=Yes },0<=_alpha_count,0<=_alpha_dithering<=1,_special_effect_factor>=0,0<=_initial_resize_method<=5,_activate_upscaling_stimulation={ 0=Does not activate | 1=Activate Upscale},_pixel_width>=1,_pixel_height>=1,_activate_hardware_stimulation={ 0=Does not activate | 1= Stimulate hardware restriction },1<=_color_section_of_hardware_restriction_precision_factor,_hardware_restriction_by_tile_width>0,_hardware_restriction_by_tile_height>0,_hardware_color_precision>2,_hardware_color_mapping_method={0=Median Cut | Median Cut and K-Means},alpha_precion_factor>2,alpha_mapping_method_for_hardware_stimulation={0=Median Cut | Median Cut and K-Means}
-#@cli : Transfer Colors to images using a palette. If using negative number or "i" for first variable, there must be exactly two layers.
-#@cli : (eq. to 'pal_t').\n
-#@cli : Default value: 'transfer_rgb=0', 'alpha_count=0', 'alpha_dithering=0%', 'special_effect_factor=.5', 'initial_resize_method=0','activate_upscaling_stimulation=0','pixel_width=1','pixel_height=1','activate_hardware_stimulation=0','color_section_of_hardware_restriction_precision_factor=10','hardware_restriction_by_tile_width=5','hardware_restriction_by_tile_height=5','_hardware_color_precision=4','hardware_color_mapping_method=1','alpha_precion_factor=10','alpha_mapping_method_for_hardware_stimulation=1'
-#@cli : For 2 layers where one is a palette - $ palette_transfer -1,0,.5 ,
-#@cli : To apply palette colors to multiple layers - $ repeat $! l[$<] palette_transfer db32,0,.5 done done ,\n
-#@cli : Author: Reptorian.
-palette_transfer:
-_iw={w}
-_ih={h}
-skip ${4=0},${5=2},${6=0},${7=.5},${8=0}${9=0},${10=1},${11=1},${12=0},${13=10},${14=5},${15=5},${16=4},${17=1},${18=10},${19=1}
-pw=$10
-ph=$11
-if $8||$9 if $pw<=0||$ph<=0 v + error "Invalid input for pixel scale factor(s)!" fi
-r={$pw>$ph?$pw/$ph:$ph/$pw} fi
-_CI={$2}
-AlpC=$5 AlpD=$6 SF=$7
-+pal $1
-if $9 r[0] {$r*100}%,{$r*100}%,1,4,$8 fi
-if $8 r[0] {100/$10}%,{100/$11}%,1,4,$8 fi
-split_opacity[0]
-l[^1] if $4 to_rgb transfer_rgb.. . fi if $_CI==0 if $12>0 l[0] ahre_rgb $13,$14,$15,$16,$3,$17 done index.. .,0,1 else index.. .,$3,1 fi rm.
-elif $_CI==1 to_rgba ${_iw},${_ih},1,4 noise. {$SF*75} to_graya. blend[^1] difference,1 to_rgb if $12>0 l[0] ahre_rgb $13,$14,$15,$16,$3,$17 done index.. .,0,1 else index.. .,$3,1 fi rm.
-elif $_CI==2 pal 0 [0] index. ..,1,1 rm.. +blend[^1] interpolation,{$5/20} rm[0,2] rv if $12>0 l[0] ahre_rgb $13,$14,$15,$16,$3,$17 done index.. .,0,1 else index.. .,$3,1 fi rm.
-else if $CI>2 if ($_CI-3)==0 +f[0] "x%2*255" else +f[0] "y%2*255" fi fi blend[^1] multiply,{$SF/4} if $12>0 l[0] ahre_rgb $13,$14,$15,$16,$3,$17 done index.. .,0,1 else index.. .,$3,1 fi rm. fi
+#@cli rep_transfer_color_reduced: [palette],0<=_dither<=1,_pixel_ratio_w>=0,_pixel_ratio_h>=0,_windows_width>=0,_window_height>=0,_color_restriction_per_window>=0,_color_restriction_per_whole>=0,_number_of_alpha>=0,_alpha_dithering>=0,_alpha_mode={ 0=index | 1=window-index | 2=ordered },_alpha_restrict>=0 : { bit_depth | bit_a:...:bit_z | :[palette] },0<=_dither<=1,_pixel_ratio_w>=0,_pixel_ratio_h>=0,_color_restriction_per_whole>=0,_number_of_alpha>=0,_alpha_dithering>=0,_alpha_mode={ 0=index | 1=ordered }
+#@cli : Change images to look as if it was reduced. Can be used to emulate old hardware.
+rep_transfer_color_reduced:
+skip ${3=1},${4=1},${5=1},${6=},${7=},${8=},${9=},${10=},${11=},${12=},${13=},${14=},${15=}
+
+# $1  = [palette] = $1                                              | $1 = { bit_depth | bit_a:...:bit_z | :[palette] } = $1
+# $2  = 0<=_dither<=1 = $2                                          | $2 = 0<=_dither<=1 = $2
+# $3  = _pixel_ratio_w>=0 = $3                                      | $3 = _pixel_ratio_w>=0 = $3
+# $4  = _pixel_ratio_h>=0 = $4                                      | $4 = _pixel_ratio_h>=0 = $4
+# $5  = _windows_width>=0 = $5                                      | $5 = _threshold_map = $5
+# $6  = _window_height>=0 = $6                                      | $6 = _color_restriction_per_whole>=0 = $6
+# $7  = _color_restriction_per_window>=0 = $7                       | $7 = _number_of_alpha>=0 = $7
+# $8  = _color_restriction_per_whole>=0 = $8                        | $8 = _alpha_dithering>=0 = $8
+# $9  = _number_of_alpha>=0 = $9                                    | $9  =_alpha_mode={ 0=index | 1=ordered } = $9
+# $10 = _alpha_dithering>=0 = $10                                   | $10 = _return_index_values={ 0=color | 1=index_value | 2=index_value_without_rescale } = $10
+# $11 = _alpha_mode={ 0=index | 1=window-index | 2=ordered } = $11
+# $12 = _alpha_restrict>=0                                   = $12
+# $13 = _alpha_threshold_map                                 = $13
+# $14 = _return_index_values={ 0=color | 1=index_value | 2=index_value_without_rescale } = $14
+
+if ${is_image_arg\ $1} mode=0
+else mode={(find('$1',':',0,1)!=-1)||isint($1)}
+fi
+
+if $mode
+
+  location_of_bracket={find('$1','[',0,1)}
+  
+  if $location_of_bracket!=-1
+    ('$1')
+    crop. $location_of_bracket,{w#-1-1}
+    img_arg={t}
+    rm.
+    pass$img_arg 0
+    _rep_transfer_color_reduced[^-1] $mode,[-1],${2-10}
+    rm.
+  else _rep_transfer_color_reduced $mode,${1-10}
+  fi
+  
+else
+
+  pass$1 0
+  _rep_transfer_color_reduced[^-1] $mode,[-1],${2-14}
+  rm.
+  
+fi
+_rep_transfer_color_reduced:
+skip ${3=1},${4=1},${5=1},${6=},${7=},${8=},${9=},${10=},${11=},${12=},${13=},${14=},${15=}
+
+# Indexed                                                           | Ordered
+# $1  = mode      = $1                                              | $1 = mode
+# $2  = [palette] = $2                                              | $2 = { bit_depth | bit_a:...:bit_z | :[palette] } = $2
+# $3  = 0<=_dither<=1 = $3                                          | $3 = 0<=_dither<=1     = $3
+# $4  = _pixel_ratio_w>=0 = $4                                      | $4 = _pixel_ratio_w>=0 = $4
+# $5  = _pixel_ratio_h>=0 = $5                                      | $5 = _pixel_ratio_h>=0 = $5
+# $6  = _windows_width>=0 = $6                                      | $6 = _threshold_map = $6
+# $7  = _window_height>=0 = $7                                      | $7 = _color_restriction_per_whole>=0 = $7
+# $8  = _color_restriction_per_window>=0 = $8                       | $8 = _number_of_alpha>=0 = $8
+# $9  = _color_restriction_per_whole>=0  = $9                       | $9 = _alpha_dithering>=0 = $9
+# $10 = _number_of_alpha>=0  = $10                                  | $10  =_alpha_mode={ 0=index | 1=ordered } = $10
+# $11 = _alpha_dithering>=0  = $11                                  | $11 = _return_index_values={ 0=color | 1=index_value | 2=index_value_without_rescale } = $11
+# $12 = _alpha_mode={ 0=index | 1=window-index | 2=ordered } = $12
+# $13 = _alpha_restrict>=0                                   = $13
+# $14 = _alpha_threshold_map                                 = $14
+# $15 = _return_index_values={ 0=color | 1=index_value | 2=index_value_without_rescale } = $15
+
+# mode == 0 => indexed
+# mode == 1 => ordered
+
+num_of_images,mode,special_effect={$!},$1,0
+
+if isnum($3)||${is_percent\ $3}
+  dither={cut($3,0,1)}
+else
+  dither,special_effect={[$mode?.25,1]}
+  ('$3')
+  split_point=-{w#-1-2}
+  split. x,$split_point
+  eff_factor={{-2,t}}
+  dither*=$eff_factor
+  ov={I(#-1,0)=='c'?4+(I(#-1,1)=='l'):(2*(I(#-1,0)=='l')+(I(#-1,1)=='v'))}
+  rm[-2,-1]
+fi
+
+pixel_ratio_w,pixel_ratio_h,rescale_back_w,rescale_back_h={pixel_ratio=vmax([1,1],int(abs([$4,$5])));[pixel_ratio,pixel_ratio*100]}
+return_index_values={$mode?(narg($11)?$11%3:0):(narg($15)?$15%3:0)}
+out_color={!$return_index_values}
+
+number_of_alpha,alpha_dithering={$mode?(narg($8)?int(abs($8))):(narg($10)?int(abs($10)))},{$mode?(narg($9)?cut($9,0,1)):(narg($11)?cut($11,0,1))}
+alpha_mode={$number_of_alpha?($mode?($10&1)*2+1:$12%3+1)}
+
+color_restriction_per_window,color_restriction_whole={!$mode?(narg($8)?$8:0)},{$mode?(narg($7)?int(abs($7))):(narg($9)?int(abs($9)))}
+
+if !$mode&&($color_restriction_whole?($color_restriction_whole<=$color_restriction_per_window)) color_restriction_per_window=0 fi
+
+decrement_color_restriction_whole={$color_restriction_whole-1}
+
+pixel_ratio_gcd={gcd($pixel_ratio_w,$pixel_ratio_h)}
+if $pixel_ratio_gcd>1 pixel_ratio_w,pixel_ratio_h/=$pixel_ratio_gcd fi
+
+if $pixel_ratio_w==1||$pixel_ratio_h==1
+  initial_rescale_w,initial_rescale_h={bd=max($pixel_ratio_w,$pixel_ratio_h);100*($pixel_ratio_w>$pixel_ratio_h?vector(#2,1)/[bd,1]:vector(#2,1)/[1,bd])}
+else
+  min_dimension,max_dimension={min($pixel_ratio_w,$pixel_ratio_h)},{max($pixel_ratio_w,$pixel_ratio_h)}
+  recip_rd={1/($max_dimension/$min_dimension)}
+  initial_rescale_w,initial_rescale_h={100*($pixel_ratio_w>$pixel_ratio_h?[$recip_rd,1]:[1,$recip_rd])}
+fi
+
+if $mode
+ threshold_map_level,alpha_threshold_map={narg($6)?$6:3}
+ alpha_restrict=$number_of_alpha
+else
+  window_width,window_height,alpha_restrict,alpha_threshold_map={int(abs([narg($6)?int(abs($6)),narg($7)?int(abs($7))]))},{narg($13)?int(abs($13))},{narg($14)?$14:3}
+  if $window_width==1&&$window_height==1 color_restriction_per_window=0 fi
+  if $window_width&&!$window_height window_height+=1 fi
+  if $window_height&&!$window_width window_width+=1 fi
+fi
+
+use_images=0
+
+if ${is_image_arg\ $2}
+
+  pass$2 0 => palette
+  
+  if !(s%2) error pal_cont_alp fi
+  
+  if h#-1>1&&d#-1==1 rotate. -90
+  elif h#-1>1&&d#-1>1 colormap. 0,,0
+  fi
+  
+  if $color_restriction_whole>=w#-1 color_restriction_whole=0 fi
+  if !$color_restriction_per_window color_restriction_per_window={w#-1} fi
+  
+  store. img_palette
+  use_images+=1
+
+fi
+
+if $alpha_mode?($alpha_mode<($mode?2:3))
+
+  $number_of_alpha,1,1,1,"begin(
+      const dividier=(w-1)/255;
+    );
+    x/dividier;"
+  
+  => alpha
+  
+  use_images+=1
+  
+fi
+
+if $use_images==2
+
+  images="$>",-1
+  v_col_info,v_alpha=[palette],[alpha]
+  
+elif $use_images==1 
+
+  images="$>",-1
+  
+  if ${is_image_arg\ $2}
+    v_col_info,v_alpha=[palette],$number_of_alpha
+  else
+    v_col_info,v_alpha=$2,[alpha]
+  fi
+  
+else 
+
+  images="$>"
+  v_col_info,v_alpha=$2,$number_of_alpha
+  
+fi
+
+contain_pal=${is_image_arg\ $v_col_info}
+
+repeat $num_of_images
+
+  local[{[$images]}] {
+  
+    if s#0>4||!s#0 continue fi
+    
+    targ_img_alp,con_img_palette={!(s#0%2)},0
+    
+    resize[0] $initial_rescale_w%,$initial_rescale_h%,100%,100%,3
+    
+    if $contain_pal
+    
+      $img_palette
+      
+      con_img_palette=1
+      
+      use_color_space_conversion,min_col_pos={s0=s#0;s0-=!(s0%2);csc=s0!=s#-1;s#-1>s0?[csc,-1]:[csc,0];}
+      
+      if $use_color_space_conversion
+        if $min_col_pos==-1 to_gray[-1]
+        else
+          cs_convert=${arg\ s#0-1,to_gray,to_graya,to_rgb}
+          $cs_convert[0]
+        fi
+      fi
+      
+    fi
+    
+    if $targ_img_alp?$out_color
+    
+      sh[0] 0,{s#0-2}
+             
+      if $color_restriction_whole&&$con_img_palette
+        
+        +index[-1] [palette],1,0
+        histogram. 100%
+        {w},1,1,1,x
+        pixelsort. -,x,..
+        crop. 0,0,$decrement_color_restriction_whole,0
+        map. [palette]
+        
+        if $special_effect _rep_transfer_color_reduced_special_effect[-3] $ov,$eff_factor fi
+          
+        if $mode rep_ordered_dithering[-3] [-1],$dither,$threshold_map_level,$out_color,1
+        else rep_index_by_window_and_color_restriction[-3] [-1],$dither,$color_restriction_per_window,$window_width,$window_height,1,$out_color
+        fi
+          
+        rm[-2,-1]
+        
+      else
+      
+        if $special_effect _rep_transfer_color_reduced_special_effect[-1] $ov,$eff_factor fi
+      
+        if $mode rep_ordered_dithering[-1] $v_col_info,$dither,$threshold_map_level,$out_color,1
+        else rep_index_by_window_and_color_restriction[-1] $v_col_info,$dither,$color_restriction_per_window,$window_width,$window_height,1,$out_color
+        fi
+        
+      fi
+      
+      rm.
+      
+      if $alpha_mode
+        
+        sh[0] {s#0-1}
+          
+        if $alpha_mode==3 rep_ordered_dithering[-1] $v_alpha,$alpha_dithering,$alpha_threshold_map,$out_color,1
+        elif $alpha_mode==2 rep_index_by_window_and_color_restriction[-1] $v_alpha,$alpha_dithering,$alpha_restrict,$window_width,$window_height,1,$out_color
+        else index[-1] $v_alpha,$alpha_dithering,1
+        fi
+          
+        rm.
+          
+      fi
+      
+    else
+      
+      if $targ_img_alp split_opacity[0] fi
+      
+      if $color_restriction_whole&&$con_img_palette
+      
+        +index[0] [palette],1,0
+        histogram. 100%
+        {w},1,1,1,x
+        pixelsort. -,x,..
+        crop. 0,0,$decrement_color_restriction_whole,0
+        map. [palette]
+        
+        if $mode rep_ordered_dithering[0] [-1],$dither,$threshold_map_level,$out_color,1
+        else rep_index_by_window_and_color_restriction[0] [-1],$dither,$color_restriction_per_window,$window_width,$window_height,1,$out_color
+        fi
+        
+        rm[-2,-1]
+        
+      else
+        
+        if $mode rep_ordered_dithering[0] $v_col_info,$dither,$threshold_map_level,$out_color,1
+        else rep_index_by_window_and_color_restriction[0] $v_col_info,$dither,$color_restriction_per_window,$window_width,$window_height,1,$out_color
+        fi
+        
+      fi
+      
+      if $targ_img_alp
+        if $return_index_values
+          if $alpha_mode==3 rep_ordered_dithering[1] $v_alpha,$alpha_dithering,$alpha_threshold_map,$out_color,1
+          elif $alpha_mode==2 rep_index_by_window_and_color_restriction[1] $v_alpha,$alpha_dithering,$alpha_restrict,$window_width,$window_height,1,$out_color
+          else index[1] $v_alpha,$alpha_dithering,$out_color
+          fi
+          a[0,1] c
+        else rm[1]
+        fi
+      fi
+      
+    fi
+    
+    if $con_img_palette rm[palette] fi
+   
+    if $return_index_values!=2 resize[0] $rescale_back_w%,$rescale_back_h%,100%,100%,1 fi
+  }
+  
 done
-if $5<2 rm. if $8 r {100*$10}%,{100*$11}%,1,3,1 fi else
-l[1] ${AlpC},1,1,1 f. "x" n. 0,255 if $12>0&&$5>2 l[0] ahre_bw $18,${AlpC},$14,$15,$16,${AlpD},$19 done index.. .,0,1 else index.. .,${AlpD},1 fi rm. done a c if $8 r {100*$10}%,{100*$11}%,1,4,1 fi fi
-#@cli pal_l :
-#@cli : Convert palettes to layers\n
-#@cli : Author: Reptorian.
-pal_l :
-repeat $! l[$>]
-_iw={w}
-if h=1 repeat ${_iw}-1 [0] done repeat ${_iw} crop[$>] $>,0,$>,0 done else v + error "This is not a palette!" fi done done
-#@cli ahre_rgb: eq. to 'auto_hardware_restriction_emulation_RGB'. : (+)
-ahre_rgb : auto_hardware_restriction_emulation_RGB $*
-#@cli auto_hardware_restriction_emulation_RGB : _precision_factor>1,_tile_size_width>0,_tile_size_height>0,_colors_per_tiles>0,dithering[%]>=1,mapping_method={0=median-cut | 1=median-cut and k-means}
-#@cli : Emulates hardware restriction automatically being based on the image using spectrum of 3.
-#@cli : (eq. to 'ahre_rgb').\n
-#@cli : Author: Reptorian.
-auto_hardware_restriction_emulation_RGB :
-repeat $! l[$>] remove_opacity to_rgba repeat $1 [0] done l[$1] +colormap $1,0,0 at[0] "s c f "ia" a c",$2,$3,,,,,3 index.. .,0,1 pal_l. r[1-{$1}] {w#0},{h#0},1,4,1 l[0] repeat $1-1 [0] done done repeat $1 l[$>,{$>+$1}] f[0] "i#0==i#1?255:0" done done k[0-{$1-1}] to_gray done to_rgb[0-{$1-1}] repeat $1 a[$>,$1] c done repeat $1 l[$>] +solidify 0,0,0,0,0 blend normal done done ac "autoindex $4,$5,$6",rgb blend alpha to_rgb done done
-#@cli ahre_bw: eq. to 'auto_hardware_restriction_emulation_BW'. : (+)
-ahre_bw: auto_hardware_restriction_emulation_BW $*
-#@cli auto_hardware_restriction_emulation_BW : _precision_factor>1,_tile_size_width>0,_tile_size_height>0,_shades_per_tiles>0,dithering[%]>=1,mapping_method={0=median-cut | 1=median-cut and k-means}
-#@cli : Emulates hardware restriction automatically being based on the image using spectrum of 1.
-#@cli : (eq. to 'ahre_bw').\n
-#@cli : Author: Reptorian.
-auto_hardware_restriction_emulation_BW : repeat $! l[$>]
-to_gray _l={im} _h={iM} $1,1,1,1 f. "x" n. 0,255 +at.. "f "ia"",$3,$4,,,,,3 index. ..,0,1 rv[^0] pal_l. r[^0-1] {w#0},{h#0},1,1,1 repeat $1 l[1,{$>+2}] f[1] "i#0==i#1?255:0" done done rm[1] repeat $1 +a[0,{$>+1}] c done rm[0-5] repeat $1 l[$>] +solidify 0,0,0,0,0 blend normal done done ac "autoindex $5,$6,$7",rgb blend alpha to_gray n ${_l},${_h} $2,1,1,1 f. "x" n. 0,255 index.. .,0,1 rm. to_gray done done
+
+remove_named alpha
+
+_rep_transfer_color_reduced_special_effect:
+
+if $1>3
+ f ":begin(
+   const eff_factor=cut($2,0,1)/4;
+   const overlay_value=($1&1)*255;
+   arr_overlay=vector(#s,overlay_value);
+  );
+  ((x+y)&1)?lerp(I,arr_overlay,eff_factor):I;"
+else
+ f ":begin(
+   const overlay_value=(int($1/2)%2)*255;
+   const eff_factor=cut($2,0,1)/4;
+   const direction=$1%2;
+   arr_overlay=vector(#s,overlay_value);
+   direction?(
+    eff_app()=x%2?(lerp(I,arr_overlay,eff_factor);):I;
+   ):(
+    eff_app()=y%2?(lerp(I,arr_overlay,eff_factor);):I;
+   );
+  );
+  eff_app();"
+fi
+#@cli rep_index_by_window_and_color_restriction:[palette],0<=_dithering<=1,_color_restriction>2,_window_width,_window_height,_window_depth,_map_palette={ 0 | 1 }
+#@cli : Index images per window
+rep_index_by_window_and_color_restriction:
+skip ${2=1},${3=},${4=1},${5=1},${6=1},${7=1}
+dithering,wi_w,wi_h,wi_d,map_palette,timg={cut($2,0,1)},{vmax(vector(#3,1),int(abs([${4-6}])))},{$7%2},{$!}
+
+
+pass$1 1
+
+if h#-1>1&&d#-1==1
+ rm. pass$1 0
+ rotate. -90
+elif h#-1>1&&d#-1>1
+ rm. pass$1 0
+ colormap. 0,,0
+fi
+
+col_res={narg($3)?cut(int(abs($3)),2,w#-1):w#-1}
+dec_col_res={$col_res-1}
+
+if $dithering
+ 
+ # Jarvis, Judice, and Ninke dithering Array
+  jjn_1R0D,jjn_2R0D,\
+  jjn_2L1D,jjn_1L1D,jjn_M01D,jjn_1R1D,jjn_2R1D,\
+  jjn_2L2D,jjn_1L2D,jjn_M02D,jjn_1R2D,jjn_2R2D\
+  ={([7,5,3,5,7,5,3,1,3,5,3,1]/48)*$dithering}
+ 
+fi
+
+eval "
+  const spectrum_size=s#-1;
+  const rf=$timg;
+  valid_spec=1;
+  repeat(rf,id,
+   if(s#id!=spectrum_size,valid_spec=0;break(););
+  );
+  valid_spec;
+ "
+ 
+if !${} error incompatible_img_pal fi
+
+if $col_res>=w#-1
+ index[^-1] [-1],$dithering,$map_palette
+ rm.
+ return
+fi
+
+repeat $timg local[$>,-1] 
+ {
+ 
+  ow,oh,od,tw,th,td,nw,nh,nd={od=[w#0,h#0,d#0];wd=vmin([w#0,h#0,d#0],[$wi_w,$wi_h,$wi_d]);td=ceil(od/wd);nd=td*wd;[od,td,nd]}
+  
+  if [$tw,$th,$td]==vector(#3,1)
+   +index[0] [1],1,0
+   histogram. 100%
+   {w},1,1,1,x
+   pixelsort. -,x,..
+   crop. 0,0,$dec_col_res,0
+   map. ...
+   index[0] .,$dithering,$map_palette
+  else
+  
+   r[0] $nw,$nh,$nd,100%,0,3,.5,.5,.5
+  
+   +index[0] [1],{$dithering?.75},0
+  
+   $tw,$th,$td,1,*"begin(
+     const nb_cols=w#1;
+    
+     const spectrum_size=s#1;
+     const inc_spectrum_size=spectrum_size+1;
+    
+     const nb_restrict=$col_res;
+     const dec_nb_restrict=nb_restrict-1;
+    
+     const res_y_spec=nb_restrict*spectrum_size;
+    
+     const wi_w=$wi_w;
+     const wi_h=$wi_h;
+     const wi_d=$wi_d;
+    
+     const dec_wi_w=wi_w-1;
+     const dec_wi_h=wi_h-1;
+     const dec_wi_d=wi_d-1;
+    
+     const box_dim=wi_w*wi_h*wi_d;
+    
+     init_freq_y_ind=expr('(x%2)?int(x/2);',nb_cols*2);
+     init_sel_res_pal_dist_arr=vector(#nb_restrict,0);
+    
+     const dithering_mode=$dithering;
+     const map_palette=$map_palette;
+    
+     dithering_mode?(
+    
+      #                            jjn_1R0D jjn_2R0D
+      # jjn_2L1D jjn_1L1D jjn_M01D jjn_1R1D jjn_2R1D
+      # jjn_2L2D jjn_1L2D jjn_M02D jjn_1R2D jjn_2R2D
+     
+      const jjn_1R0D=$jjn_1R0D;
+      const jjn_2R0D=$jjn_2R0D;
+      const jjn_2L1D=$jjn_2L1D;
+      const jjn_1L1D=$jjn_1L1D;
+      const jjn_M01D=$jjn_M01D;
+      const jjn_1R1D=$jjn_1R1D;
+      const jjn_2R1D=$jjn_2R1D;
+      const jjn_2L2D=$jjn_2L2D;
+      const jjn_1L2D=$jjn_1L2D;
+      const jjn_M02D=$jjn_M02D;
+      const jjn_1R2D=$jjn_1R2D;
+      const jjn_2R2D=$jjn_2R2D;
+     
+      v_col()=I(#2,pos_x,pos_y,pos_z);
+     
+      # gen_res_pal_col();
+     
+      map_palette?(
+       result_img_part()=(
+        old_color=I(#0,pos_x,pos_y,pos_z);
+        new_color=I(#1,res_col_id[argmin(sqrt(res_color_sum))],0,0);
+      
+        I(#0,pos_x,pos_y,pos_z)=new_color;
+       );
+      ):(
+       result_img_part()=(
+        old_color=I(#0,pos_x,pos_y,pos_z);
+        new_color_pos=res_col_id[argmin(sqrt(res_color_sum))];
+        new_color=I(#1,new_color_pos,0,0);
+      
+        i(#0,pos_x,pos_y,pos_z,0)=new_color_pos;
+       );
+      );
+     
+      result_img()=(
+       result_img_part();
+       diff_color=old_color-new_color;
+      
+       use_strip_1D=(pos_y+1)<min_out_of_boundary_offset_pos[2];
+       use_strip_2D=(pos_y+2)<min_out_of_boundary_offset_pos[2];
+      
+       use_strip_1D?(
+        I(#0,pos_x,pos_y+1,pos_z)+=diff_color*jjn_M01D;
+       );
+      
+       use_strip_2D?(
+        I(#0,pos_x,pos_y+2,pos_z)+=diff_color*jjn_M02D;
+       );
+      
+       (pos_x-2)>min_out_of_boundary_offset_pos[0]?(
+        use_strip_1D?(
+         I(#0,pos_x-2,pos_y+1,pos_z)+=diff_color*jjn_2L1D;
+        );
+        use_strip_2D?(
+         I(#0,pos_x-2,pos_y+2,pos_z)+=diff_color*jjn_2L2D;
+        );
+       );
+      
+       (pos_x-1)>min_out_of_boundary_offset_pos[0]?(
+        use_strip_1D?(
+         I(#0,pos_x-1,pos_y+1,pos_z)+=diff_color*jjn_1L1D;
+        );
+        use_strip_2D?(
+         I(#0,pos_x-1,pos_y+2,pos_z)+=diff_color*jjn_1L2D;
+        );
+       );
+      
+       (pos_x+1)<min_out_of_boundary_offset_pos[1]?(
+        I(#0,pos_x+1,pos_y,pos_z)+=diff_color*jjn_1R0D;
+        use_strip_1D?(
+         I(#0,pos_x+1,pos_y+1,pos_z)+=diff_color*jjn_1R1D;
+        );
+        use_strip_2D?(
+         I(#0,pos_x+1,pos_y+2,pos_z)+=diff_color*jjn_1R2D;
+        );
+       );
+       
+       (pos_x+2)<min_out_of_boundary_offset_pos[1]?(
+        I(#0,pos_x+2,pos_y,pos_z)+=diff_color*jjn_2R0D;
+        use_strip_1D?(
+         I(#0,pos_x+2,pos_y+1,pos_z)+=diff_color*jjn_2R1D;
+        );
+        use_strip_2D?(
+         I(#0,pos_x+2,pos_y+2,pos_z)+=diff_color*jjn_2R2D;
+        );
+       ); 
+       
+      );
+     
+     ):(
+    
+      v_col()=I(#0,pos_x,pos_y,pos_z);
+     
+      # gen_res_pal_col();
+      
+      map_palette?(
+       result_img()=(
+        I(#0,pos_x,pos_y,pos_z)=I(#1,res_col_id[argmin(sqrt(res_color_sum))],0,0);
+       );
+      ):(
+       result_img()=(
+        i(#0,pos_x,pos_y,pos_z,0)=res_col_id[argmin(sqrt(res_color_sum))];
+       );
+      );
+     );
+    
+    
+    );
+   
+    c_xp=x*wi_w;
+    c_yp=y*wi_h;
+    c_zp=z*wi_d;
+   
+    min_out_of_boundary_offset_pos=[c_xp,c_xp,c_yp]+[-1,wi_w,wi_h];
+   
+    freq_y_ind=init_freq_y_ind;
+    
+    tv=crop(#2,c_xp,c_yp,c_zp,0,wi_w,wi_h,wi_d,1);
+    
+    repeat(box_dim,k,
+     ++freq_y_ind[tv[k]*2];
+    );
+   
+    freq_y_ind=sort(freq_y_ind,0,nb_cols,2);
+    res_col_id=(freq_y_ind)[1,nb_restrict,2];
+   
+    res_pal=vector(#res_y_spec,0);
+    
+    repeat(nb_restrict,p,
+     res_pal_col=I(#1,res_col_id[p],0,0);
+     repeat(spectrum_size,q,
+      res_pal[q*nb_restrict+p]=res_pal_col[q];
+     );
+    );
+   
+    repeat(wi_d,oz,
+     pos_z=c_zp+oz;
+    
+     repeat(wi_h,oy,
+      pos_y=c_yp+oy;
+     
+      repeat(wi_w,ox,  
+       pos_x=c_xp+ox;
+      
+       res_color_sum=init_sel_res_pal_dist_arr;
+       v_col=I(#0,pos_x,pos_y,pos_z);
+      
+       repeat(spectrum_size,k,
+        res_color_sum+=sqr((res_pal)[k*nb_restrict,nb_restrict]-v_col[k]);
+       );
+      
+       result_img();
+       
+      );
+     );
+    );
+    0;
+    "
+   
+   if !$map_palette channels[0] 0 fi
+   
+   r[0] $ow,$oh,$od,100%,0,0,.5,.5,.5
+   
+  fi
+  
+  k[0,1]
+ }
+done
+
+rm.
+#@cli rep_ordered_dithering: 
+#@cli : level>0,0<=dither<=1,threshold_map_iter>0,map_pal={ 0 | 1 },_use_previous_threshold_map={ 0 | 1 } : 
+#@cli : level_a>0:.:level_z>0,0<=dither<=1,threshold_map_iter>0,map_pal={ 0 | 1 },_use_previous_threshold_map={ 0 | 1 }  :
+#@cli : [palette],0<=dither<=1,threshold_map_iter>0,map_pal={ 0 | 1 },_use_previous_threshold_map={ 0 | 1 } :
+#@cli : level<0,0<=dither<=1,threshold_map_iter>0,spread,_use_previous_threshold_map={ 0 | 1 } 
+#@cli :
+#@cli : Apply ordered dithering effect onto image.
+#@cli :
+#@cli : Note A: depth_a:.:depth_z implies that the first argument is a set of arguments joined by the ':' char. This is used for separating bit depth channels. 
+#@cli : Note B: Negative value is used to alter values of images without indexing, and that is useful for generating windows-based ordered-dithering with the use of rep_index_by_window_and_color_restriction command.
+rep_ordered_dithering:
+skip ${4=1},${5=0}
+check "($2?($2>=0&&$3>0):1)"
+
+dithering,iteration={cut(abs($2),0,1)},{int(abs($3))}
+
+if ${is_image_arg\ $1} use_pal_image=1
+else use_pal_image=0
+fi
+
+m "convert_first_arg_to_mul_args :
+
+  ('$1')
+
+  local[-1] {
+   split. -,{':'}
+   foreach[^-1] {
+    (',')
+    a y
+   }
+   a y
+  }
+
+  _bit_depths={t} rm.
+
+  u $_bit_depths"
+  
+m "index_from_bitmaps :
+
+  t_bit_depths:=[$_bit_depths]+1
+
+  foreach {
+
+   if s>$_narg_bit_depths 
+    sh. 0,{$_narg_bit_depths-1}
+   fi
+
+   if s==3 
+    dims:=vector3($t_bit_depths,1,1)
+    $dims,{s},:\"begin(
+      const mxi=w-1;
+      const myi=h-1;
+      const mzi=d-1
+     );
+     [x/mxi,y/myi,z/mzi]*255;\"
+   elif s==2 
+    dims:=vector3(vector2($t_bit_depths),1,1)
+    $dims,{s},:\"begin(
+      const mxi=w-1;
+      const myi=h-1;
+     );
+     [x/mxi,y/myi]*255;\"
+   else 
+    dims:=vector1(vector2($t_bit_depths),1,1)
+    $dims,{s},\"begin(
+      const mxi=w-1;
+     );
+     x/mxi*255;\"
+   fi
+
+   index[-2] [-1],0,1
+
+   k[0]
+
+  }"
+  
+if isnum($1)
+ if $1<0
+
+  if $#!=4 error inv_arg_cnt fi
+  if $-1==0 error inv_spr fi
+ 
+  +rep_bayer_threshold_map $iteration,,$5
+ 
+  f[^-1] "begin(
+    const n=w#-1-1;
+    const dithering=$dithering*abs($-1);
+   );
+   thres_x=x&n;
+   thres_y=y&n;
+   threshold_map=i(#-1,thres_x,thres_y,0,0);
+   new_color=(I+threshold_map*dithering);"
+  rm.
+ 
+  return
+  
+ fi
+fi
+
+if $use_pal_image
+
+ pass$1 0
+
+ +rep_bayer_threshold_map $iteration,,$5
+
+ repeat $!-2 {
+  local[$>,-2,-1] {
+  
+   {w#0},{h#0},100%,1,"
+     v_col=I#0;
+     color_sum=vector(#w#-2,0);
+     repeat(s#-2,k,
+      color_sum+=sqr(crop(#-2,0,0,0,k,w#-2,1,1,1)-v_col[k]);
+     );
+     color_sum=sqrt(color_sum);
+     p=argmin(color_sum);
+     color_sum[p];
+     "
+   spread:=ic#-1*2
+   
+   rm.
+   
+   if $spread
+   
+    f[0] "begin(
+      const n=w#-1-1;
+      const scale=$dithering*$spread;
+     );
+     thres_x=x&n;
+     thres_y=y&n;
+     threshold_map=i(#-1,thres_x,thres_y,0,0);
+     v_col=cut((I+threshold_map*scale),0,255);"
+     
+    index[0] [1],0,$4
+    
+   fi
+   
+  }
+ }
+ 
+ rm[-2,-1]
+
+else
+
+ if $dithering
+ 
+  _bit_depths=${-convert_first_arg_to_mul_args}
+  var_bit_depths:=var($_bit_depths)
+  
+  if !$var_bit_depths&&narg($_bit_depths)>0
+    _bit_depths:=([$_bit_depths])[0]
+  fi
+  
+  if isint($_bit_depths)
+   
+   +rep_bayer_threshold_map $iteration,,$5
+
+   f[^-1] "begin(
+     const n=w#-1-1;
+     const bit_depth=max(1,int(abs($_bit_depths)));
+     const scale=255/bit_depth;
+     const end_scale=$4?scale:1;
+     const dithering=$dithering;
+     const internal_scale=scale*dithering;
+     const power_level=s>1?2^(1/(bit_depth+.5)):1;
+    );
+    thres_x=x&n;
+    thres_y=y&n;
+    threshold_map=i(#-1,thres_x,thres_y,0,0);
+    new_color=(I+internal_scale*threshold_map)/scale;
+    inew_color=int(new_color);
+    exp_dist_from_inew_color=abs(new_color-inew_color)^power_level;
+    cut(round(lerp(new_color,exp_dist_from_inew_color+inew_color,dithering))*end_scale,0,255);"
+
+   rm.
+
+  else
+
+   _narg_bit_depths:=narg($_bit_depths)
+   if $_narg_bit_depths>3 error excess_args fi
+
+   +rep_bayer_threshold_map $iteration
+
+   f[^-1] "begin(
+     const n=w#-1-1;
+     const dithering=$dithering;
+     _bit_depths=vector(#s,"$_bit_depths");
+     scale=255/_bit_depths;
+     internal_scale=scale*dithering;
+     power_level=2^(1/_bit_depths);
+    );
+    thres_x=x&n;
+    thres_y=y&n;
+    threshold_map=i(#-1,thres_x,thres_y,0,0);
+    new_color=(I+internal_scale*threshold_map*dithering);"
+
+   rm.
+
+   index_from_bitmaps
+
+  fi
+
+ else
+
+  if isint($1)
+
+   f "begin(
+     const bit_depth=max(1,int(abs($1)));
+     const scale=255/bit_depth;
+    );
+    round(I/scale)*scale;"
+
+  else
+
+   _bit_depths=${-convert_first_arg_to_mul_args}
+   _narg_bit_depths:=narg($_bit_depths)
+   if $_narg_bit_depths>3 error excess_args fi
+
+   index_from_bitmaps
+
+  fi
+
+ fi
+
+fi
+
+um convert_first_arg_to_mul_args,index_from_bitmaps
+#@cli +rep_bayer_threshold_map: iteration,_normalize,_load_preserved_map
+#@cli : Create Bayer Threshold Map
++rep_bayer_threshold_map:
+skip ${2=1},${3=0}
+
+if narg($_bayer_threshold_map)&&$3
+ $_bayer_threshold_map
+else
+ ws=2
+
+ (0,2;3,1)
+ +store. initial_map
+
+ repeat $1 {
+
+  ws*=2
+ 
+  $initial_map
+ 
+  $ws,$ws
+ 
+  eval[-2] "begin(
+    const ws=$ws;
+    const half_ws=ws>>1;
+    initial=crop(#-3);
+   );
+   M_Surface=initial*4;
+   M_Surface+=i;
+   draw(#-1,M_Surface,x*half_ws,y*half_ws,0,0,half_ws,half_ws,1,1);
+   "
+ 
+  rm[-3,-2]
+ 
+ }
+
+ if $2
+
+  +. 1
+  /. {4^($1+1)}
+  -. {ia#-1}
+ 
+ fi
+ 
+ +store. _bayer_threshold_map
+fi
+
+gcd_dith_map : skip ${1=1}
+  (0) l. {
+    repeat $1 {
+      *[0] 4 ++[0] 2 ++[0] 3 ++[0] 1
+      a[0,1] x a[1,2] x a y
+    }
+  } * {4^-$1}
 #@cli rep_modo_mc: eq. to 'rep_modular_operation_multiple_channels' : (+)
 rep_modo_mc: rep_modular_operation_multiple_channels $*
 #@cli rep_modular_operation_multiple_channels: operation,max_channel_value,channel_value(%)...operation_n,max_channel_value_n,channel_value_n
@@ -17083,73 +17901,2065 @@ u "{$1}"\
 "{"$message_out"}"\
 "{0}_"$enable_export\
 "{$1}"
-#@gui Transfer Colors [Reduced Colors]:tcrc,tcrc_preview(0)
-#@gui :_=note("<b>- Notes -</b> \n\nThis filter is used to stimulate pixel art or can be used for testing palettes. If you picked Auto for method of color transfer, that means palettes are automatically generated from images, and depending on your input layer choices, the top could be the reference image or the target image.\n\nWhen using pre-made palettes, the order of layers don't really matter unless you picked image as a reference for palette.In the case that you picked a image as a reference, you must make sure that the image in question is only 1px vertically, and the width is no more than 256 colors."), _=separator()
-#@gui :_=note("<b>Color-mapping Preliminary Setup</b>")
-#@gui :Method of Color Transfer=choice(0,"Auto","Palette")
-#@gui :Palette to Use=choice(10,"BW-{2}","RGB-{3}","B-RGB-{4}","BW-RGB-{5}","CMY-{3}","CMYK-{4}","WCMYK-{5}","RGBCMY-{6}","1-Bit RGB-{8}","Aurora-{256}","Zenit-241","Game Builder Garage: Texture-Sprite Editor Palette-{117}","Duel-{256}","Hocus Pocus-{256}","PLAYPAl-{249}","Sonic Robo Blast 2-{256}","Uzebox-{256}","Andrew Kensler - 16","Andrew Kensler - 32","Andrew Kensler - 54","AAP-Micro 12","AAP-16","AAP-64","AAP-RadiantPLUS-{96}","AAP-SPLENDOR128","AAP-DGA16","Cheerful-32","DB8","DB16","DB32","DB-ISO22","DimWiddy 17","DimWiddy 23","Endesga-4","Endesga-8","Endesga-16","Endesga-32","Endesga-36","Endesga-64","Famicube","Juicy-32","Juicy-56","XAIUE-22","15P-DX","20P-DX","24P-DX","Cabana-64","Fantasy 16","Fantasy 24","Tranquil Fantasy 23","Tranquility Plus 39","Faraway 48","Fleja Master Palette","Koni32","Linear Color Palette Basic","LEGO colors-{43}","Lego Colours 2021-{40}","Vines Flexible Linear Ramps-{38}","Arcade Standard 29","ARQ16","Atom-8","BLK 36","BLK-NEO","Broken Facility-{40}","Bubblegum-16","CPC BOY-{32}","Cade 15","Calder 8","CD-BAC-{16}","CG Arne-{16}","Dinoknight 16","||||-22","FZT Ethereal 16","Indecision-{17}","Island Joy 16","Journey-{64}","Shallowmarsh26","Lago Nenufar [Lake Water Lily]-{19}","Juicy 17","ChocolateGanache-{96}","Bright Winter 1-{74}","Bright Winter 2-{83}","Kawaii16","0xdb-01-{17}","GZXP-{11}","Chromatic16","Piet-{20}","Matrix-{96}","Material Design-{96}","Rainbow A-{88}","Rainbow B-{96}","SCRJ-XXXVI-{36}","Pxls Default-{32}","Moderna-{24}","Oak21-{21}","Nature's Embrace 55","RBYPGO-{94}","New Worlds 46","Nauris-16","Dynamite-{40}","Interstate 28","Downgraded 32","Pear 36","Pineapple 32","Peachy Pop 16","Resurrect 32","Rosy 42","SLSO-CLR17","Softy 15","SPEC12","The Roarin 80s-{8}","Starmancer-{52}","SuperFuture25","SUNSHINE 35","Sweetie 16","Calm 48","Optimism-{32}","Taffy 16","Todayland Palette V2-{25}","TriRampo-{12}","r\place 2022-{32}","Tropical Cone 24","Vivid-17","SHIDO50+-{72}","Intacto14","Itatsi-{23}","ENOS16","Grixel Grotto-{16}","Superb 8","Undertones-17","Tango-{28}","Cheese Palette-{28}","Equpix 15","Zughy 32","Voodo34","Franzston 30","Night 16","Star 29","Star 34","Still-Life-{14}","SimpleJPC-16","Acid 15","Battery 24","Clumpy 18","Cthulhu-{16}","Crimso 11-{16}","Copper-Tech-{16}","DRZ15A-{15}","Eggy 15","Europa 16","GreyT-bit-{8}","Jewel-{15}","Polar 11","Sheltzy 32","Wyrm 24","Yume Nikki-{24}","Rube-Goldberg-{9}","BoomBoom-{7}","Generic-8","Crayola Blind-{9}","Matriax8c","NT1H-{26}","JerryPie 22","Nineties Nine-{9}","On70-{35}","ANB16","Retrocal-8","Punolit-{21}","Luap 40","Autum Villan 6","Autum 15","Autum 15 [Yellow]","Galaxy Flame-{16}","Antiquity16","Mushroom-{14}","Aerugo-{32}","Hotel Paintings 6","Nopal-12","Brightness GPY-{3}","Blessing-{5}","Fairydust 8","Fuzzy Four-{4}","Fairy Tales-{8}","Naji 16","Easter Island-{16}","Pastel and Darks 58","17 Pastels","NOSTALGIA15","Ocaso-{17}","Oh Hell Pastel-{15}","Pollen-8","KULE-16","Hydrangea 11","Fluffy8","ST 8 R&B Remake","Neon Space-{10}","Cyclope6","Sy17","Syz15","TUI-15","Cave-{8}","Psygnosia-{16}","MarshMellow32","Lost Century 24","Finlal 11","Industrial Factory 16","Murder Mystery 16","Fate & Destiny 12","Vinik 24","YKB-22","Halloween-{7}","Graveyard-21","Steam Lords-{16}","Frostical-{18}","DeuteroSpill-{9}","Cool Bone 7","Muted Ally 6","EPHEMERA-{12}","Ink-{5}","Violet Dreams-{8}","Tinyfolks-{5}","Old Gold 7","Rosemoss-8","AAP-RadiantXV-{15}","AAP-Majesty XVII-{17}","Dead Weight-8","Mojave20","Petite-8","Petite-8 Afterdark","XAIUE-Radiant-{22}","Daruda 22","Firestorm-{9}","Borkfest-{8}","Spicy 07","Rust-6","Apricot-{6}","SuperNova 7","Pastry-{5}","Sandy 06","Illumination-{5}","NYX8","Dream Haze 8","OIL6","Regal10","Soft Demon 7","SGM-Palette 2-{17}","Midnight ablaze-{7}","Black Cherry-{5}","Sunset Red-{5}","INKPINK-{6}","Brash Pink-{5}","Pink Neon Sign 6","Enchanted Purple-{12}","Arch-{11}","Spacey Easter-{17}","Fornax Void I-{256}","Fornax Void II-{128}","Pixelwave-{12}","S1-6","Berry Nebula-{8}","ABYSS-9","Moonlight 15","Moonlit-39","H2O-{10}","Magic Waters 9","Bluem0ld-{4}","Moss-{5}","DEEP MAZE-{7}","Toxic Slime-{5}","Lush Green-{6}","Tsunami-{5}","Cryptic Ocean-{6}","Marsh Madness-{5}","OXYD-{8}","Pink&Green-{8}","Walking in the Woods 8","Paper 8","Sahara Pastell-{7}","Sunflower Painting 7","Art Hoe Aesthetic 7","Sky5-{8}","Ocean Glass-{8}","RoyalGuard-{6}","Eulbink-{8}","Winter Wonderland-{8}","Moon Squid 7","Stratus-{5}","Arctic Dust-{5}","CL8UDS","Lilac Skies 5","Sea of Fire-{6}","Autochrome 3","Autochrome 5","GB Default 1-{4}","GB Default 2-{4}","GB Andrade-{4}","GB Blue Seni-{4}","GB Blackzone-{4}","GB Suburb-{4}","GB Crimson-{4}","GB Didi-{4}","GB Dirty-{4}","GB Arne-{4}","GB Easy-{4}","GB Forest-{4}","GB Harsh Green-{4}","GB Light Green-{4}","GB Nostalgia-{4}","GB Platinum-{4}","GB Kirokaze-{4}","GB Cyber-{4}","GB Wish-{4}","GB Grapefruit-{4}","GB Ice Cream-{4}","GB Red_Blue-{4}","Gold GB-{4}","GB Chocolate-{4}","GB Gray-{4}","GB Spacehaze-{4}","GB Purple Dawn-{4}","Moon Crystal-{4}","ARNE4","Autumn Chill-{4}","CherryMelon-{4}","HallowPumpkin-{4}","Hollow-{4}","Lavender4","MAW-{4}","Voltage Warning-{4}","Tritanopia-{4}","Rabbit 7-{4}","Amiga 2600 NTSC-{128}","Amiga 2600 PAL-{108}","Amiga 2600 SECAM-{8}","Amiga 7800 M.E.S.S-{256}","Amiga 7800-{256}","Amstrad CPC-{27}","Apple II-{15}","Atari 8-Bit Series-{256}","CGA-{16}","CGA Mode 0 [Low]-{4}","CGA Mode 0 [High]-{4}","CGA Mode 1 [Low]-{4}","CGA Mode 1 [High]-{4}","CGA Mode 2 [Low]-{4}","CGA Mode 2 [High]-{4}","C64[Pepto]-{16}","C64[Colodore]-{16}","Commodore VIC-20-{16}","Colecovision-{15}","Japanese Machine Palette-{16}","Macintosh II-{16}","Macintosh 8-Bit System-{256}","MSX-{15}","NES-{55}","PICO-8-{16}","RISC OS-{16}","SAM Coupe-{128}","Thomson MO5-{16}","TRS-80 Color Computer Palette-{4}","Virtual Boy interpreted-{4}","VGA-{256}","Win95-{256}","ZX Spectrum-{15}","GNOME 32","Electronic Crayon 22","Chip16","Deluxe Paint-{222}","FlatUI-{20}","MakeCode Arcade Palette-{15}","Oekaki-{20}","Legacy Paint-{16}","XP Paint-{28}","Vista Paint-{28}","Human Faces-{94}","MadjikHSV-{96}","ST24 Christmas","Reds-{24}","Dullish Rainbow-{6}")
-#@gui :Layer to Use=choice(0,"Top Layer","Bottom Layer")
-#@gui :Indexing Style=choice(0,"Regular [No Special Effect]","Noise","Luminance-Indexing","Vertical","Horizontal")
-#@gui :Color Count=int(16,2,256)
-#@gui :Color Dithering (%)=float(50,0,100)
-#@gui :Transfer Color to Target Image?=bool(0)
-#@gui :Alpha Count=int(2,1,256)
-#@gui :Alpha Dithering (%)=float(50,0,100)
-#@gui :Special Effect (%)=float(50,0,100)
-#@gui :_=separator(),_=note("<b>Pixel Ratio and Interpolation</b")
-#@gui :Initial Rescale Method=choice(0,"Disabled","Nearest","Average","Linear","Grid","Bicubic","Lanczos")
-#@gui :Upscale?=bool(0)
-#@gui :Pixel Width=int(2,1,16)
-#@gui :Pixel Height=int(2,1,16)
-#@gui :_=separator(),_=note("<b>Hardware Restriction Stimulation</b>\nWarning: This is computationally intensive!")
-#@gui :Hardware Stimulation?=bool(0)
-#@gui :Hardware Stimulation Precision Factor=int(2,2,32)
-#@gui :_=separator(),_=note("<i>Preliminary Processing Area for Hardware Stimulation</i>")
-#@gui :Hardware Restriction Data Size=choice(2,"By Width","By Height","Specified Width and Height")
-#@gui :Row/Column Thickness=int(1,1,40)
-#@gui :Tile Width=int(16,2,40)
-#@gui :Tile Height=int(16,2,40)
-#@gui :_=separator()_=note("<i>Color Restrictions Information</i>")
-#@gui :Hardware Color Restriction=int(2,2,16)
-#@gui :Hardware Color Mapping=choice(1,"Median Cut","Median Cut and K-Means")
-#@gui :Alpha Precision=int(2,2,32)
-#@gui :Alpha Mapping=choice(1,"Median Cut","Median Cut and K-Means")
-#@gui :_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"),Preview Split=point(50,50,0,0,200,200,200,0,10)_0
-#@gui :_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2019/5/18</i>.</small>")
-tcrc: if $1==0 if $3==1 rv fi repeat $!-1 l[0,{$>+1}] +colormap.. $5,1,1 to_rgb. pal_t[^0] -1,$4,{$6/100},0,$8,{$9/100},{$10/100},$11,$12,$13,$14,$15,$16,{$17==2?$19:($17==0?$18:{w})},{$17==2?$20:($17==0?{h}:$18)},$21,$22,$23,$24 rv done done if $!>2 rv[{$!-1},1] fi if $3==1 rv fi else if $2!=0 repeat $! l[$>]  pal_t {$2-1},$4,{$6/100},$7,$8,{$9/100},{$10/100},$11,$12,$13,$14,$15,$16,{$17==2?$19:($17==0?$18:{w})},{$17==2?$20:($17==0?{h}:$18)},$21,$22,$23,$24 done done else if $3==1 rv fi repeat $!-1 l[0,{$>+1}] [0] pal_t[^0] -1,$4,{$6/100},$7,$8,{$9/100},{$10/100},$11,$12,$13,$14,$15,$16,{$17==2?$19:($17==0?$18:{w})},{$17==2?$20:($17==0?{h}:$18)},$21,$22,$23,$24 done done if $3!=1 rv fi fi fi
-tcrc_preview:
-tcrc $*
-gui_split_preview "tcrc $*",${-3--1}
+#@gui Transfer Color [Reduced Colors]:fx_rep_transfer_color_reduced,fx_rep_transfer_color_reduced_preview(0)*
+#@gui:_=separator(),_=note("<b>Preliminary Setup</b>")
+#@gui:Style of Dithering=choice(0,"Indexing","Ordered")
+#@gui:Dithering (%)=float(95,0,100)
+#@gui:Special Effect=choice(0,"None","Horizontal-D","Vertical-D","Horizontal-L","Vertical-L","Checkerboard-D","Checkerboard-L")
+#@gui:Special Effect Factor (%)=float(50,0,100)
+#@gui:_=separator(),_=note("<b>Palette</b>")
+#@gui:Coloring Method=choice(0,"Premade Palette","Bit Depth/Levels")
+#@gui:Palette Method=choice(0,"Premade","Auto","Import","Custom")
+#@gui:Use Bit Depth=bool(0)
+#@gui:Levels=int(4,1,64)
+#@gui:Red Levels=int(4,1,64)
+#@gui:Green Levels=int(4,1,64)
+#@gui:Blue Levels=int(4,1,64)
+#@gui:Use Same Levels for All Channels=bool(0)
+#@gui:Bit-Depth=int(2,1,8)
+#@gui:Red Bit-Depth=int(2,1,8)
+#@gui:Green Bit-Depth=int(2,1,8)
+#@gui:Blue Bit-Depth=int(2,1,8)
+#@gui:Use Same Bit-Depths for All Channel=bool(0)
+#@gui:Palette to Use=choice(3,"BW-{2}","RGB-{3}","B-RGB-{4}","BW-RGB-{5}","CMY-{3}","CMYK-{4}","WCMYK-{5}","RGBCMY-{6}","1-Bit RGB-{8}","Aurora-{256}","Zenit-241","Game Builder Garage: Texture-Sprite Editor Palette-{117}","Duel-{256}","Hocus Pocus-{256}","PLAYPAl-{249}","Sonic Robo Blast 2-{256}","Uzebox-{256}","Andrew Kensler - 16","Andrew Kensler - 32","Andrew Kensler - 54","AAP-Micro 12","AAP-16","AAP-64","AAP-RadiantPLUS-{96}","AAP-SPLENDOR128","AAP-DGA16","Cheerful-32","DB8","DB16","DB32","DB-ISO22","DimWiddy 17","DimWiddy 23","Endesga-4","Endesga-8","Endesga-16","Endesga-32","Endesga-36","Endesga-64","Famicube","Juicy-32","Juicy-56","XAIUE-22","15P-DX","20P-DX","24P-DX","Cabana-64","Fantasy 16","Fantasy 24","Tranquil Fantasy 23","Tranquility Plus 39","Faraway 48","Fleja Master Palette","Koni32","Linear Color Palette Basic","LEGO colors-{43}","Lego Colours 2021-{40}","Vines Flexible Linear Ramps-{38}","Arcade Standard 29","ARQ16","Atom-8","BLK 36","BLK-NEO","Broken Facility-{40}","Bubblegum-16","CPC BOY-{32}","Cade 15","Calder 8","CD-BAC-{16}","CG Arne-{16}","Dinoknight 16","||||-22","FZT Ethereal 16","Indecision-{17}","Island Joy 16","Journey-{64}","Shallowmarsh26","Lago Nenufar [Lake Water Lily]-{19}","Juicy 17","ChocolateGanache-{96}","Bright Winter 1-{74}","Bright Winter 2-{83}","Kawaii16","0xdb-01-{17}","GZXP-{11}","Chromatic16","Piet-{20}","Matrix-{96}","Material Design-{96}","Rainbow A-{88}","Rainbow B-{96}","SCRJ-XXXVI-{36}","Pxls Default-{32}","Moderna-{24}","Oak21-{21}","Nature's Embrace 55","RBYPGO-{94}","New Worlds 46","Nauris-16","Dynamite-{40}","Interstate 28","Downgraded 32","Pear 36","Pineapple 32","Peachy Pop 16","Resurrect 32","Rosy 42","SLSO-CLR17","Softy 15","SPEC12","The Roarin 80s-{8}","Starmancer-{52}","SuperFuture25","SUNSHINE 35","Sweetie 16","Calm 48","Optimism-{32}","Taffy 16","Todayland Palette V2-{25}","TriRampo-{12}","r\place 2022-{32}","Tropical Cone 24","Vivid-17","SHIDO50+-{72}","Intacto14","Itatsi-{23}","ENOS16","Grixel Grotto-{16}","Superb 8","Undertones-17","Tango-{28}","Cheese Palette-{28}","Equpix 15","Zughy 32","Voodo34","Franzston 30","Night 16","Star 29","Star 34","Still-Life-{14}","SimpleJPC-16","Acid 15","Battery 24","Clumpy 18","Cthulhu-{16}","Crimso 11-{16}","Copper-Tech-{16}","DRZ15A-{15}","Eggy 15","Europa 16","GreyT-bit-{8}","Jewel-{15}","Polar 11","Sheltzy 32","Wyrm 24","Yume Nikki-{24}","Rube-Goldberg-{9}","BoomBoom-{7}","Generic-8","Crayola Blind-{9}","Matriax8c","NT1H-{26}","JerryPie 22","Nineties Nine-{9}","On70-{35}","ANB16","Retrocal-8","Punolit-{21}","Luap 40","Autum Villan 6","Autum 15","Autum 15 [Yellow]","Galaxy Flame-{16}","Antiquity16","Mushroom-{14}","Aerugo-{32}","Hotel Paintings 6","Nopal-12","Brightness GPY-{3}","Blessing-{5}","Fairydust 8","Fuzzy Four-{4}","Fairy Tales-{8}","Naji 16","Easter Island-{16}","Pastel and Darks 58","17 Pastels","NOSTALGIA15","Ocaso-{17}","Oh Hell Pastel-{15}","Pollen-8","KULE-16","Hydrangea 11","Fluffy8","ST 8 R&B Remake","Neon Space-{10}","Cyclope6","Sy17","Syz15","TUI-15","Cave-{8}","Psygnosia-{16}","MarshMellow32","Lost Century 24","Finlal 11","Industrial Factory 16","Murder Mystery 16","Fate & Destiny 12","Vinik 24","YKB-22","Halloween-{7}","Graveyard-21","Steam Lords-{16}","Frostical-{18}","DeuteroSpill-{9}","Cool Bone 7","Muted Ally 6","EPHEMERA-{12}","Ink-{5}","Violet Dreams-{8}","Tinyfolks-{5}","Old Gold 7","Rosemoss-8","AAP-RadiantXV-{15}","AAP-Majesty XVII-{17}","Dead Weight-8","Mojave20","Petite-8","Petite-8 Afterdark","XAIUE-Radiant-{22}","Daruda 22","Firestorm-{9}","Borkfest-{8}","Spicy 07","Rust-6","Apricot-{6}","SuperNova 7","Pastry-{5}","Sandy 06","Illumination-{5}","NYX8","Dream Haze 8","OIL6","Regal10","Soft Demon 7","SGM-Palette 2-{17}","Midnight ablaze-{7}","Black Cherry-{5}","Sunset Red-{5}","INKPINK-{6}","Brash Pink-{5}","Pink Neon Sign 6","Enchanted Purple-{12}","Arch-{11}","Spacey Easter-{17}","Fornax Void I-{256}","Fornax Void II-{128}","Pixelwave-{12}","S1-6","Berry Nebula-{8}","ABYSS-9","Moonlight 15","Moonlit-39","H2O-{10}","Magic Waters 9","Bluem0ld-{4}","Moss-{5}","DEEP MAZE-{7}","Toxic Slime-{5}","Lush Green-{6}","Tsunami-{5}","Cryptic Ocean-{6}","Marsh Madness-{5}","OXYD-{8}","Pink&Green-{8}","Walking in the Woods 8","Paper 8","Sahara Pastell-{7}","Sunflower Painting 7","Art Hoe Aesthetic 7","Sky5-{8}","Ocean Glass-{8}","RoyalGuard-{6}","Eulbink-{8}","Winter Wonderland-{8}","Moon Squid 7","Stratus-{5}","Arctic Dust-{5}","CL8UDS","Lilac Skies 5","Sea of Fire-{6}","Autochrome 3","Autochrome 5","GB Default 1-{4}","GB Default 2-{4}","GB Andrade-{4}","GB Blue Seni-{4}","GB Blackzone-{4}","GB Suburb-{4}","GB Crimson-{4}","GB Didi-{4}","GB Dirty-{4}","GB Arne-{4}","GB Easy-{4}","GB Forest-{4}","GB Harsh Green-{4}","GB Light Green-{4}","GB Nostalgia-{4}","GB Platinum-{4}","GB Kirokaze-{4}","GB Cyber-{4}","GB Wish-{4}","GB Grapefruit-{4}","GB Ice Cream-{4}","GB Red_Blue-{4}","Gold GB-{4}","GB Chocolate-{4}","GB Gray-{4}","GB Spacehaze-{4}","GB Purple Dawn-{4}","Moon Crystal-{4}","ARNE4","Autumn Chill-{4}","CherryMelon-{4}","HallowPumpkin-{4}","Hollow-{4}","Lavender4","MAW-{4}","Voltage Warning-{4}","Tritanopia-{4}","Rabbit 7-{4}","Amiga 2600 NTSC-{128}","Amiga 2600 PAL-{108}","Amiga 2600 SECAM-{8}","Amiga 7800 M.E.S.S-{256}","Amiga 7800-{256}","Amstrad CPC-{27}","Apple II-{15}","Atari 8-Bit Series-{256}","CGA-{16}","CGA Mode 0 [Low]-{4}","CGA Mode 0 [High]-{4}","CGA Mode 1 [Low]-{4}","CGA Mode 1 [High]-{4}","CGA Mode 2 [Low]-{4}","CGA Mode 2 [High]-{4}","C64[Pepto]-{16}","C64[Colodore]-{16}","Commodore VIC-20-{16}","Colecovision-{15}","Japanese Machine Palette-{16}","Macintosh II-{16}","Macintosh 8-Bit System-{256}","MSX-{15}","NES-{55}","PICO-8-{16}","RISC OS-{16}","SAM Coupe-{128}","Thomson MO5-{16}","TRS-80 Color Computer Palette-{4}","Virtual Boy interpreted-{4}","VGA-{256}","Win95-{256}","ZX Spectrum-{15}","GNOME 32","Electronic Crayon 22","Chip16","Deluxe Paint-{222}","FlatUI-{20}","MakeCode Arcade Palette-{15}","Oekaki-{20}","Legacy Paint-{16}","XP Paint-{28}","Vista Paint-{28}","Human Faces-{94}","MadjikHSV-{96}","ST24 Christmas","Reds-{24}","Dullish Rainbow-{6}")
+#@gui:Send to Custom Palette=button()
+#@gui:Palette File Location=file()
+#@gui:Re-Import File‎‎=button()
+#@gui:Number of Color=int(8,2,256)
+#@gui:Number of Color=int(8,2,256)
+#@gui:Color Restriction Per Whole Image=int(0,0,256)
+#@gui:Color Restriction Per Window=int(0,0,16)
+#@gui:Display Custom Palette Colors=bool(1)
+#@gui:Multi-Select Palette Color=bool(0)
+#@gui:_=separator()
+#@gui:Delete All Selected Palette=button(0)
+#@gui:_=separator()
+#@gui:Palette Color 1=color(247,244,191)
+#@gui:‎  ‎  ‎  ‎  Delete Color 1‎  ‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 1 Selected=_bool(0)
+#@gui:Palette Color 2=color(255,240,43)
+#@gui:‎  ‎  ‎  ‎  Delete Color 2‎  ‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 2 Selected=_bool(0)
+#@gui:Palette Color 3=color(255,207,5)
+#@gui:‎  ‎  ‎  ‎  Delete Color 3‎  ‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 3 Selected=_bool(0)
+#@gui:Palette Color 4=color(255,177,8)
+#@gui:‎  ‎  ‎  ‎  Delete Color 4‎  ‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 4 Selected=_bool(0)
+#@gui:Palette Color 5=color(233,134,39)
+#@gui:‎  ‎  ‎  ‎  Delete Color 5‎  ‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 5 Selected=_bool(0)
+#@gui:Palette Color 6=color(191,90,62)
+#@gui:‎  ‎  ‎  ‎  Delete Color 6‎  ‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 6 Selected=_bool(0)
+#@gui:Palette Color 7=color(156,51,39)
+#@gui:‎  ‎  ‎  ‎  Delete Color 7‎  ‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 7 Selected=_bool(0)
+#@gui:Palette Color 8=color(114,28,3)
+#@gui:‎  ‎  ‎  ‎  Delete Color 8‎  ‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 8 Selected=_bool(0)
+#@gui:Palette Color 9=color(255,226,207)
+#@gui:‎  ‎  ‎  ‎  Delete Color 9‎  ‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 9 Selected=_bool(0)
+#@gui:Palette Color 10=color(212,174,170)
+#@gui:‎  ‎  ‎  ‎  Delete Color 10‎  ‎  ‎  ‎ ‎=button(0)
+#@gui:Color 10 Selected=_bool(0)
+#@gui:Palette Color 11=color(181,139,148)
+#@gui:‎  ‎  ‎  ‎ Delete Color 11‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 11 Selected=_bool(0)
+#@gui:Palette Color 12=color(173,121,132)
+#@gui:‎  ‎  ‎  ‎ Delete Color 12‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 12 Selected=_bool(0)
+#@gui:Palette Color 13=color(145,96,106)
+#@gui:‎  ‎  ‎  ‎ Delete Color 13‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 13 Selected=_bool(0)
+#@gui:Palette Color 14=color(119,83,91)
+#@gui:‎  ‎  ‎  ‎ Delete Color 14‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 14 Selected=_bool(0)
+#@gui:Palette Color 15=color(94,65,74)
+#@gui:‎  ‎  ‎  ‎ Delete Color 15‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 15 Selected=_bool(0)
+#@gui:Palette Color 16=color(73,33,41)
+#@gui:‎  ‎  ‎  ‎ Delete Color 16‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 16 Selected=_bool(0)
+#@gui:Palette Color 17=color(131,147,195)
+#@gui:‎  ‎  ‎  ‎ Delete Color 17‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 17 Selected=_bool(0)
+#@gui:Palette Color 18=color(108,130,196)
+#@gui:‎  ‎  ‎  ‎ Delete Color 18‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 18 Selected=_bool(0)
+#@gui:Palette Color 19=color(82,116,197)
+#@gui:‎  ‎  ‎  ‎ Delete Color 19‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 19 Selected=_bool(0)
+#@gui:Palette Color 20=color(81,101,174)
+#@gui:‎  ‎  ‎  ‎ Delete Color 20‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 20 Selected=_bool(0)
+#@gui:Palette Color 21=color(61,80,131)
+#@gui:‎  ‎  ‎  ‎ Delete Color 21‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 21 Selected=_bool(0)
+#@gui:Palette Color 22=color(45,61,114)
+#@gui:‎  ‎  ‎  ‎ Delete Color 22‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 22 Selected=_bool(0)
+#@gui:Palette Color 23=color(40,51,93)
+#@gui:‎  ‎  ‎  ‎ Delete Color 23‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 23 Selected=_bool(0)
+#@gui:Palette Color 24=color(38,36,80)
+#@gui:‎  ‎  ‎  ‎ Delete Color 24‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 24 Selected=_bool(0)
+#@gui:Palette Color 25=color(209,189,254)
+#@gui:‎  ‎  ‎  ‎ Delete Color 25‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 25 Selected=_bool(0)
+#@gui:Palette Color 26=color(186,171,247)
+#@gui:‎  ‎  ‎  ‎ Delete Color 26‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 26 Selected=_bool(0)
+#@gui:Palette Color 27=color(169,150,236)
+#@gui:‎  ‎  ‎  ‎ Delete Color 27‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 27 Selected=_bool(0)
+#@gui:Palette Color 28=color(149,133,241)
+#@gui:‎  ‎  ‎  ‎ Delete Color 28‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 28 Selected=_bool(0)
+#@gui:Palette Color 29=color(121,100,186)
+#@gui:‎  ‎  ‎  ‎ Delete Color 29‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 29 Selected=_bool(0)
+#@gui:Palette Color 30=color(88,74,127)
+#@gui:‎  ‎  ‎  ‎ Delete Color 30‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 30 Selected=_bool(0)
+#@gui:Palette Color 31=color(60,49,81)
+#@gui:‎  ‎  ‎  ‎ Delete Color 31‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 31 Selected=_bool(0)
+#@gui:Palette Color 32=color(29,29,33)
+#@gui:‎  ‎  ‎  ‎ Delete Color 32‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 32 Selected=_bool(0)
+#@gui:Palette Color 33=color(253,247,134)
+#@gui:‎  ‎  ‎  ‎ Delete Color 33‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 33 Selected=_bool(0)
+#@gui:Palette Color 34=color(255,213,155)
+#@gui:‎  ‎  ‎  ‎ Delete Color 34‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 34 Selected=_bool(0)
+#@gui:Palette Color 35=color(235,189,157)
+#@gui:‎  ‎  ‎  ‎ Delete Color 35‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 35 Selected=_bool(0)
+#@gui:Palette Color 36=color(213,163,154)
+#@gui:‎  ‎  ‎  ‎ Delete Color 36‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 36 Selected=_bool(0)
+#@gui:Palette Color 37=color(185,140,147)
+#@gui:‎  ‎  ‎  ‎ Delete Color 37‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 37 Selected=_bool(0)
+#@gui:Palette Color 38=color(151,116,136)
+#@gui:‎  ‎  ‎  ‎ Delete Color 38‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 38 Selected=_bool(0)
+#@gui:Palette Color 39=color(118,93,115)
+#@gui:‎  ‎  ‎  ‎ Delete Color 39‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 39 Selected=_bool(0)
+#@gui:Palette Color 40=color(85,71,105)
+#@gui:‎  ‎  ‎  ‎ Delete Color 40‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 40 Selected=_bool(0)
+#@gui:Palette Color 41=color(109,204,255)
+#@gui:‎  ‎  ‎  ‎ Delete Color 41‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 41 Selected=_bool(0)
+#@gui:Palette Color 42=color(85,177,241)
+#@gui:‎  ‎  ‎  ‎ Delete Color 42‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 42 Selected=_bool(0)
+#@gui:Palette Color 43=color(64,151,234)
+#@gui:‎  ‎  ‎  ‎ Delete Color 43‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 43 Selected=_bool(0)
+#@gui:Palette Color 44=color(20,118,192)
+#@gui:‎  ‎  ‎  ‎ Delete Color 44‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 44 Selected=_bool(0)
+#@gui:Palette Color 45=color(16,93,162)
+#@gui:‎  ‎  ‎  ‎ Delete Color 45‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 45 Selected=_bool(0)
+#@gui:Palette Color 46=color(7,72,124)
+#@gui:‎  ‎  ‎  ‎ Delete Color 46‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 46 Selected=_bool(0)
+#@gui:Palette Color 47=color(3,49,95)
+#@gui:‎  ‎  ‎  ‎ Delete Color 47‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 47 Selected=_bool(0)
+#@gui:Palette Color 48=color(0,27,64)
+#@gui:‎  ‎  ‎  ‎ Delete Color 48‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 48 Selected=_bool(0)
+#@gui:Palette Color 49=color(224,250,235)
+#@gui:‎  ‎  ‎  ‎ Delete Color 49‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 49 Selected=_bool(0)
+#@gui:Palette Color 50=color(169,209,193)
+#@gui:‎  ‎  ‎  ‎ Delete Color 50‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 50 Selected=_bool(0)
+#@gui:Palette Color 51=color(138,193,150)
+#@gui:‎  ‎  ‎  ‎ Delete Color 51‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 51 Selected=_bool(0)
+#@gui:Palette Color 52=color(135,174,142)
+#@gui:‎  ‎  ‎  ‎ Delete Color 52‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 52 Selected=_bool(0)
+#@gui:Palette Color 53=color(113,149,125)
+#@gui:‎  ‎  ‎  ‎ Delete Color 53‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 53 Selected=_bool(0)
+#@gui:Palette Color 54=color(91,123,105)
+#@gui:‎  ‎  ‎  ‎ Delete Color 54‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 54 Selected=_bool(0)
+#@gui:Palette Color 55=color(71,101,90)
+#@gui:‎  ‎  ‎  ‎ Delete Color 55‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 55 Selected=_bool(0)
+#@gui:Palette Color 56=color(45,75,71)
+#@gui:‎  ‎  ‎  ‎ Delete Color 56‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 56 Selected=_bool(0)
+#@gui:Palette Color 57=color(244,163,128)
+#@gui:‎  ‎  ‎  ‎ Delete Color 57‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 57 Selected=_bool(0)
+#@gui:Palette Color 58=color(215,147,116)
+#@gui:‎  ‎  ‎  ‎ Delete Color 58‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 58 Selected=_bool(0)
+#@gui:Palette Color 59=color(191,126,99)
+#@gui:‎  ‎  ‎  ‎ Delete Color 59‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 59 Selected=_bool(0)
+#@gui:Palette Color 60=color(169,109,88)
+#@gui:‎  ‎  ‎  ‎ Delete Color 60‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 60 Selected=_bool(0)
+#@gui:Palette Color 61=color(148,93,79)
+#@gui:‎  ‎  ‎  ‎ Delete Color 61‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 61 Selected=_bool(0)
+#@gui:Palette Color 62=color(120,76,73)
+#@gui:‎  ‎  ‎  ‎ Delete Color 62‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 62 Selected=_bool(0)
+#@gui:Palette Color 63=color(83,57,58)
+#@gui:‎  ‎  ‎  ‎ Delete Color 63‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 63 Selected=_bool(0)
+#@gui:Palette Color 64=color(55,36,35)
+#@gui:‎  ‎  ‎  ‎ Delete Color 64‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 64 Selected=_bool(0)
+#@gui:Palette Color 65=color(127,189,57)
+#@gui:‎  ‎  ‎  ‎ Delete Color 65‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 65 Selected=_bool(0)
+#@gui:Palette Color 66=color(120,158,36)
+#@gui:‎  ‎  ‎  ‎ Delete Color 66‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 66 Selected=_bool(0)
+#@gui:Palette Color 67=color(107,132,45)
+#@gui:‎  ‎  ‎  ‎ Delete Color 67‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 67 Selected=_bool(0)
+#@gui:Palette Color 68=color(88,113,44)
+#@gui:‎  ‎  ‎  ‎ Delete Color 68‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 68 Selected=_bool(0)
+#@gui:Palette Color 69=color(76,95,51)
+#@gui:‎  ‎  ‎  ‎ Delete Color 69‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 69 Selected=_bool(0)
+#@gui:Palette Color 70=color(57,77,60)
+#@gui:‎  ‎  ‎  ‎ Delete Color 70‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 70 Selected=_bool(0)
+#@gui:Palette Color 71=color(46,61,71)
+#@gui:‎  ‎  ‎  ‎ Delete Color 71‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 71 Selected=_bool(0)
+#@gui:Palette Color 72=color(29,44,67)
+#@gui:‎  ‎  ‎  ‎ Delete Color 72‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 72 Selected=_bool(0)
+#@gui:Palette Color 73=color(254,223,177)
+#@gui:‎  ‎  ‎  ‎ Delete Color 73‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 73 Selected=_bool(0)
+#@gui:Palette Color 74=color(207,175,142)
+#@gui:‎  ‎  ‎  ‎ Delete Color 74‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 74 Selected=_bool(0)
+#@gui:Palette Color 75=color(179,151,131)
+#@gui:‎  ‎  ‎  ‎ Delete Color 75‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 75 Selected=_bool(0)
+#@gui:Palette Color 76=color(145,122,123)
+#@gui:‎  ‎  ‎  ‎ Delete Color 76‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 76 Selected=_bool(0)
+#@gui:Palette Color 77=color(117,104,110)
+#@gui:‎  ‎  ‎  ‎ Delete Color 77‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 77 Selected=_bool(0)
+#@gui:Palette Color 78=color(86,80,111)
+#@gui:‎  ‎  ‎  ‎ Delete Color 78‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 78 Selected=_bool(0)
+#@gui:Palette Color 79=color(59,56,85)
+#@gui:‎  ‎  ‎  ‎ Delete Color 79‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 79 Selected=_bool(0)
+#@gui:Palette Color 80=color(38,35,61)
+#@gui:‎  ‎  ‎  ‎ Delete Color 80‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 80 Selected=_bool(0)
+#@gui:Palette Color 81=color(255,246,79)
+#@gui:‎  ‎  ‎  ‎ Delete Color 81‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 81 Selected=_bool(0)
+#@gui:Palette Color 82=color(232,210,75)
+#@gui:‎  ‎  ‎  ‎ Delete Color 82‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 82 Selected=_bool(0)
+#@gui:Palette Color 83=color(209,170,57)
+#@gui:‎  ‎  ‎  ‎ Delete Color 83‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 83 Selected=_bool(0)
+#@gui:Palette Color 84=color(186,136,46)
+#@gui:‎  ‎  ‎  ‎ Delete Color 84‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 84 Selected=_bool(0)
+#@gui:Palette Color 85=color(158,101,32)
+#@gui:‎  ‎  ‎  ‎ Delete Color 85‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 85 Selected=_bool(0)
+#@gui:Palette Color 86=color(133,79,18)
+#@gui:‎  ‎  ‎  ‎ Delete Color 86‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 86 Selected=_bool(0)
+#@gui:Palette Color 87=color(117,59,9)
+#@gui:‎  ‎  ‎  ‎ Delete Color 87‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 87 Selected=_bool(0)
+#@gui:Palette Color 88=color(98,42,0)
+#@gui:‎  ‎  ‎  ‎ Delete Color 88‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 88 Selected=_bool(0)
+#@gui:Palette Color 89=color(208,204,50)
+#@gui:‎  ‎  ‎  ‎ Delete Color 89‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 89 Selected=_bool(0)
+#@gui:Palette Color 90=color(180,170,51)
+#@gui:‎  ‎  ‎  ‎ Delete Color 90‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 90 Selected=_bool(0)
+#@gui:Palette Color 91=color(150,154,38)
+#@gui:‎  ‎  ‎  ‎ Delete Color 91‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 91 Selected=_bool(0)
+#@gui:Palette Color 92=color(124,131,30)
+#@gui:‎  ‎  ‎  ‎ Delete Color 92‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 92 Selected=_bool(0)
+#@gui:Palette Color 93=color(97,115,8)
+#@gui:‎  ‎  ‎  ‎ Delete Color 93‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 93 Selected=_bool(0)
+#@gui:Palette Color 94=color(73,93,0)
+#@gui:‎  ‎  ‎  ‎ Delete Color 94‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 94 Selected=_bool(0)
+#@gui:Palette Color 95=color(47,79,8)
+#@gui:‎  ‎  ‎  ‎ Delete Color 95‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 95 Selected=_bool(0)
+#@gui:Palette Color 96=color(32,41,0)
+#@gui:‎  ‎  ‎  ‎ Delete Color 96‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 96 Selected=_bool(0)
+#@gui:Palette Color 97=color(229,154,124)
+#@gui:‎  ‎  ‎  ‎ Delete Color 97‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 97 Selected=_bool(0)
+#@gui:Palette Color 98=color(210,141,122)
+#@gui:‎  ‎  ‎  ‎ Delete Color 98‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 98 Selected=_bool(0)
+#@gui:Palette Color 99=color(193,126,122)
+#@gui:‎  ‎  ‎  ‎ Delete Color 99‎  ‎  ‎  ‎  ‎=button(0)
+#@gui:Color 99 Selected=_bool(0)
+#@gui:Palette Color 100=color(172,111,110)
+#@gui:‎  ‎  ‎  ‎ Delete Color 100‎  ‎  ‎  ‎‎=button(0)
+#@gui:Color 100 Selected=_bool(0)
+#@gui:Palette Color 101=color(152,89,90)
+#@gui:‎  ‎  ‎  ‎Delete Color 101‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 101 Selected=_bool(0)
+#@gui:Palette Color 102=color(124,75,71)
+#@gui:‎  ‎  ‎  ‎Delete Color 102‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 102 Selected=_bool(0)
+#@gui:Palette Color 103=color(99,52,50)
+#@gui:‎  ‎  ‎  ‎Delete Color 103‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 103 Selected=_bool(0)
+#@gui:Palette Color 104=color(73,37,28)
+#@gui:‎  ‎  ‎  ‎Delete Color 104‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 104 Selected=_bool(0)
+#@gui:Palette Color 105=color(255,205,255)
+#@gui:‎  ‎  ‎  ‎Delete Color 105‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 105 Selected=_bool(0)
+#@gui:Palette Color 106=color(255,166,197)
+#@gui:‎  ‎  ‎  ‎Delete Color 106‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 106 Selected=_bool(0)
+#@gui:Palette Color 107=color(255,125,175)
+#@gui:‎  ‎  ‎  ‎Delete Color 107‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 107 Selected=_bool(0)
+#@gui:Palette Color 108=color(248,93,128)
+#@gui:‎  ‎  ‎  ‎Delete Color 108‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 108 Selected=_bool(0)
+#@gui:Palette Color 109=color(217,74,105)
+#@gui:‎  ‎  ‎  ‎Delete Color 109‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 109 Selected=_bool(0)
+#@gui:Palette Color 110=color(159,59,82)
+#@gui:‎  ‎  ‎  ‎Delete Color 110‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 110 Selected=_bool(0)
+#@gui:Palette Color 111=color(113,43,59)
+#@gui:‎  ‎  ‎  ‎Delete Color 111‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 111 Selected=_bool(0)
+#@gui:Palette Color 112=color(67,23,41)
+#@gui:‎  ‎  ‎  ‎Delete Color 112‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 112 Selected=_bool(0)
+#@gui:Palette Color 113=color(220,212,255)
+#@gui:‎  ‎  ‎  ‎Delete Color 113‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 113 Selected=_bool(0)
+#@gui:Palette Color 114=color(184,174,255)
+#@gui:‎  ‎  ‎  ‎Delete Color 114‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 114 Selected=_bool(0)
+#@gui:Palette Color 115=color(156,155,239)
+#@gui:‎  ‎  ‎  ‎Delete Color 115‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 115 Selected=_bool(0)
+#@gui:Palette Color 116=color(142,140,226)
+#@gui:‎  ‎  ‎  ‎Delete Color 116‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 116 Selected=_bool(0)
+#@gui:Palette Color 117=color(120,119,193)
+#@gui:‎  ‎  ‎  ‎Delete Color 117‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 117 Selected=_bool(0)
+#@gui:Palette Color 118=color(100,101,157)
+#@gui:‎  ‎  ‎  ‎Delete Color 118‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 118 Selected=_bool(0)
+#@gui:Palette Color 119=color(74,82,128)
+#@gui:‎  ‎  ‎  ‎Delete Color 119‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 119 Selected=_bool(0)
+#@gui:Palette Color 120=color(50,53,88)
+#@gui:‎  ‎  ‎  ‎Delete Color 120‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 120 Selected=_bool(0)
+#@gui:Palette Color 121=color(237,212,147)
+#@gui:‎  ‎  ‎  ‎Delete Color 121‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 121 Selected=_bool(0)
+#@gui:Palette Color 122=color(237,182,124)
+#@gui:‎  ‎  ‎  ‎Delete Color 122‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 122 Selected=_bool(0)
+#@gui:Palette Color 123=color(206,151,112)
+#@gui:‎  ‎  ‎  ‎Delete Color 123‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 123 Selected=_bool(0)
+#@gui:Palette Color 124=color(189,125,100)
+#@gui:‎  ‎  ‎  ‎Delete Color 124‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 124 Selected=_bool(0)
+#@gui:Palette Color 125=color(167,96,87)
+#@gui:‎  ‎  ‎  ‎Delete Color 125‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 125 Selected=_bool(0)
+#@gui:Palette Color 126=color(144,70,71)
+#@gui:‎  ‎  ‎  ‎Delete Color 126‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 126 Selected=_bool(0)
+#@gui:Palette Color 127=color(110,36,52)
+#@gui:‎  ‎  ‎  ‎Delete Color 127‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 127 Selected=_bool(0)
+#@gui:Palette Color 128=color(95,9,38)
+#@gui:‎  ‎  ‎  ‎Delete Color 128‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 128 Selected=_bool(0)
+#@gui:Palette Color 129=color(251,234,163)
+#@gui:‎  ‎  ‎  ‎Delete Color 129‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 129 Selected=_bool(0)
+#@gui:Palette Color 130=color(232,203,130)
+#@gui:‎  ‎  ‎  ‎Delete Color 130‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 130 Selected=_bool(0)
+#@gui:Palette Color 131=color(204,169,110)
+#@gui:‎  ‎  ‎  ‎Delete Color 131‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 131 Selected=_bool(0)
+#@gui:Palette Color 132=color(178,144,98)
+#@gui:‎  ‎  ‎  ‎Delete Color 132‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 132 Selected=_bool(0)
+#@gui:Palette Color 133=color(153,121,81)
+#@gui:‎  ‎  ‎  ‎Delete Color 133‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 133 Selected=_bool(0)
+#@gui:Palette Color 134=color(126,97,68)
+#@gui:‎  ‎  ‎  ‎Delete Color 134‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 134 Selected=_bool(0)
+#@gui:Palette Color 135=color(97,74,60)
+#@gui:‎  ‎  ‎  ‎Delete Color 135‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 135 Selected=_bool(0)
+#@gui:Palette Color 136=color(69,49,37)
+#@gui:‎  ‎  ‎  ‎Delete Color 136‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 136 Selected=_bool(0)
+#@gui:Palette Color 137=color(0,222,218)
+#@gui:‎  ‎  ‎  ‎Delete Color 137‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 137 Selected=_bool(0)
+#@gui:Palette Color 138=color(0,191,163)
+#@gui:‎  ‎  ‎  ‎Delete Color 138‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 138 Selected=_bool(0)
+#@gui:Palette Color 139=color(0,160,135)
+#@gui:‎  ‎  ‎  ‎Delete Color 139‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 139 Selected=_bool(0)
+#@gui:Palette Color 140=color(0,130,121)
+#@gui:‎  ‎  ‎  ‎Delete Color 140‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 140 Selected=_bool(0)
+#@gui:Palette Color 141=color(0,107,109)
+#@gui:‎  ‎  ‎  ‎Delete Color 141‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 141 Selected=_bool(0)
+#@gui:Palette Color 142=color(0,81,98)
+#@gui:‎  ‎  ‎  ‎Delete Color 142‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 142 Selected=_bool(0)
+#@gui:Palette Color 143=color(0,64,81)
+#@gui:‎  ‎  ‎  ‎Delete Color 143‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 143 Selected=_bool(0)
+#@gui:Palette Color 144=color(0,46,73)
+#@gui:‎  ‎  ‎  ‎Delete Color 144‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 144 Selected=_bool(0)
+#@gui:Palette Color 145=color(248,198,218)
+#@gui:‎  ‎  ‎  ‎Delete Color 145‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 145 Selected=_bool(0)
+#@gui:Palette Color 146=color(219,153,191)
+#@gui:‎  ‎  ‎  ‎Delete Color 146‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 146 Selected=_bool(0)
+#@gui:Palette Color 147=color(193,120,170)
+#@gui:‎  ‎  ‎  ‎Delete Color 147‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 147Selected=_bool(0)
+#@gui:Palette Color 148=color(185,109,145)
+#@gui:‎  ‎  ‎  ‎Delete Color 148‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 148 Selected=_bool(0)
+#@gui:Palette Color 149=color(151,84,117)
+#@gui:‎  ‎  ‎  ‎Delete Color 149‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 149 Selected=_bool(0)
+#@gui:Palette Color 150=color(102,54,89)
+#@gui:‎  ‎  ‎  ‎Delete Color 150‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 150 Selected=_bool(0)
+#@gui:Palette Color 151=color(73,40,61)
+#@gui:‎  ‎  ‎  ‎Delete Color 151‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 151 Selected=_bool(0)
+#@gui:Palette Color 152=color(46,16,38)
+#@gui:‎  ‎  ‎  ‎Delete Color 152‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 152 Selected=_bool(0)
+#@gui:Palette Color 153=color(221,191,154)
+#@gui:‎  ‎  ‎  ‎Delete Color 153‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 153 Selected=_bool(0)
+#@gui:Palette Color 154=color(192,165,136)
+#@gui:‎  ‎  ‎  ‎Delete Color 154‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 154 Selected=_bool(0)
+#@gui:Palette Color 155=color(158,138,110)
+#@gui:‎  ‎  ‎  ‎Delete Color 155‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 155 Selected=_bool(0)
+#@gui:Palette Color 156=color(126,108,84)
+#@gui:‎  ‎  ‎  ‎Delete Color 156‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 156 Selected=_bool(0)
+#@gui:Palette Color 157=color(114,90,81)
+#@gui:‎  ‎  ‎  ‎Delete Color 157‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 157 Selected=_bool(0)
+#@gui:Palette Color 158=color(94,70,70)
+#@gui:‎  ‎  ‎  ‎Delete Color 158‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 158 Selected=_bool(0)
+#@gui:Palette Color 159=color(74,53,60)
+#@gui:‎  ‎  ‎  ‎Delete Color 159‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 159 Selected=_bool(0)
+#@gui:Palette Color 160=color(49,34,42)
+#@gui:‎  ‎  ‎  ‎Delete Color 160‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 160 Selected=_bool(0)
+#@gui:Palette Color 161=color(255,250,171)
+#@gui:‎  ‎  ‎  ‎Delete Color 161‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 161 Selected=_bool(0)
+#@gui:Palette Color 162=color(236,197,129)
+#@gui:‎  ‎  ‎  ‎Delete Color 162‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 162 Selected=_bool(0)
+#@gui:Palette Color 163=color(216,159,117)
+#@gui:‎  ‎  ‎  ‎Delete Color 163‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 163 Selected=_bool(0)
+#@gui:Palette Color 164=color(199,130,108)
+#@gui:‎  ‎  ‎  ‎Delete Color 164‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 164 Selected=_bool(0)
+#@gui:Palette Color 165=color(174,107,96)
+#@gui:‎  ‎  ‎  ‎Delete Color 165‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 165 Selected=_bool(0)
+#@gui:Palette Color 166=color(138,82,88)
+#@gui:‎  ‎  ‎  ‎Delete Color 166‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 166 Selected=_bool(0)
+#@gui:Palette Color 167=color(90,60,69)
+#@gui:‎  ‎  ‎  ‎Delete Color 167‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 167 Selected=_bool(0)
+#@gui:Palette Color 168=color(59,48,60)
+#@gui:‎  ‎  ‎  ‎Delete Color 168‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 168 Selected=_bool(0)
+#@gui:Palette Color 169=color(235,240,246)
+#@gui:‎  ‎  ‎  ‎Delete Color 169‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 169 Selected=_bool(0)
+#@gui:Palette Color 170=color(186,199,219)
+#@gui:‎  ‎  ‎  ‎Delete Color 170‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 170 Selected=_bool(0)
+#@gui:Palette Color 171=color(171,174,190)
+#@gui:‎  ‎  ‎  ‎Delete Color 171‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 171 Selected=_bool(0)
+#@gui:Palette Color 172=color(132,135,149)
+#@gui:‎  ‎  ‎  ‎Delete Color 172‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 172 Selected=_bool(0)
+#@gui:Palette Color 173=color(115,115,127)
+#@gui:‎  ‎  ‎  ‎Delete Color 173‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 173 Selected=_bool(0)
+#@gui:Palette Color 174=color(91,92,105)
+#@gui:‎  ‎  ‎  ‎Delete Color 174‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 174 Selected=_bool(0)
+#@gui:Palette Color 175=color(72,71,77)
+#@gui:‎  ‎  ‎  ‎Delete Color 175‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 175 Selected=_bool(0)
+#@gui:Palette Color 176=color(45,49,54)
+#@gui:‎  ‎  ‎  ‎Delete Color 176‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 176 Selected=_bool(0)
+#@gui:Palette Color 177=color(255,219,255)
+#@gui:‎  ‎  ‎  ‎Delete Color 177‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 177 Selected=_bool(0)
+#@gui:Palette Color 178=color(255,187,199)
+#@gui:‎  ‎  ‎  ‎Delete Color 178‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 178 Selected=_bool(0)
+#@gui:Palette Color 179=color(255,155,168)
+#@gui:‎  ‎  ‎  ‎Delete Color 179‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 179 Selected=_bool(0)
+#@gui:Palette Color 180=color(255,118,118)
+#@gui:‎  ‎  ‎  ‎Delete Color 180‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 180 Selected=_bool(0)
+#@gui:Palette Color 181=color(228,92,95)
+#@gui:‎  ‎  ‎  ‎Delete Color 181‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 181 Selected=_bool(0)
+#@gui:Palette Color 182=color(182,60,53)
+#@gui:‎  ‎  ‎  ‎Delete Color 182‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 182 Selected=_bool(0)
+#@gui:Palette Color 183=color(130,33,29)
+#@gui:‎  ‎  ‎  ‎Delete Color 183‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 183 Selected=_bool(0)
+#@gui:Palette Color 184=color(94,7,17)
+#@gui:‎  ‎  ‎  ‎Delete Color 184‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 184 Selected=_bool(0)
+#@gui:Palette Color 185=color(145,218,161)
+#@gui:‎  ‎  ‎  ‎Delete Color 185‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 185 Selected=_bool(0)
+#@gui:Palette Color 186=color(85,182,125)
+#@gui:‎  ‎  ‎  ‎Delete Color 186‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 186 Selected=_bool(0)
+#@gui:Palette Color 187=color(73,137,96)
+#@gui:‎  ‎  ‎  ‎Delete Color 187‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 187 Selected=_bool(0)
+#@gui:Palette Color 188=color(65,116,85)
+#@gui:‎  ‎  ‎  ‎Delete Color 188‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 188 Selected=_bool(0)
+#@gui:Palette Color 189=color(50,92,64)
+#@gui:‎  ‎  ‎  ‎Delete Color 189‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 189 Selected=_bool(0)
+#@gui:Palette Color 190=color(56,81,64)
+#@gui:‎  ‎  ‎  ‎Delete Color 190‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 190 Selected=_bool(0)
+#@gui:Palette Color 191=color(47,63,56)
+#@gui:‎  ‎  ‎  ‎Delete Color 191‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 191 Selected=_bool(0)
+#@gui:Palette Color 192=color(26,51,44)
+#@gui:‎  ‎  ‎  ‎Delete Color 192‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 192 Selected=_bool(0)
+#@gui:Palette Color 193=color(116,245,253)
+#@gui:‎  ‎  ‎  ‎Delete Color 193‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 193 Selected=_bool(0)
+#@gui:Palette Color 194=color(82,210,255)
+#@gui:‎  ‎  ‎  ‎Delete Color 194‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 194 Selected=_bool(0)
+#@gui:Palette Color 195=color(65,178,227)
+#@gui:‎  ‎  ‎  ‎Delete Color 195‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 195 Selected=_bool(0)
+#@gui:Palette Color 196=color(49,142,184)
+#@gui:‎  ‎  ‎  ‎Delete Color 196‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 196 Selected=_bool(0)
+#@gui:Palette Color 197=color(54,107,138)
+#@gui:‎  ‎  ‎  ‎Delete Color 197‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 197 Selected=_bool(0)
+#@gui:Palette Color 198=color(37,70,107)
+#@gui:‎  ‎  ‎  ‎Delete Color 198‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 198 Selected=_bool(0)
+#@gui:Palette Color 199=color(35,50,77)
+#@gui:‎  ‎  ‎  ‎Delete Color 199‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 199 Selected=_bool(0)
+#@gui:Palette Color 200=color(24,31,47)
+#@gui:‎  ‎  ‎  ‎Delete Color 200‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 200 Selected=_bool(0)
+#@gui:Palette Color 201=color(166,204,52)
+#@gui:‎  ‎  ‎  ‎Delete Color 201‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 201 Selected=_bool(0)
+#@gui:Palette Color 202=color(125,164,45)
+#@gui:‎  ‎  ‎  ‎Delete Color 202‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 202 Selected=_bool(0)
+#@gui:Palette Color 203=color(81,136,34)
+#@gui:‎  ‎  ‎  ‎Delete Color 203‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 203 Selected=_bool(0)
+#@gui:Palette Color 204=color(47,105,12)
+#@gui:‎  ‎  ‎  ‎Delete Color 204‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 204 Selected=_bool(0)
+#@gui:Palette Color 205=color(34,89,24)
+#@gui:‎  ‎  ‎  ‎Delete Color 205‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 205 Selected=_bool(0)
+#@gui:Palette Color 206=color(23,74,27)
+#@gui:‎  ‎  ‎  ‎Delete Color 206‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 206 Selected=_bool(0)
+#@gui:Palette Color 207=color(0,50,33)
+#@gui:‎  ‎  ‎  ‎Delete Color 207‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 207 Selected=_bool(0)
+#@gui:Palette Color 208=color(0,34,25)
+#@gui:‎  ‎  ‎  ‎Delete Color 208‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 208 Selected=_bool(0)
+#@gui:Palette Color 209=color(198,236,255)
+#@gui:‎  ‎  ‎  ‎Delete Color 209‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 209 Selected=_bool(0)
+#@gui:Palette Color 210=color(199,214,255)
+#@gui:‎  ‎  ‎  ‎Delete Color 210‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 210 Selected=_bool(0)
+#@gui:Palette Color 211=color(150,178,217)
+#@gui:‎  ‎  ‎  ‎Delete Color 211‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 211 Selected=_bool(0)
+#@gui:Palette Color 212=color(134,144,178)
+#@gui:‎  ‎  ‎  ‎Delete Color 212‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 212 Selected=_bool(0)
+#@gui:Palette Color 213=color(122,119,153)
+#@gui:‎  ‎  ‎  ‎Delete Color 213‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 213 Selected=_bool(0)
+#@gui:Palette Color 214=color(97,95,132)
+#@gui:‎  ‎  ‎  ‎Delete Color 214‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 214 Selected=_bool(0)
+#@gui:Palette Color 215=color(58,69,104)
+#@gui:‎  ‎  ‎  ‎Delete Color 215‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 215 Selected=_bool(0)
+#@gui:Palette Color 216=color(40,43,74)
+#@gui:‎  ‎  ‎  ‎Delete Color 216‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 216 Selected=_bool(0)
+#@gui:Palette Color 217=color(255,233,73)
+#@gui:‎  ‎  ‎  ‎Delete Color 217‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 217 Selected=_bool(0)
+#@gui:Palette Color 218=color(255,188,78)
+#@gui:‎  ‎  ‎  ‎Delete Color 218‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 218 Selected=_bool(0)
+#@gui:Palette Color 219=color(249,155,78)
+#@gui:‎  ‎  ‎  ‎Delete Color 219‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 219 Selected=_bool(0)
+#@gui:Palette Color 220=color(227,120,64)
+#@gui:‎  ‎  ‎  ‎Delete Color 220‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 220 Selected=_bool(0)
+#@gui:Palette Color 221=color(205,94,70)
+#@gui:‎  ‎  ‎  ‎Delete Color 221‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 221 Selected=_bool(0)
+#@gui:Palette Color 222=color(182,77,70)
+#@gui:‎  ‎  ‎  ‎Delete Color 222‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 222 Selected=_bool(0)
+#@gui:Palette Color 223=color(148,54,58)
+#@gui:‎  ‎  ‎  ‎Delete Color 223‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 223 Selected=_bool(0)
+#@gui:Palette Color 224=color(102,43,41)
+#@gui:‎  ‎  ‎  ‎Delete Color 224‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 224 Selected=_bool(0)
+#@gui:Palette Color 225=color(136,214,255)
+#@gui:‎  ‎  ‎  ‎Delete Color 225‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 225 Selected=_bool(0)
+#@gui:Palette Color 226=color(36,174,214)
+#@gui:‎  ‎  ‎  ‎Delete Color 226‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 226 Selected=_bool(0)
+#@gui:Palette Color 227=color(50,140,167)
+#@gui:‎  ‎  ‎  ‎Delete Color 227‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 227 Selected=_bool(0)
+#@gui:Palette Color 228=color(0,111,137)
+#@gui:‎  ‎  ‎  ‎Delete Color 228‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 228 Selected=_bool(0)
+#@gui:Palette Color 229=color(11,102,127)
+#@gui:‎  ‎  ‎  ‎Delete Color 229‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 229 Selected=_bool(0)
+#@gui:Palette Color 230=color(0,77,94)
+#@gui:‎  ‎  ‎  ‎Delete Color 230‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 230 Selected=_bool(0)
+#@gui:Palette Color 231=color(0,56,80)
+#@gui:‎  ‎  ‎  ‎Delete Color 231‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 231 Selected=_bool(0)
+#@gui:Palette Color 232=color(0,39,53)
+#@gui:‎  ‎  ‎  ‎Delete Color 232‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 232 Selected=_bool(0)
+#@gui:Palette Color 233=color(255,206,127)
+#@gui:‎  ‎  ‎  ‎Delete Color 233‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 233 Selected=_bool(0)
+#@gui:Palette Color 234=color(251,170,132)
+#@gui:‎  ‎  ‎  ‎Delete Color 234‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 234 Selected=_bool(0)
+#@gui:Palette Color 235=color(213,141,107)
+#@gui:‎  ‎  ‎  ‎Delete Color 235‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 235 Selected=_bool(0)
+#@gui:Palette Color 236=color(173,110,81)
+#@gui:‎  ‎  ‎  ‎Delete Color 236‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 236 Selected=_bool(0)
+#@gui:Palette Color 237=color(154,98,76)
+#@gui:‎  ‎  ‎  ‎Delete Color 237‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 237 Selected=_bool(0)
+#@gui:Palette Color 238=color(136,80,65)
+#@gui:‎  ‎  ‎  ‎Delete Color 238‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 238 Selected=_bool(0)
+#@gui:Palette Color 239=color(115,61,59)
+#@gui:‎  ‎  ‎  ‎Delete Color 239‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 239 Selected=_bool(0)
+#@gui:Palette Color 240=color(88,49,38)
+#@gui:‎  ‎  ‎  ‎Delete Color 240‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 240 Selected=_bool(0)
+#@gui:Palette Color 241=color(255,243,214)
+#@gui:‎  ‎  ‎  ‎Delete Color 241‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 241 Selected=_bool(0)
+#@gui:Palette Color 242=color(234,219,201)
+#@gui:‎  ‎  ‎  ‎Delete Color 242‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 242 Selected=_bool(0)
+#@gui:Palette Color 243=color(204,195,177)
+#@gui:‎  ‎  ‎  ‎Delete Color 243‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 243 Selected=_bool(0)
+#@gui:Palette Color 244=color(187,175,164)
+#@gui:‎  ‎  ‎  ‎Delete Color 244‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 244 Selected=_bool(0)
+#@gui:Palette Color 245=color(174,161,137)
+#@gui:‎  ‎  ‎  ‎Delete Color 245‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 245 Selected=_bool(0)
+#@gui:Palette Color 246=color(158,140,121)
+#@gui:‎  ‎  ‎  ‎Delete Color 246‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 246 Selected=_bool(0)
+#@gui:Palette Color 247=color(133,117,101)
+#@gui:‎  ‎  ‎  ‎Delete Color 247‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 247 Selected=_bool(0)
+#@gui:Palette Color 248=color(98,93,84)
+#@gui:‎  ‎  ‎  ‎Delete Color 248‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 248 Selected=_bool(0)
+#@gui:Palette Color 249=color(245,247,250)
+#@gui:‎  ‎  ‎  ‎Delete Color 249‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 249 Selected=_bool(0)
+#@gui:Palette Color 250=color(205,210,218)
+#@gui:‎  ‎  ‎  ‎Delete Color 250‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 250 Selected=_bool(0)
+#@gui:Palette Color 251=color(166,174,186)
+#@gui:‎  ‎  ‎  ‎Delete Color 251‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 251 Selected=_bool(0)
+#@gui:Palette Color 252=color(130,139,152)
+#@gui:‎  ‎  ‎  ‎Delete Color 252‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 252 Selected=_bool(0)
+#@gui:Palette Color 253=color(98,104,113)
+#@gui:‎  ‎  ‎  ‎Delete Color 253‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 253 Selected=_bool(0)
+#@gui:Palette Color 254=color(67,69,73)
+#@gui:‎  ‎  ‎  ‎Delete Color 254‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 254 Selected=_bool(0)
+#@gui:Palette Color 255=color(34,35,35)
+#@gui:‎  ‎  ‎  ‎Delete Color 255‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 255 Selected=_bool(0)
+#@gui:Palette Color 256=color(0,0,0)
+#@gui:‎  ‎  ‎  ‎Delete Color 256‎  ‎  ‎  ‎  =button(0)
+#@gui:Color 256 Selected=_bool(0)
+#@gui:_=separator()
+#@gui:‎  ‎  ‎  Add Palette Color‎  ‎ ‎  ‎‎=button(0)
+#@gui:Delete All Selected Palette=button(0)
+#@gui:_=separator(),_=note("<b>RGB Output</b>")
+#@gui:Pixel Width=int(1,1,8)
+#@gui:Pixel Height=int(1,1,8)
+#@gui:Windows Width=int(1,1,128)
+#@gui:Use Image Width as Windows Width=bool(0)
+#@gui:Windows Height=int(1,1,128)
+#@gui:Use Image Height as Windows Height=bool(0)
+#@gui:Threshold Map Iteration=int(3,1,6)
+#@gui:_=separator(),_=note("<b>Alpha Output</b>")
+#@gui:Enable Alpha Processing=bool(0)
+#@gui:Number of Alpha=int(2,2,256)
+#@gui:Alpha Dithering (%)=float(50,0,100)
+#@gui:Alpha Mode=choice(0,"Indexed","Windows-Based Indexing","Ordered")
+#@gui:Alpha Mode=choice(0,"Indexed","Ordered")
+#@gui:Alpha Restriction=int(0,0,128)
+#@gui:Alpha Threshold Map Iteration=int(3,1,6)
+#@gui:_=note("<small>If this section is empty, it is because there is no alpha on any images.</small>")
+#@gui:_=separator(),_=note("<b>CLI Command</b>")
+#@gui:CLI version=_text("Here is where you copy command to command line interface.")
+#@gui:Import Palette File=file()_0
+#@gui:Imported=bool(0)_0
+#@gui:_=note("<small>Note: Here is where you copy command to command line interface. </small>")
+#@gui:_=separator(),_=note("<b>Post-Processing</b>")
+#@gui:Resize to Original Dimension?=bool(0)
+#@gui:Message Out=text("Initialized GUI Filter!")
+#@gui:Status=int(0,0,3)_0
+#@gui:Color Status=color(255,255,255)
+#@gui:_=separator(),_=note("<b>Preview</b>")
+#@gui:Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse")
+#@gui:Preview Split=point(50,50,0,0,200,200,200,0,10)_0
+#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2022/07/26</i>.</small>")
+fx_rep_transfer_color_reduced:
+skip ${20=""},${1326=""}
 
-set_a={$1==1?2:0}
-set_b={$11==0?0:2}
-set_c={$15==0?0:2}
-set_d={$15==0?0:($17==2?2:0)}
+if $1330==1 error inv_inp fi
+if $1330==2 error import_mode_err fi
+
+use_pal={$1?!$5:1}
+
+img_cont_alp={sum(1-expr('s#x',$!)&1)}
+
+if $img_cont_alp
+  img_cont_alp=0
+  
+  foreach {
+    if s&1 continue fi
+    
+    sh. {s#-1-1}
+    
+    if iv#-1 rm. img_cont_alp=1 break 
+    else rm.
+    fi
+  }
+fi
+
+if $1318&&$img_cont_alp
+  if $1 alpha_args=$1319,{$1320/100},$1322
+  else  alpha_args=$1319,{$1320/100},$1321,$1323,$1324
+  fi
+else
+  alpha_args=0
+fi
+
+
+if $use_pal
+  if $6==3
+    (${29-1308})
+    split. x,-5
+    a[-256--1] y
+    permute. yzcx
+    channels. 0,2
+    store. palette
+  fi
+else
+  if $7
+    if $17 tcrc_arg={2^$13}
+    else tcrc_arg={2^$14}:{2^$15}:{2^$16}
+    fi
+  else
+    if $12 tcrc_arg=$8
+    else tcrc_arg=$9:$10:$11
+    fi
+  fi
+fi
+
+fx_rep_tcrc_windows_width,fx_rep_tcrc_window_height=${arg\ $1314+1,$1313,w},${arg\ $1316+1,$1315,h}
+
+if $3&&$4
+ fx_rep_tcrc_dither=$4%${arg\ $3,dh,dv,lh,lv,cd,cl}
+else
+ fx_rep_tcrc_dither={$2/100}
+fi
+
+foreach {
+  od={[w-1,h-1]}
+  
+  if $use_pal
+  
+    if $6==3
+    
+      $palette
+      
+      if $1 rep_transfer_color_reduced.. :[-1],$fx_rep_tcrc_dither,$1311,$1312,$1317,$24,$alpha_args
+      else rep_transfer_color_reduced.. [-1],$fx_rep_tcrc_dither,$1311,$1312,$fx_rep_tcrc_windows_width,$fx_rep_tcrc_window_height,$25,$24,$alpha_args
+      fi
+      
+    elif $6==1
+    
+      if s>2 sh[0] 0,2
+      else sh[0] 0
+      fi    
+      
+      +colormap. $23 rm..
+      
+      if $1 rep_transfer_color_reduced.. :[-1],$fx_rep_tcrc_dither,$1311,$1312,$1317,0,$_alpha_args
+      else rep_transfer_color_reduced.. [-1],$fx_rep_tcrc_dither,$1311,$1312,$fx_rep_tcrc_windows_width,$fx_rep_tcrc_window_height,$25,0,$alpha_args
+      fi
+      
+    else
+    
+      +pal $18
+      
+      if $1 rep_transfer_color_reduced.. :[-1],$fx_rep_tcrc_dither,$1311,$1312,$1317,$24,$alpha_args
+      else rep_transfer_color_reduced.. [-1],$fx_rep_tcrc_dither,$1311,$1312,$fx_rep_tcrc_windows_width,$fx_rep_tcrc_window_height,$25,$24,$alpha_args
+      fi
+      
+    fi
+    rm.
+    
+  else rep_transfer_color_reduced $_tcrc_arg,$_fx_rep_tcrc_dither,$1311,$1312,$1317,$24,$_alpha_args
+  fi
+  
+  if $1330==3 crop 0,0,$od fi
+}
+fx_rep_transfer_color_reduced_preview:
+skip ${20=""},${1326=""}
+
+original_width,original_height={[w#0,h#0]}
+
+imgs,dec_imgs,use_pal,imported={$!},{$!-1},{$1?!$5:1},$1327
+use_custom_pal,num_of_colors,pal_method={$use_pal&&($6>1?1:!$6?$19)},$22,$6
+text_box="$1325"
+
+img_cont_alp={sum(1-expr('s#x',$!)&1)}
+
+if $img_cont_alp
+  img_cont_alp=0
+  
+  foreach {
+    if s&1 continue fi
+    
+    sh. {s#-1-1}
+    
+    if iv#-1 rm. img_cont_alp=1 break 
+    else rm.
+    fi
+  }
+fi
+
+if $pal_method!=1
+  z $_preview_x0,$_preview_y0,$_preview_x1,$_preview_y1
+  r $_preview_width,$_preview_height,1,100%
+fi
+
+if $1309 num_of_colors+=1 fi
+
+if $1314&&$1316 tcrc_windows_width_check,tcrc_windows_height_check,_fx_rep_tcrc_windows_width,_fx_rep_tcrc_window_height=0,0,$1313,$1315
+else            tcrc_windows_width_check,tcrc_windows_height_check,_fx_rep_tcrc_windows_width,_fx_rep_tcrc_window_height=$1314,$1316,${arg\ $1314+1,$1313,w},${arg\ $1316+1,$1315,h}
+fi
+
+if $1318&&$img_cont_alp
+  if $1 _alpha_args=$1319,{$1320/100},$1322
+  else  _alpha_args=$1319,{$1320/100},$1321,$1323,$1324
+  fi
+else
+  _alpha_args=0
+fi
+
+if $3&&$4
+ _fx_rep_tcrc_dither=$4%${arg\ $3,dh,dv,lh,lv,cd,cl}
+else
+ _fx_rep_tcrc_dither={$2/100}
+fi
+
+if narg($_persistent)&&!$use_custom_pal
+
+  ($_persistent)
+  
+  repeat 256 {
+    q={$>*3}
+    color_$>:=crop(#-1,$q,3)
+  }
+
+  rm.
+  
+elif !$use_custom_pal
+
+  (${29-1306})
+  
+  repeat 256 {
+    q={$>*5}
+    color_$>:=crop(#-1,$q,3)
+  }
+  
+  _persistent=$color_0,$color_1,$color_2,$color_3,$color_4,$color_5,$color_6,$color_7,$color_8,$color_9,$color_10,$color_11,$color_12,$color_13,$color_14,$color_15,$color_16,$color_17,$color_18,$color_19,$color_20,$color_21,$color_22,$color_23,$color_24,$color_25,$color_26,$color_27,$color_28,$color_29,$color_30,$color_31,$color_32,$color_33,$color_34,$color_35,$color_36,$color_37,$color_38,$color_39,$color_40,$color_41,$color_42,$color_43,$color_44,$color_45,$color_46,$color_47,$color_48,$color_49,$color_50,$color_51,$color_52,$color_53,$color_54,$color_55,$color_56,$color_57,$color_58,$color_59,$color_60,$color_61,$color_62,$color_63,$color_64,$color_65,$color_66,$color_67,$color_68,$color_69,$color_70,$color_71,$color_72,$color_73,$color_74,$color_75,$color_76,$color_77,$color_78,$color_79,$color_80,$color_81,$color_82,$color_83,$color_84,$color_85,$color_86,$color_87,$color_88,$color_89,$color_90,$color_91,$color_92,$color_93,$color_94,$color_95,$color_96,$color_97,$color_98,$color_99,$color_100,$color_101,$color_102,$color_103,$color_104,$color_105,$color_106,$color_107,$color_108,$color_109,$color_110,$color_111,$color_112,$color_113,$color_114,$color_115,$color_116,$color_117,$color_118,$color_119,$color_120,$color_121,$color_122,$color_123,$color_124,$color_125,$color_126,$color_127,$color_128,$color_129,$color_130,$color_131,$color_132,$color_133,$color_134,$color_135,$color_136,$color_137,$color_138,$color_139,$color_140,$color_141,$color_142,$color_143,$color_144,$color_145,$color_146,$color_147,$color_148,$color_149,$color_150,$color_151,$color_152,$color_153,$color_154,$color_155,$color_156,$color_157,$color_158,$color_159,$color_160,$color_161,$color_162,$color_163,$color_164,$color_165,$color_166,$color_167,$color_168,$color_169,$color_170,$color_171,$color_172,$color_173,$color_174,$color_175,$color_176,$color_177,$color_178,$color_179,$color_180,$color_181,$color_182,$color_183,$color_184,$color_185,$color_186,$color_187,$color_188,$color_189,$color_190,$color_191,$color_192,$color_193,$color_194,$color_195,$color_196,$color_197,$color_198,$color_199,$color_200,$color_201,$color_202,$color_203,$color_204,$color_205,$color_206,$color_207,$color_208,$color_209,$color_210,$color_211,$color_212,$color_213,$color_214,$color_215,$color_216,$color_217,$color_218,$color_219,$color_220,$color_221,$color_222,$color_223,$color_224,$color_225,$color_226,$color_227,$color_228,$color_229,$color_230,$color_231,$color_232,$color_233,$color_234,$color_235,$color_236,$color_237,$color_238,$color_239,$color_240,$color_241,$color_242,$color_243,$color_244,$color_245,$color_246,$color_247,$color_248,$color_249,$color_250,$color_251,$color_252,$color_253,$color_254,$color_255
+  
+  rm.
+  
+fi
+
+if $use_pal
+  
+  if $use_custom_pal||($6==2?('"$1326"'!='"$20"'))
+    (${29-1308})
+    split. x,-5
+    a[-256--1] y
+    permute. yzcx
+  fi
+  
+  if $6==3
+    
+    if $27
+    
+      sh. 4
+      num_of_colors-={is#-1}
+      t_sub_col={is#-1}
+      
+      if $t_sub_col
+        if $num_of_colors
+          area_fg. 0
+          $num_of_colors,1,1,3,"I(#-2,x+i(#-1,x));"
+          rm..
+        else
+          rm.
+          num_of_colors=2
+          2,1,1,3,vector(#3,x);
+        fi
+      else
+        rm.
+        +crop. 0,0,0,0,{$num_of_colors-1},0,0,2
+      fi
+      
+    else
+    
+      sh. 3
+      
+      max_val:=iM
+      pos:=xM
+      rm.   
+      
+      if $max_val
+        if $pos==($num_of_colors-1)
+          +crop. 0,0,0,0,{$num_of_colors-2},0,0,2
+        elif !$pos
+          +crop. 1,0,0,0,{$num_of_colors-1},0,0,2
+        else
+          +crop. 0,0,0,0,{$pos-1},0,0,2
+          +crop.. {$pos+1},0,0,0,{$num_of_colors-1},0,0,2
+          a[-2,-1] x
+        fi
+        num_of_colors-=1
+      else
+        +crop. 0,0,0,0,{$num_of_colors-1},0,0,2
+      fi        
+      
+    fi
+    
+    image.. .
+    
+    store. _palette
+    
+    channels. 0,2
+    
+    repeat 256 { color_$>={I(#-1,$>)} }
+    
+    rm.
+    
+    if $1 
+      gui_split_preview "$_palette rep_transfer_color_reduced[^-1] :[-1],$_fx_rep_tcrc_dither,$1311,$1312,$1317,$24,$_alpha_args rm.",${-3--1}
+      text_out="rep_transfer_color_reduced[^-1] :[-1]",$_fx_rep_tcrc_dither,$1311,$1312,$1317,$24,$_alpha_args
+    else 
+      gui_split_preview "$_palette rep_transfer_color_reduced[^-1] [-1],$_fx_rep_tcrc_dither,$1311,$1312,$_fx_rep_tcrc_windows_width,$_fx_rep_tcrc_window_height,$25,$24,$_alpha_args rm.",${-3--1}
+      text_out="rep_transfer_color_reduced[^-1] [-1]",$_fx_rep_tcrc_dither,$1311,$1312,$_fx_rep_tcrc_windows_width,$_fx_rep_tcrc_window_height,$25,$24,$_alpha_args
+    fi
+    
+  elif $6==2
+  
+    apply_preview_image=0
+  
+    if narg($20)?(('$1326'!='$20')||($imported?$21))
+      
+      apply_preview_image,imported=1
+      
+      num_of_images={$!}
+      
+      i $20
+      
+      if $!>($num_of_images+1) error excess_imgs fi
+      
+      if whd#-1<2 error inv_pal_dim fi
+      
+      if w#-1>1&&(h#-1>1||d#-1>1) colormap. 0
+      elif w#-1==1&&h#-1>1 rotate. 90
+      fi
+      
+      image.. .
+      
+      num_of_colors={w#-1}
+      
+      store. _palette
+      
+      channels. 0,2
+      
+      repeat 256 { color_$>={I(#-1,$>)} }
+      
+      pal_method=3
+      
+    fi
+    
+    k[0-$dec_imgs]
+    
+    if $apply_preview_image
+      if $1 
+        gui_split_preview "$_palette rep_transfer_color_reduced[^-1] :[-1],$_fx_rep_tcrc_dither,$1311,$1312,$1317,$24,$_alpha_args rm.",${-3--1}
+        text_out="rep_transfer_color_reduced[^-1] :[-1]",$_fx_rep_tcrc_dither,$1311,$1312,$1317,$24,$_alpha_args
+      else 
+        gui_split_preview "$_palette rep_transfer_color_reduced[^-1] [-1],$_fx_rep_tcrc_dither,$1311,$1312,$_fx_rep_tcrc_windows_width,$_fx_rep_tcrc_window_height,$25,$24,$_alpha_args rm.",${-3--1}
+        text_out="rep_transfer_color_reduced[^-1] [-1]",$_fx_rep_tcrc_dither,$1311,$1312,$_fx_rep_tcrc_windows_width,$_fx_rep_tcrc_window_height,$25,$24,$_alpha_args
+      fi
+    else
+      foreach {
+        sh. 0,2
+        100%,100%,100%,4 drgba. blend[-2] [-1],normal,.5 rm.
+        text_outline. "Awaiting\n palette",.5~,.5~,10%
+        rm.
+      }
+    fi
+    
+  elif $6==1
+    
+    if s>2 sh[0] 0,2
+    else sh[0] 0
+    fi
+    
+    +colormap. $23
+    store. _palette
+    rm.
+    
+    z $_preview_x0,$_preview_y0,$_preview_x1,$_preview_y1
+    r $_preview_width,$_preview_height,1,100%
+  
+    if $1      
+      gui_split_preview "$_palette rep_transfer_color_reduced[^-1] :[-1],$_fx_rep_tcrc_dither,$1311,$1312,$1317,0,$_alpha_args rm.",${-3--1}
+      text_box="+colormap $23 rep_transfer_color_reduced[^-1] :[-1]",$_fx_rep_tcrc_dither,$1311,$1312,$1317,0,$_alpha_args
+    else 
+      gui_split_preview "$_palette rep_transfer_color_reduced[^-1] [-1],$_fx_rep_tcrc_dither,$1311,$1312,$_fx_rep_tcrc_windows_width,$_fx_rep_tcrc_window_height,$25,0,$_alpha_args rm.",${-3--1}
+      text_box="+colormap $23 $_palette rep_transfer_color_reduced[^-1] [-1]",$_fx_rep_tcrc_dither,$1311,$1312,$_fx_rep_tcrc_windows_width,$_fx_rep_tcrc_window_height,$25,0,$_alpha_args
+    fi
+    
+  else
+  
+    +pal $18
+    
+    if $19
+      num_of_colors:=whd#-1
+      channels.. 0,2
+      image.. .
+      repeat 256 { color_$>={I(#-2,$>)} }
+      rm..
+      pal_method=3
+    fi
+    
+    store. _palette
+    
+    if $1 
+      gui_split_preview "$_palette rep_transfer_color_reduced[^-1] :[-1],$_fx_rep_tcrc_dither,$1311,$1312,$1317,$24,$_alpha_args rm.",${-3--1}
+      text_box="rep_transfer_color_reduced[^-1] :[-1]",$_fx_rep_tcrc_dither,$1311,$1312,$1317,$24,$_alpha_args
+    else 
+      gui_split_preview "$_palette rep_transfer_color_reduced[^-1] [-1],$_fx_rep_tcrc_dither,$1311,$1312,$_fx_rep_tcrc_windows_width,$_fx_rep_tcrc_window_height,$25,$24,$_alpha_args rm.",${-3--1}
+      text_box="rep_transfer_color_reduced[^-1] [-1]",$_fx_rep_tcrc_dither,$1311,$1312,$_fx_rep_tcrc_windows_width,$_fx_rep_tcrc_window_height,$25,$24,$_alpha_args
+    fi
+    
+  fi
+  
+else
+
+  if $7
+    if $17 _tcrc_arg={2^$13}
+    else _tcrc_arg={2^$14}:{2^$15}:{2^$16}
+    fi
+  else
+    if $12 _tcrc_arg=$8
+    else _tcrc_arg=$9:$10:$11
+    fi
+  fi
+  
+  gui_split_preview "rep_transfer_color_reduced $_tcrc_arg,$_fx_rep_tcrc_dither,$1311,$1312,$1317,$24,$_alpha_args",${-3--1}
+  text_box="rep_transfer_color_reduced "$_tcrc_arg,$_fx_rep_tcrc_dither,$1311,$1312,$1317,$24,$_alpha_args
+fi
+
+out_status=4
+message_out=""
+status_color=${1331-1333}
+
+if $pal_method!=2
+  if $1328
+    pixel_width,pixel_height=${1311-1312}
+    pixel_ratio_gcd={gcd($pixel_width,$pixel_height)}
+    if $pixel_ratio_gcd>1 pixel_width,pixel_height/=$pixel_ratio_gcd fi
+    if min($pixel_width,$pixel_height)>1 out_status=1
+    else
+      f_w={$original_width/$pixel_width}
+      f_h={$original_height/$pixel_height}
+      if ($f_w!=int($f_w))||($f_h!=int($f_h)) out_status=3 fi
+    fi
+  fi
+else out_status=2
+fi
+
+if $out_status==4 
+  message_out="Pass!"
+  status_color=62,205,0
+elif $out_status==3 
+  message_out="Output Trimmed. Proceed Anyway."
+  status_color=255,194,0
+else
+  if $out_status==2 message_out="Exit out of Import Mode to proceed with output"
+  else message_out="Will not output!"
+  fi
+  status_color=170,43,0
+fi
+
+display_palette:=$use_pal&&($pal_method==3)
 
 u "{$1}"\
-"{$2}_"$set_a\
-"{$3}_"{$1==0||($1==1&&$2==0)?2:1}\
-"{$4}"\
-"{$5}_"{$1==1?0:2}\
-"{$6}"\
-"{$7}_"$set_a\
-"{$8}{$9}"\
-"{$10}_"{$4==0?1:2}\
-"{$11}"\
-"{$12}_"$set_b\
-"{$13}_"$set_b\
-"{$14}_"$set_b\
-"{$15}"\
-"{$16}_"$set_c\
-"{$17}_"$set_c\
-"{$18}_"{$15==0?0:($17==2?0:2)}\
-"{$19}_"$set_d\
-"{$20}_"$set_d\
-"{$21}_"$set_c\
-"{$22}_"$set_c\
-"{$23}_"$set_c\
-"{$24}_"$set_c\
-"{$25}{$26,$27}"
+"{$2}_"{$3?1:2}\
+"{$3}"\
+"{$4}_"{$3?2:1}\
+"{$5}_"{$1?2}\
+"{"$pal_method"}_"{$1?(!$5?2):2}\
+"{$7}_"{$1&&$5?2}\
+"{$8}_"{$1&&$5&&!$7?($12?2)}\
+"{$9}_"{$1&&$5&&!$7?(!$12?2)}\
+"{$10}_"{$1&&$5&&!$7?(!$12?2)}\
+"{$11}_"{$1&&$5&&!$7?(!$12?2)}\
+"{$12}_"{$1&&$5&&!$7?2}\
+"{$13}_"{$1&&$5&&$7?($17?2)}\
+"{$14}_"{$1&&$5&&$7?(!$17?2)}\
+"{$15}_"{$1&&$5&&$7?(!$17?2)}\
+"{$16}_"{$1&&$5&&$7?(!$17?2)}\
+"{$17}_"{$1&&$5&&$7?2}\
+"{$18}_"{$1?(!$5?(!$pal_method?2)):(!$pal_method?2)}\
+"{0}_"{$1?(!$5?(!$pal_method?2)):(!$pal_method?2)}\
+"{$20}_"{$1?(!$5?($pal_method==2?2)):($pal_method==2?2)}\
+"{0}_"{$1?(!$5?($pal_method==2?2)):($pal_method==2?($imported?2:1))}\
+"{"$num_of_colors"}_"{$1?(!$5?($pal_method==3?2)):($pal_method==3?2)}\
+"{$23}_"{$1?(!$5?($pal_method==1?2)):($pal_method==1?2)}\
+"{$24}_"{$1?(!$5?($pal_method!=1?2)):($pal_method!=1?2)}\
+"{$25}_"{!$1?2}\
+"{$26}_"{$display_palette?2}\
+"{$27}_"{$26&&$display_palette?2}\
+"{0}_"{$26&&$display_palette&&$27?2}\
+"{"$color_0"}_"{$26&&$display_palette&&(0<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(0<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(0<$num_of_colors)?($27?2)}\
+"{"$color_1"}_"{$26&&$display_palette&&(1<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(1<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(1<$num_of_colors)?($27?2)}\
+"{"$color_2"}_"{$26&&$display_palette&&(2<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(2<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(2<$num_of_colors)?($27?2)}\
+"{"$color_3"}_"{$26&&$display_palette&&(3<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(3<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(3<$num_of_colors)?($27?2)}\
+"{"$color_4"}_"{$26&&$display_palette&&(4<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(4<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(4<$num_of_colors)?($27?2)}\
+"{"$color_5"}_"{$26&&$display_palette&&(5<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(5<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(5<$num_of_colors)?($27?2)}\
+"{"$color_6"}_"{$26&&$display_palette&&(6<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(6<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(6<$num_of_colors)?($27?2)}\
+"{"$color_7"}_"{$26&&$display_palette&&(7<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(7<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(7<$num_of_colors)?($27?2)}\
+"{"$color_8"}_"{$26&&$display_palette&&(8<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(8<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(8<$num_of_colors)?($27?2)}\
+"{"$color_9"}_"{$26&&$display_palette&&(9<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(9<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(9<$num_of_colors)?($27?2)}\
+"{"$color_10"}_"{$26&&$display_palette&&(10<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(10<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(10<$num_of_colors)?($27?2)}\
+"{"$color_11"}_"{$26&&$display_palette&&(11<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(11<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(11<$num_of_colors)?($27?2)}\
+"{"$color_12"}_"{$26&&$display_palette&&(12<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(12<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(12<$num_of_colors)?($27?2)}\
+"{"$color_13"}_"{$26&&$display_palette&&(13<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(13<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(13<$num_of_colors)?($27?2)}\
+"{"$color_14"}_"{$26&&$display_palette&&(14<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(14<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(14<$num_of_colors)?($27?2)}\
+"{"$color_15"}_"{$26&&$display_palette&&(15<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(15<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(15<$num_of_colors)?($27?2)}\
+"{"$color_16"}_"{$26&&$display_palette&&(16<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(16<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(16<$num_of_colors)?($27?2)}\
+"{"$color_17"}_"{$26&&$display_palette&&(17<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(17<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(17<$num_of_colors)?($27?2)}\
+"{"$color_18"}_"{$26&&$display_palette&&(18<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(18<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(18<$num_of_colors)?($27?2)}\
+"{"$color_19"}_"{$26&&$display_palette&&(19<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(19<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(19<$num_of_colors)?($27?2)}\
+"{"$color_20"}_"{$26&&$display_palette&&(20<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(20<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(20<$num_of_colors)?($27?2)}\
+"{"$color_21"}_"{$26&&$display_palette&&(21<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(21<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(21<$num_of_colors)?($27?2)}\
+"{"$color_22"}_"{$26&&$display_palette&&(22<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(22<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(22<$num_of_colors)?($27?2)}\
+"{"$color_23"}_"{$26&&$display_palette&&(23<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(23<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(23<$num_of_colors)?($27?2)}\
+"{"$color_24"}_"{$26&&$display_palette&&(24<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(24<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(24<$num_of_colors)?($27?2)}\
+"{"$color_25"}_"{$26&&$display_palette&&(25<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(25<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(25<$num_of_colors)?($27?2)}\
+"{"$color_26"}_"{$26&&$display_palette&&(26<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(26<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(26<$num_of_colors)?($27?2)}\
+"{"$color_27"}_"{$26&&$display_palette&&(27<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(27<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(27<$num_of_colors)?($27?2)}\
+"{"$color_28"}_"{$26&&$display_palette&&(28<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(28<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(28<$num_of_colors)?($27?2)}\
+"{"$color_29"}_"{$26&&$display_palette&&(29<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(29<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(29<$num_of_colors)?($27?2)}\
+"{"$color_30"}_"{$26&&$display_palette&&(30<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(30<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(30<$num_of_colors)?($27?2)}\
+"{"$color_31"}_"{$26&&$display_palette&&(31<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(31<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(31<$num_of_colors)?($27?2)}\
+"{"$color_32"}_"{$26&&$display_palette&&(32<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(32<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(32<$num_of_colors)?($27?2)}\
+"{"$color_33"}_"{$26&&$display_palette&&(33<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(33<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(33<$num_of_colors)?($27?2)}\
+"{"$color_34"}_"{$26&&$display_palette&&(34<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(34<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(34<$num_of_colors)?($27?2)}\
+"{"$color_35"}_"{$26&&$display_palette&&(35<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(35<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(35<$num_of_colors)?($27?2)}\
+"{"$color_36"}_"{$26&&$display_palette&&(36<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(36<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(36<$num_of_colors)?($27?2)}\
+"{"$color_37"}_"{$26&&$display_palette&&(37<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(37<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(37<$num_of_colors)?($27?2)}\
+"{"$color_38"}_"{$26&&$display_palette&&(38<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(38<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(38<$num_of_colors)?($27?2)}\
+"{"$color_39"}_"{$26&&$display_palette&&(39<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(39<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(39<$num_of_colors)?($27?2)}\
+"{"$color_40"}_"{$26&&$display_palette&&(40<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(40<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(40<$num_of_colors)?($27?2)}\
+"{"$color_41"}_"{$26&&$display_palette&&(41<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(41<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(41<$num_of_colors)?($27?2)}\
+"{"$color_42"}_"{$26&&$display_palette&&(42<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(42<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(42<$num_of_colors)?($27?2)}\
+"{"$color_43"}_"{$26&&$display_palette&&(43<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(43<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(43<$num_of_colors)?($27?2)}\
+"{"$color_44"}_"{$26&&$display_palette&&(44<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(44<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(44<$num_of_colors)?($27?2)}\
+"{"$color_45"}_"{$26&&$display_palette&&(45<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(45<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(45<$num_of_colors)?($27?2)}\
+"{"$color_46"}_"{$26&&$display_palette&&(46<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(46<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(46<$num_of_colors)?($27?2)}\
+"{"$color_47"}_"{$26&&$display_palette&&(47<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(47<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(47<$num_of_colors)?($27?2)}\
+"{"$color_48"}_"{$26&&$display_palette&&(48<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(48<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(48<$num_of_colors)?($27?2)}\
+"{"$color_49"}_"{$26&&$display_palette&&(49<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(49<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(49<$num_of_colors)?($27?2)}\
+"{"$color_50"}_"{$26&&$display_palette&&(50<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(50<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(50<$num_of_colors)?($27?2)}\
+"{"$color_51"}_"{$26&&$display_palette&&(51<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(51<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(51<$num_of_colors)?($27?2)}\
+"{"$color_52"}_"{$26&&$display_palette&&(52<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(52<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(52<$num_of_colors)?($27?2)}\
+"{"$color_53"}_"{$26&&$display_palette&&(53<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(53<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(53<$num_of_colors)?($27?2)}\
+"{"$color_54"}_"{$26&&$display_palette&&(54<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(54<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(54<$num_of_colors)?($27?2)}\
+"{"$color_55"}_"{$26&&$display_palette&&(55<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(55<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(55<$num_of_colors)?($27?2)}\
+"{"$color_56"}_"{$26&&$display_palette&&(56<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(56<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(56<$num_of_colors)?($27?2)}\
+"{"$color_57"}_"{$26&&$display_palette&&(57<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(57<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(57<$num_of_colors)?($27?2)}\
+"{"$color_58"}_"{$26&&$display_palette&&(58<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(58<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(58<$num_of_colors)?($27?2)}\
+"{"$color_59"}_"{$26&&$display_palette&&(59<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(59<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(59<$num_of_colors)?($27?2)}\
+"{"$color_60"}_"{$26&&$display_palette&&(60<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(60<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(60<$num_of_colors)?($27?2)}\
+"{"$color_61"}_"{$26&&$display_palette&&(61<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(61<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(61<$num_of_colors)?($27?2)}\
+"{"$color_62"}_"{$26&&$display_palette&&(62<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(62<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(62<$num_of_colors)?($27?2)}\
+"{"$color_63"}_"{$26&&$display_palette&&(63<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(63<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(63<$num_of_colors)?($27?2)}\
+"{"$color_64"}_"{$26&&$display_palette&&(64<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(64<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(64<$num_of_colors)?($27?2)}\
+"{"$color_65"}_"{$26&&$display_palette&&(65<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(65<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(65<$num_of_colors)?($27?2)}\
+"{"$color_66"}_"{$26&&$display_palette&&(66<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(66<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(66<$num_of_colors)?($27?2)}\
+"{"$color_67"}_"{$26&&$display_palette&&(67<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(67<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(67<$num_of_colors)?($27?2)}\
+"{"$color_68"}_"{$26&&$display_palette&&(68<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(68<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(68<$num_of_colors)?($27?2)}\
+"{"$color_69"}_"{$26&&$display_palette&&(69<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(69<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(69<$num_of_colors)?($27?2)}\
+"{"$color_70"}_"{$26&&$display_palette&&(70<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(70<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(70<$num_of_colors)?($27?2)}\
+"{"$color_71"}_"{$26&&$display_palette&&(71<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(71<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(71<$num_of_colors)?($27?2)}\
+"{"$color_72"}_"{$26&&$display_palette&&(72<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(72<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(72<$num_of_colors)?($27?2)}\
+"{"$color_73"}_"{$26&&$display_palette&&(73<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(73<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(73<$num_of_colors)?($27?2)}\
+"{"$color_74"}_"{$26&&$display_palette&&(74<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(74<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(74<$num_of_colors)?($27?2)}\
+"{"$color_75"}_"{$26&&$display_palette&&(75<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(75<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(75<$num_of_colors)?($27?2)}\
+"{"$color_76"}_"{$26&&$display_palette&&(76<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(76<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(76<$num_of_colors)?($27?2)}\
+"{"$color_77"}_"{$26&&$display_palette&&(77<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(77<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(77<$num_of_colors)?($27?2)}\
+"{"$color_78"}_"{$26&&$display_palette&&(78<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(78<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(78<$num_of_colors)?($27?2)}\
+"{"$color_79"}_"{$26&&$display_palette&&(79<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(79<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(79<$num_of_colors)?($27?2)}\
+"{"$color_80"}_"{$26&&$display_palette&&(80<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(80<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(80<$num_of_colors)?($27?2)}\
+"{"$color_81"}_"{$26&&$display_palette&&(81<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(81<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(81<$num_of_colors)?($27?2)}\
+"{"$color_82"}_"{$26&&$display_palette&&(82<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(82<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(82<$num_of_colors)?($27?2)}\
+"{"$color_83"}_"{$26&&$display_palette&&(83<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(83<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(83<$num_of_colors)?($27?2)}\
+"{"$color_84"}_"{$26&&$display_palette&&(84<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(84<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(84<$num_of_colors)?($27?2)}\
+"{"$color_85"}_"{$26&&$display_palette&&(85<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(85<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(85<$num_of_colors)?($27?2)}\
+"{"$color_86"}_"{$26&&$display_palette&&(86<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(86<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(86<$num_of_colors)?($27?2)}\
+"{"$color_87"}_"{$26&&$display_palette&&(87<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(87<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(87<$num_of_colors)?($27?2)}\
+"{"$color_88"}_"{$26&&$display_palette&&(88<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(88<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(88<$num_of_colors)?($27?2)}\
+"{"$color_89"}_"{$26&&$display_palette&&(89<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(89<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(89<$num_of_colors)?($27?2)}\
+"{"$color_90"}_"{$26&&$display_palette&&(90<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(90<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(90<$num_of_colors)?($27?2)}\
+"{"$color_91"}_"{$26&&$display_palette&&(91<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(91<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(91<$num_of_colors)?($27?2)}\
+"{"$color_92"}_"{$26&&$display_palette&&(92<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(92<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(92<$num_of_colors)?($27?2)}\
+"{"$color_93"}_"{$26&&$display_palette&&(93<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(93<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(93<$num_of_colors)?($27?2)}\
+"{"$color_94"}_"{$26&&$display_palette&&(94<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(94<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(94<$num_of_colors)?($27?2)}\
+"{"$color_95"}_"{$26&&$display_palette&&(95<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(95<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(95<$num_of_colors)?($27?2)}\
+"{"$color_96"}_"{$26&&$display_palette&&(96<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(96<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(96<$num_of_colors)?($27?2)}\
+"{"$color_97"}_"{$26&&$display_palette&&(97<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(97<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(97<$num_of_colors)?($27?2)}\
+"{"$color_98"}_"{$26&&$display_palette&&(98<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(98<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(98<$num_of_colors)?($27?2)}\
+"{"$color_99"}_"{$26&&$display_palette&&(99<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(99<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(99<$num_of_colors)?($27?2)}\
+"{"$color_100"}_"{$26&&$display_palette&&(100<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(100<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(100<$num_of_colors)?($27?2)}\
+"{"$color_101"}_"{$26&&$display_palette&&(101<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(101<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(101<$num_of_colors)?($27?2)}\
+"{"$color_102"}_"{$26&&$display_palette&&(102<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(102<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(102<$num_of_colors)?($27?2)}\
+"{"$color_103"}_"{$26&&$display_palette&&(103<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(103<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(103<$num_of_colors)?($27?2)}\
+"{"$color_104"}_"{$26&&$display_palette&&(104<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(104<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(104<$num_of_colors)?($27?2)}\
+"{"$color_105"}_"{$26&&$display_palette&&(105<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(105<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(105<$num_of_colors)?($27?2)}\
+"{"$color_106"}_"{$26&&$display_palette&&(106<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(106<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(106<$num_of_colors)?($27?2)}\
+"{"$color_107"}_"{$26&&$display_palette&&(107<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(107<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(107<$num_of_colors)?($27?2)}\
+"{"$color_108"}_"{$26&&$display_palette&&(108<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(108<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(108<$num_of_colors)?($27?2)}\
+"{"$color_109"}_"{$26&&$display_palette&&(109<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(109<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(109<$num_of_colors)?($27?2)}\
+"{"$color_110"}_"{$26&&$display_palette&&(110<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(110<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(110<$num_of_colors)?($27?2)}\
+"{"$color_111"}_"{$26&&$display_palette&&(111<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(111<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(111<$num_of_colors)?($27?2)}\
+"{"$color_112"}_"{$26&&$display_palette&&(112<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(112<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(112<$num_of_colors)?($27?2)}\
+"{"$color_113"}_"{$26&&$display_palette&&(113<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(113<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(113<$num_of_colors)?($27?2)}\
+"{"$color_114"}_"{$26&&$display_palette&&(114<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(114<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(114<$num_of_colors)?($27?2)}\
+"{"$color_115"}_"{$26&&$display_palette&&(115<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(115<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(115<$num_of_colors)?($27?2)}\
+"{"$color_116"}_"{$26&&$display_palette&&(116<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(116<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(116<$num_of_colors)?($27?2)}\
+"{"$color_117"}_"{$26&&$display_palette&&(117<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(117<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(117<$num_of_colors)?($27?2)}\
+"{"$color_118"}_"{$26&&$display_palette&&(118<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(118<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(118<$num_of_colors)?($27?2)}\
+"{"$color_119"}_"{$26&&$display_palette&&(119<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(119<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(119<$num_of_colors)?($27?2)}\
+"{"$color_120"}_"{$26&&$display_palette&&(120<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(120<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(120<$num_of_colors)?($27?2)}\
+"{"$color_121"}_"{$26&&$display_palette&&(121<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(121<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(121<$num_of_colors)?($27?2)}\
+"{"$color_122"}_"{$26&&$display_palette&&(122<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(122<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(122<$num_of_colors)?($27?2)}\
+"{"$color_123"}_"{$26&&$display_palette&&(123<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(123<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(123<$num_of_colors)?($27?2)}\
+"{"$color_124"}_"{$26&&$display_palette&&(124<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(124<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(124<$num_of_colors)?($27?2)}\
+"{"$color_125"}_"{$26&&$display_palette&&(125<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(125<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(125<$num_of_colors)?($27?2)}\
+"{"$color_126"}_"{$26&&$display_palette&&(126<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(126<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(126<$num_of_colors)?($27?2)}\
+"{"$color_127"}_"{$26&&$display_palette&&(127<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(127<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(127<$num_of_colors)?($27?2)}\
+"{"$color_128"}_"{$26&&$display_palette&&(128<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(128<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(128<$num_of_colors)?($27?2)}\
+"{"$color_129"}_"{$26&&$display_palette&&(129<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(129<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(129<$num_of_colors)?($27?2)}\
+"{"$color_130"}_"{$26&&$display_palette&&(130<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(130<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(130<$num_of_colors)?($27?2)}\
+"{"$color_131"}_"{$26&&$display_palette&&(131<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(131<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(131<$num_of_colors)?($27?2)}\
+"{"$color_132"}_"{$26&&$display_palette&&(132<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(132<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(132<$num_of_colors)?($27?2)}\
+"{"$color_133"}_"{$26&&$display_palette&&(133<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(133<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(133<$num_of_colors)?($27?2)}\
+"{"$color_134"}_"{$26&&$display_palette&&(134<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(134<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(134<$num_of_colors)?($27?2)}\
+"{"$color_135"}_"{$26&&$display_palette&&(135<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(135<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(135<$num_of_colors)?($27?2)}\
+"{"$color_136"}_"{$26&&$display_palette&&(136<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(136<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(136<$num_of_colors)?($27?2)}\
+"{"$color_137"}_"{$26&&$display_palette&&(137<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(137<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(137<$num_of_colors)?($27?2)}\
+"{"$color_138"}_"{$26&&$display_palette&&(138<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(138<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(138<$num_of_colors)?($27?2)}\
+"{"$color_139"}_"{$26&&$display_palette&&(139<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(139<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(139<$num_of_colors)?($27?2)}\
+"{"$color_140"}_"{$26&&$display_palette&&(140<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(140<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(140<$num_of_colors)?($27?2)}\
+"{"$color_141"}_"{$26&&$display_palette&&(141<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(141<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(141<$num_of_colors)?($27?2)}\
+"{"$color_142"}_"{$26&&$display_palette&&(142<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(142<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(142<$num_of_colors)?($27?2)}\
+"{"$color_143"}_"{$26&&$display_palette&&(143<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(143<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(143<$num_of_colors)?($27?2)}\
+"{"$color_144"}_"{$26&&$display_palette&&(144<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(144<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(144<$num_of_colors)?($27?2)}\
+"{"$color_145"}_"{$26&&$display_palette&&(145<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(145<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(145<$num_of_colors)?($27?2)}\
+"{"$color_146"}_"{$26&&$display_palette&&(146<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(146<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(146<$num_of_colors)?($27?2)}\
+"{"$color_147"}_"{$26&&$display_palette&&(147<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(147<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(147<$num_of_colors)?($27?2)}\
+"{"$color_148"}_"{$26&&$display_palette&&(148<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(148<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(148<$num_of_colors)?($27?2)}\
+"{"$color_149"}_"{$26&&$display_palette&&(149<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(149<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(149<$num_of_colors)?($27?2)}\
+"{"$color_150"}_"{$26&&$display_palette&&(150<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(150<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(150<$num_of_colors)?($27?2)}\
+"{"$color_151"}_"{$26&&$display_palette&&(151<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(151<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(151<$num_of_colors)?($27?2)}\
+"{"$color_152"}_"{$26&&$display_palette&&(152<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(152<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(152<$num_of_colors)?($27?2)}\
+"{"$color_153"}_"{$26&&$display_palette&&(153<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(153<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(153<$num_of_colors)?($27?2)}\
+"{"$color_154"}_"{$26&&$display_palette&&(154<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(154<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(154<$num_of_colors)?($27?2)}\
+"{"$color_155"}_"{$26&&$display_palette&&(155<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(155<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(155<$num_of_colors)?($27?2)}\
+"{"$color_156"}_"{$26&&$display_palette&&(156<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(156<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(156<$num_of_colors)?($27?2)}\
+"{"$color_157"}_"{$26&&$display_palette&&(157<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(157<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(157<$num_of_colors)?($27?2)}\
+"{"$color_158"}_"{$26&&$display_palette&&(158<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(158<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(158<$num_of_colors)?($27?2)}\
+"{"$color_159"}_"{$26&&$display_palette&&(159<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(159<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(159<$num_of_colors)?($27?2)}\
+"{"$color_160"}_"{$26&&$display_palette&&(160<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(160<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(160<$num_of_colors)?($27?2)}\
+"{"$color_161"}_"{$26&&$display_palette&&(161<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(161<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(161<$num_of_colors)?($27?2)}\
+"{"$color_162"}_"{$26&&$display_palette&&(162<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(162<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(162<$num_of_colors)?($27?2)}\
+"{"$color_163"}_"{$26&&$display_palette&&(163<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(163<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(163<$num_of_colors)?($27?2)}\
+"{"$color_164"}_"{$26&&$display_palette&&(164<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(164<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(164<$num_of_colors)?($27?2)}\
+"{"$color_165"}_"{$26&&$display_palette&&(165<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(165<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(165<$num_of_colors)?($27?2)}\
+"{"$color_166"}_"{$26&&$display_palette&&(166<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(166<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(166<$num_of_colors)?($27?2)}\
+"{"$color_167"}_"{$26&&$display_palette&&(167<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(167<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(167<$num_of_colors)?($27?2)}\
+"{"$color_168"}_"{$26&&$display_palette&&(168<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(168<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(168<$num_of_colors)?($27?2)}\
+"{"$color_169"}_"{$26&&$display_palette&&(169<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(169<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(169<$num_of_colors)?($27?2)}\
+"{"$color_170"}_"{$26&&$display_palette&&(170<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(170<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(170<$num_of_colors)?($27?2)}\
+"{"$color_171"}_"{$26&&$display_palette&&(171<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(171<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(171<$num_of_colors)?($27?2)}\
+"{"$color_172"}_"{$26&&$display_palette&&(172<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(172<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(172<$num_of_colors)?($27?2)}\
+"{"$color_173"}_"{$26&&$display_palette&&(173<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(173<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(173<$num_of_colors)?($27?2)}\
+"{"$color_174"}_"{$26&&$display_palette&&(174<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(174<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(174<$num_of_colors)?($27?2)}\
+"{"$color_175"}_"{$26&&$display_palette&&(175<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(175<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(175<$num_of_colors)?($27?2)}\
+"{"$color_176"}_"{$26&&$display_palette&&(176<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(176<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(176<$num_of_colors)?($27?2)}\
+"{"$color_177"}_"{$26&&$display_palette&&(177<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(177<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(177<$num_of_colors)?($27?2)}\
+"{"$color_178"}_"{$26&&$display_palette&&(178<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(178<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(178<$num_of_colors)?($27?2)}\
+"{"$color_179"}_"{$26&&$display_palette&&(179<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(179<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(179<$num_of_colors)?($27?2)}\
+"{"$color_180"}_"{$26&&$display_palette&&(180<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(180<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(180<$num_of_colors)?($27?2)}\
+"{"$color_181"}_"{$26&&$display_palette&&(181<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(181<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(181<$num_of_colors)?($27?2)}\
+"{"$color_182"}_"{$26&&$display_palette&&(182<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(182<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(182<$num_of_colors)?($27?2)}\
+"{"$color_183"}_"{$26&&$display_palette&&(183<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(183<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(183<$num_of_colors)?($27?2)}\
+"{"$color_184"}_"{$26&&$display_palette&&(184<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(184<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(184<$num_of_colors)?($27?2)}\
+"{"$color_185"}_"{$26&&$display_palette&&(185<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(185<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(185<$num_of_colors)?($27?2)}\
+"{"$color_186"}_"{$26&&$display_palette&&(186<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(186<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(186<$num_of_colors)?($27?2)}\
+"{"$color_187"}_"{$26&&$display_palette&&(187<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(187<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(187<$num_of_colors)?($27?2)}\
+"{"$color_188"}_"{$26&&$display_palette&&(188<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(188<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(188<$num_of_colors)?($27?2)}\
+"{"$color_189"}_"{$26&&$display_palette&&(189<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(189<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(189<$num_of_colors)?($27?2)}\
+"{"$color_190"}_"{$26&&$display_palette&&(190<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(190<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(190<$num_of_colors)?($27?2)}\
+"{"$color_191"}_"{$26&&$display_palette&&(191<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(191<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(191<$num_of_colors)?($27?2)}\
+"{"$color_192"}_"{$26&&$display_palette&&(192<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(192<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(192<$num_of_colors)?($27?2)}\
+"{"$color_193"}_"{$26&&$display_palette&&(193<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(193<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(193<$num_of_colors)?($27?2)}\
+"{"$color_194"}_"{$26&&$display_palette&&(194<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(194<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(194<$num_of_colors)?($27?2)}\
+"{"$color_195"}_"{$26&&$display_palette&&(195<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(195<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(195<$num_of_colors)?($27?2)}\
+"{"$color_196"}_"{$26&&$display_palette&&(196<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(196<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(196<$num_of_colors)?($27?2)}\
+"{"$color_197"}_"{$26&&$display_palette&&(197<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(197<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(197<$num_of_colors)?($27?2)}\
+"{"$color_198"}_"{$26&&$display_palette&&(198<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(198<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(198<$num_of_colors)?($27?2)}\
+"{"$color_199"}_"{$26&&$display_palette&&(199<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(199<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(199<$num_of_colors)?($27?2)}\
+"{"$color_200"}_"{$26&&$display_palette&&(200<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(200<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(200<$num_of_colors)?($27?2)}\
+"{"$color_201"}_"{$26&&$display_palette&&(201<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(201<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(201<$num_of_colors)?($27?2)}\
+"{"$color_202"}_"{$26&&$display_palette&&(202<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(202<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(202<$num_of_colors)?($27?2)}\
+"{"$color_203"}_"{$26&&$display_palette&&(203<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(203<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(203<$num_of_colors)?($27?2)}\
+"{"$color_204"}_"{$26&&$display_palette&&(204<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(204<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(204<$num_of_colors)?($27?2)}\
+"{"$color_205"}_"{$26&&$display_palette&&(205<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(205<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(205<$num_of_colors)?($27?2)}\
+"{"$color_206"}_"{$26&&$display_palette&&(206<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(206<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(206<$num_of_colors)?($27?2)}\
+"{"$color_207"}_"{$26&&$display_palette&&(207<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(207<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(207<$num_of_colors)?($27?2)}\
+"{"$color_208"}_"{$26&&$display_palette&&(208<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(208<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(208<$num_of_colors)?($27?2)}\
+"{"$color_209"}_"{$26&&$display_palette&&(209<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(209<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(209<$num_of_colors)?($27?2)}\
+"{"$color_210"}_"{$26&&$display_palette&&(210<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(210<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(210<$num_of_colors)?($27?2)}\
+"{"$color_211"}_"{$26&&$display_palette&&(211<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(211<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(211<$num_of_colors)?($27?2)}\
+"{"$color_212"}_"{$26&&$display_palette&&(212<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(212<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(212<$num_of_colors)?($27?2)}\
+"{"$color_213"}_"{$26&&$display_palette&&(213<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(213<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(213<$num_of_colors)?($27?2)}\
+"{"$color_214"}_"{$26&&$display_palette&&(214<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(214<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(214<$num_of_colors)?($27?2)}\
+"{"$color_215"}_"{$26&&$display_palette&&(215<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(215<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(215<$num_of_colors)?($27?2)}\
+"{"$color_216"}_"{$26&&$display_palette&&(216<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(216<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(216<$num_of_colors)?($27?2)}\
+"{"$color_217"}_"{$26&&$display_palette&&(217<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(217<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(217<$num_of_colors)?($27?2)}\
+"{"$color_218"}_"{$26&&$display_palette&&(218<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(218<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(218<$num_of_colors)?($27?2)}\
+"{"$color_219"}_"{$26&&$display_palette&&(219<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(219<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(219<$num_of_colors)?($27?2)}\
+"{"$color_220"}_"{$26&&$display_palette&&(220<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(220<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(220<$num_of_colors)?($27?2)}\
+"{"$color_221"}_"{$26&&$display_palette&&(221<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(221<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(221<$num_of_colors)?($27?2)}\
+"{"$color_222"}_"{$26&&$display_palette&&(222<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(222<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(222<$num_of_colors)?($27?2)}\
+"{"$color_223"}_"{$26&&$display_palette&&(223<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(223<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(223<$num_of_colors)?($27?2)}\
+"{"$color_224"}_"{$26&&$display_palette&&(224<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(224<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(224<$num_of_colors)?($27?2)}\
+"{"$color_225"}_"{$26&&$display_palette&&(225<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(225<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(225<$num_of_colors)?($27?2)}\
+"{"$color_226"}_"{$26&&$display_palette&&(226<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(226<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(226<$num_of_colors)?($27?2)}\
+"{"$color_227"}_"{$26&&$display_palette&&(227<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(227<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(227<$num_of_colors)?($27?2)}\
+"{"$color_228"}_"{$26&&$display_palette&&(228<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(228<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(228<$num_of_colors)?($27?2)}\
+"{"$color_229"}_"{$26&&$display_palette&&(229<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(229<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(229<$num_of_colors)?($27?2)}\
+"{"$color_230"}_"{$26&&$display_palette&&(230<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(230<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(230<$num_of_colors)?($27?2)}\
+"{"$color_231"}_"{$26&&$display_palette&&(231<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(231<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(231<$num_of_colors)?($27?2)}\
+"{"$color_232"}_"{$26&&$display_palette&&(232<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(232<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(232<$num_of_colors)?($27?2)}\
+"{"$color_233"}_"{$26&&$display_palette&&(233<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(233<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(233<$num_of_colors)?($27?2)}\
+"{"$color_234"}_"{$26&&$display_palette&&(234<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(234<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(234<$num_of_colors)?($27?2)}\
+"{"$color_235"}_"{$26&&$display_palette&&(235<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(235<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(235<$num_of_colors)?($27?2)}\
+"{"$color_236"}_"{$26&&$display_palette&&(236<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(236<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(236<$num_of_colors)?($27?2)}\
+"{"$color_237"}_"{$26&&$display_palette&&(237<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(237<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(237<$num_of_colors)?($27?2)}\
+"{"$color_238"}_"{$26&&$display_palette&&(238<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(238<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(238<$num_of_colors)?($27?2)}\
+"{"$color_239"}_"{$26&&$display_palette&&(239<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(239<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(239<$num_of_colors)?($27?2)}\
+"{"$color_240"}_"{$26&&$display_palette&&(240<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(240<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(240<$num_of_colors)?($27?2)}\
+"{"$color_241"}_"{$26&&$display_palette&&(241<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(241<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(241<$num_of_colors)?($27?2)}\
+"{"$color_242"}_"{$26&&$display_palette&&(242<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(242<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(242<$num_of_colors)?($27?2)}\
+"{"$color_243"}_"{$26&&$display_palette&&(243<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(243<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(243<$num_of_colors)?($27?2)}\
+"{"$color_244"}_"{$26&&$display_palette&&(244<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(244<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(244<$num_of_colors)?($27?2)}\
+"{"$color_245"}_"{$26&&$display_palette&&(245<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(245<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(245<$num_of_colors)?($27?2)}\
+"{"$color_246"}_"{$26&&$display_palette&&(246<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(246<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(246<$num_of_colors)?($27?2)}\
+"{"$color_247"}_"{$26&&$display_palette&&(247<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(247<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(247<$num_of_colors)?($27?2)}\
+"{"$color_248"}_"{$26&&$display_palette&&(248<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(248<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(248<$num_of_colors)?($27?2)}\
+"{"$color_249"}_"{$26&&$display_palette&&(249<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(249<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(249<$num_of_colors)?($27?2)}\
+"{"$color_250"}_"{$26&&$display_palette&&(250<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(250<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(250<$num_of_colors)?($27?2)}\
+"{"$color_251"}_"{$26&&$display_palette&&(251<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(251<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(251<$num_of_colors)?($27?2)}\
+"{"$color_252"}_"{$26&&$display_palette&&(252<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(252<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(252<$num_of_colors)?($27?2)}\
+"{"$color_253"}_"{$26&&$display_palette&&(253<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(253<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(253<$num_of_colors)?($27?2)}\
+"{"$color_254"}_"{$26&&$display_palette&&(254<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(254<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(254<$num_of_colors)?($27?2)}\
+"{"$color_255"}_"{$26&&$display_palette&&(255<$num_of_colors)?2}\
+"{0}_"{$26&&$display_palette&&(255<$num_of_colors)?(!$27?2)}\
+"{0}_"{$26&&$display_palette&&(255<$num_of_colors)?($27?2)}\
+"{0}_"{$26&&$display_palette?2}\
+"{0}_"{$26&&$display_palette&&$27?2}\
+"{$1311}"\
+"{$1312}"\
+"{$1313}_"{!$1?((!$25||$tcrc_windows_width_check)?1:2)}\
+"{"$tcrc_windows_width_check"}_"{!$1?(!$25?1:2)}\
+"{$1315}_"{!$1?((!$25||$tcrc_windows_height_check)?1:2)}\
+"{"$tcrc_windows_height_check"}_"{!$1?(!$25?1:2)}\
+"{$1317}_"{$1?2}\
+"{$1318}_"{$img_cont_alp?2}\
+"{$1319}_"{$img_cont_alp?($1318?2:1)}\
+"{$1320}_"{$img_cont_alp?($1318?2:1)}\
+"{$1321}_"{$img_cont_alp?($1318?(!$1?2):(!$1?1))}\
+"{$1322}_"{$img_cont_alp?($1318?($1?2):($1?1))}\
+"{$1323}_"{$img_cont_alp?($1318?(!$1&&$1321==1?2):(!$1&&$1321==1?1))}\
+"{$1324}_"{$img_cont_alp?($1318?(!$1?($1321==2?2:0)):(!$1?($1321==2?1:0)))}\
+"{"$text_box"}"\
+"{$20}"\
+"{"$imported"}"\
+"{$1328}"\
+"{"$message_out"}"\
+"{"$out_status"}"\
+"{"$status_color"}"\
+"{$1334}"\
+"{$1335,$1336}"
 #@gui Color Modulo Texture:gui_rep_colmt,gui_rep_colmt_preview
 #@gui :_=note("This filter is inspired by <a href="https://forums.getpaint.net/topic/111782-color-modulo-texture-tool-ymd20170922/">Color Modulo</a> plugin made by <b>MadJik</b> for <a href="https://www.getpaint.net/">Paint.NET</a> software.\n\nPreview is inaccurate! Use 100% Zoom Preview for most accuracy!"), _=separator()
 #@gui :_=note("<b>Colour and Channel Setting</b>"), _=separator()
