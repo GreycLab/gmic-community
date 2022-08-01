@@ -1543,18 +1543,22 @@ m "generate_border :
   sy=(y+1)*pixel_size-ip;
   ex=(x+1)*pixel_size+max(iq-1,0);
   ey=(y+1)*pixel_size+max(iq-1,0);
-  if(i!=j(1,0,0,0,0,1),polygon(#-1,4,
-   sx,iy,
-   ex,iy,
-   ex,ey,
-   sx,ey,
-  1,color););
-  if(i!=j(0,1,0,0,0,1),polygon(#-1,4,
-   ix,sy,
-   ex,sy,
-   ex,ey,
-   ix,ey,
-  1,color););
+  if(i!=j(1,0,0,0,0,1),
+   polygon(#-1,4,
+    sx,iy,
+    ex,iy,
+    ex,ey,
+    sx,ey,
+   1,color);
+  );
+  if(i!=j(0,1,0,0,0,1),
+   polygon(#-1,4,
+    ix,sy,
+    ex,sy,
+    ex,ey,
+    ix,ey,
+   1,color);
+  );
 # end(
 #  polygon(#-1,4,
 #   0,0,
@@ -2963,7 +2967,6 @@ fi
 #@cli : Return the inverse permutation.
 #@cli :
 #@cli : number_list must be in the form of 0,1,2,3.... , but can be in any order.
-#@cli : $ ('xyzc') (${rep_invert_permute\ 3,0,1,2}) f. i(#-2,i) echo {t} rm
 rep_inverse_permutation:
 if $#>1
  if sort([$*])==expr('x',$#)
@@ -14945,38 +14948,52 @@ else
 
  fi
 fi
-#@cli rep_aspect_crop_2d: _width_ratio>=1,_height_ratio>=1,-1<=_shift_factor[%]<=1,_interpolation={ 0=nearest | 1=linear }
+#@cli rep_aspect_crop_2d: _width_ratio>=1,_height_ratio>=1,-1<=_shift_factor[%]<=1
 #@cli : Crop images based on specified aspect ratio.
 #@cli : Default value: 'shift_factor=0'\n
 #@cli : Author: Reptorian.
 rep_aspect_crop_2d:
-skip ${3=0},${4=0}
+skip ${3=0}
 
-foreach {
+ratio_w,ratio_h,_arc2d_crop_shift_factor=${1-2},{(cut($3,-1,1)+1)/2}
 
- A=$1
- B=$2
- shift_factor=$3
+_arc2d_crop_ratio,inv_arc2d_crop_ratio={$ratio_w/$ratio_h},{$ratio_h/$ratio_w}
 
- if $A==$B
+_min_arc_2d_ratio={min($_arc2d_crop_ratio,$inv_arc2d_crop_ratio)}
 
-  if w>h
-   r {h},100%,1,100%,0,0,{.5+$shift_factor/2},.5
-  else
-   r 100%,{w},1,100%,0,0,0.5,{.5+$shift_factor/2}
-  fi
+if $ratio_w==$ratio_h
+  m "cmd_arc_2d_crop :
+    if w==h return fi
+    
+    if w>h
+      start_point={int($_arc2d_crop_shift_factor*(w-h))}
+      crop $start_point,0,{$start_point+h-1},{h-1}
+    else
+      start_point={int($_arc2d_crop_shift_factor*(h-w))}
+      crop 0,$start_point,{w-1},{$start_point+w-1}
+    fi
+    "
+else
+  m "cmd_arc_2d_crop :
+    ratio={w/h}
+    
+    if $ratio==$_arc2d_crop_ratio return fi
+    
+    if $_arc2d_crop_ratio>$ratio
+      nh={round($_min_arc_2d_ratio*$ratio*h)}
+      start_point={int($_arc2d_crop_shift_factor*(h-$nh))}
+      crop 0,$start_point,{w-1},{$start_point+$nh-1}
+    else
+      nw={round($_min_arc_2d_ratio/$ratio*w)}
+      start_point={int($_arc2d_crop_shift_factor*(w-$nw))}
+      crop $start_point,0,{$start_point+$nw-1},{h-1}
+    fi
+    "
+fi
 
- else
+foreach { cmd_arc_2d_crop }
 
-  if ($A/$B)>(w/h)
-   r 100%,{$B/$A*(w/h)*100}%,1,100%,0,0,0.5,{.5+$shift_factor/2}
-  else
-   r {$A/$B/(w/h)*100}%,100%,1,100%,0,0,{.5+$shift_factor/2},0.5
-  fi
-
- fi
-
-}
+um cmd_arc2d_crop
 #@cli rep_nebulous: _main_surf_xy_factor>0,_main_surf_x_factor>0,_main_surf_y_factor>0,-100<=_x_center[%]<=100,-100<=_y_center[%]<=100,0<=_fxyangle<=360,_wave,0<=_lighting_angle<=360,_disturbance>=0,_distx,_disty,0<=_distangle<=360,_disturbance_mode={ 0= do_not_scale | 1=scale_by_axisfact },_color={ 0=gray | 1=color },_alpha_base={ 0=None | 1=hard_light | 2=hard_shade | 3=soft_light | 4=soft_light },_subpixelevel>=0,subpixelprocessingmethod={ 0=Average | 1=Linear | 2=Grid | 3=Bicubic | 4=Lanczos }
 #@cli : Creates a Nebulous texture inspired by its Paint.NET plugin equivalent made by MadJik.\n
 #@cli : '_main_surf_xy_factor' - Amount of waves by xy-axis.
