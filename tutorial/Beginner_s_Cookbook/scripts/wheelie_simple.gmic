@@ -1,129 +1,134 @@
-wheelie :
-   # wheelie: a circle of a particular (1) radius, (2) phase angle
-   # (orientation) and (3) discrete angular velocity - a relative
-   # integral number of revolutions per however long one revolution
-   # takes. Wheelies chain together, the center of one situated at 0°
-   # on the rim of its predecessor. The first wheelie of the chain
-   # centers at the origin and the last has, instead of another
-   # wheelie, an attached marking pen. Thus, the entire ensemble 
-   # draws an "arabesque" as the individual wheelies rotate at their
-   #  respective angular velocities from their initial orientations.
+#@cli gtutor_wheelie : radius₀>0,–∞<orientation₀<+∞,-∞<rotational rate₀<+∞…
+#@cli : Compose an arabesque from a chain of wheelies; specify each
+#@cli : link with triplets: radius (+float), orientation (±degrees,
+#@cli : float), rotational rate (±integer) and draw on the selected
+#@cli : images.  A wheelie is a tail-anchored rotating vector of a
+#@cli : particular (1) radius, (2) phase angle (orientation) and (3)
+#@cli : discrete rotational rate, some relative integral number of
+#@cli : revolutions per an unspecified period. Wheelies chain
+#@cli : together, the center of one situated at the 0° mark on the
+#@cli : rim of its antecedent. The first wheelie of the chain
+#@cli : centers on the origin and the last has attached instead of
+#@cli : another wheelie, a marking pen. Thus, the entire ensemble
+#@cli : draws an "arabesque" as the individual wheelies rotate at
+#@cli : their respective rotational rates and from their initial
+#@cli : orientations.
+#@cli : $ 1024,1024,1,1 gtutor_wheelie. 0.5,67,1,0.25,0,-3 name. tricirc
 
+gtutor_wheelie: 
    # Fetch an arbitrarily long argument list to $a0, $a1, …, $an
 
    $=a
 
    # Expect data triplets: radius, phase angle, angular velocity.
 
-   -check "isint($a1) && !(($#-1)%3)"
-
-   # Initial argument: side width (sw)
-
-   sw={$a1/2}
+   -check "!(($#)%3)"
 
    # Argument image: For each wheelie, compose radius and phase
    # arguments into a transformation matrix. In the generation
    # loop, we compose this with the angle resulting from one
    # angular velocity step.
 
-   wcnt={int(($#-1)/3)}
+   wcnt={int(($#)/3)}
    -input $wcnt,1,1,12
    -name.  args
 
-   # Iterate over argument vector. For each triplet – representing a
-   # wheelie – Fetch radius (rad), phase angle (ang) and angular
-   # velocity (sf) parameters.
+   # Iterate over argument vector. For each triplet –
+   # representing a delta wheelie – Fetch radius (rad), phase
+   # angle (ang) and angular velocity (sf) parameters.
 
-   -repeat $#-1 j=$>
+   -repeat $# j=$>
       -if   $j%3==0 # get radius
-         rad=${a{2+$j}}
+         rad=${a{1+$j}}
          -check isnum($rad)" && "$rad>=0
          -set[args] $rad,{round($j/3,1,-1)},0,0,0
       -elif $j%3==1 # get angle, degrees
-         ang=${a{2+$j}}
-         -check isnum($ang)" && "$ang>=0" && "$ang<=360
+         ang=${a{1+$j}}
+         -check isnum($ang)
          -set[args] $ang,{round($j/3,1,-1)},0,0,1
       -else         # get ω and set spectral coefficient
-         sf=${a{2+$j}}
+         sf=${a{1+$j}}
          -set[args] $sf,{round($j/3,1,-1)},0,0,2
       -fi
    -done
 
-   # Iterate over argument image, each 12 channel pixel representing
-   # one wheelie. The first three channels contain wheelie radius,
-   # phase angle and radial velocity. Compose a matrix transforming
-   # the origin to the tip of the wheelie, a radial translation and
-   # phase rotation. Populate the nine remaining channels with this
-   # matrix.
+   # Iterate over argument image, each 12 channel pixel
+   # representing one wheelie. The first three channels contain
+   # wheelie radius, phase angle and radial velocity. Compose a
+   # matrix transforming the origin to the tip of the wheelie, a
+   # radial translation and phase rotation. Populate the nine
+   # remaining channels with this matrix.
 
    -fill[args] ">
-           CPX=I;
-           orot=rot([0,0,1],deg2rad(CPX[1])); # phase rotation
-           xlat=eye(3);
-           xlat[2]=CPX[0];                    # translation origin
-           [CPX[0,3,1],mul(orot,xlat,3)];     # -to-rim, i.e.
-               "                              # 'rotation & xlation'
-                                              # store above in
-                                              # 12-channel pixel
+        CPX=I;
+        orot=rot([0,0,1],deg2rad(CPX[1])); # phase rotation
+        xlat=eye(3);
+        xlat[2]=CPX[0];                    # translation origin
+        [CPX[0,3,1],mul(orot,xlat,3)];     # -to-rim, i.e.
+               "                           # 'rotation & xlation'
+                                           # store above in
+                                           # 12-channel pixel
    -permute[args] cyzx
    -store[args] circles
 
    # Screenspace transform.
-   ssxfrm={"
-            specw=get('sw',0,0);
-            id=eye(3);
-            id[0]=specw;
-            id[2]=specw;
-            id[4]=-specw;
-            id[5]=specw;
-            id
-           "}
+   foreach {
+       # Draw arabesques on the current image
+       # Designate it as the drawing "canvas".
+       -name. canvas
+       specw={int(min(w,h)/2)} 
+       ssxfrm={"
+                sw=get('specw',0,0);
+                id=eye(3);
+                id[0]=sw;
+                id[2]=sw;
+                id[4]=-sw;
+                id[5]=sw;
+                id
+               "}
+       atk=0 # Accumulate "angular ticks"...
+       lastpt={vector3([0,0,1])}
+       firstpt={vector3([0,0,1])}
+       -repeat 3*$specw k=$>
+         # For each wheelie:
+         # increment by angular velocity
+         # find corresponding rotation matrix
+         # compose with radial argument image,
+         # compose with screenspace transform
+         # and plot via polygon().
 
-   # Draw arabesques on this image
-   -input {2*$sw},{2*$sw},1,1
-   -name. canvas
-
-   atk=0
-   lastpt={vector3([0,0,1])}
-   firstpt={vector3([0,0,1])}
-   -repeat 3*$sw k=$>
-       # For each wheelie:
-       # increment by angular velocity
-       # find corresponding rotation matrix
-       # compose with radial argument image, compose
-       # with screenspace transform and plot via polygon().
-
-       -eval ">
-           const cc=$wcnt;
-           fpt=get('firstpt',3,0);
-           ik=get('k',0,0);
-           lpt=get('lastpt',3,0);
-           omega=get('atk',0,0);
-           specw=get('sw',0,0);
-           circs=get('circles',12*cc,0);
-           pp=vector3([0,0,1]);
-           imat=eye(3);
-           repeat(
-                 cc,k,
-                 idx=cc-k-1;
-                 imat=mul(
-                         mul(
-                            rot([0,0,1],circs[12*idx+2]*omega),
-                            circs[12*idx+3,9,1],
-                            3
-                            ),
-                         imat,
-                         3
-                         );
-                 );
-           ssx=get('ssxfrm',9,0);
-           plt=ssx*(imat*pp);
-           ik>0?
-           polygon(#$canvas,-2,[plt[0,2],lpt[0,2]],1,0xffffffff,255):
-           store('firstpt',plt,3,1,1,1);
-           store('lastpt',plt,3,1,1,1);
-           ik==(3*specw-1)?
-           polygon(#$canvas,-2,[fpt[0,2],plt[0,2]],1,0xffffffff,255)
-              "
-       atk={2*pi*($k/(3*$sw-1))}
-   -done
+         -eval ">
+          const cc=$wcnt;
+          fpt=get('firstpt',3,0);
+          ik=get('k',0,0);
+          lpt=get('lastpt',3,0);
+          omega=get('atk',0,0);
+          sw=get('specw',0,0);
+          circs=get('circles',12*cc,0);
+          pp=vector3([0,0,1]);
+          imat=eye(3);
+          repeat(
+                cc,k,
+                idx=cc-k-1;
+                imat=mul(
+                        mul(
+                           rot([0,0,1],circs[12*idx+2]*omega),
+                           circs[12*idx+3,9,1],
+                           3
+                           ),
+                        imat,
+                        3
+                        );
+                );
+          ssx=get('ssxfrm',9,0);
+          plt=ssx*(imat*pp);
+          ik>0?
+          polygon(#$canvas,-2,[plt[0,2],lpt[0,2]],1,0xffffffff,255):
+          store('firstpt',plt,3,1,1,1);
+          store('lastpt',plt,3,1,1,1);
+          ik==(3*sw-1)?
+          polygon(#$canvas,-2,[fpt[0,2],plt[0,2]],1,0xffffffff,255)
+               "
+          atk={2*pi*($k/(3*$specw-1))}
+       -done
+   } #foreach

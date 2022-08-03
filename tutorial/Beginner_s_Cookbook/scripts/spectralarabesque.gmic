@@ -1,85 +1,80 @@
-#@cli fwheelie : spectral_width,radius_0,angle_0,angular_velocity_0…
-#@cli : Plot a two channel image of the discrete frequency domain
-#@cli : that generates the arabesque corresponding to the supplied
-#@cli : wheelie parameters, r, θ and ±ω triplet(s) on the command
-#@cli : line. (1) width and height of the phase plot portraying
-#@cli : the wheelie (2...) r, θ, ±ω triplets, length, degrees
-#@cli : orientation and revolutions +ω (counterclockwise) or -ω
-#@cli : (clockwise); one triplet for each wheelie. Fwheelie leaves a
-#@cli : ½(spectral_width+spectral_width%2?0:1),1,1,2 image on the
-#@cli : list with plotted wheelie sums as complex frequency domain
-#@cli : ordinals; channel 0 real and channel 1 imaginary. Image
-#@cli : suitable as a specplot selection, which generates the phase
-#@cli : plot.
+#@cli gtutor_fwheelie : radius₀,angle₀,angular_velocity₀…
+#@cli : Plot a two channel discrete frequency domain image corresponding to
+#@cli : the supplied wheelie parameters: +r, ±θ and ±f triplet(s) on the command
+#@cli : line, one triplet for each wheelie. Image suitable as a gtutor_specplot
+#@cli : selection, which generates the arabesque.
+#@cli : $ 1024,1024,1,1 gtutor_fwheelie. 0.5,67,1,0.25,0,-3 gtutor_specplot. name. circ_segment_triangle
 
-fwheelie :
+gtutor_fwheelie:
    # Pseudo assignment expands to command line arguments
    $=a
 
    # Expect data triplets $a1,$a2,$a3…
 
-   -check {!(($#-1)%3)}
+   -check {!($#%3)}
+ 
+    $=a
+    dwheelcnt={$#/3}
+    -input $dwheelcnt,1,1,3
+    -name. args
+    -repeat $# j=$>
+       if   $j%3==0
+           -set[args] ${a{$j+1}},{int($j/3)},0,0,0
+       elif $j%3==1
+           -set[args] ${a{$j+1}},{int($j/3)},0,0,1
+       else
+           -set[args] ${a{$j+1}},{int($j/3)},0,0,2
+       fi
+    -done
+    -store[args] deltawheelies
 
-   # Phase plot is 2*$sw × 2*$sw for mapping to
-   # [-1…1] on a side in the complex plane; force $sw odd.
+   foreach {
+      # For each selected image:
+      # Fetch and check radius
+      # velocity parameters. Aggregate Σf -> $accsf; Σθ → $acca
+      # specw={k=int(min(w,h)/2);!(k%2)?k+1:k}
+      specw={int(min(w,h)/2)}
 
-   sw={$a1/2}
-   -if $sw%2==0
-      sw+=1
-   -fi
+      #coeffcient image
+      -input $specw,1,1,2
+      -name carray
+      -store[carray] coefficientarray
 
-   # carray: Two row vectors for real and imaginary
-   # frequency domain ordinals. Size from first argument.
-
-   -input $sw,1,1,2
-   -name. carray
-
-   # Fetch and check diameter, phase angle and angular
-   # velocity parameters. Aggregate Σω -> $accsf; Σθ → $acca
-
-   accsf=0
-   acca=0
-
-   # Iterate over arguments; populate carray and aggregate.
-
-   -repeat $#-1 j=$>
-      -if   $j%3==0 # get radius r
-         rad=${a{2+$j}}
-         -check isnum($rad)" && "$rad>=0
-      -elif $j%3==1 # get angle, θ, degrees
-         ang=${a{2+$j}}
-         -check isnum($ang)" && "$ang>=0" && "$ang<=360
-         acca+=$ang
-      -else         # get ω, revolutions
-         sf=${a{2+$j}}
-
-         accsf+=$sf
-         -if $accsf<0
-            sf={($sw+$accsf)%$sw}
-         -elif $accsf>=0
-            sf=$accsf
-         -fi
-         # Ordinal components via Σθ, then populate freq. dom.
-         rr={$rad*cos(deg2rad($acca))}
-         ir={$rad*sin(deg2rad($acca))}
-         -set[carray] {$rr+i(#0,$sf,0,0,0)},$sf,0,0,0
-         -set[carray] {$ir+i(#0,$sf,0,0,1)},$sf,0,0,1
-      -fi
-   -done
-
-   # Scale freq. dom. by dom. length - for ifft.
-   # carray: frequency domain image generated from
-   # the given wheelie chain.
+      # Iterate over arguments; populate carray and aggregate.
    
-   -mul[carray] $sw
+      -eval "const wc=$dwheelcnt;
+             const sw=$specw;
+         dw=get('deltawheelies',wc*3);
+         ca=get('coefficientarray',sw*2);
+         acca=0;
+         accsf=0;
+         repeat(
+                      wc,
+                      k,
+                      r=dw[k];
+                      acca+=deg2rad(dw[wc+k]);
+                      accsf=dw[2*wc+k]+accsf;
+                      aidx=accsf%sw;
+                      ca[aidx]+=r*cos(acca);
+                      ca[sw+aidx]+=r*sin(acca);
+                   );
+             store('coefficientarray',ca,sw,1,1,2)"
+   
+      # Scale freq. dom. by dom. length - for ifft.
+      # carray: frequency domain image generated from
+      # the given wheelie chain.
+      -input $coefficientarray
+      -name. carray
+      -mul[carray] $specw
+      -keep[carray]
+   }
 
-#@cli specplot : 
+#@cli gtutor_specplot : 
 #@cli : Generate a phase plot from the selected frequency
-#@cli : domain image.
+#@cli : domain images.
 
-specplot :
-   -foreach
-     {
+gtutor_specplot :
+   -foreach {
         # Frequency domain → time domain
         -name. carray
         -split[carray] c
@@ -115,4 +110,4 @@ specplot :
                                      )
                             )"
         -keep[canvas]
-     }
+     } #foreach
