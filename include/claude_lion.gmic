@@ -444,3 +444,116 @@ cl_lineart:
 
 cl_lineart_preview:
 	gui_split_preview "cl_lineart $*",${-3--1}
+
+#@gui _<b>Frames</b>
+#------------------
+#@gui Frame [Relief]: cl_reliefFrame, cl_reliefFrame(1)
+#@gui : note = note("<b>Frame Limit:</b>")
+#@gui : Type = choice(2, "Outset", "Inset", "Groove", "Ridge")
+#@gui : Size = float(10,6,40)
+#@gui : Relief Width = float(1.5,0,10)
+#@gui : Relief Amount = float(75,0,127)
+#@gui : sep = separator()
+#@gui : note = note("<b>Frame Area:</b>")
+#@gui : Kaleidoscope Effect = bool(1)
+#@gui : Frame Blur = float(60,5,80)
+#@gui : Frame Hue Change = float(0,-180,180)
+#@gui : Frame Saturation Change = float(0,-1,1)
+#@gui : Frame Luminosity Change = float(0,-0.5,0.5)
+#@gui : sep = separator()
+#@gui : note = note("<b>Graininess:</b>")
+#@gui : Graininess Type = choice("Gaussian", "Uniform", "Poisson")
+#@gui : Graininess Amount = float(0,0,80)
+#@gui : Graininess on = choice("Frame", "Picture", "Both")
+#@gui : sep = separator()
+#@gui : url = link("Filter discussed here","http://gimpchat.com/viewtopic.php?f=28&t=20005#p274661")
+#@gui : note = note("<small>Author: <i>Claude Lion</i>. Latest Update: <i>2022/08/18</i>.</small>")
+#@gui : note = note("<small>It uses filters of David Tschumperlé and an algorithm of Reptorian.</small>")
+
+cl_reliefFrame:
+
+	frameType,frameSize,reliefWidth,reliefAmount,kaleido,frameBlur,frameHue,frameSat,frameLum,grainType,grainAmount,grainFrameOn=$*
+
+	if $grainType==2
+		grainType=3
+	fi
+
+	foreach {
+		remove_opacity.
+
+		[-1]
+		if $kaleido
+			fx_kaleidoscope. 50,50,0,0,100,10,2
+		fi
+		b. $frameBlur
+
+		l.
+			rgb2hsl split c
+			+. $frameLum c. 0,1
+			+.. $frameSat c.. 0,1
+			+... $frameHue %... 360
+			a c hsl2rgb
+		done
+
+		if $grainFrameOn==0
+			fx_noise. $grainAmount,$grainType,16,1,0,50,50
+		elif $grainFrameOn==1
+			fx_noise.. $grainAmount,$grainType,16,1,0,50,50
+		fi
+
+		100%,100%,1,1,0
+		fx_frame_round. $frameSize,20,1,255,255,255,255,0,0,3
+		remove_opacity.
+		n. 0,255
+
+		[-1]
+
+		if $frameType>=1 # inset, groove, ridge
+			negate.
+		fi
+
+		if $frameType>=2 # groove, ridge
+			gradient_norm.
+		fi
+
+		if $frameType==3 # ridge
+			negate.
+		fi
+
+		fx_smooth_antialias. 100,10,5,0,50,50
+		
+		negate.
+
+
+
+		l.
+			# inspired by emboss_image of Reptorian
+			b. $reliefWidth
+			fill. if(abs(i)<1e-10,0,i) # to work around https://github.com/dtschump/gmic/issues/402
+			gradient2rgb. 0 n. 0,255
+			[-1]
+			rgb2hsv[-2,-1] split[-2,-1] c
+
+			l[-3--1] +[-3] {315} %[-3] 360 done
+			l[-6--4] +[-3] {135} %[-3] 360 done
+			l[-3--1] a c hsv2rgb s c done
+			l[-6--4] a c hsv2rgb s c done
+			rm[^-6,-3]
+			negate..
+			/ 2
+			+. 128
+			blend grainmerge,1
+		done
+		to_rgb.
+
+		apply_curve. 1,0,{127-$reliefAmount},255,{128+$reliefAmount}
+
+		fill[0] i#2*i#1+(255-i#2)*i n[0] 0,255
+		rm.. rm..
+
+		blend grainmerge,1
+		if $grainFrameOn==2
+			fx_noise. $grainAmount,$grainType,16,1,0,50,50
+		fi
+	}
+
