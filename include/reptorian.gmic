@@ -60,57 +60,65 @@
 +rep_lavander_binary_map:
 skip ${1=11},${2=2},${3=01},${4=10},${5=0},${6=}
 
-check "$1>0&&($1==int($1))"
+check "$1>0&&($1==int($1))&&(isint($2)||('-'=='$2'))"
 
-a6={narg('$6')}
-shift,length,mode,str_code={int(abs($5))},{2^$1},{($2>=0||!$a6)?int($2)%3:-1},0
+a6={size('$6')}
+shift,length,mode,str_code={int(abs($5))},{2^$1},{v='$2'=='-';n=isint($2)?$2:0;v?0:(n>=0?n%3+1:-((abs(n)-1)%3+1));},0
 size_of_arr={int(log2($length+$shift-1))+1}
 str_code_2=n=init_num()
+act_arr_sortclass={$mode>-1}
 
-$length,1,1,1,x
+if !$mode&&!$a6 error custom_formula_required fi
 
-if v='$3';max(v)>49||min(v)<48 error inv_char_arg_3 fi
+if $act_arr_sortclass
 
-+f. :"begin(
-  const size_binary_arr=$size_of_arr;
-  init_bin_arr=vector(#size_binary_arr,-1);
-  bin_search_arr='$3'-47;
-  const bin_search_arr_size=size(bin_search_arr);
-  const max_pos=size_binary_arr-bin_search_arr_size+1;
- );
- count=p=0;
- n=i+$shift;
- bin_arr=init_bin_arr;
- rf=int(log2(n))+1;
- mk=rf-1;
- repeat(rf,k,
-  bin_arr[mk-k]=(n>>k)&1;
- );
- ++bin_arr;
- while(bin_arr[p]&&p<max_pos,
-   (bin_arr)[p,bin_search_arr_size]==bin_search_arr?(
-    ++count;
-    p+=bin_search_arr_size;
-   ):(
-    ++p;
-   );
- );
- count;"
+ $length,1,1,1,x
 
-if $shift -. {im} fi
+ if v='$3';max(v)>49||min(v)<48 error inv_char_arg_3 fi
 
-# Pixel sort integer by count sort
+ +f. :"begin(
+   const size_binary_arr=$size_of_arr;
+   init_bin_arr=vector(#size_binary_arr,-1);
+   bin_search_arr='$3'-47;
+   const bin_search_arr_size=size(bin_search_arr);
+   const max_pos=size_binary_arr-bin_search_arr_size+1;
+  );
+  count=p=0;
+  n=i+$shift;
+  bin_arr=init_bin_arr;
+  rf=int(log2(n))+1;
+  mk=rf-1;
+  repeat(rf,k,
+   bin_arr[mk-k]=(n>>k)&1;
+  );
+  ++bin_arr;
+  while(bin_arr[p]&&p<max_pos,
+    (bin_arr)[p,bin_search_arr_size]==bin_search_arr?(
+     ++count;
+     p+=bin_search_arr_size;
+    ):(
+     ++p;
+    );
+  );
+  count;"
 
-+histogram. 100%
-f. >begin(n=0;);i?(v=n;n+=i;v;);
-f.. >v=i(#-1,i);++i(#-1,i);v;
-{w#-2},1,1,1
-eval... i(#-1,i)=i(#-4,x);
-rm[-4--2]
+ if $shift -. {im} fi
 
-if v='$4';max(v)>49||min(v)<48 error inv_char_arg_4 fi
+ # Pixel sort integer by count sort
 
-if $mode==-1
+ +histogram. 100%
+ f. >begin(n=0;);i?(v=n;n+=i;v;);
+ f.. >v=i(#-1,i);++i(#-1,i);v;
+ {w#-2},1,1,1
+ eval... i(#-1,i)=i(#-4,x);
+ rm[-4--2]
+
+fi
+
+if $act_arr_sortclass?(v='$4';):(v='$3';);max(v)>49||min(v)<48 error inv_char_arg_4 fi
+
+if !$mode
+
  str_code=ix=max_index-x;iy=max_index-y;int($6)
  str_code_2..=ix=max_index-x;iy=max_index-y;
 
@@ -128,27 +136,54 @@ if $mode==-1
  size_of_arr={int(log2(iM#-1))+1}
 
  rm.
+
+fi
+
+if $act_arr_sortclass bin_search_arr={'$4'-47}
+else bin_search_arr={'$3'-47}
 fi
 
 $length,$length,1,1,:"begin(
+  const shift_factor=$shift;
   const max_index=w-1;
   const size_binary_arr=$size_of_arr;
   init_bin_arr=vector(#size_binary_arr,-1);
-  bin_search_arr='$4'-47;
+  bin_search_arr=["$bin_search_arr"];
   const bin_search_arr_size=size(bin_search_arr);
   const mode=$mode;
   x()=i(#-1,x,0,0,0,0,2);
   y()=i(#-1,y,0,0,0,0,2);
   ix()=i(#-1,max_index-x,0,0,0,0,2);
   iy()=i(#-1,max_index-y,0,0,0,0,2);
-  mode==2?(
+  mode==3?(
    init_num()=xor(i(#-1,x,0,0),i(#-1,y,0,0));
   ):
-  mode==1?(
+  mode==2?(
    init_num()=i(#-1,x,0,0)|i(#-1,y,0,0);
   ):
-  mode==0?(
+  mode==1?(
    init_num()=i(#-1,x,0,0)&i(#-1,y,0,0);
+  ):
+  mode==-1?(
+   shift_factor?(
+    init_num()=(x+shift_factor)&(y+shift_factor);
+   ):(
+    init_num()=x&y;
+   );
+  ):
+  mode==-2?(
+   shift_factor?(
+    init_num()=(x+shift_factor)|(y+shift_factor);
+   ):(
+    init_num()=x|y;
+   );
+  ):
+  mode==-3?(
+   shift_factor?(
+    init_num()=xor(x+shift_factor,y+shift_factor);
+   ):(
+    init_num()=xor(x,y);
+   );
   ):(
    init_num()=int("$6");
   );
@@ -173,7 +208,10 @@ $length,$length,1,1,:"begin(
  );
  count;"
 
-rm..
+if $act_arr_sortclass rm..
+else
+ if $shift -. {im} fi
+fi
 #@cli rep_vibrance_ych: 0<vibrance<=1
 #@cli : Increase chroma of Image with minimal to no impact on high-chroma areas. Based on Darktable YCH "Vibrance" code.
 rep_vibrance_ych:
@@ -26018,9 +26056,10 @@ u "{"$str_inform"}"
 #@gui:_=separator(),_=note("<b>Main</b>")
 #@gui:Size of Array=choice(0,"Auto","User-Defined")
 #@gui:User-Defined Size=int(8,2,14)
-#@gui:Formula=choice(2,"AND","OR","XOR","User-Defined")
-#@gui:Binary Number A=text("01")
-#@gui:Binary Number B=text("10")
+#@gui:Formula=choice(5,"AND-Simple","OR-Simple","XOR-Simple","AND","OR","XOR","User-Defined")
+#@gui:Binary String A=text("01")
+#@gui:Binary String B=text("10")
+#@gui:Binary String=text("01")
 #@gui:Shift Factor=int(0,0,1000000)
 #@gui:Custom Formula=text{"xor(min(xor(x(),y()),xor(ix(),iy())),ix()|iy())"}
 #@gui:_=separator(),_=note("<b>Additional</b>")
@@ -26031,6 +26070,7 @@ u "{"$str_inform"}"
 #@gui:_=separator(),_=note("<b>Random Binary String</b>")
 #@gui:Number of digits for Binary String A=int(2,1,4)
 #@gui:Number of digits for Binary String B=int(2,1,4)
+#@gui:Number of digits for Binary String=int(2,1,4)
 #@gui:Binary String A Index=int(0,0,1)
 #@gui:Binary String A Index=int(1,0,3)
 #@gui:Binary String A Index=int(2,0,7)
@@ -26039,9 +26079,14 @@ u "{"$str_inform"}"
 #@gui:Binary String B Index=int(2,0,3)
 #@gui:Binary String B Index=int(5,0,7)
 #@gui:Binary String B Index=int(1,0,15)
+#@gui:Binary String Index=int(1,0,1)
+#@gui:Binary String Index=int(2,0,3)
+#@gui:Binary String Index=int(5,0,7)
+#@gui:Binary String Index=int(1,0,15)
 #@gui:Randomize Binary String A=button()
 #@gui:Randomize Binary String B=button()
 #@gui:Randomize Both=button()
+#@gui:Randomize=button()
 #@gui:_=separator(),_=note("<b>Color</b>")
 #@gui:Color Mode=choice(1,"Normalized","Colorized")
 #@gui:Number of Colors=int(5,3,5)
@@ -26058,7 +26103,7 @@ u "{"$str_inform"}"
 #@gui:Color D=color(164,184,218)
 #@gui:Color E=color(255,255,255)
 #@gui:Recolor using changed number of color=button()
-#@gui:Random Shade Exponential Factor (%)=float(1,-80,80)
+#@gui:Random Shade Exponential Factor (%)=float(0,-80,80)
 #@gui:Random Lightness Start A (%)=float(0,0,100)
 #@gui:Random Darkness Start B(%)=float(0,0,100)
 #@gui:TODO Maximum - Lightness=_float(50,50,100)_0
@@ -26081,12 +26126,13 @@ u "{"$str_inform"}"
 #@gui:_=note{"\n<b>Basic Description:</b>\n\nGenerates a image based on the count of binary number found in string of binary. Initial array contains value count-sorted by count of binary number within binary representation of integers.\n\n<b>Step:</b>\n\n1) Create an array of integer that matches index with size of 2^n.\n2) Create another array which is the count of 'bin_a' in binary representation of the previous array.\n3) Count sort the array of integer with the count of binary number array.\n4) Delete all other array other than the sorted array.\n5) Generate a surface with row and column the same size as the primary array, and use formula which takes values from the sorted value, and then find the count of 'bin_b' in binary representation of the found value.\n\n<b>Source Code: </b>\n\nAuthor: Lavander in discord/generative AKA weightt_an in discuss.pixls.us"}
 #@gui:Python Source Code=_text{1,"def m_show(m, size = 4, cmap = 'afmhot'):\n    import matplotlib.pyplot as plt\n    from numpy import array\n    cmaps =  ['binary', 'gist_yarg', 'gist_gray', 'gray', 'bone',\n                'pink', 'spring', 'summer', 'autumn', 'winter', 'cool',\n                'Wistia', 'hot', 'afmhot', 'gist_heat', 'copper']\n    plt.figure(num = None, figsize=(size, size), dpi=300)\n    plt.axis('off')\n    plot = plt.imshow(array(m), cmap = cmap) #, interpolation='bicubic' )\n    plt.show()\n    plt.close()\n\nfrom tqdm import tqdm\n\ndef get_matrix_bin(s):\n    n = len(s)\n    mat =  [[0]*n for i in range(n)]\n    for x in tqdm(range(0, n)):\n        for y in range(0, n):\n            f = format((s[x] ^ s[y]), 'b').count('10')\n            mat[x][y] = f\n            #mat[y][x] = f\n    return mat\n\nbig_n = 11\n\npows = [i for i in range(0, 2**big_n)]\npows = sorted(pows, key = lambda k: format(k, 'b').count('01'))\nadj_m = get_matrix_bin(pows)\n\nm_show(adj_m)"}
 #@gui:Stored Text=_text{1,"def m_show(m, size = 4, cmap = 'afmhot'):\n    import matplotlib.pyplot as plt\n    from numpy import array\n    cmaps =  ['binary', 'gist_yarg', 'gist_gray', 'gray', 'bone',\n                'pink', 'spring', 'summer', 'autumn', 'winter', 'cool',\n                'Wistia', 'hot', 'afmhot', 'gist_heat', 'copper']\n    plt.figure(num = None, figsize=(size, size), dpi=300)\n    plt.axis('off')\n    plot = plt.imshow(array(m), cmap = cmap) #, interpolation='bicubic' )\n    plt.show()\n    plt.close()\n\nfrom tqdm import tqdm\n\ndef get_matrix_bin(s):\n    n = len(s)\n    mat =  [[0]*n for i in range(n)]\n    for x in tqdm(range(0, n)):\n        for y in range(0, n):\n            f = format((s[x] ^ s[y]), 'b').count('10')\n            mat[x][y] = f\n            #mat[y][x] = f\n    return mat\n\nbig_n = 11\n\npows = [i for i in range(0, 2**big_n)]\npows = sorted(pows, key = lambda k: format(k, 'b').count('01'))\nadj_m = get_matrix_bin(pows)\n\nm_show(adj_m)"}_0
-#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2022/08/25</i>.</small>")
+#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2022/08/30</i>.</small>")
 #@gui:Started?=bool(0)_0
 #@gui:Size of Array=choice(0,"Auto","User-Defined")_0
-#@gui:Formula=choice(2,"AND","OR","XOR","User-Defined")_0
-#@gui:Binary Number A=text("01")_0
-#@gui:Binary Number B=text("10")_0
+#@gui:Formula=choice(2,"AND-Simple","OR-Simple","XOR-Simple","AND","OR","XOR","User-Defined")_0
+#@gui:Binary String A=text("01")_0
+#@gui:Binary String B=text("10")_0
+#@gui:Binary String=text("01")_0
 #@gui:Binary String A Index=int(0,0,1)_0
 #@gui:Binary String A Index=int(1,0,3)_0
 #@gui:Binary String A Index=int(2,0,7)_0
@@ -26095,6 +26141,10 @@ u "{"$str_inform"}"
 #@gui:Binary String B Index=int(2,0,3)_0
 #@gui:Binary String B Index=int(5,0,7)_0
 #@gui:Binary String B Index=int(1,0,15)_0
+#@gui:Binary String Index=int(1,0,1)_0
+#@gui:Binary String Index=int(2,0,3)_0
+#@gui:Binary String Index=int(5,0,7)_0
+#@gui:Binary String Index=int(1,0,15)_0
 #@gui:Shift Factor=int(0,0,1000000)_0
 #@gui:Custom Formula=text{"xor(min(xor(x(),y()),xor(ix(),iy())),ix()|iy())"}_0
 #@gui:TODO Direction=choice(0,"Default","Mirror-X","Mirror-Y","Mirror-XY")_0_0
@@ -26131,28 +26181,28 @@ img_width,img_height={[w#0,h#0]}
 if !narg($_persistent) error uninitialized fi
 $_persistent
 keep[output]
-if !$1&&$11 resize $img_width,$img_height,100%,100%,0,{$11+1},.5,.5 fi
+if !$1&&$12 resize $img_width,$img_height,100%,100%,0,{$12+1},.5,.5 fi
 fx_rep_lavander_binary_map_preview:
 skip "$*"
 
-started,use_persistent,max_img_ind,timg,neq_form,color_mode_change,cont_base_map,ind_col_change,previous_status_of_random,previous_state_of_symmetry,current_num_of_colors,_num_of_colors=$82,{narg($_persistent)?1},{[$!-1,$!]},0,{$25?($25!=$104?1:0):($25!=$104)},0,0,$73,$98,$105,$26
+started,use_persistent,max_img_ind,timg,neq_form,color_mode_change,cont_base_map,ind_col_change,previous_status_of_random,previous_state_of_symmetry,current_num_of_colors,_num_of_colors=$89,{narg($_persistent)?1},{[$!-1,$!]},0,{$32?($32!=$116?1:0):($32!=$116)},0,0,$80,$110,$117,$33
 
-status_of_random={$25?$previous_status_of_random}
+status_of_random={$32?$previous_status_of_random}
 
-seed_change={$69!=$147}
-act_rand_map={$25?(($status_of_random==2?$71)||$seed_change||$70)}
-previous_shade,previous_lightness,previous_darkness=${142-144}
+seed_change={$76!=$159}
+act_rand_map={$32?(($status_of_random==2?$78)||$seed_change||$77)}
+previous_shade,previous_lightness,previous_darkness=${154-156}
 
-cli_command_text="$75"
-cli_command_text_with_slash={/"$76"}
-_color_info="$77"
-mapping_info={/"$78"}
+cli_command_text="$82"
+cli_command_text_with_slash={/"$83"}
+_color_info="$84"
+mapping_info={/"$85"}
 
-_fx_rep_lavander_binary_map_seed={$70?int(u(24000+1)):$69}
+_fx_rep_lavander_binary_map_seed={$77?int(u(24000+1)):$76}
 
 if !narg($_persistent) started=0 fi
 
-if $63||$70||$71 _num_of_colors=$26 fi
+if $70||$77||$78 _num_of_colors=$33 fi
 
 if $act_rand_map
  m "fx_rep_lavander_binary_map_create_palette:
@@ -26161,9 +26211,9 @@ if $act_rand_map
       const max_index=w-1;
       const half_max_index=max_index>>1;
 
-      const expf=1-abs($64)/100;
-      const rand_light=$65%;
-      const rand_dark=$66%;
+      const expf=1-abs($71)/100;
+      const rand_light=$72%;
+      const rand_dark=$73%;
 
       rand_dark||rand_light?(
        v_shade=expr('begin(srand($_fx_rep_lavander_binary_map_seed));u(1)',w);
@@ -26181,8 +26231,8 @@ if $act_rand_map
        gen_base_shade()=lerp(0,1,x/max_index);
       );
 
-      $64?(
-       $64<0?(
+      $71?(
+       $71<0?(
         gen_shade()=1-(1-gen_base_shade())^expf;
        ):(
         gen_shade()=gen_base_shade()^expf;
@@ -26205,11 +26255,11 @@ if $act_rand_map
    "
 else
 
- if $25
+ if $32
 
-  if $_num_of_colors==5   _color_info=(${48-50};${51-53};${54-56};${57-59};${60-62})
-  elif $_num_of_colors==4 _color_info=(${36-38};${39-41};${42-44};${45-47})
-  elif $_num_of_colors==3 _color_info=(${27-29};${30-32};${33-35})
+  if $_num_of_colors==5   _color_info=(${55-57};${58-60};${61-63};${64-66};${67-69})
+  elif $_num_of_colors==4 _color_info=(${43-45};${46-48};${49-51};${52-54})
+  elif $_num_of_colors==3 _color_info=(${34-36};${37-39};${40-42})
   fi
 
   m fx_rep_lavander_binary_map_create_palette:$_color_info
@@ -26245,72 +26295,77 @@ old_color_2_1_r,old_color_2_1_g,old_color_2_1_b,\
 old_color_2_2_r,old_color_2_2_g,old_color_2_2_b,\
 old_color_2_3_r,old_color_2_3_g,old_color_2_3_b,\
 old_color_2_4_r,old_color_2_4_g,old_color_2_4_b\
-=${27-62},${106-141}
+=${34-69},${118-153}
 
-if ($25?([${27-62}]!=[${106-141}]))||$63
+if ($32?([${34-69}]!=[${118-153}]))||$70
  status_of_random=2
  color_mode_change=1
- _num_of_colors=$26
+ _num_of_colors=$33
  ind_col_change=1
 fi
 
 if $act_rand_map
  color_mode_change=1
  status_of_random=1
- _num_of_colors=$26
- previous_shade,previous_lightness,previous_darkness=${64-66}
+ _num_of_colors=$33
+ previous_shade,previous_lightness,previous_darkness=${71-73}
 fi
 
-if $25?([${64-66}]!=[$previous_shade,$previous_lightness,$previous_darkness])||($26!=$_num_of_colors) status_of_random=2 fi
+if $32?([${71-73}]!=[$previous_shade,$previous_lightness,$previous_darkness])||($33!=$_num_of_colors) status_of_random=2 fi
 
-if $25 previous_status_of_random=$status_of_random fi
+if $32 previous_status_of_random=$status_of_random fi
 
-if !$started||!narg($_persistent)||!$102 auto_size,auto_size_sym={v=int(log2(min($img_width,$img_height)));[v,v-1]}
-else auto_size,auto_size_sym={[$102,$103]}
+if !$started||!narg($_persistent)||!$114 auto_size,auto_size_sym={v=int(log2(min($img_width,$img_height)));[v,v-1]}
+else auto_size,auto_size_sym={[$114,$115]}
 fi
 
 if $1
- if $1&&!$83
-  pw2size,user_defined_size=$100
+ if $1&&!$90
+  pw2size,user_defined_size=$112
  else
   pw2size,user_defined_size=$2
  fi
 elif !$started
  user_defined_size,pw2size=$auto_size
 else
- pw2size={$9?$auto_size_sym:$auto_size}
- user_defined_size=$100
+ pw2size={$10?$auto_size_sym:$auto_size}
+ user_defined_size=$112
 fi
 
-size_changed={$pw2size!=$101}
-
-if v='$4';max(v)>49||min(v)<48 error inv_bin_str_a fi
-if v='$5';max(v)>49||min(v)<48 error inv_bin_str_b fi
+size_changed={$pw2size!=$113}
 
 bin_a=$4
 bin_b=$5
+bin_c=$6
 
-bin_a_size,bin_b_size,neq_bin_a,neq_bin_b={bin_a='$4';bin_b='$5';[size(bin_a),size(bin_b),bin_a!='$85',bin_b!='$86']}
-neq_bin={$neq_bin_a||$neq_bin_b}
+if v='$bin_a';max(v)>49||min(v)<48 error inv_bin_str_a fi
+if v='$bin_b';max(v)>49||min(v)<48 error inv_bin_str_b fi
+if v='$bin_c';max(v)>49||min(v)<48 error inv_bin_str_c fi
+
+bin_a_size,bin_b_size,bin_c_size,neq_bin_a,neq_bin_b,neq_bin_c={bin_a='$4';bin_b='$5';bin_c='$6';[size(bin_a),size(bin_b),size(bin_c),bin_a!='$92',bin_b!='$93',bin_c!='$94']}
+neq_bin={$neq_bin_a||$neq_bin_b||$neq_bin_c}
 
 if !$bin_a_size error absen_bin_a fi
 if !$bin_b_size error absen_bin_b fi
+if !$bin_c_size error absen_bin_c fi
 if $bin_a_size>4 error exces_bin_a fi
 if $bin_b_size>4 error exces_bin_b fi
+if $bin_c_size>4 error exces_bin_c fi
 
-num_of_rand_bin_a_digits,num_of_rand_bin_b_digits,\
+num_of_rand_bin_a_digits,num_of_rand_bin_b_digits,num_of_rand_bin_c_digits,\
 binary_string_a_ind_0,binary_string_a_ind_1,binary_string_a_ind_2,binary_string_a_ind_3,\
-binary_string_b_ind_0,binary_string_b_ind_1,binary_string_b_ind_2,binary_string_b_ind_3\
-=${12-21}
+binary_string_b_ind_0,binary_string_b_ind_1,binary_string_b_ind_2,binary_string_b_ind_3,\
+binary_string_c_ind_0,binary_string_c_ind_1,binary_string_c_ind_2,binary_string_c_ind_3\
+=${13-27}
 
-if $22||$23||$24
+if $28||$29||$30||$31
 
- if $22||$24
+ if $28||$30
 
   if $num_of_rand_bin_a_digits==1
    bin_a,binary_string_a_ind_0={!$binary_string_a_ind_0}
   else
-   index=${arg\ $num_of_rand_bin_a_digits,${14-17}}
+   index=${arg\ $num_of_rand_bin_a_digits,${16-19}}
    binary_string_a_ind_{$num_of_rand_bin_a_digits-1},temp={a=int(u(0,2^$num_of_rand_bin_a_digits));a==$index?(a+1)%(2^$num_of_rand_bin_a_digits):a;}
    (${rep_extract_combination_order\ $num_of_rand_bin_a_digits,2,$temp})
    +. 48
@@ -26320,12 +26375,12 @@ if $22||$23||$24
 
  fi
 
- if $23||$24
+ if $29||$30
 
   if $num_of_rand_bin_b_digits==1
    bin_b,binary_string_b_ind_0={!$binary_string_b_ind_0}
   else
-   index=${arg\ $num_of_rand_bin_b_digits,${18-21}}
+   index=${arg\ $num_of_rand_bin_b_digits,${20-23}}
    binary_string_b_ind_{$num_of_rand_bin_b_digits-1},temp={b=int(u(0,2^$num_of_rand_bin_b_digits));b==$index?(b+1)%(2^$num_of_rand_bin_b_digits):b;}
    (${rep_extract_combination_order\ $num_of_rand_bin_b_digits,2,$temp})
    +. 48
@@ -26335,7 +26390,22 @@ if $22||$23||$24
 
  fi
 
- neq_bin:=('$bin_a'!='$85')||('$bin_b'!='$86')
+ if $31
+
+  if $num_of_rand_bin_c_digits==1
+   bin_c,binary_string_c_ind_0={!$binary_string_c_ind_0}
+  else
+   index=${arg\ $num_of_rand_bin_c_digits,${24-27}}
+   binary_string_c_ind_{$num_of_rand_bin_c_digits-1},temp={c=int(u(0,2^$num_of_rand_bin_c_digits));c==$index?(c+1)%(2^$num_of_rand_bin_c_digits):c;}
+   (${rep_extract_combination_order\ $num_of_rand_bin_c_digits,2,$temp})
+   +. 48
+   bin_c={t}
+   rm.
+  fi
+
+ fi
+
+ neq_bin:=('$bin_a'!='$92')||('$bin_b'!='$93')||('$bin_c'!='$94')
 
 elif $neq_bin
 
@@ -26349,46 +26419,75 @@ elif $neq_bin
   binary_string_b_ind_{$num_of_rand_bin_b_digits-1}=${rep_find_combination_lexicographic_index\ 2,{['$5']-48}}
  fi
 
+ if $neq_bin_c
+  num_of_rand_bin_c_digits=$bin_c_size
+  binary_string_c_ind_{$num_of_rand_bin_c_digits-1}=${rep_find_combination_lexicographic_index\ 2,{['$6']-48}}
+ fi
+
 else
 
- if $started&&([${14-21}]!=[${87-94}])
+ if $started&&([${16-27}]!=[${95-106}])
 
   $=arg_pos_
 
-  repeat 8 {
+  if $3>2
 
-   left_arg=${arg_pos_{$>+14}}
-   right_arg=${arg_pos_{$>+87}}
+   repeat 8 {
 
-   ab_pos,bin_group_pos={[int($>/4),$>%4]}
+    left_arg=${arg_pos_{$>+16}}
+    right_arg=${arg_pos_{$>+95}}
 
-   a_b=${arg\ $ab_pos+1,a,b}
-   num_of_digits={$bin_group_pos+1}
+    ab_pos,bin_group_pos={[int($>/4),$>%4]}
 
-   if !$bin_group_pos
+    a_b=${arg\ $ab_pos+1,a,b}
+    num_of_digits={$bin_group_pos+1}
 
-    if $left_arg!=$right_arg
-     num_of_rand_bin_$a_b"_digits"=$num_of_digits
-     bin_$a_b,binary_string_$a_b"_ind_"$bin_group_pos=$left_arg
-     neq_bin=1
-     break
+    if !$bin_group_pos
+
+     if $left_arg!=$right_arg
+      num_of_rand_bin_$a_b"_digits"=$num_of_digits
+      bin_$a_b,binary_string_$a_b"_ind_"$bin_group_pos=$left_arg
+      neq_bin=1
+      break
+     fi
+
+    else
+
+     if $left_arg!=$right_arg
+      (${rep_extract_combination_order\ $num_of_digits,2,$left_arg})
+      +. 48
+      bin_$a_b={t}
+      num_of_rand_bin_$a_b"_digits"=$num_of_digits
+      binary_string$a_b"_ind_"$bin_group_pos=$left_arg
+      neq_bin=1
+      rm. break
+     fi
+
     fi
 
-   else
+   }
+
+  else
+
+   repeat 4 {
+
+    left_arg=${arg_pos_{$>+24}}
+    right_arg=${arg_pos_{$>+103}}
+    num_of_digits={$>+1}
 
     if $left_arg!=$right_arg
      (${rep_extract_combination_order\ $num_of_digits,2,$left_arg})
      +. 48
-     bin_$a_b={t}
-     num_of_rand_bin_$a_b"_digits"=$num_of_digits
-     binary_string$a_b"_ind_"$bin_group_pos=$left_arg
+     bin_c={t}
+     num_of_rand_bin_c_digits=$num_of_digits
+     binary_string_c_ind_$>=$left_arg
      neq_bin=1
      rm. break
     fi
 
-   fi
+   }
 
-  }
+  fi
 
  elif !$started
 
@@ -26398,34 +26497,46 @@ else
   num_of_rand_bin_b_digits=$bin_b_size
   binary_string_b_ind_{$num_of_rand_bin_b_digits-1}=${rep_find_combination_lexicographic_index\ 2,{['$5']-48}}
 
+  num_of_rand_bin_c_digits=$bin_c_size
+  binary_string_c_ind_{$num_of_rand_bin_c_digits-1}=${rep_find_combination_lexicographic_index\ 2,{['$6']-48}}
+
  fi
 
 fi
 
-form_b=$96
+form_b=$108
 
-if $3==3
- neq_form:='$7'!='$96'
- form_b=$7
+if $3==6
+ neq_form:='$8'!='$108'
+ form_b=$8
 fi
 
-switch_use_sym={($9?1)!=($98?1)}
-act_sym_switch={$9!=$98}
+switch_use_sym={($10?1)!=($110?1)}
+act_sym_switch={$10!=$110}
 sym_mode={$switch_use_sym||$act_sym_switch}
 
-if ([$3,$6]!=[$84,$95])||$neq_form||$neq_bin||$size_changed||!$started
+if ([$3,$7]!=[$91,$107])||$neq_form||$neq_bin||$size_changed||!$started
 
- use_persistent,color_mode_change,formula_mode={[0,1,$3==3?-1:$3]}
+ use_persistent,color_mode_change={[0,1]}
 
- +rep_lavander_binary_map $pw2size,$formula_mode,$bin_a,$bin_b,$6,"$7" => base_map
+ if $3<6 formula_mode={$3>2?$3-3:-($3+1)}
+ else formula_mode=-
+ fi
 
- base_cli_command="+rep_lavander_binary_map "$pw2size,$formula_mode,$bin_a,$bin_b,$6,
- cli_command_text=$base_cli_command\"$7\"
- cli_command_text_with_slash=$base_cli_command{`92`}\"$7{`92`}\"
+ if $3>2
+  +rep_lavander_binary_map $pw2size,$formula_mode,$bin_a,$bin_b,$7,"$8" => base_map
+  base_cli_command="+rep_lavander_binary_map "$pw2size,$formula_mode,$bin_a,$bin_b,$7,
+ else
+  +rep_lavander_binary_map $pw2size,$formula_mode,$bin_c,,$7,"$8" => base_map
+  base_cli_command="+rep_lavander_binary_map "$pw2size,$formula_mode,$bin_c,,$7,
+ fi
+
+ cli_command_text=$base_cli_command\"$8\"
+ cli_command_text_with_slash=$base_cli_command{`92`}\"$8{`92`}\"
 
  keep[base_map]
 
- if $9 rep_symmetrize_xy {$9-1} => base_map fi
+ if $10 rep_symmetrize_xy {$10-1} => base_map fi
 
  cont_base_map=1
 
@@ -26437,12 +26548,12 @@ if $sym_mode
 
  use_persistent=0
 
- if $98?$9&&$98:$9
+ if $110?$10&&$110:$10
   $_persistent keep[-2,-1]
-  if $98
+  if $110
    eval "
     const pw2size=2^$pw2size;
-    const pos=max(0,$98-1);
+    const pos=max(0,$110-1);
     init_v=[1,pw2size]-1;
     off_x=(pw2size-1)*(pos&1);
     off_y=(pw2size-1)*(pos>>1);
@@ -26455,7 +26566,7 @@ if $sym_mode
  else
   eval "
    const pw2size=2^$pw2size;
-   const pos=max(0,$98)-1;
+   const pos=max(0,$110)-1;
    init_v=[1,pw2size]-1;
    off_x=(pw2size-1)*(pos&1);
    off_y=(pw2size-1)*(pos>>1);
@@ -26467,14 +26578,14 @@ if $sym_mode
   crop[-2,-1] ${}
  fi
 
- if $9 rep_symmetrize_xy {$9-1} fi
+ if $10 rep_symmetrize_xy {$10-1} fi
 
  name[-2,-1] base_map,output
  +store[-2,-1] _persistent
 
  keep[output]
 
- if !$1&&$11 resize $img_width,$img_height,100%,100%,0,{$11+1},.5,.5 fi
+ if !$1&&$12 resize $img_width,$img_height,100%,100%,0,{$12+1},.5,.5 fi
 
 fi
 
@@ -26490,7 +26601,7 @@ if $color_mode_change
 
  size_val_arr_base_map={iM#$base_map+1}
 
- if $25
+ if $32
 
   current_num_of_colors=$_num_of_colors
 
@@ -26553,7 +26664,7 @@ if $color_mode_change
   old_color_2_4_r,old_color_2_4_g,old_color_2_4_b\
   ={crop(#-2)}
 
-  if $25!=$104||!$started mapping_info=" "{`123`}iM+1{`125`},1,1,1,lerp(0,{`123`}w#-2-1{`125`},x/(w-1))" "rep_cubic_map[-1]" "[-3]" "map[-2]" "[-1]" "rm[-3,-1] fi
+  if $32!=$116||!$started mapping_info=" "{`123`}iM+1{`125`},1,1,1,lerp(0,{`123`}w#-2-1{`125`},x/(w-1))" "rep_cubic_map[-1]" "[-3]" "map[-2]" "[-1]" "rm[-3,-1] fi
 
  else
   +n. 0,255 => output
@@ -26563,7 +26674,7 @@ if $color_mode_change
 
  keep[output]
 
- if !$1&&$11 resize $img_width,$img_height,100%,100%,0,{$11+1},.5,.5 fi
+ if !$1&&$12 resize $img_width,$img_height,100%,100%,0,{$12+1},.5,.5 fi
 
 fi
 
@@ -26571,19 +26682,19 @@ if $use_persistent
  $_persistent
  keep[output]
 
- if !$1&&$11 resize $img_width,$img_height,100%,100%,0,{$11+1},.5,.5 fi
+ if !$1&&$12 resize $img_width,$img_height,100%,100%,0,{$12+1},.5,.5 fi
 
 fi
 
 um fx_rep_lavander_binary_map_create_palette
 
-if $79 selectable_cli_command_text=$cli_command_text_with_slash
+if $86 selectable_cli_command_text=$cli_command_text_with_slash
 else selectable_cli_command_text=$cli_command_text
 fi
 
-if $9 selectable_cli_command_text.=" rep_symmetrize_xy[-1] "{$9-1} fi
+if $10 selectable_cli_command_text.=" rep_symmetrize_xy[-1] "{$10-1} fi
 
-if $25
+if $32
  selectable_cli_command_text..=$_color_info" permute[-1] yzcx "
 fi
 
@@ -26592,50 +26703,57 @@ selectable_cli_command_text.=$mapping_info
 u "{$1}"\
 "{"$pw2size"}_"{$1+1}\
 "{$3}"\
-"{"$bin_a"}"\
-"{"$bin_b"}"\
-"{$6}"\
-"{$7}_"{($3==3)+1}\
-"{$8}"\
+"{"$bin_a"}_"{$3>2?2}\
+"{"$bin_b"}_"{$3>2?2}\
+"{"$bin_c"}_"{$3<3?2}\
+"{$7}"\
+"{$8}_"{($3==6)+1}\
 "{$9}"\
 "{$10}"\
-"{$11}_"{!$1*2}\
-"{"$num_of_rand_bin_a_digits"}"\
-"{"$num_of_rand_bin_b_digits"}"\
-"{"$binary_string_a_ind_0"}_"{$num_of_rand_bin_a_digits==1?2}\
-"{"$binary_string_a_ind_1"}_"{$num_of_rand_bin_a_digits==2?2}\
-"{"$binary_string_a_ind_2"}_"{$num_of_rand_bin_a_digits==3?2}\
-"{"$binary_string_a_ind_3"}_"{$num_of_rand_bin_a_digits==4?2}\
-"{"$binary_string_b_ind_0"}_"{$num_of_rand_bin_b_digits==1?2}\
-"{"$binary_string_b_ind_1"}_"{$num_of_rand_bin_b_digits==2?2}\
-"{"$binary_string_b_ind_2"}_"{$num_of_rand_bin_b_digits==3?2}\
-"{"$binary_string_b_ind_3"}_"{$num_of_rand_bin_b_digits==4?2}\
-"{0}"\
-"{0}"\
-"{0}"\
-"{$25}"\
-"{$26}_"{$25?2}\
-"{"$color_0_0_r","$color_0_0_g","$color_0_0_b"}_"{$25?($26==3?2)}\
-"{"$color_0_1_r","$color_0_1_g","$color_0_1_b"}_"{$25?($26==3?2)}\
-"{"$color_0_2_r","$color_0_2_g","$color_0_2_b"}_"{$25?($26==3?2)}\
-"{"$color_1_0_r","$color_1_0_g","$color_1_0_b"}_"{$25?($26==4?2)}\
-"{"$color_1_1_r","$color_1_1_g","$color_1_1_b"}_"{$25?($26==4?2)}\
-"{"$color_1_2_r","$color_1_2_g","$color_1_2_b"}_"{$25?($26==4?2)}\
-"{"$color_1_3_r","$color_1_3_g","$color_1_3_b"}_"{$25?($26==4?2)}\
-"{"$color_2_0_r","$color_2_0_g","$color_2_0_b"}_"{$25?($26==5?2)}\
-"{"$color_2_1_r","$color_2_1_g","$color_2_1_b"}_"{$25?($26==5?2)}\
-"{"$color_2_2_r","$color_2_2_g","$color_2_2_b"}_"{$25?($26==5?2)}\
-"{"$color_2_3_r","$color_2_3_g","$color_2_3_b"}_"{$25?($26==5?2)}\
-"{"$color_2_4_r","$color_2_4_g","$color_2_4_b"}_"{$25?($26==5?2)}\
-"{0}_"{$25?(($26!=$current_num_of_colors)+1)}\
-"{$64}_"{$25?2}\
-"{$65}_"{$25?2}\
-"{$66}_"{$25?2}\
-"{$67}"\
-"{$68}"\
-"{"$_fx_rep_lavander_binary_map_seed"}_"{$25?2}\
-"{0}_"{$25?2}\
-"{0}_"{$25?$status_of_random}\
+"{$11}"\
+"{$12}_"{!$1*2}\
+"{"$num_of_rand_bin_a_digits"}_"{$3>2?2}\
+"{"$num_of_rand_bin_b_digits"}_"{$3>2?2}\
+"{"$num_of_rand_bin_c_digits"}_"{$3<3?2}\
+"{"$binary_string_a_ind_0"}_"{$3>2?$num_of_rand_bin_a_digits==1?2}\
+"{"$binary_string_a_ind_1"}_"{$3>2?$num_of_rand_bin_a_digits==2?2}\
+"{"$binary_string_a_ind_2"}_"{$3>2?$num_of_rand_bin_a_digits==3?2}\
+"{"$binary_string_a_ind_3"}_"{$3>2?$num_of_rand_bin_a_digits==4?2}\
+"{"$binary_string_b_ind_0"}_"{$3>2?$num_of_rand_bin_b_digits==1?2}\
+"{"$binary_string_b_ind_1"}_"{$3>2?$num_of_rand_bin_b_digits==2?2}\
+"{"$binary_string_b_ind_2"}_"{$3>2?$num_of_rand_bin_b_digits==3?2}\
+"{"$binary_string_b_ind_3"}_"{$3>2?$num_of_rand_bin_b_digits==4?2}\
+"{"$binary_string_c_ind_0"}_"{$3<3?$num_of_rand_bin_c_digits==1?2}\
+"{"$binary_string_c_ind_1"}_"{$3<3?$num_of_rand_bin_c_digits==2?2}\
+"{"$binary_string_c_ind_2"}_"{$3<3?$num_of_rand_bin_c_digits==3?2}\
+"{"$binary_string_c_ind_3"}_"{$3<3?$num_of_rand_bin_c_digits==4?2}\
+"{0}_"{$3>2?2}\
+"{0}_"{$3>2?2}\
+"{0}_"{$3>2?2}\
+"{0}_"{$3<3?2}\
+"{$32}"\
+"{$33}_"{$32?2}\
+"{"$color_0_0_r","$color_0_0_g","$color_0_0_b"}_"{$32?($33==3?2)}\
+"{"$color_0_1_r","$color_0_1_g","$color_0_1_b"}_"{$32?($33==3?2)}\
+"{"$color_0_2_r","$color_0_2_g","$color_0_2_b"}_"{$32?($33==3?2)}\
+"{"$color_1_0_r","$color_1_0_g","$color_1_0_b"}_"{$32?($33==4?2)}\
+"{"$color_1_1_r","$color_1_1_g","$color_1_1_b"}_"{$32?($33==4?2)}\
+"{"$color_1_2_r","$color_1_2_g","$color_1_2_b"}_"{$32?($33==4?2)}\
+"{"$color_1_3_r","$color_1_3_g","$color_1_3_b"}_"{$32?($33==4?2)}\
+"{"$color_2_0_r","$color_2_0_g","$color_2_0_b"}_"{$32?($33==5?2)}\
+"{"$color_2_1_r","$color_2_1_g","$color_2_1_b"}_"{$32?($33==5?2)}\
+"{"$color_2_2_r","$color_2_2_g","$color_2_2_b"}_"{$32?($33==5?2)}\
+"{"$color_2_3_r","$color_2_3_g","$color_2_3_b"}_"{$32?($33==5?2)}\
+"{"$color_2_4_r","$color_2_4_g","$color_2_4_b"}_"{$32?($33==5?2)}\
+"{0}_"{$32?(($33!=$current_num_of_colors)+1)}\
+"{$71}_"{$32?2}\
+"{$72}_"{$32?2}\
+"{$73}_"{$32?2}\
+"{$74}"\
+"{$75}"\
+"{"$_fx_rep_lavander_binary_map_seed"}_"{$32?2}\
+"{0}_"{$32?2}\
+"{0}_"{$32?$status_of_random}\
 "{"$status_of_random"}"\
 "{"$previous_status_of_random"}"\
 "{"$selectable_cli_command_text"}"\
@@ -26643,14 +26761,15 @@ u "{$1}"\
 "{"$cli_command_text_with_slash"}"\
 "{"$_color_info"}"\
 "{"$mapping_info"}"\
-"{$79}"\
-"{$81}"\
-"{$81}"\
+"{$86}"\
+"{$88}"\
+"{$88}"\
 "{1}"\
 "{$1}"\
 "{$3}"\
 "{"$bin_a"}"\
 "{"$bin_b"}"\
+"{"$bin_c"}"\
 "{"$binary_string_a_ind_0"}"\
 "{"$binary_string_a_ind_1"}"\
 "{"$binary_string_a_ind_2"}"\
@@ -26659,16 +26778,20 @@ u "{$1}"\
 "{"$binary_string_b_ind_1"}"\
 "{"$binary_string_b_ind_2"}"\
 "{"$binary_string_b_ind_3"}"\
-"{$6}"\
+"{"$binary_string_c_ind_0"}"\
+"{"$binary_string_c_ind_1"}"\
+"{"$binary_string_c_ind_2"}"\
+"{"$binary_string_c_ind_3"}"\
+"{$7}"\
 "{"$form_b"}"\
-"{$8}"\
 "{$9}"\
-"{$99}"\
+"{$10}"\
+"{$111}"\
 "{"$user_defined_size"}"\
 "{"$pw2size"}"\
 "{"$auto_size"}"\
 "{"$auto_size_sym"}"\
-"{$25}"\
+"{$32}"\
 "{"$current_num_of_colors"}"\
 "{"$old_color_0_0_r","$old_color_0_0_g","$old_color_0_0_b"}"\
 "{"$old_color_0_1_r","$old_color_0_1_g","$old_color_0_1_b"}"\
@@ -26685,10 +26808,10 @@ u "{$1}"\
 "{"$previous_shade"}"\
 "{"$previous_lightness"}"\
 "{"$previous_darkness"}"\
-"{$145}"\
-"{$146}"\
+"{$157}"\
+"{$158}"\
 "{"$_fx_rep_lavander_binary_map_seed"}"\
-"{$148}"
+"{$160}"
 ######################
 
 # Local Variables:

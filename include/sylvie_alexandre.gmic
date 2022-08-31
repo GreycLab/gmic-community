@@ -39,7 +39,7 @@
 #@gui :_=note("<b>Nettoyage du code/Cleaning the code :</b>)
 #@gui :_=note("Thank RepTorian1125 for modernizing the source code of these filters for GMIC 3.1.0")
 #@gui :_=note("Merci Reptorian1125 pour avoir modernisé le code source de ces filtres pour GMIC 3.1.0")
-#@gui :_=note("Version 2022/08/28 GMIC 3.1.6_pre")
+#@gui :_=note("Version 2022/08/29 GMIC 3.1.6_pre")
 
 samj_about :
  Dim=1024
@@ -24276,6 +24276,230 @@ samj_rien_various :
 ####     #@gui :_=note("5 \303\275      )
 ####     #@gui :_=note("6 \303\276      )
 ####     #@gui :_=note("7 \303\277   ÿ   )
+
+#################################################
+##                                             ##
+##             samj_Carres_Lignes              ##
+##                                             ##
+#################################################
+
+#@gui Carres Lignes / Squares Lines : samj_Carres_Lignes, samj_Carres_Lignes(0)
+#@gui :_=separator()
+#@gui :_=note("Ce filtre est très lent - This filter is very slow")
+#@gui :_=separator()
+#@gui : 1 - Densité/Density = int(2000,10,10000)
+#@gui : 2 - Variation = float(3,0,100)
+#@gui : 3 - Graine/Seed = int(1234,0,65536)
+#@gui : 4 - Degradation = int(0,0,10)
+#@gui :_=note("<b>Carrés/Squares</b>")
+#@gui : 5 - Alpha = float(1,0,1)
+#@gui :_=separator()
+#@gui :_=note("<b>Lignes/Lines</b>")
+#@gui : 6 - Densité/Density = float(1.5,0,100)
+#@gui : 7 - Alpha LA = float(0,0,1)
+#@gui : 8 - Alpha LB = float(0,0,1)
+#@gui : 9 - Dilate = int(1,1,5)
+#@gui :_=separator()
+#@gui :_=note("<b>Fond/Background</b>")
+#@gui : 10 11 12 13 - Fond/Background = color(0,0,0,255)
+#@gui :_=separator()
+#@gui :_=note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2022/08/29</i>.</small>")
+
+samj_Carres_Lignes :
+
+Quantite=$1
+Variation=$2
+Graine=$3
+Degradation=$4
+AlphaPoly=$5
+PCL=$6
+AlphaLA=$7
+AlphaLB=$8
+DilateLignes=$9
+FR=$10
+VR=$11
+BR=$12
+AR=$13
+
+foreach {
+ MaxL={round($Quantite/100*$PCL)+1}
+ srand $Graine
+ to_rgba
+ {w},{h},1,4
+ {w},{h},1,4
+ rv
+ repeat $Quantite
+  Index=$>
+  Angle={round(u*90)}
+  Xori={round(u*{w})}
+  Yori={round(u*{h})}
+  Diag={round(u*$Variation/400*{w+h})+1}
+  X1p={$Xori+round($Diag*cos(pi/180*$Angle))}
+  Y1p={$Yori+round($Diag*sin(pi/180*$Angle))}
+  X2p={$Xori+round($Diag*cos(pi/180*{$Angle+90}))}
+  Y2p={$Yori+round($Diag*sin(pi/180*{$Angle+90}))}
+  X3p={$Xori+round($Diag*cos(pi/180*{$Angle+180}))}
+  Y3p={$Yori+round($Diag*sin(pi/180*{$Angle+180}))}
+  X4p={$Xori+round($Diag*cos(pi/180*{$Angle+270}))}
+  Y4p={$Yori+round($Diag*sin(pi/180*{$Angle+270}))}
+
+  couleur_pixel={I(#-1,$Xori,$Yori)}
+  Rp={arg(1,$couleur_pixel)}
+  Vp={arg(2,$couleur_pixel)}
+  Bp={arg(3,$couleur_pixel)}
+  Ap={arg(4,$couleur_pixel)}
+
+  polygon.. 4,$X1p,$Y1p,$X2p,$Y2p,$X3p,$Y3p,$X4p,$Y4p,1,$Rp,$Vp,$Bp,{$AlphaPoly*$Ap}
+
+ if $Index<$MaxL
+  a_Ligne={{$Y3p-$Y1p}/{$X3p-$X1p}}
+  b_Ligne={$Y3p-($a_Ligne*$X3p)}
+  X_Ex_a=0
+  Y_Ex_a=$b_Ligne
+  X_Ex_b={{w}-1}
+  Y_Ex_b={{$a_Ligne*$X_Ex_b}+$b_Ligne}
+  if $Y_Ex_b>=0 line... $X_Ex_a,$Y_Ex_a,$X_Ex_b,$Y_Ex_b,1,$Rp,$Vp,$Bp,{$AlphaLA*$Ap} fi
+
+  a_Ligne={{$Y4p-$Y2p}/{$X4p-$X2p}}
+  b_Ligne={$Y4p-($a_Ligne*$X4p)}
+  X_Ex_a=0
+  Y_Ex_a=$b_Ligne
+  X_Ex_b={{w}-1}
+  Y_Ex_b={{$a_Ligne*$X_Ex_b}+$b_Ligne}
+  if $Y_Ex_b>=0 line... $X_Ex_a,$Y_Ex_a,$X_Ex_b,$Y_Ex_b,1,$Rp,$Vp,$Bp,{$AlphaLB*$Ap} fi
+
+ fi
+ done
+ if $DilateLignes>1 dilate_circ... $DilateLignes fi
+ rm.
+ blend alpha
+ {w},{h},1,4
+ fill_color. $FR,$VR,$BR,$AR
+ rv
+ blend alpha
+ if $Degradation>0 kuwahara. $Degradation fi
+}
+
+#################################################
+##                                             ##
+##           FIN samj_Carres_Lignes            ##
+##                                             ##
+#################################################
+
+#################################################
+##                                             ##
+##            samj_Triangles_Lignes            ##
+##                                             ##
+#################################################
+
+#@gui Triangles Lignes / Lines : samj_Triangles_Lignes, samj_Triangles_Lignes(0)
+#@gui :_=separator()
+#@gui :_=note("Ce filtre est très lent - This filter is very slow")
+#@gui :_=separator()
+#@gui : 1 - Densité/Density = int(2000,10,10000)
+#@gui : 2 - Variation = float(3,0,100)
+#@gui : 3 - Graine/Seed = int(1234,0,65536)
+#@gui : 4 - Degradation = int(0,0,10)
+#@gui :_=note("<b>Triangles</b>")
+#@gui : 5 - Alpha = float(1,0,1)
+#@gui :_=separator()
+#@gui :_=note("<b>Lignes/Lines<b>")
+#@gui : 6 - Densité/Density = float(1.5,0,100)
+#@gui : 7 - Alpha LA = float(0,0,1)
+#@gui : 8 - Alpha LB = float(0.5,0,1)
+#@gui : 9 - Alpha LC = float(0.5,0,1)
+#@gui : 10 - Dilate = int(1,1,5)
+#@gui :_=separator()
+#@gui :_=note("<b>Fond/Background</b>")
+#@gui : 11 12 13 14 - Fond/Background = color(0,0,0,255)
+#@gui :_=separator()
+#@gui :_=note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2022/08/25</i>.</small>")
+
+
+samj_Triangles_Lignes :
+
+Quantite=$1
+Variation=$2
+Graine=$3
+Degradation=$4
+AlphaPoly=$5
+PCL=$6
+AlphaLA=$7
+AlphaLB=$8
+AlphaLC=$9
+DilateLignes=$10
+FR=$11
+VR=$12
+BR=$13
+AR=$14
+
+foreach {
+ MaxL={round($Quantite/100*$PCL)+1}
+ srand $Graine
+ to_rgba
+ {w},{h},1,4
+ {w},{h},1,4
+ rv
+ repeat $Quantite
+  Index=$>
+  X1p={round(u*{w})}
+  Y1p={round(u*{h})}
+  X2p={$X1p+round(u*$Variation/100*{h})+1}
+  Y2p={$Y1p+round(u*$Variation/100*{h})+1}
+  X3p={$X1p+round(u*$Variation/100*{h})+1}
+  Y3p={$Y1p+round(u*$Variation/100*{h})+1}
+  OrigineH=$X1p
+  OrigineV=$Y1p
+
+  couleur_pixel={I(#-1,$OrigineH,$OrigineV)}
+  Rp={arg(1,$couleur_pixel)}
+  Vp={arg(2,$couleur_pixel)}
+  Bp={arg(3,$couleur_pixel)}
+  Ap={arg(4,$couleur_pixel)}
+
+  polygon.. 3,$X1p,$Y1p,$X2p,$Y2p,$X3p,$Y3p,1,$Rp,$Vp,$Bp,{$AlphaPoly*$Ap}
+
+ if $Index<$MaxL
+  a_Ligne={{$Y2p-$Y1p}/{$X2p-$X1p}}
+  b_Ligne={$Y2p-($a_Ligne*$X2p)}
+  X_Ex_a=0
+  Y_Ex_a=$b_Ligne
+  X_Ex_b={{w}-1}
+  Y_Ex_b={{$a_Ligne*$X_Ex_b}+$b_Ligne}
+  if $Y_Ex_b>=0 line... $X_Ex_a,$Y_Ex_a,$X_Ex_b,$Y_Ex_b,1,$Rp,$Vp,$Bp,{$AlphaLA*$Ap} fi
+
+  a_Ligne={{$Y2p-$Y3p}/{$X2p-$X3p}}
+  b_Ligne={$Y2p-($a_Ligne*$X2p)}
+  X_Ex_a=0
+  Y_Ex_a=$b_Ligne
+  X_Ex_b={{w}-1}
+  Y_Ex_b={{$a_Ligne*$X_Ex_b}+$b_Ligne}
+  if $Y_Ex_b>=0 line... $X_Ex_a,$Y_Ex_a,$X_Ex_b,$Y_Ex_b,1,$Rp,$Vp,$Bp,{$AlphaLB*$Ap} fi
+
+  a_Ligne={{$Y1p-$Y3p}/{$X1p-$X3p}}
+  b_Ligne={$Y1p-($a_Ligne*$X1p)}
+  X_Ex_a=0
+  Y_Ex_a=$b_Ligne
+  X_Ex_b={{w}-1}
+  Y_Ex_b={{$a_Ligne*$X_Ex_b}+$b_Ligne}
+  if $Y_Ex_b>=0 line... $X_Ex_a,$Y_Ex_a,$X_Ex_b,$Y_Ex_b,1,$Rp,$Vp,$Bp,{$AlphaLC*$Ap} fi
+ fi
+ done
+ if $DilateLignes>1 dilate_circ... $DilateLignes fi
+ rm.
+ blend alpha
+ {w},{h},1,4
+ fill_color. $FR,$VR,$BR,$AR
+ rv
+ blend alpha
+ if $Degradation>0 kuwahara. $Degradation fi
+}
+
+#################################################
+##                                             ##
+##          FIN samj_Triangles_Lignes          ##
+##                                             ##
+#################################################
 
 #################################################
 ##                                             ##
