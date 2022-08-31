@@ -1016,6 +1016,36 @@ gcd_resize_vw : skip ${2=100%},${3=100%}
     *.. . r $1,$2,$3,100%,3 /
   done done
 
+#@cli gcd_resize_vw_aligned : width[%],_height[%],_depth[%]
+#@cli : Resize selected images with pixel aligned variance weighted bilinear interpolation.
+#@cli : Default values: 'height=100%' and 'depth=100%'.
+#@cli : $ image.jpg r2dx 25%,2 +gcd_resize_vw_aligned 400%,400%
+gcd_resize_vw_aligned : skip ${2=100%},${3=100%}
+  e[^-1] "Resize image$? to $1x$2x$3, with variance weighted bilinear interpolation."
+  repeat $! l[$>]
+    if d==1
+      (0.0625,0.125,0.0625;0.125,0.25,0.125;0.0625,0.125,0.0625)
+    else # volumetric
+      (0.015625,0.03125,0.015625;0.03125,0.0625,0.03125;0.015625,0.03125,0.015625/\
+      0.03125,0.0625,0.03125;0.0625,0.125,0.0625;0.03125,0.0625,0.03125/\
+      0.015625,0.03125,0.015625;0.03125,0.0625,0.03125;0.015625,0.03125,0.015625)
+    fi
+    [0]x2 sqr.. convolve[-2,-1] [1] rm[1] sqr. -[-2,-1] max. 0
+    compose_channels. + /. 3 +. 1e-6 ^. -1
+    *.. . gcd_resize_aligned $1,$2,$3 /
+  done done
+
+#@cli gcd_resize_aligned : width[%],_height[%],_depth[%]
+#@cli : Resize selected images with pixel aligned bilinear interpolation.
+#@cli : Default values: 'height=100%' and 'depth=100%'.
+#@cli : $ image.jpg +gcd_resize_aligned 400%,400% r2dx 25%,2
+gcd_resize_aligned : skip ${2=100%},${3=100%}
+  e[^-1] "Resize image$? to $1x$2x$3, with bilinear interpolation."
+  foreach {
+    $1,$2,$3,3,"[w#0*(x+0.5)/w-0.5,h#0*(y+0.5)/h-0.5,d#0*(z+0.5)/d-0.5]"
+    warp.. .,0 rm.
+  }
+
 #@cli gcd_smooth_variance : size>=0[%],_tolerance>=0
 #@cli : Filter selected images by variance smoothing of specified size.
 #@cli : Default values: 'size=3' and 'tolerance=1e-6'.
@@ -2616,6 +2646,54 @@ gcd_median_transfer_curve :
       rm[0] z. 0,0,0,{i(0,h-1)-1}
     done done a[^50%-100%] c
   done
+
+#@cli gcd_solve_kernel : [target],_size>=1,_[mask],_boundary_conditions
+#@cli : Solve for 2D [kernel] in 'convolve[selection] [kernel] = [target]'.
+#@cli : 'boundary_conditions' can be { 0=dirichlet | 1=neumann | 2=periodic | 3=mirror }.
+#@cli : Default values: 'size=1' and 'boundary_conditions=1'.
+#@cli : $ image.jpg +laplacian +gcd_solve_kernel.. .
+gcd_solve_kernel : skip ${3=1},${4=1} check ${"is_image_arg $1"}" && isint(${2=1})"
+  e[^-1] "Solve kernel for image$? with convolution target $1
+          and "${"arg 1+$4,dirichlet,neumann,periodic,mirror"}" boundary conditions."
+  pass$1 K:=$2*2+1 => target
+  if ${"is_image_arg $3"}
+    pass$3 0 => mask
+    repeat $!-2 {
+      l[$>,target,mask] {
+        nm={0,n}"_kernel" 0 => patches 0 => points
+        eval[mask] "begin(const boundary=$4;const K=$K);
+          if(i>=1,
+            da_push(#-2,crop(#0,x-$2,y-$2,z,c,K,K,1,1));
+            da_push(#-1,i(#1,x,y));
+          )"
+        if h==0 error[0] "Command 'gcd_solve_kernel': mask image is empty." fi
+        permute[patches] cyxz
+        H:=i(0,h-1)-1 z[patches,points] 0,0,100%,$H
+        +transpose[patches] => patch_t
+        +mmul[patch_t] [patches] rm[patches] invert. => inv
+        rv[points,patch_t,inv] mmul[inv,patch_t,points]
+        mirror[inv] y r[inv] $K,$K,1,1,-1 rm[0] mv[inv] 0
+        =>[inv] $nm
+      }
+    } rm[mask]
+  else
+    repeat $!-1 {
+      l[$>,target] {
+        nm={0,n}"_kernel" 0 => patches 0 => points
+        eval[0] "begin(const boundary=$4;const K=$K);
+            da_push(#-2,crop(#0,x-$2,y-$2,z,c,K,K,1,1));
+            da_push(#-1,i(#1,x,y));"
+        permute[patches] cyxz
+        H:=i(0,h-1)-1 z[patches,points] 0,0,100%,$H
+        +transpose[patches] => patch_t
+        +mmul[patch_t] [patches] rm[patches] invert. => inv
+        rv[points,patch_t,inv] mmul[inv,patch_t,points]
+        mirror[inv] y r[inv] $K,$K,1,1,-1 rm[0] mv[inv] 0
+        =>[inv] $nm
+      }
+    }
+  fi
+  rm[target]
 
 #=============================================
 #************* FILE BROWSER ******************
