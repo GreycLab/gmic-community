@@ -7912,29 +7912,49 @@ do
 while {*}" && "!{*,ESC}
 
 um pass2endimage k[-1]
-#@cli rep_bitplane_shuffle: direction={ 0=backward | 1=forward },index_0...index_inf
+#@cli rep_bitplane_shuffle: direction={ 0=backward | 1=forward },color_channel_only={ 0=all_channels | 1=color_channel_only },index_0...index_inf
 #@cli : Shuffle Bit Planes according to the order of index specified by user.
 rep_bitplane_shuffle:
-num_of_ind,direction={$#-1},{$1&1}
+skip ${2=0}
+if !$! error no_imgs fi
+
+num_of_ind,direction,all_channels={$#-2},{$1&1},{!$2}
 size_of_map={2^$num_of_ind}
 
 whole_numbers=[{expr('x',$num_of_ind)}]
-order=[${2--1}]
+order=[${3--1}]
 
-if $#==2 error insuf_args fi
+if $#<=3 error insuf_args fi
 if sort($order)!=$whole_numbers error inv_ind_args fi
 if $order==$whole_numbers return fi
 
-if !$direction order=[${rep_inverse_permutation\ ${2--1}}] fi
+if !$direction order=[${rep_inverse_permutation\ ${3--1}}] fi
 
-dims_imgs={sum(expr('whds#x',$!))}
+use_map={$!==1?whds>$size_of_map:(use_map=sum=0;repeat($!,k,sum+=whds#k;if(sum>$size_of_map,use_map=1;break();););use_map;);}
 
-if $dims_imgs>$size_of_map
+if $use_map
  $size_of_map,1,1,1,[sum((x>>$whole_numbers&1)<<$order)];
- map[^-1] [-1]
- rm.
+ if $all_channels
+  map[^-1] [-1]
+  rm.
+ else
+  store. bin_map
+  foreach {
+   if !(s&1) sh 0,{s-2} fi
+   $bin_map
+   map[-2] [-1]
+   k[0]
+  }
+ fi
 else
- f sum((i>>$whole_numbers&1)<<$order);
+ if $all_channels f sum((i>>$whole_numbers&1)<<$order);
+ else
+  foreach {
+   if !(s&1) sh 0,{s-2} fi
+   f. sum((i>>$whole_numbers&1)<<$order);
+   k[0]
+  }
+ fi
 fi
 #@cli rep_edgefade: radius>0,_exponential_factor>0 : radius>0,_exponential_factor>0,_nl_amplitude>0,0<_n_smooth<=1,0<_a_smooth<=1
 #@cli : Fade edges on alpha. Only applicable for images with 2 channels or 4+ channels. The last channel is the alpha channel.\n
@@ -22374,205 +22394,374 @@ u "{$1}_"{!$3?2}\
 "{$8}"\
 "{$9,$10}"
 #@gui Bit-Plane Shuffler: fx_rep_bitplane_shuffle,fx_rep_bitplane_shuffle_preview
-#@gui :Direction=choice(0,"Forward","Backward")
-#@gui :Depth=choice(0,"8-Bit","16-Bit")
-#@gui :Index=int(1,1,40320)
-#@gui :Plane A=int(1,1,8)
-#@gui :Plane B=int(2,1,8)
-#@gui :Plane C=int(3,1,8)
-#@gui :Plane D=int(4,1,8)
-#@gui :Plane E=int(5,1,8)
-#@gui :Plane F=int(6,1,8)
-#@gui :Plane G=int(7,1,8)
-#@gui :Plane H=int(8,1,8)
-#@gui :Plane A=int(1,1,8)_0
-#@gui :Plane B=int(2,1,8)_0
-#@gui :Plane C=int(3,1,8)_0
-#@gui :Plane D=int(4,1,8)_0
-#@gui :Plane E=int(5,1,8)_0
-#@gui :Plane F=int(6,1,8)_0
-#@gui :Plane G=int(7,1,8)_0
-#@gui :Plane H=int(8,1,8)_0
-#@gui :Randomize Index=button()
-#@gui :Index=int(1,1,40320)_0
-#@gui :Plane A=int(1,1,16)
-#@gui :Plane B=int(2,1,16)
-#@gui :Plane C=int(3,1,16)
-#@gui :Plane D=int(4,1,16)
-#@gui :Plane E=int(5,1,16)
-#@gui :Plane F=int(6,1,16)
-#@gui :Plane G=int(7,1,16)
-#@gui :Plane H=int(8,1,16)
-#@gui :Plane I=int(9,1,16)
-#@gui :Plane J=int(10,1,16)
-#@gui :Plane K=int(11,1,16)
-#@gui :Plane L=int(12,1,16)
-#@gui :Plane M=int(13,1,16)
-#@gui :Plane N=int(14,1,16)
-#@gui :Plane O=int(15,1,16)
-#@gui :Plane P=int(16,1,16)
-#@gui :Plane A=int(1,1,16)_0
-#@gui :Plane B=int(2,1,16)_0
-#@gui :Plane C=int(3,1,16)_0
-#@gui :Plane D=int(4,1,16)_0
-#@gui :Plane E=int(5,1,16)_0
-#@gui :Plane F=int(6,1,16)_0
-#@gui :Plane G=int(7,1,16)_0
-#@gui :Plane H=int(8,1,16)_0
-#@gui :Plane I=int(9,1,16)_0
-#@gui :Plane J=int(10,1,16)_0
-#@gui :Plane K=int(11,1,16)_0
-#@gui :Plane L=int(12,1,16)_0
-#@gui :Plane M=int(13,1,16)_0
-#@gui :Plane N=int(14,1,16)_0
-#@gui :Plane O=int(15,1,16)_0
-#@gui :Plane P=int(16,1,16)_0
-#@gui :Randomize Order=button()
-#@gui :_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"),Preview Split=point(50,50,0,0,200,200,200,0,10)_0
-#@gui :_=separator(),_=note("<small>Author: <i>Reptorian</i> Latest update: <i>2022/05/27</i>.</small>")
+#@gui:_=separator(),_=note("<b>Main</b>)
+#@gui:Direction=choice(1,"Backward","Forward")
+#@gui:Depth=choice(0,"8-Bit","16-Bit")
+#@gui:Use Alpha?=bool(0)
+#@gui:_=separator(),_=note("<b>Plane Shuffling</b>)
+#@gui:Index=int(100,1,40320)
+#@gui:Index=int(100,1,40320)_0
+#@gui:Plane A=int(1,1,8)
+#@gui:Plane B=int(2,1,8)
+#@gui:Plane C=int(3,1,8)
+#@gui:Plane D=int(4,1,8)
+#@gui:Plane E=int(5,1,8)
+#@gui:Plane F=int(6,1,8)
+#@gui:Plane G=int(7,1,8)
+#@gui:Plane H=int(8,1,8)
+#@gui:Plane A=int(1,1,8)_0
+#@gui:Plane B=int(2,1,8)_0
+#@gui:Plane C=int(3,1,8)_0
+#@gui:Plane D=int(4,1,8)_0
+#@gui:Plane E=int(5,1,8)_0
+#@gui:Plane F=int(6,1,8)_0
+#@gui:Plane G=int(7,1,8)_0
+#@gui:Plane H=int(8,1,8)_0
+#@gui:Randomize Index=button()
+#@gui:Index=text("9896398100167")_0
+#@gui:Index=text("9896398100167")_0
+#@gui:Plane A=int(8,1,16)
+#@gui:Plane B=int(10,1,16)
+#@gui:Plane C=int(9,1,16)
+#@gui:Plane D=int(4,1,16)
+#@gui:Plane E=int(7,1,16)
+#@gui:Plane F=int(13,1,16)
+#@gui:Plane G=int(1,1,16)
+#@gui:Plane H=int(3,1,16)
+#@gui:Plane I=int(11,1,16)
+#@gui:Plane J=int(14,1,16)
+#@gui:Plane K=int(6,1,16)
+#@gui:Plane L=int(2,1,16)
+#@gui:Plane M=int(12,1,16)
+#@gui:Plane N=int(5,1,16)
+#@gui:Plane O=int(15,1,16)
+#@gui:Plane P=int(16,1,16)
+#@gui:Plane A=int(8,1,16)_0
+#@gui:Plane B=int(10,1,16)_0
+#@gui:Plane C=int(9,1,16)_0
+#@gui:Plane D=int(4,1,16)_0
+#@gui:Plane E=int(7,1,16)_0
+#@gui:Plane F=int(13,1,16)_0
+#@gui:Plane G=int(1,1,16)_0
+#@gui:Plane H=int(3,1,16)_0
+#@gui:Plane I=int(11,1,16)_0
+#@gui:Plane J=int(14,1,16)_0
+#@gui:Plane K=int(6,1,16)_0
+#@gui:Plane L=int(2,1,16)_0
+#@gui:Plane M=int(12,1,16)_0
+#@gui:Plane N=int(5,1,16)_0
+#@gui:Plane O=int(15,1,16)_0
+#@gui:Plane P=int(16,1,16)_0
+#@gui:Randomize Order=button()
+#@gui:Direction=choice(1,"Backward","Forward")_0
+#@gui:Depth=choice(0,"8-Bit","16-Bit")_0
+#@gui:_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"),Preview Split=point(50,50,0,0,200,200,200,0,10)_0
+#@gui:_=separator(),_=note("<small>Author: <i>Reptorian</i> Latest update: <i>2022/09/02</i>.</small>")
 fx_rep_bitplane_shuffle:
-if $2
- * 257
- round 0
- rep_bitplane_shuffle {!$1},{[${22-37}]-1}
- / 257
+if $2?$23==1:$4==1 return fi
+
+if narg($_persistent)
+  if $3
+    if $2 *[^-1] 257 fi
+    $_persistent
+    map[^-1] [-1]
+    rm.
+    if $2 / 257 fi
+  else
+    foreach {
+      if !(s&1) sh 0,{s-2} fi
+      if $2 *. 257 fi
+      $_persistent
+      map[-2] [-1]
+      if $2 /[-2] 257 fi
+      k[0]
+    }
+  fi
 else
- rep_bitplane_shuffle {!$1},{[${4-11}]-1}
+  args=$1,{!$3}
+  if $2 rep_bitplane_shuffle $args,${rep_extract_permutation_order\ 16,{$23-1}}
+  else  rep_bitplane_shuffle $args,${rep_extract_permutation_order\ 8,{$4-1}}
+  fi
 fi
 fx_rep_bitplane_shuffle_preview:
-index_8bit,\
-_plane_8bit_a,_plane_8bit_b,_plane_8bit_c,_plane_8bit_d,_plane_8bit_e,_plane_8bit_f,_plane_8bit_g,_plane_8bit_h,\
-_plane_16bit_a,_plane_16bit_b,_plane_16bit_c,_plane_16bit_d,_plane_16bit_e,_plane_16bit_f,_plane_16bit_g,_plane_16bit_h,_plane_16bit_i,_plane_16bit_j,_plane_16bit_k,_plane_16bit_l,_plane_16bit_m,_plane_16bit_n,_plane_16bit_o,_plane_16bit_p\
-=${3-11},${22-37}
+direction,use_16_bits_depth,_use_alpha,index_8_bits,old_index_8_bits,index_16_bits,old_index_16_bits,depth_changed=${1-5},${23-24},{$2!=$59}
+direction_change:=$direction!=$58
 
-if $3!=$21
- ni={$3-1}
- _plane_8bit_a,_plane_8bit_b,_plane_8bit_c,_plane_8bit_d,_plane_8bit_e,_plane_8bit_f,_plane_8bit_g,_plane_8bit_h={[${rep_extract_permutation_order\ 8,$ni}]+1}
-fi
+plane_8bits_a,plane_8bits_b,plane_8bits_c,\
+plane_8bits_d,plane_8bits_e,plane_8bits_f,\
+plane_8bits_g,plane_8bits_h\
+=${6-13}
 
-if $20
- rd={int(u(0,40320))}
- _plane_8bit_a,_plane_8bit_b,_plane_8bit_c,_plane_8bit_d,_plane_8bit_e,_plane_8bit_f,_plane_8bit_g,_plane_8bit_h={[${rep_extract_permutation_order\ 8,$rd}]+1}
- index_8bit={$rd+1}
-fi
+plane_16bits_a,plane_16bits_b,plane_16bits_c,\
+plane_16bits_d,plane_16bits_e,plane_16bits_f,\
+plane_16bits_g,plane_16bits_h,plane_16bits_i,\
+plane_16bits_j,plane_16bits_k,plane_16bits_l,\
+plane_16bits_m,plane_16bits_n,plane_16bits_o,\
+plane_16bits_p\
+=${25-40}
 
-if [${4-11}]!=[${12-19}]
+activate_random_order={$use_16_bits_depth?$57:$22}
 
- eval "
-  v0=[${4-11}];
-  v1=[${12-19}];
-  diff_ind=!(v1-v0);
-  n0_pos=find(diff_ind,0,0,1);
-  n0=v0[n0_pos];
-  v0[n0_pos]=-1;
-  n1_pos=find(v0,n0,0,1);
-  swap(v1[n0_pos],v1[n1_pos]);
-  v1;
-  "
+if $use_16_bits_depth
 
- _plane_8bit_a,_plane_8bit_b,_plane_8bit_c,_plane_8bit_d,_plane_8bit_e,_plane_8bit_f,_plane_8bit_g,_plane_8bit_h=${}
+  change_detected={$depth_changed||$activate_random_order||$direction_change}
 
- index_8bit={${rep_find_permutation_lexicographic_index\ {[${}]-1}}+1}
-
- wait 200
-
-fi
-
-if $54
- rd={int(u(0,20922789888000))}
- _plane_16bit_a,_plane_16bit_b,_plane_16bit_c,_plane_16bit_d,_plane_16bit_e,_plane_16bit_f,_plane_16bit_g,_plane_16bit_h,_plane_16bit_i,_plane_16bit_j,_plane_16bit_k,_plane_16bit_l,_plane_16bit_m,_plane_16bit_n,_plane_16bit_o,_plane_16bit_p={[${rep_extract_permutation_order\ 16,$rd}]+1}
-fi
-
-if [${22-37}]!=[${38-53}]
- eval "
-  v0=[${22-37}];
-  v1=[${38-53}];
-  diff_ind=!(v1-v0);
-  n0_pos=find(diff_ind,0,0,1);
-  n0=v0[n0_pos];
-  v0[n0_pos]=-1;
-  n1_pos=find(v0,n0,0,1);
-  swap(v1[n0_pos],v1[n1_pos]);
-  v1;
-  "
-
- _plane_16bit_a,_plane_16bit_b,_plane_16bit_c,_plane_16bit_d,_plane_16bit_e,_plane_16bit_f,_plane_16bit_g,_plane_16bit_h,_plane_16bit_i,_plane_16bit_j,_plane_16bit_k,_plane_16bit_l,_plane_16bit_m,_plane_16bit_n,_plane_16bit_o,_plane_16bit_p=${}
-
- wait 200
-
-fi
-
-if $2
- gui_split_preview "
-   * 257
-   round 0
-   rep_bitplane_shuffle {!$1},{[$_plane_16bit_a,$_plane_16bit_b,$_plane_16bit_c,$_plane_16bit_d,$_plane_16bit_e,$_plane_16bit_f,$_plane_16bit_g,$_plane_16bit_h,$_plane_16bit_i,$_plane_16bit_j,$_plane_16bit_k,$_plane_16bit_l,$_plane_16bit_m,$_plane_16bit_n,$_plane_16bit_o,$_plane_16bit_p]-1}
-   / 257
-  ",${-3--1}
+  if !narg($_persistent)&&$index_16_bits>1
+  
+    order:=[${25-40}]-1
+    
+    plane_16bits_a,plane_16bits_b,plane_16bits_c,\
+    plane_16bits_d,plane_16bits_e,plane_16bits_f,\
+    plane_16bits_g,plane_16bits_h,plane_16bits_i,\
+    plane_16bits_j,plane_16bits_k,plane_16bits_l,\
+    plane_16bits_m,plane_16bits_n,plane_16bits_o,\
+    plane_16bits_p\
+    :=[$order]+1 
+    
+    if !$direction order=${rep_inverse_permutation\ $order} fi   
+    order=[$order]
+    
+    65536,1,1,1,sum((x>>[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]&1)<<$order)
+    store. _persistent
+    
+  fi
+  
+  user_array_changed:=[${25-40}]!=[${41-56}]
+  change_detected+=$user_array_changed
+  
+  if $change_detected
+  
+    if $user_array_changed
+    
+      eval "
+        a=[${25-40}];
+        b=[${41-56}];
+        diff_pos=argmax(abs(a-b));
+        swap_pos=find(b,a[diff_pos],0,1);
+        swap(b[diff_pos],b[swap_pos]);
+        b;"
+      
+      plane_16bits_a,plane_16bits_b,plane_16bits_c,\
+      plane_16bits_d,plane_16bits_e,plane_16bits_f,\
+      plane_16bits_g,plane_16bits_h,plane_16bits_i,\
+      plane_16bits_j,plane_16bits_k,plane_16bits_l,\
+      plane_16bits_m,plane_16bits_n,plane_16bits_o,\
+      plane_16bits_p\
+      =${}
+      
+      new_order:=[${}]-1
+      index_16_bits:=${rep_find_permutation_lexicographic_index\ $new_order}+1
+      if !$direction new_order=${rep_inverse_permutation\ $new_order} fi 
+      new_order=[$new_order]
+      65536,1,1,1,sum((x>>[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]&1)<<$new_order)
+      store. _persistent
+      
+    elif $depth_changed||$direction_change
+      order:=[${25-40}]-1
+      if !$direction order=${rep_inverse_permutation\ $order} fi
+      order=[$order]
+      65536,1,1,1,sum((x>>[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]&1)<<$order)
+      store. _persistent
+    else  
+      index_16_bits={int(u(0,20922789888000))}
+      new_order=${rep_extract_permutation_order\ 16,$index_16_bits}
+      index_16_bits+=1
+      
+      plane_16bits_a,plane_16bits_b,plane_16bits_c,\
+      plane_16bits_d,plane_16bits_e,plane_16bits_f,\
+      plane_16bits_g,plane_16bits_h,plane_16bits_i,\
+      plane_16bits_j,plane_16bits_k,plane_16bits_l,\
+      plane_16bits_m,plane_16bits_n,plane_16bits_o,\
+      plane_16bits_p\
+      :=[$new_order]+1 
+      
+      if !$direction new_order=${rep_inverse_permutation\ $new_order} fi
+      new_order=[$new_order]
+      65536,1,1,1,sum((x>>[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]&1)<<$new_order)
+      store. _persistent      
+    fi
+    
+  fi
+  
+  if $index_16_bits>1
+    gui_split_preview "
+      * 257
+      if !$_use_alpha&&(!(s%2)) sh 0,{s-2} fi
+      $_persistent 
+      map[-2] [-1]
+      k[0]
+      / 257
+     ",${-3--1}
+  else
+    gui_split_preview "skip $*",${3--1}
+  fi
+  
 else
- gui_split_preview "
-   round 0
-   rep_bitplane_shuffle {!$1},{[$_plane_8bit_a,$_plane_8bit_b,$_plane_8bit_c,$_plane_8bit_d,$_plane_8bit_e,$_plane_8bit_f,$_plane_8bit_g,$_plane_8bit_h]-1}
-  ",${-3--1}
+
+  change_detected,index_change={v=$4!=$5;[v||$depth_changed||$activate_random_order||$direction_change,v];}
+  
+  if !narg($_persistent)&&$index_8_bits>1
+  
+    order:=${rep_extract_permutation_order\ 8,{$index_8_bits-1}}
+    
+    plane_8bits_a,plane_8bits_b,plane_8bits_c,\
+    plane_8bits_d,plane_8bits_e,plane_8bits_f,\
+    plane_8bits_g,plane_8bits_h\
+    :=[$order]+1   
+    
+    if !$direction order=${rep_inverse_permutation\ $order} fi   
+    order=[$order]
+    
+    256,1,1,1,sum((x>>[0,1,2,3,4,5,6,7]&1)<<$order)
+    store. _persistent
+    
+  fi
+  
+  user_array_changed:=[${6-13}]!=[${14-21}]
+  change_detected+=$user_array_changed
+  
+  if $change_detected
+  
+    if $user_array_changed
+    
+      eval "
+        a=[${6-13}];
+        b=[${14-21}];
+        diff_pos=argmax(abs(a-b));
+        swap_pos=find(b,a[diff_pos],0,1);
+        swap(b[diff_pos],b[swap_pos]);
+        b;"
+      
+      plane_8bits_a,plane_8bits_b,plane_8bits_c,\
+      plane_8bits_d,plane_8bits_e,plane_8bits_f,\
+      plane_8bits_g,plane_8bits_h\
+      =${}
+      
+      new_order:=[${}]-1
+      index_8_bits:=${rep_find_permutation_lexicographic_index\ $new_order}+1
+      if !$direction new_order=${rep_inverse_permutation\ $new_order} fi 
+      new_order=[$new_order]
+      256,1,1,1,sum((x>>[0,1,2,3,4,5,6,7]&1)<<$new_order)
+      store. _persistent
+      
+    elif $depth_changed||$direction_change
+    
+      order:=[${6-13}]-1
+      if !$direction order=${rep_inverse_permutation\ $order} fi
+      order=[$order]
+      256,1,1,1,sum((x>>[0,1,2,3,4,5,6,7]&1)<<$order)
+      store. _persistent
+      
+    elif $index_change
+    
+      new_order=${rep_extract_permutation_order\ 8,{$index_8_bits-1}}
+      
+      plane_8bits_a,plane_8bits_b,plane_8bits_c,\
+      plane_8bits_d,plane_8bits_e,plane_8bits_f,\
+      plane_8bits_g,plane_8bits_h\
+      :=[$new_order]+1  
+      
+      if !$direction new_order=${rep_inverse_permutation\ $new_order} fi
+      new_order=[$new_order]           
+      
+      256,1,1,1,sum((x>>[0,1,2,3,4,5,6,7]&1)<<$new_order)
+      store. _persistent
+      
+    else
+    
+      index_8_bits={int(u(0,40320))}
+      new_order=${rep_extract_permutation_order\ 8,$index_8_bits}
+      index_8_bits+=1
+      
+      plane_8bits_a,plane_8bits_b,plane_8bits_c,\
+      plane_8bits_d,plane_8bits_e,plane_8bits_f,\
+      plane_8bits_g,plane_8bits_h\
+      :=[$new_order]+1 
+      
+      if !$direction new_order=${rep_inverse_permutation\ $new_order} fi
+      new_order=[$new_order]
+      256,1,1,1,sum((x>>[0,1,2,3,4,5,6,7]&1)<<$new_order)
+      store. _persistent      
+      
+    fi
+    
+  fi
+  
+  if $index_8_bits>1
+    gui_split_preview "
+      round 0
+      if !$_use_alpha&&(!(s%2)) sh 0,{s-2} fi
+      $_persistent 
+      map[-2] [-1]
+      k[0]
+     ",${-3--1}
+  else
+    gui_split_preview "skip $*",${3--1}
+  fi
+  
 fi
 
-use_8_bits={!$2?2}
-use_16_bits={$2?2}
+visible_8_bits,visible_16_bits={$use_16_bits_depth?[0,2]:[2,0]}
 
-u "{$1}"\ # Direction
-"{$2}"\ # Depth
-"{"$index_8bit"}_"$use_8_bits\
-"{"$_plane_8bit_a"}_"$use_8_bits\
-"{"$_plane_8bit_b"}_"$use_8_bits\
-"{"$_plane_8bit_c"}_"$use_8_bits\
-"{"$_plane_8bit_d"}_"$use_8_bits\
-"{"$_plane_8bit_e"}_"$use_8_bits\
-"{"$_plane_8bit_f"}_"$use_8_bits\
-"{"$_plane_8bit_g"}_"$use_8_bits\
-"{"$_plane_8bit_h"}_"$use_8_bits\
-"{"$_plane_8bit_a"}"\
-"{"$_plane_8bit_b"}"\
-"{"$_plane_8bit_c"}"\
-"{"$_plane_8bit_d"}"\
-"{"$_plane_8bit_e"}"\
-"{"$_plane_8bit_f"}"\
-"{"$_plane_8bit_g"}"\
-"{"$_plane_8bit_h"}"\
-"{0}_"$use_8_bits\
-"{"$index_8bit"}"\
-"{"$_plane_16bit_a"}_"$use_16_bits\
-"{"$_plane_16bit_b"}_"$use_16_bits\
-"{"$_plane_16bit_c"}_"$use_16_bits\
-"{"$_plane_16bit_d"}_"$use_16_bits\
-"{"$_plane_16bit_e"}_"$use_16_bits\
-"{"$_plane_16bit_f"}_"$use_16_bits\
-"{"$_plane_16bit_g"}_"$use_16_bits\
-"{"$_plane_16bit_h"}_"$use_16_bits\
-"{"$_plane_16bit_i"}_"$use_16_bits\
-"{"$_plane_16bit_j"}_"$use_16_bits\
-"{"$_plane_16bit_k"}_"$use_16_bits\
-"{"$_plane_16bit_l"}_"$use_16_bits\
-"{"$_plane_16bit_m"}_"$use_16_bits\
-"{"$_plane_16bit_n"}_"$use_16_bits\
-"{"$_plane_16bit_o"}_"$use_16_bits\
-"{"$_plane_16bit_p"}_"$use_16_bits\
-"{"$_plane_16bit_a"}"\
-"{"$_plane_16bit_b"}"\
-"{"$_plane_16bit_c"}"\
-"{"$_plane_16bit_d"}"\
-"{"$_plane_16bit_e"}"\
-"{"$_plane_16bit_f"}"\
-"{"$_plane_16bit_g"}"\
-"{"$_plane_16bit_h"}"\
-"{"$_plane_16bit_i"}"\
-"{"$_plane_16bit_j"}"\
-"{"$_plane_16bit_k"}"\
-"{"$_plane_16bit_l"}"\
-"{"$_plane_16bit_m"}"\
-"{"$_plane_16bit_n"}"\
-"{"$_plane_16bit_o"}"\
-"{"$_plane_16bit_p"}"\
-"{0}_"$use_16_bits\
+u "{"$direction"}"\
+"{"$use_16_bits_depth"}"\
+"{"$_use_alpha"}"\
+"{"$index_8_bits"}_"$visible_8_bits\
+"{"$index_8_bits"}"\
+"{"$plane_8bits_a"}_"$visible_8_bits\
+"{"$plane_8bits_b"}_"$visible_8_bits\
+"{"$plane_8bits_c"}_"$visible_8_bits\
+"{"$plane_8bits_d"}_"$visible_8_bits\
+"{"$plane_8bits_e"}_"$visible_8_bits\
+"{"$plane_8bits_f"}_"$visible_8_bits\
+"{"$plane_8bits_g"}_"$visible_8_bits\
+"{"$plane_8bits_h"}_"$visible_8_bits\
+"{"$plane_8bits_a"}"\
+"{"$plane_8bits_b"}"\
+"{"$plane_8bits_c"}"\
+"{"$plane_8bits_d"}"\
+"{"$plane_8bits_e"}"\
+"{"$plane_8bits_f"}"\
+"{"$plane_8bits_g"}"\
+"{"$plane_8bits_h"}"\
+"{0}_"$visible_8_bits\
+"{"$index_16_bits"}"\
+"{"$index_16_bits"}"\
+"{"$plane_16bits_a"}_"$visible_16_bits\
+"{"$plane_16bits_b"}_"$visible_16_bits\
+"{"$plane_16bits_c"}_"$visible_16_bits\
+"{"$plane_16bits_d"}_"$visible_16_bits\
+"{"$plane_16bits_e"}_"$visible_16_bits\
+"{"$plane_16bits_f"}_"$visible_16_bits\
+"{"$plane_16bits_g"}_"$visible_16_bits\
+"{"$plane_16bits_h"}_"$visible_16_bits\
+"{"$plane_16bits_i"}_"$visible_16_bits\
+"{"$plane_16bits_j"}_"$visible_16_bits\
+"{"$plane_16bits_k"}_"$visible_16_bits\
+"{"$plane_16bits_l"}_"$visible_16_bits\
+"{"$plane_16bits_m"}_"$visible_16_bits\
+"{"$plane_16bits_n"}_"$visible_16_bits\
+"{"$plane_16bits_o"}_"$visible_16_bits\
+"{"$plane_16bits_p"}_"$visible_16_bits\
+"{"$plane_16bits_a"}"\
+"{"$plane_16bits_b"}"\
+"{"$plane_16bits_c"}"\
+"{"$plane_16bits_d"}"\
+"{"$plane_16bits_e"}"\
+"{"$plane_16bits_f"}"\
+"{"$plane_16bits_g"}"\
+"{"$plane_16bits_h"}"\
+"{"$plane_16bits_i"}"\
+"{"$plane_16bits_j"}"\
+"{"$plane_16bits_k"}"\
+"{"$plane_16bits_l"}"\
+"{"$plane_16bits_m"}"\
+"{"$plane_16bits_n"}"\
+"{"$plane_16bits_o"}"\
+"{"$plane_16bits_p"}"\
+"{0}_"$visible_16_bits\
+"{"$direction"}"\
+"{"$use_16_bits_depth"}"\
 "{$-3}"\
 "{$-2,$-1}"
 #@gui Graphical Tiling Glitch (Interactive): fx_rep_x_graphical_tiling,fx_rep_x_graphical_tiling_preview(0)
