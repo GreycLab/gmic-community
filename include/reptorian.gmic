@@ -47,6 +47,188 @@
 #@cli :: Reptorian's CLI Commands
 #
 #-------------------------------
+#@cli rep_red_acrylic_filter: [source_image],_luminosity_blend_factor>=0%,_green_cut>=0%,_green_visibility>=0%
+#@cli : Alter a image so that target image would be visible using a red acrylic plastic sheet as cover.
+rep_red_acrylic_filter:
+skip ${1=},${2=0%},${3=0%},${4=100%}
+
+n_imgs,blend_factor,boost,green_chroma={$!},{cut($2,0,1)},{cut(abs($3),0,1)*255},{cut($4,0,1)}
+import_img=${is_image_arg\ $1}
+
+if $import_img||($n_imgs&1)
+
+ eval "
+  start_vector=[w#0,h#0,d#0];
+  same_dim=1;
+  repeat($n_imgs-1,p,
+   q=p+1;
+   if([w#q,h#q,d#q]!=start_vector,same_dim=0;break(););
+  );
+  same_dim;"
+
+ eq_dims=${}
+
+ if $import_img
+  pass$1 0
+ fi
+
+ if s&1
+  to_gray[-1]
+ else
+  to_graya[-1]
+  split[-1] c
+  /. 255
+  *[-2,-1]
+ fi
+
+ if $!-$n_imgs>1 error inv_imp_count fi
+
+ if $eq_dims
+
+  target_dim={[w#0,h#0]}
+  rep_aspect_crop_2d[-1] $target_dim
+  resize[-1] $target_dim,100%,100%,3
+  name[-1] channel
+
+  repeat $!-1 local[$>,channel] {
+    if s#0&1 to_gray..
+    else
+     to_graya..
+     split.. c
+    fi
+
+    100%,100%,100%,100%
+    +negate[0] 255
+
+    a[0,-2,-1] c
+    image[0] [channel],0,0,0,1
+
+    if $!==3 append[0,1] c fi
+
+    shared[0] 0 shared[0] 1
+
+    if $blend_factor
+     image[-1] [-2],0,0,0,0,$blend_factor
+    fi
+
+    if $boost
+     cut[-1] $boost,255
+    fi
+
+    if $green_chroma<1
+     *[-1] $green_chroma
+    fi
+
+    rm[-2,-1]
+
+   }
+  done
+
+  rm[channel]
+
+ else
+
+  store. channel
+
+  foreach {
+
+   contain_alpha=0
+
+   target_dim={[w,h]}
+
+   if s&1
+    to_gray
+   else
+    to_graya
+    split c
+    contain_alpha=1
+   fi
+
+   $channel
+
+   rep_aspect_crop_2d. $target_dim
+   resize. $target_dim,100%,100%,3
+
+   +negate[0] 255
+
+   if $blend_factor
+    image.. [0],0,0,0,0,$blend_factor
+   fi
+
+   if $boost
+    cut.. $boost,255
+   fi
+
+   if $green_chroma<1
+    mul.. $green_chroma
+   fi
+
+   if $contain_alpha
+    append[0,2,3] c
+   fi
+
+   append c
+
+  }
+
+ fi
+
+else
+
+  source_pos,target_pos={[1,0]}
+
+  repeat $!>>1 {
+
+   contain_alpha,current_source_pos=0,$source_pos
+
+   target_dim={[w#$target_pos,h#$target_pos]}
+
+   if s#$source_pos&1
+    to_gray[$source_pos]
+   else
+    to_graya[$source_pos]
+    split[$source_pos] c
+    /. 255
+    *[$source_pos,{$source_pos+1}]
+   fi
+
+   if s#$target_pos&1
+    to_gray[$target_pos]
+   else
+    to_graya[$target_pos]
+    split[$target_pos] c
+    contain_alpha,current_source_pos+=1
+   fi
+
+   rep_aspect_crop_2d[$current_source_pos] $target_dim
+   resize[$current_source_pos] $target_dim,100%,100%,3
+
+   +negate[$target_pos] 255
+
+   if $blend_factor
+    image[$current_source_pos] [$target_pos],0,0,0,0,$blend_factor
+   fi
+
+   if $boost
+    cut[$current_source_pos] $boost,255
+   fi
+
+   if $green_chroma<1
+    *[$current_source_pos] $green_chroma
+   fi
+
+   append[$target_pos,$current_source_pos] c
+   append[$target_pos,-1] c
+
+   if $contain_alpha
+    append[$target_pos,{$target_pos+1}] c
+   fi
+
+   source_pos,target_pos+=1
+
+  }
+
+fi
 #@cli rep_lavander_binary_map: _size_of_arr_by_power_of_two>0,_mode={ -1=custom | 0=and | 1=or | 2=xor },_bin_a,_bin_b,_shift>0,custom_expression
 #@cli : Create a texture that does the following steps:
 #@cli : 1) Create an array of integer that matches index with size of 2^n.
@@ -27047,6 +27229,102 @@ u "{$1}"\
 "{$158}"\
 "{"$_fx_rep_lavander_binary_map_seed"}"\
 "{$160}"
+#@gui Red Acrylic Plastic Filter:fx_rep_red_acrylic_filter,fx_rep_red_acrylic_filter_preview(0)
+#@gui:_=note("This generates image in which you use red acrylic plastic cover in order to reveal a image.\n\nThis filter require multiple images.")
+#@gui:_=separator(),_=note("<b>Initial</b>")
+#@gui:Use Imported Image?=bool(0)
+#@gui:Image Location=file()
+#@gui:Use Reference Layer=bool(0)
+#@gui:Reference Layer=choice(0,"Top","Bottom")
+#@gui:_=separator(),_=note("<b>Effect</b>")
+#@gui:Luminosity Blend=float(0,0,100)
+#@gui:Green Cut Point=float(0,0,100)
+#@gui:Green Visibility=float(100,0,100)
+#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2022/09/12</i>.</small>")
+#@gui:Use Imported Image?=bool(0)_0
+#@gui:Image Location=file()_0
+#@gui:Use Reference Layer=bool(0)_0
+#@gui:Reference Layer=choice(0,"Top","Bottom")_0
+#@gui:Luminosity Blend=float(0,0,100)_0
+#@gui:Green Cut Point=float(0,0,100)_0
+#@gui:Green Visibility=float(100,0,100)_0
+fx_rep_red_acrylic_filter:
+skip "${2=}","${9=}"
+
+n_images,\
+cond_import_image,cond_refer_image,\
+ref_image_id,luma_fact,verd_green_min_pt,verd_green_visil,\
+previo_cond_import_image,previo_cond_refer_image,\
+previo_ref_image_id,previo_luma_fact,previo_verd_green_min_pt,previo_verd_green_visil\
+={$!},$1,${3-8},${10-14}
+
+if $cond_import_image
+ if narg($_persistent) $_persistent
+ else i "$2"
+ fi
+ rep_red_acrylic_filter[0--2] [-1],$args
+ rm[-1]
+else
+ if $n_images&1||$cond_refer_image
+  if $ref_image_id rep_red_acrylic_filter[0--2] [-1],$args
+  else             rep_red_acrylic_filter[1--1] [0],$args
+  fi
+ else
+  rv rep_red_acrylic_filter ,$args
+ fi
+fi
+fx_rep_red_acrylic_filter_preview:
+skip "${2=}","${9=}"
+
+n_images,\
+cond_import_image,cond_refer_image,\
+ref_image_id,luma_fact,verd_green_min_pt,verd_green_visil,\
+previo_cond_import_image,previo_cond_refer_image,\
+previo_ref_image_id,previo_luma_fact,previo_verd_green_min_pt,previo_verd_green_visil\
+={$!},$1,${3-8},${10-14}
+
+args:=[$luma_fact,$verd_green_min_pt,$verd_green_visil]/100
+
+if $cond_import_image
+
+ if narg("$2")
+  image_loc="$2"
+  previo_image_loc="$9"
+
+  if !narg($_persistent)||('$image_loc'!='$previo_image_loc') i $image_loc +store. _persistent
+  else $_persistent
+  fi
+
+  rep_red_acrylic_filter[0--2] [-1],$args
+  rm[-1]
+ fi
+
+else
+
+ if $n_images&1||$cond_refer_image
+  if $ref_image_id rep_red_acrylic_filter[0--2] [-1],$args
+  else             rep_red_acrylic_filter[1--1] [0],$args
+  fi
+ else
+  rv rep_red_acrylic_filter ,$args
+ fi
+
+fi
+
+u "{$1}"\
+"{$2}_"{$1?2:1}\
+"{$3}_"{!$1?2}\
+"{$4}_"{!$1?$n_images&1||$cond_refer_image?2}\
+"{$5}"\
+"{$6}"\
+"{$7}"\
+"{$1}"\
+"{$2}"\
+"{$3}"\
+"{$4}"\
+"{$5}"\
+"{$6}"\
+"{$7}"
 ######################
 
 # Local Variables:
