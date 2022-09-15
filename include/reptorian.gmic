@@ -15494,6 +15494,7 @@ else
 fi
 #@cli rep_aspect_crop_2d: _width_ratio>0,_height_ratio>0,-1<=_shift_factor[%]<=1
 #@cli : Crop images based on specified aspect ratio.
+#@gui : Code for finding new dimension was provided by Sumruv in discord/generative.
 #@cli : Default value: 'shift_factor=0'
 #@cli : Author: Reptorian.
 rep_aspect_crop_2d:
@@ -15501,13 +15502,9 @@ skip ${3=0}
 
 check "$1>0&&$2>0"
 
-ratio_w,ratio_h,_arc2d_crop_shift_factor=${1-2},{(cut($3,-1,1)+1)/2}
+_aspect_crop_ratio_w,_aspect_crop_ratio_h,_arc2d_crop_shift_factor=${1-2},{(cut($3,-1,1)+1)/2}
 
-_arc2d_crop_ratio,inv_arc2d_crop_ratio={$ratio_w/$ratio_h},{$ratio_h/$ratio_w}
-
-_min_arc_2d_ratio={min($_arc2d_crop_ratio,$inv_arc2d_crop_ratio)}
-
-if $ratio_w==$ratio_h
+if $_aspect_crop_ratio_w==$_aspect_crop_ratio_h
   m "cmd_arc_2d_crop :
     if w==h return fi
 
@@ -15520,19 +15517,22 @@ if $ratio_w==$ratio_h
     fi
     "
 else
+
+  _arc2d_crop_ratio={$_aspect_crop_ratio_h/$_aspect_crop_ratio_w}
+
   m "cmd_arc_2d_crop :
-    ratio={w/h}
+    ratio={h/w}
 
     if $ratio==$_arc2d_crop_ratio return fi
 
-    if $_arc2d_crop_ratio>$ratio
-      nh={round($_min_arc_2d_ratio*$ratio*h)}
-      start_point={int($_arc2d_crop_shift_factor*(h-$nh))}
-      crop 0,$start_point,{w-1},{$start_point+$nh-1}
+    new_dim,mode={b=[w,h];aspect_ratio=$_arc2d_crop_ratio;ny=min(b[0]*aspect_ratio,b[1]);ny<b[1]?[round(ny),1]:[round(b[1]/aspect_ratio),0];}
+
+    if $mode
+     start_point={int($_arc2d_crop_shift_factor*(h-$new_dim))}
+     crop 0,$start_point,{w-1},{$start_point+$new_dim-1}
     else
-      nw={round($_min_arc_2d_ratio/$ratio*w)}
-      start_point={int($_arc2d_crop_shift_factor*(w-$nw))}
-      crop $start_point,0,{$start_point+$nw-1},{h-1}
+     start_point={int($_arc2d_crop_shift_factor*(w-$new_dim))}
+     crop $start_point,0,{$start_point+$new_dim-1},{h-1}
     fi
     "
 fi
@@ -27229,7 +27229,7 @@ u "{$1}"\
 "{$158}"\
 "{"$_fx_rep_lavander_binary_map_seed"}"\
 "{$160}"
-#@gui Red Acrylic Plastic Filter:fx_rep_red_acrylic_filter,fx_rep_red_acrylic_filter_preview(0)
+#@gui Red Acrylic Plastic Filter:fx_rep_red_acrylic_filter,fx_rep_red_acrylic_filter_preview(1)
 #@gui:_=note("This generates image in which you use red acrylic plastic cover in order to reveal a image.\n\nThis filter require multiple images.")
 #@gui:_=separator(),_=note("<b>Initial</b>")
 #@gui:Use Imported Image?=bool(0)
@@ -27249,31 +27249,6 @@ u "{$1}"\
 #@gui:Green Cut Point=float(0,0,100)_0
 #@gui:Green Visibility=float(100,0,100)_0
 fx_rep_red_acrylic_filter:
-skip "${2=}","${9=}"
-
-n_images,\
-cond_import_image,cond_refer_image,\
-ref_image_id,luma_fact,verd_green_min_pt,verd_green_visil,\
-previo_cond_import_image,previo_cond_refer_image,\
-previo_ref_image_id,previo_luma_fact,previo_verd_green_min_pt,previo_verd_green_visil\
-={$!},$1,${3-8},${10-14}
-
-if $cond_import_image
- if narg($_persistent) $_persistent
- else i "$2"
- fi
- rep_red_acrylic_filter[0--2] [-1],$args
- rm[-1]
-else
- if $n_images&1||$cond_refer_image
-  if $ref_image_id rep_red_acrylic_filter[0--2] [-1],$args
-  else             rep_red_acrylic_filter[1--1] [0],$args
-  fi
- else
-  rv rep_red_acrylic_filter ,$args
- fi
-fi
-fx_rep_red_acrylic_filter_preview:
 skip "${2=}","${9=}"
 
 n_images,\
@@ -27310,11 +27285,17 @@ else
  fi
 
 fi
+fx_rep_red_acrylic_filter_preview:
+skip "${2=}","${9=}"
+
+n_images:=$!
+
+fx_rep_red_acrylic_filter $*
 
 u "{$1}"\
 "{$2}_"{$1?2:1}\
 "{$3}_"{!$1?2}\
-"{$4}_"{!$1?$n_images&1||$cond_refer_image?2}\
+"{$4}_"{!$1?$n_images&1||$1?2}\
 "{$5}"\
 "{$6}"\
 "{$7}"\
