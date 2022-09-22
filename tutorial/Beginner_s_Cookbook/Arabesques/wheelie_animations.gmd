@@ -1,0 +1,280 @@
+= totherebackagain
+# Wheelie Animations 
+
+|- ''Wheelies'' | [Interlude](wheelies.html#interlude) | ''Deep Dive'' | ''From Wheelies, Arabesques''
+| ''From Arabesques, Wheelies'' | ''Wheelie Animations''
+
+|![genarabesque](images/ampersand_anim.mp4)\n     *A 1911 Goudy Bookletter Ampersand via 1,024 delta wheelies*|Fourteen years ago, [Santiago Ginnobili](https://santi75.wordpress.com/) wondered on YouTube if, somewhere in the Universe, a planetary orbit might exist resembling Homer Simpson. This — being YouTube — induced Dr. Ginnobili to post the prerequisite [demo video](https://www.youtube.com/watch?v=QVuU2YCwHjw). It did indeed demonstrate a system of epicycles tracing the elder Simpson.\n\nExplanations for finding just the right epicycles — a thousand in number, Dr. Ginnobili attested — were missing. And to good effect. Any explanation would have been fatal to the sheer panache of Dr. Ginnobili's cyclic _capriccio_. He trusted that, by the sweet by-and-by, YouTube would serve up some sod or two who would sacrifice brio for technical prosaics and make good with actual epicyclic computations.\n\nIndeed, over the sweet by-and-by YouTube did not disappoint. Improvements in compression resolutions and a lifting of play time constraints have given rise to a number of [longer running epicyclic hits](https://www.youtube.com/watch?v=-qgreAUpPwM). These, unkinked, lay bare circular paths that are bashed a bit. There are even YouTubers who have taken up in fair dinkum ways the lot of explaining epicyclic computations:
+
+| 1.  |Grant Sanderson ( 3Blue1Brown ):  [But what is the Fourier Transform? A visual introduction.](https://www.youtube.com/watch?v=spUNpyF58BY) and its companion [But what is a Fourier series? From heat flow to drawing with circles](https://www.youtube.com/watch?v=r6sGWTCMz2k).
+| 2.  |Burkard Polster ( Mathologer ): [Epicycles, complex Fourier series and Homer Simpson's orbit](https://www.youtube.com/watch?v=qS4H6PEcCCA),  uses Santiago Ginnobili's epicyclic rendering of Homer Simpson as a jumping off point as to what may be going on with all of those circles.
+| 3.  |Daniel Shiffman ( Coding Train ) runs through a [JavaScript implementation](https://www.youtube.com/watch?v=MY4luNgGfms).
+
+Implementations in other languages abound, including G'MIC. If you have made your way from [wheelies](wheelies.html) through to [deep dives](deep_dive.html), assembled [from wheelies arabesques](from_wheelies_arabesques.html) and deconstructed [arabesques into wheelies](from_arabesques_wheelies.html) you know already what these gyrating line segments are. Chaotic in appearance — yes, but appearances deceive: these segments dance a ballet choreographed with rocket-launch precision. They are delta wheelies, linked end-to-end, no more, no less, in a manner prescribed by the original [wheelie chain recipe](wheelies.html#firstplay). For some instant in time, these delta wheelies add up vectorially to the cardinal sum evaluated at just that same instant, as they must, for the deltas are differenced from that cardinal sum — are just a picturesque re-expression of that sum — which must necessarily land at the same point.
+
+To be sure, these visualized delta wheelie chains are much, _much_, ___MUCH!___ longer than the single-digit linkages we explored back in [Wheelies](wheelies.html), but we know that, in principle, delta wheelie chains with a million, million links are principally no different than those with just a few: they are just the pairwise differencing of the _N_ terms of some cardinal sum ordered in one of its _N!_ ways, and that such a cardinal sum has an analogous frequency domain spectral image. Digitize a former circle kinked up to look like Homer Simpson, or the 1911 Goudy Bookletter ampersand, or Jean-Baptiste Joseph Fourier, and ''-fft'' will fetch for you the cardinal sum. Then difference terms for the delta wheelie chain using any permutation you care to and with however many links you need for the fidelity you want.
+
+The particulars:
+
+|      1.  |Digitize the path: obtain discrete samples at (presumably) equal time steps.
+|      2.  |Through the discrete forward Fourier transform, find the frequency domain image of the path these samples trace.
+|      3.  |Compute the delta wheelies through some pair-wise differencing scheme of spectral coefficients.
+|      4.  |Animate the delta wheelie chain and the plotting of the arabesque. The animations mesh automagically. Take your bow; bask in the applause.
+
+We could use any permutation of the ordinals, but there is whimsy in differencing "from the origin to the Nyquist rate." The large, low rotational rate, delta wheelies serve well as a visual root for the small-but-frantically spinning higher frequency deltas.
+
+= spectralpermutation
+===
+| ![spectralpermutation](images/spectralpermutation.svg)
+|*15. Selection order for alternate clockwise and counterclockwise wheelies, large to small magnitude (usually...)*
+===
+
+The implementaton which follows glides over digitization. Sometime shortly after this writing (January 2023) there will be a [cheatsheet](https://gmic.eu/tutorial/cheatsheet.html) on the topic of calling scripts and executables from G'MIC, for which a Python 3 script that parses Structured Vector Graphics files demonstrate the technique. For the impatient, a [G'MIC exercises](https://discuss.pixls.us/t/gmic-exercises/6774/1019) discussion hosted on the [discuss.pixls.us](https://discuss.pixls.us/) discourse server embodies that cheatsheet. Alternatively, you may [download the CSV](images/goudyampersand.csv) file of the 1911 Goudy Bookletter ampersand for a playpen digitized path; you know you've always wanted one.
+
+( [Download wheelie_animchain.gmic](scripts/wheelie_animchain.gmic) ):
+
+??? wheelie_animchain.gmic 
+
+~~~
+  1 gtutor_mkchainanim :
+  2    # Argument 1: image, 1×2n×1×2.  n=Nyquist Sample Rate.
+  3    # Argument 2: positive integer. Animation frames.
+  4    # Argument 3: positive integer. Lower passband, Hertz.
+  5 
+  6    -check ${is_image_arg\ $1}" && ${2=300}>0 && ${3=32}>0"
+  7    -pass$1
+  8    -name[0] canvas
+  9    -name[1] spectral
+ 10    fcnt=$2
+ 11    wcnt=$3
+ 12 
+ 13    # Scale and clear zero frequency, eliding any
+ 14    # offset from the complex plane origin. As a
+ 15    # consequence, the root wheelie originates
+ 16    # at the origin.
+ 17 
+ 18    -div[spectral] {h#$spectral}
+ 19    -eval I[#$spectral,0]=vector2(0)
+ 20 
+ 21    # Image 'coefficients' for dynamic array (da);
+ 22    # storage for frequency domain ordinals.
+ 23 
+ 24    0
+ 25    -name. coefficients
+ 26 
+ 27    # Scan spectral image and set 'wfound' to the count of
+ 28    # non-zero, (meaningful) coefficients. Note that many
+ 29    # coefficients in the spectral image may have zero-length
+ 30    # and, thus, no bearing on the arabesque. The dynamic
+ 31    # array ('coefficients') acquires the non-zero
+ 32    # coefficients, converted to polar form (r ∠ θ). Scan
+ 33    # alternately down the counterclockwise (m%2==0) and
+ 34    # clockwise (m%2!=0) portions of the frequency axis,
+ 35    # toward the Nyquist Sampling Rate mid-point. 'o' obtains
+ 36    # the rotational rate in each loop; 'j' is the index to
+ 37    # the currently assayed ordinal — it alternates between
+ 38    # clockwise and counterclockwise indices; 'm' is the
+ 39    # loopcounter.
+ 40 
+ 41    wfound={">
+ 42             wc=get('wcnt',0,0);
+ 43             sz=0;
+ 44             repeat(2*wc,m,
+ 45                    sw=h#$spectral;
+ 46                    if(
+ 47                       m%2==0,
+ 48                       j=int(m/2)+1;
+ 49                       o=j,
+ 50                       j=sw-(int(m/2)+1);
+ 51                       o=-(int(m/2)+1)
+ 52                      );
+ 53                    rad=norm2(I(#$spectral,0,j));
+ 54                    if(rad>0,
+ 55                       ang=atan2(
+ 56                                  i(#$spectral,0,j,0,1),
+ 57                                  i(#$spectral,0,j,0,0)
+ 58                                );
+ 59                       ang<0?ang=ang+2*pi;
+ 60                       da_push(#$coefficients,[rad,ang,o])
+ 61                     );
+ 62                   );
+ 63             da_size(#$coefficients)
+ 64            "}
+ 65 
+ 66    -if $wfound
+ 67 
+ 68       # The coefficient array (da) may still be
+ 69       # manipulated as an image; we strip the penultimate
+ 70       # and last pixel of the dynamic array image,
+ 71       # containing administrative size and capacity
+ 72       # counts. The remaining three channel image contains
+ 73       # a permutation of non-zero cardinal sum
+ 74       # coefficients: radius (channel zero), orientation
+ 75       # (channel 1) and rotational rate (channel 2). By
+ 76       # virtue of our "ends-to-the-middle" scan, we have
+ 77       # prepared a coefficient permutation where the
+ 78       # rotational rates alternate in sign and increase in
+ 79       # magnitude.
+ 80 
+ 81       -crop[coefficients] 0,0,0,0,0,{$wfound},0,3
+ 82       -shift[coefficients] 0,1,0,0,0
+ 83 
+ 84       # During animation, rotors spin delta 
+ 85       # wheelies by fixed angular increments.
+ 86  
+ 87       -split[coefficients] c,2
+ 88       -name. rotors
+ 89       -fill[rotors] "begin(framecount=get('fcnt',0,0));
+ 90                      [i(0,y,0,1),(2*pi*i(0,y,0,0))/framecount]"
+ 91 
+ 92       # Backplate imaging: Generate arabesque
+ 93       # from the spectral image. This is a reference
+ 94       # image to compare what delta wheelie chain
+ 95       # draws.
+ 96 
+ 97       -mul[spectral] {h#$spectral}
+ 98       +split[spectral] c
+ 99       -ifft[-2,-1]
+100       -append[-2,-1] c
+101       -name. plots
+102       -fill[plots] "begin(
+103                            sw=min(w#$canvas,h#$canvas)/2;
+104                            id=eye(3);
+105                            id[0]=sw;
+106                            id[2]=sw;
+107                            id[4]=-sw;
+108                            id[5]=sw;
+109                            store('amat',id,3,3)
+110                          );
+111                          (id*[I(x,y),1])[0,2]
+112                    "
+113       -permute[plots] cyzx
+114       -eval "PV=crop(#$plots);
+115              polygon(#$canvas,
+116                      -int(size(PV)/2),
+117                      PV,
+118                      0.375,
+119                      0xaaaaaaaa,
+120                      75,85,110,96
+121                     )"
+122       -remove[spectral,plots]
+123       -store[canvas] canvastemplate
+124 
+125       # Allocate plot storage for tracing the tip
+126       # of the wheeli echain.
+127       
+128       -input[0] 1,$fcnt,1,2
+129       -name[0] trace
+130 
+131       # Animation loop…
+132       -repeat $fcnt k=$>
+133 
+134          # 0. Assemble (cumulate)
+135          #    & scale delta wheelie
+136          #    chain [dwchain].
+137 
+138          +split[coefficients] c
+139          -polar2complex[-2,-1]
+140          -append[-2,-1] c
+141          -cumulate[-1] y
+142          -crop[-1] 0,0,0,0,0,{2*h-1},0,{s-1},3
+143          -name. dwchain
+144          -fill[dwchain] "begin(id=get('amat',9));(id*[I(x,y),1])[0,2]"
+145 
+146          # 1. Copy position of delta wheelie tip
+147          #    into path trace buffer.
+148 
+149          -eval I(#$trace,0,$k,0)=I(#$dwchain,0,h#$coefficients-1)
+150          -input[trace] $canvastemplate
+151          -if $k>0
+152 
+153             # 2. if: Trace buffer needs at least two
+154             #    plots of the wheelie tip path.
+155 
+156             +crop[trace] 0,0,0,0,0,$k,0,1
+157             -crop[-1] 0,0,0,0,0,{2*h-1},0,{s-1},3
+158             -permute[-1] cyzx
+159 
+160             # 3. Draw wheelie tip trace.
+161 
+162             -eval "PV=crop(#-1);
+163                    sz=size(PV);
+164                    polygon(#$canvas,
+165                            -int(sz/2),
+166                             PV,
+167                             1.00,
+168                             0xffffffff,
+169                             40,50,50,255
+170                           )"
+171             -remove[-1]
+172          -fi
+173 
+174          # 4. Draw delta wheelie chain.
+175 
+176          -permute[dwchain] cyzx
+177          -eval "PV=crop(#$dwchain);
+178                 sz=size(PV);
+179                 polygon(#$canvas,
+180                         -int(sz/2),
+181                              PV,
+182                              1.00,
+183                              0xffffffff,
+184                              60,100,200,255
+185                        )"
+186 
+187          # 5. Draw red dot hinges.
+188 
+189          -eval "PV=crop(#$dwchain,0,0,0,0,2,h#$coefficients,1,1);
+190                 sz=size(PV);
+191                 for(j=0,
+192                     j<(sz/2),
+193                     j++,
+194                     ellipse(#$canvas,
+195                             PV[2*j,2],
+196                             1.5,
+197                             1.5,
+198                             0,
+199                             1,
+200                             240,25,210,255
+201                            )
+202                    )"
+203          -remove[dwchain]
+204          -name[canvas] frame
+205             
+206          # 6. Increment delta wheelies
+207          #    for next frame.
+208 
+209          -add[coefficients] [rotors]
+210       -done # Animation loop 
+211 
+212       # 7. Drawn all frames. Remove
+213       #    all not labeled 'frame'.
+214  
+215       -remove[^frame]
+216    -else
+217       -error "Spectral image argument has no coefficients."
+218 -fi
+
+~~~
+
+???
+    
+??? Weeds, for those seeking further distractions
+
+|  __Line__  |  __Remark__  
+|  **1-11** |__Argument management:__ The image selected by the command sets some of the non-dynamic characteristics of the animation; frame dimensions and number of color channels. One could easily select an image with imagery. Such would then form an unanimated "backplate." In classic cel animation, the backplate is furthest from the camera, occupies the bottom of the cel stack and is retained from shot to shot. The upper cells carry the animation, being mostly transparent and swapped with successor cels from shot to shot.\n\nThe command's first argument is a spectral representation of a plot path; note that it is expected to be arrayed along the image _y_ axis. This is a convention born of convenience, as a common provider of such plot paths, ''-input_csv'' stacks the path along the _y_ image dimension. `-permute[xoriented] yxzc` can appropriately rearrange spectral representations stacked along the _x_ image dimension.\n\nThe second argument sets the number of frames to be rendered for the animation. How long that may be in seconds depends upon what frame rate may be given to some output renderer. If that output renderer is told to make an animation at 30 frames a second, then 300 frames will provide for a ten second animation.\n\nThe third passband argument are for those who find joy in sloppy tracing effects. Technically, it deletes all but the given number positive and negative coefficients; a passband of 30 Hertz elides all but thirty counterclockwise and thirty clockwise coefficients, retaining sixty coefficients all told. In practice, this removes the high frequency components from the path. Barring a path initially comprised only of low frequencies, this gives rise to an animation that rounds off sharp corners and the like, as sharp corners contain high frequency components — for such is what makes corners sharp.          
+|  **18-19** |__Centering the arabesque:__ We adjust the spectral domain image by eliminating the _f=0_ spectral coefficient. A strict fellow may rightfully carp that this destroys data. That is true, but we are in the service of Art, where compositional adjustments are common. This adjustment removes any offset phasor of the arabesque from the origin so that the spatial conversion of this spectral data by ''-ifft'' centers the image on the origin. That is, the deletion of the _f=0_ coefficient in the spectral domain gives rise to the average position of zero for all plots in the spatial domain.  
+|  **24-25** |__Dynamic Array Coefficient Cache:__ We establish a [dynamic array](https://gmic.eu/reference/mathematical_expressions.html#dynamic_arrays) container image to hold harvested non-zero cardinal sum coefficients. We start with an empty image. Dynamic array internals will set image dimensions, as needed, when vectors of particular dimensions are pushed onto the stack. See **41-64** commentary. 
+|  **41-64** |__Finding Cardinal Sum Coefficients:__ We harness a math expression to set the command line variable `wfound` to the number of wheelies found; that is, the number of non-zero coefficients of the cardinal sum. A spectral image may be predominantly populated with zero coefficients, so we set out to find and cache — in a [dynamic array](https://gmic.eu/reference/mathematical_expressions.html#dynamic_arrays) — only the non-zero ones.\n\nWhilst we are busying ourselves with this coefficient filtering, we also order found items in a particular permutation, that of alternating positive and negative coefficients while proceeding from low to high rotational rates, this as described in the text. When we plot the delta wheelie chain in the animation loop, **138-144, 178,187,** the slowly rotating, large radii delta wheelies will be toward the root end of the chain, with the more rapidly rotating deltas near the tip. This plotting convention appears in most epicycle (nèe "delta wheelie") renderings.\n\nAlso, whilst we are at it, we represent coeffcients in polar form, storing the same as dynamic array vectors of the form: `[+radius, ±orientation, ±rotational_rate]` for each non-zero coefficient. This layout is in the service of our animation loop, to wit: animate the orientation angles of the cardinal sum coefficients by adding "smidgen angles," — delta angles derived from the rotational rate. Incrementing by smidgen angles becomes straightforward addition when the coefficients are in polar form. See **81-91, 138-146 and 209**.
+|  **81-91** |__Tomb-Raiding the Dynamic Array:__ With the number of coefficients ascertained (`wfound` is positive), we deconstruct the image underlying the dynamic array, turning it into a "coefficient vector" and a "rotor vector". We: (1) trim away dynamic array administrative fields by means of ''-crop''; see **81**. (2) by means of ''-shift'' and the [Dirichlet boundary rule](https://gmic.eu/tutorial/images_have_edges_now_what.html#images_have_edges_now_what), we introduce a dummy constant coefficient term, `r=0, ∠=0°,` to the cardinal sum. This doesn't change the sum — it is effectively zero — but in the course of converting cardinal sum coefficients to wheelie chain hinge points, this dummy term becomes the very first plot point of the chain. See _Culminate Coefficients:_ **138-144**\n\nAs a first step in finding "smidgen angles", we ''-split'' out channel three, `±rotational_rate,` from the coefficient vector, making a proto "rotor vector"; see **87-91**. The ''-fill'' mathematical expression applied to the rotor vector accomplishes two tasks: (1) It implements smidgen angle conversion: `(2π × f) ÷ framecount` for _f_, the rotational rate of each vector, scaling the vector elements by _2π_, then dividing by the frame count. This leaves the rotor vector holding "smidgen angles," by which the animation loop advances the orientations of cardinal sum terms. It also (2) injects an additional, zeroed-out, channel into the rotor vector, converting its elements into `[r=0,∠Δθ]` polar values. Such values may be added to the coefficient vector in a straightforward manner without altering the radius component; see **209**. The means of fabricating such a zeroed-out channel stems from a side-effect of the _pixel accessor function_ [i(#ind,_x,_y,_z,_c,_interpolation,_boundary_conditions)](https://gmic.eu/reference/mathematical_expressions.html#specific_functions). This pixel accessor invocation: `i(0,y,0,1)` references a channel that does not initially exist in rotor vector. Recall that the ''-split'' of proto rotors from the coefficient vector produced single channel elements, these _just_ rotational rates. In the absence of an explicitly specified boundary_condition, G'MIC creates an out-of-bounds channel and uses the default Dirichlet [boundary rule](https://gmic.eu/tutorial/images_have_edges_now_what.html); off-image pixels are set to constant black.
+|  **97-121** |__Plot a Back Plate Image:__ We create and ''-store'' a back plate image. It portrays the spatial plot points encoded in the Argument 1 `[spectral]` image, this so that the user might compare the wheelie-generated trace with the actual image. We recover the plot points of the actual image by means of the inverse, discrete time Fourier transform of `[spectral]`, ''-ifft''; this brings about a set of plot points realizing an image plotted on the complex plane.\n\nTo render these plot points, we harness the mathematical expression function `polygon().` Particulars follow closely on that of rendering cardinal sums in [From Wheelies, Arabesques](from_wheelies_arabesques.html#cesum); the transform of plot points into pixel image space, suitable for consumption by `polygon()` takes place through an affine transform. See the [anim_simple.gmic annotations](#annotations) for how this transform to screen space comes about.\n\nOnce `polygon()` has rendered the plot points on the back plate, we employ the ''-store'' command to stash the back plate off the image list and into a named storage variable, `canvastemplate.` In the animation loop, we restore this image via ''-input''  at the start of each frame, upon which we further render wheelie chains and tip tracery; see the `Animation loop...` **150**.
+|  **124-129** |__Tracing the Wheelie Chain Tip:__ Before entering the animation loop, we set up storage to retain plot points of the wheelie tip's per-frame travels. Accumulating coefficients at the top of the animation loop, **138-144** expediently finds all the wheelie chain hinge points; the last hinge point corresponds to the chain's tip. On each frame, we add that tip plot to `[trace]` for subsequent rendering; see **176-185**.  This overlay trace rendering allows a visual comparison between the wheelie chain drawing and the benchmark arabesque scribed on the back plate. See **97-121**.   
+|  **131-210** |__Animation Loop:__ In the animation loop, we: (1) culminate coefficients, creating wheelie chain hinge points; see **138-144** (2) update the trace buffer with the current tip position for this frame; see **149** (3) Fetch a copy of the back plate from off image list storage; see **150** (4) with sufficient trace points accumulated, render the wheelie chain tip trace from plot points accumulated from previous frames; see **153-171** (5) render "hinges" at the joins of the wheelie chain; see **189-202** (6) Increment coefficient orientations by rotor vector angles; see **209** and **81-91**.  
+|  **138-144** |__Culminate Coefficients:__ A very expedient way to convert a cardinal sum into a wheelie chain is to just accumulate the coefficients into a progressive sum by means of G'MIC's ''-cumulate'' command; see **141**. Each intermediary sum locates a hinge point between successive delta wheelies; rendering line segments from hinge point to hinge point visualizes the delta wheelie chain itself.\n\nWe actually animate the cardinal sum by adding pre-computed "smidgen angles" to the constant angular component of each cardinal sum term; these "smidgen angles" are scaled from the rotational rate of each term; see _Tomb-Raiding the Dynamic Array_, **81-91.** For each frame in the animation loop we step the orientations of each cardinal sum term by a "smidgin angle", see **209,** culminate the adjusted cardinal sum terms, then render the trace, chain, and hinge markers. The culmination method here follows from the distinction between [delta wheelies and cardinal sum terms](from_wheelies_arabesques.html#recombine); the line segment between hinges elucidates a pairwise _difference_ between successive cardinal sum terms and is the delta wheelie "connecting" the paired terms. The `[dwchain]` image houses the hinge plot points. As noted, these are regenerated at the top of the animation loop, once every frame, after stepping the orientations. 
+|  **149-170** |__Mirroring Paths for Fun and Profit:__ The last hinge point corresponds to the wheelie chain's tip. For each frame, we copy this last hinge point from the coefficient array to the end of the trace buffer. If more than one trace point has accumulated, we render the entire point set via `polygon().` \n\nThe two ''-crop'' commands, **156-157**, may mystify. When given _k_ plot points to render the connecting _k–1_ line segments, `polygon()` automatically closes the loop with a _k_ th additional segment, this running from point _k–1_ to 0: the last to the first point. Strictly speaking, that is exactly what `polygon()` has been _designed_ to do: make closed polygons. That being so, if one should still wish for (insist on?) "open" polygons, _sans_ closing segments, then the [textbook recommendation](https://gmic.eu/reference/mathematical_expressions.html#specific_functions) suggests calling `polygon()` _k–1_ times for _k_ plots, passing it each time successive pairs of plot points. That works, but is not an [optimal approach](from_wheelies_arabesques.html#threewheelieredrawn). It is quite a bit faster to call `polygon()` — _once_ — with, say, _2×k_ plots than _k–1_ times with point pairs, as that doubled data set still bypasses much overhead from `polygon()` setup-and-teardown. The doubled data set, _2×k_, arises from mirroring the path, so as to first walk forward along the unmirrored plots, and then trace steps backward along the mirrored plots. `polygon()` still closes the polygon, but since the first and last points in the data set coincide, there is no visual effect and we _seem_ to have an open polygon. This doubled data set, with one half the plot points the mirror of the other half, furnishes a means of overcoming a `polygon()` shortcoming: out of the box, it draws single pixel wide lines. With a mirrored dataset, one can displace the outbound half in one direction along miter lines and the other half in the opposite direction; a supplied width parameter controls centerline displacement. There are details: the size of the bisecting angle between successive line segments affects the amount of displacement; it is necessary to scale the furnished width as a function of the bisecting angle. Look for particulars in an upcoming [cheatsheet](https://gmic.eu/tutorial/cheatsheet.html) on variable-width line plotting with `polygon()`.\n\nThe second ''-crop'' at line **157** mirrors the data set; how this is so may not be immediately clear. The command trims images, to be sure, but not _just_ to make smaller images. One may also crop from smaller to larger dimensions, and in that case, [boundary policies](https://gmic.eu/tutorial/images_have_edges_now_what.html) come into play. In the present case, we crop a column vector image with height _h_ to a double-height image: _2×h_. G'MIC needs to know how to fill the new pixels: the `mirror` boundary policy, selected by the last ''-crop'' argument of `3`, instructs G'MIC to fill the new space with a mirror of the old. We get a walk-back data set in one fell swoop.                
+|  **174-204** |__Annotating the Frame:__From this point forward, we embark upon a succession `polyon()`or `ellipse()` -based plottings to annotate the back plate with the dynamic elements of the animation. At **150**, the top of the animation loop, we ''-input'' the named image variable `$canvastemplate`, introducing a copy of the animation back plate drawn at **97-121**; see the article _Plot a Back Plate Image_ and the ''-store'' command. With a fresh copy of the back plate, we harness `polygon()`to render the current wheelie chain trace, **162-171,** and the wheelie chain proper, **176-185. we employ `ellipse()` to dot the hinge plot points. These three dynamic annotations all employ the hinge plot points in the `[dwchain]` vector image, data computed at the top of the animation; see **138-144,** _Culminate Coefficients_. We name the backplate `frame` to enroll the image into the animation sequence. After we have exited the animation loop, **215**, we invoke ''-remove'' [^frame] to purge the image list of everything _but_ animation frames.    
+|  **209** |__Stepping the Animation:__ Adding the `[rotors]` and `[coefficients]` column vector images steps the orientation angles of the cardinal sum, adding the celebrated "smidgen angles" _2πfΔt_ to each term. See the run-up to animation loop, **81-91**, _Tomb-Raiding the Dynamic Array_ , for the setup behind this addition.
+
+???
+
+|- Previous: | ''From Wheelies, Arabesques'' |                      |                      |
