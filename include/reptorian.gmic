@@ -1680,30 +1680,52 @@ ones:=int($1%10)
 u ${arg\ $thousands+1,,M,MM,MMM}${arg\ $hundreds+1,,C,CC,CCC,CD,D,DC,DCC,DCCC,CM}${arg\ $tens+1,,X,XX,XXX,XL,L,LX,LXX,LXXX,XC}${arg\ $ones+1,,I,II,III,IV,V,VI,VII,VIII,IX}
 #@cli rep_roman2int: roman_numeral_string
 #@cli : Return Roman Numeral as integer.
-rep_roman2int:
+new_rep_roman2int:
 struppercase $1
 roman_num=${}
 
-('$roman_num')
+eval "
+ ans=num=0;
+ roman_chars=['IVXLCDM'];
+ const chars_count=size(roman_chars);
+ num_vals=expr('(x&1?5:1)*10^(x>>1)',chars_count);
+ char_freq_list=vector(#chars_count,0);
+ roman_num='"${}"';
+ const roman_num_length=size(roman_num);
+ const dec_roman_num_length=roman_num_length-1;
+ 
+ repeat(roman_num_length,p,
+  char=roman_num[dec_roman_num_length-p];
+  
+  pos=find(roman_chars,char,0,1);
+  
+  if(pos==-1,run('error inv_char'));
+  
+  encounters=++char_freq_list[pos];
+  
+  if(encounters>3,
+   run('error excess_char');
+  );
+  
+  if(pos&1,
+   d_pos=pos-1;
+   if(char_freq_list[d_pos],char_freq_list[d_pos]+=2;);
+  );
+  
+  num=num_vals[pos];
 
-eval. <"begin(v=0;ans=0;num=0;);
- I=='I'?num=1:
- I=='V'?num=5:
- I=='X'?num=10:
- I=='L'?num=50:
- I=='C'?num=100:
- I=='D'?num=500:
- I=='M'?num=1000;
- (4*num<ans)?(ans-=num;):(ans+=num;);
- end(run('inum=',ans););
- "
+  if(num<<4<ans,ans-=num,ans+=num);
+ );
+ 
+ ans;"
 
-rm.
+ans=${}
 
-if !inrange($inum,1,3999,1,1) error lim_excess fi
-if '$roman_num'!='${rep_int2roman\ $inum}' error inv_roman_num fi
+if '$roman_num'!='${rep_int2roman\ $ans}' 
+ error inv_roman_num 
+fi
 
-u $inum
+u $ans
 #@cli rep_output_jasc: filename
 #@cli : Output selected image JASC-PAL files(s).(.pal)
 rep_output_jasc:
