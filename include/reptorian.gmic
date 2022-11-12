@@ -3150,6 +3150,97 @@ eval "
  );
 
  idx;"
+#@cli rep_variable_combination: number_of_items_a,number_of_items_b,...,_axis{x,y,z}
+#@cli : Generates variable combinations. Zero items count as a item.
+#@cli : Default values: '_axis=x'
+rep_variable_combinations:
+check "[${1--2}]==int([${1--2}])"
+
+if find(abs([${1--2}]),0,0,1)+1 error inv_num fi
+
+if narg($-1)
+ if v='$-1';a=size(v)==1;b=inrange((v)[0],120,122,1,1);!(a&&b)
+  error inv_axis_inp
+ fi
+ axis={'$-1'-120}
+else
+ axis=1
+fi
+
+num_of_combinations={v=abs([${1--2}]);prod(v)}
+
+if $num_of_combinations==1 {$#-1} return fi
+
+if $num_of_combinations>16777216 error excess_combina fi
+
+if $num_of_combinations>3125 mode=:
+else mode=>
+fi
+
+outdim={v=vector(#3,1);v[$axis]=$num_of_combinations;v;}
+
+$outdim,{$#-1},$mode"begin(
+  const axis=$axis;
+  const d_s=s-1;
+  items_list=abs([${1--2}]);
+  div_list=vector(#s,0);
+  div_list[0]=tv=1;
+  repeat(d_s,p,
+   div_list[p+1]=tv*=items_list[d_s-p];
+  );
+  div_list=reverse(div_list);
+  axis==2?(index()=z;):
+  axis==1?(index()=y;):
+           index()=x;
+ );
+ int(index()/div_list)%items_list;
+ "
+#@cli rep_extract_variable_combination: index,number_of_items_a,number_of_items_b,...
+#@cli : Return the combination at index for specified variable combination.
+rep_extract_variable_combination:
+
+eval "
+ items_list=int(abs([${2--1}]));
+ 
+ if(find(items_list,0,0,1)+1,run('error zero_num_err'););
+ 
+ index=$1%prod(items_list);
+ const group_count=size(items_list);
+ const dec_group_count=group_count-1;
+ 
+ div_list=vector(#group_count,0);
+ div_list[0]=tv=1;
+
+ repeat(dec_group_count,p,
+  div_list[p+1]=tv*=items_list[dec_group_count-p];
+ );
+
+ div_list=reverse(div_list);
+ 
+ int(index/div_list)%items_list;
+ "
+#@cli rep_find_variable_combination_lexicographic_index: number_of_items_a,...,combination_a,...
+#@cli : Return the lexicographic index in which this combination is found within a list of all combinations possible.
+#@cli :
+#@cli : Note: There must be equal amount of number_of_items, and combination_number.
+rep_find_variable_combination_lexicographic_index:
+if $#&1 error inv_args_count fi
+
+eval "
+ const half_list_size=$#>>1;
+ const dec_half_list_size=half_list_size-1;
+ mul_items=int(abs(([${1--1}])[0,half_list_size]));
+ combinations=int(abs(([${1--1}])[half_list_size,half_list_size]));
+ combinations%=mul_items;
+ mul_items=shift(mul_items,-1,0);
+ ++mul_items[dec_half_list_size];
+ tv=1;
+ repeat(half_list_size,p,
+  tv=mul_items[dec_half_list_size-p]*=tv;
+ );
+ mul_items;
+ sum(mul_items*combinations);
+ "
 #@cli rep_full_combinations: 0<=number_of_items<9,_axis={x|y|z}
 #@cli : Generates all combinations that are equal to size of input in number of items and occurances.
 #@cli : Default values:'_axis=x'
