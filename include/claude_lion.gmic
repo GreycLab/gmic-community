@@ -567,3 +567,177 @@ cl_reliefFrame:
 		fi
 	}
 
+
+cl_circ :
+	# $1 : center x-coordinate
+	# $2 : center y-coordinate
+	# $3 : radius
+	# $4 : stroke width
+
+	fill. stroke(d)=cut($4-abs(d/2),0,1);stroke(sqrt((x-$1)^2+(y-$2)^2)-$3)
+	n. 0,255
+
+cl_innerCirc :
+
+	xC=$1 # center x-coordinate
+	yC=$2 # center y-coordinate
+	radi=$3 # big circle radius
+	wid=$4 # stroke width
+	nb=$5 # number of small circles
+	lvl=$6 # number of levels
+
+	if $lvl>0
+		angl={pi/$nb}
+		sinu={sin($angl)}
+		ra={$radi/(1+1/$sinu)}
+		ray={$radi/(1+$sinu)}
+		
+		+fill. 0
+		[-1]x{$nb-1}
+		foreach[1--1] {
+			num=$>
+			xA={$ray*cos(2*$num*$angl)}
+			yA={$ray*sin(2*$num*$angl)}
+			cl_circ {$xC+$xA},{$yC+$yA},$ra,$wid
+			cl_innerCirc {$xC+$xA},{$yC+$yA},$ra,$wid,$nb,{$lvl-1}
+		}
+	fi
+
+#@gui ____<b>Rendering</b>
+#------------------
+#@gui Tangential Circles: cl_tangentialCircle, cl_tangentialCircle(1)
+#@gui : note = note("<small>Warning: This is a slow filter and it might consume too much RAM.</small>")
+#@gui : sep = separator()
+#@gui : note = note("<b>Drawing:</b>")
+#@gui : Draw Big Circle = bool(1)
+#@gui : Big Circle Radius = float(100, 10, 1000)
+#@gui : Dimensions = choice[0, "According to Radius", "According to Layer", "According to Layer (Proportionate)", "According to Layer (Scaling)"]
+#@gui : note = note("<small>If you choose "proportionate" or "Scaling", the Big Circle Radius is a percentage of 1/3 of the smaller dimension of the layer. Otherwise, it is a number of pixels.</small>")
+#@gui : Stroke Width = float(1,0.5,10)
+#@gui : Number of Small Circles = int(5, 2, 100)
+#@gui : Number of Levels = int(1, 1, 4)
+#@gui : sep = separator()
+#@gui : note = note("<b>Colors:</b>")
+#@gui : Background Color = color(255,255,255)
+#@gui : Foreground Color = color(0,0,0)
+#@gui : sep = separator()
+#@gui : note = note("<b>Effects:</b>")
+#@gui : Effect = choice(0, "None", "Transparent Background", "Strange Polygons", "Multicolored", "Rainbow", "Double", "Colored Tube", "Red-Yellow Halo", "Blue-Cyan Halo")
+#@gui : sep = separator()
+#@gui : note = note("<small>Note: The preview might be much more aliased than the final result and some effects ignore colors.</small>")
+#@gui : sep = separator()
+#@gui : url = link("Filter discussed here","http://gimpchat.com/viewtopic.php?f=28&t=20121")
+#@gui : note = note("<small>Author: <i>Claude Lion</i>. Latest Update: <i>2022/11/14</i>.</small>")
+#@gui : note = note("<small>It uses filters of David Tschumperlé and Rod/GimpChat and an algorithm of Reptorian.</small>")
+
+cl_tangentialCircle:
+
+	showBig,radi,dime,wid,nb,lvl,backR,backG,backB,foreR,foreG,foreB,effect=$*
+
+	grow=3
+	dimens={$radi*$grow}
+
+	rectWid={if($dime==1||$dime==2,w,$dimens)}
+	rectHei={if($dime==1||$dime==2,h,$dimens)}
+	chanNumb={if($effect,4,3)}
+	$rectWid,$rectHei,1,$chanNumb,255
+	radius={if($dime==2,$radi/300*min(w,h),$radi)}
+
+	local.
+
+		xC={w/2} # center x-coordinate
+		yC={h/2} # center y-coordinate
+
+		if $effect==1
+			backR,backG,backB=$foreR,$foreG,$foreB
+		elif $effect>=7
+			backR,backG,backB=255,255,255
+			foreR,foreG,foreB=0,0,0
+		fi
+
+		foreA=255
+		backA={if($effect==1,0,255)}
+
+		if $showBig==1
+			cl_circ. $xC,$yC,$radius,$wid
+		else
+			n. 0,255
+		fi
+		
+		cl_innerCirc. $xC,$yC,$radius,$wid,$nb,$lvl
+
+		blend screen,1
+
+		n. 0,1
+		
+		if $effect<=1
+			fill. [i*$foreR+(1-i)*$backR,i*$foreG+(1-i)*$backG,i*$foreB+(1-i)*$backB,i*$foreA+(1-i)*$backA]
+		elif $effect==2
+			fx_rodilius. 15,1,0,$nb,90,0,1,0,0
+			n. 0,1
+			fill. [i*$foreR+(1-i)*$backR,i*$foreG+(1-i)*$backG,i*$foreB+(1-i)*$backB,i*$foreA+(1-i)*$backA]
+			n. 0,255
+		elif $effect==3
+			fx_curvature 10,0,100,0,0
+			fx_gradient2rgb 0,0,100,0,0
+			apply_curve 1,0,0,16,240,255,255
+			fx_smooth_antialias. 15,0,1,0,50,50
+			fx_smooth_antialias. 50,50,2.5,0,50,50
+		elif $effect==4
+			fx_dog 1.4,1.5,0,0,0
+			fx_gradient2rgb 0,0,100,0,0
+			apply_curve 1,0,0,64,192,255,255
+			fx_smooth_antialias. 15,0,1,0,50,50
+			fx_smooth_antialias. 50,50,2.5,0,50,50
+		elif $effect==5
+			dog. 1.4,1.5
+			remove_opacity.
+			n. 0,255
+		elif $effect==6
+			fx_dog. 1.4,1.5,0,0,0
+			apply_curve. 1,0,0,16,0,255,255
+			cut. 0,255
+			
+			fx_distance. 0,2,1,0
+			negate. [-1] [-1]
+			fx_decompose_channels 8,1,1,0
+			l.
+				# inspired by emboss_image of Reptorian
+				+apply_curve. 1,0,0,240,16,255,255
+				l.
+					b. 2.5
+					gradient2rgb. 0 n. 0,255
+					[-1]
+					rgb2hsv[-2,-1] split[-2,-1] c
+			
+					l[-3--1] +[-3] {315} %[-3] 360 done
+					l[-6--4] +[-3] {135} %[-3] 360 done
+					l[-3--1] a c hsv2rgb s c done
+					l[-6--4] a c hsv2rgb s c done
+					rm[^-6,-3]
+					negate..
+					/ 2
+					+. 128
+					blend grainmerge,1
+				done
+				to_rgb
+				blend grainmerge,1
+			done
+			
+			fx_smooth_antialias. 15,0,1,0,50,50
+			fx_smooth_antialias. 50,50,2.5,0,50,50
+			sharpen 300
+		elif $effect>=7
+			fill. [i*$foreR+(1-i)*$backR,i*$foreG+(1-i)*$backG,i*$foreB+(1-i)*$backB,i*$foreA+(1-i)*$backA]
+			remove_opacity.
+			split. c rm. rm..
+			+fx_morphological. 0,2,10,"1,0,1; 0,1,0; 1,0,1",0,0,0,0
+			+fx_morphological. 0,2,20,"1,0,1; 0,1,0; 1,0,1",0,0,0,0
+			if $effect==8 reverse[-3,-1] fi
+			a c
+		fi
+	
+	done
+	
+	mv[-1] 0
+	if $dime==3 resize[0] {min(w,h)/3}%,{min(w,h)/3}%,1,$chanNumb,5 fi
