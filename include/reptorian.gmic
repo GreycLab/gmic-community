@@ -1685,7 +1685,7 @@ struppercase $1
 roman_num=${}
 
 eval "
- old_pos=ans=num=0;
+ started=old_char=old_pos=ans=num=0;
  roman_chars=['IVXLCDM'];
  const chars_count=size(roman_chars);
  num_vals=expr('(x&1?5:1)*10^(x>>1)',chars_count);
@@ -1696,8 +1696,15 @@ eval "
 
  if(roman_num_length>15,run('error exc_roman_length'););
 
+ old_char=0;
+ char_changed=0;
+
  repeat(roman_num_length,p,
   char=roman_num[dec_roman_num_length-p];
+
+  if(started&&!char_changed,char_changed=char!=old_char;);
+
+  old_char=char;
 
   pos=find(roman_chars,char,0,1);
 
@@ -1711,16 +1718,57 @@ eval "
 
   encounters=++char_freq_list[pos];
 
-  if(encounters>4,
+  if(encounters>(3+char_changed),
    run('error excess_char');
   );
 
   num=num_vals[pos];
 
   if(num<<2<ans,ans-=num,ans+=num);
+
+  started=1;
  );
 
- if(sum(encounters)>15,run('error exc_counter'););
+ if(!var(roman_num)&&encounters==4,run('error exc_char_rep'););
+ if(ans>3999,run('error exc_val'););
+
+ a=ans%10;
+ b=a%5;
+
+ a&&b?(
+  a<5||b<4?(
+   b==1?(
+    if((roman_num)[roman_num_length-1,1]!='I',
+     run('error inv_char_set');
+    );
+   ):
+   b==2?(
+    if((roman_num)[roman_num_length-2,2]!='II',
+     run('error inv_char_set');
+    );
+   ):
+   b==3?(
+    if((roman_num)[roman_num_length-3,3]!='III',
+     run('error inv_char_set');
+    );
+   ):
+   a==4?(
+    if((roman_num)[roman_num_length-2,2]!='IV'||(roman_num_length>2?(roman_num)[roman_num_length-3,3]=='IIV'),
+     run('error inv_char_set');
+    );
+   );
+  ):(
+   a==9?(
+    if((roman_num)[roman_num_length-2,2]!='IX',
+     run('error inv_char_set');
+    );
+   );
+  );
+ ):(
+  roman_num[roman_num_length-1]=='I'?(
+   run('error inv_char_set');
+  );
+ );
 
  ans;"
 #@cli rep_output_jasc: filename
@@ -3154,7 +3202,7 @@ eval "
  );
 
  idx;"
-#@cli rep_variable_combination: number_of_items_a,number_of_items_b,...,_axis{x,y,z}
+#@cli rep_variable_combinations: number_of_items_a,number_of_items_b,...,_axis{x,y,z}
 #@cli : Generates variable combinations. Zero items count as a item.
 #@cli : Default values: '_axis=x'
 rep_variable_combinations:
