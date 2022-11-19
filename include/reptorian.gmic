@@ -15899,7 +15899,10 @@ if $11 shift 50%,50%,0,0,3,1 fi
 rep_stitch:
 skip ${3=0},${4=0},${5=0},${6=},${7=},${8=3},${9=1},${10=2},${11=}
 
-modulo_mode,random_offset_mode,random_strip_mode,seed_off,seed_strip,boundary,sublevel,interpolation,diff_dim_mode,timg,max_img_ind={int($3)},{$4%2},{$5%3},${6-7},{$8%4},{abs($9)+1},{v=abs($10)+1;v==4?++v:v;},0,{$!},{$!-1}
+modulo_mode,random_offset_mode,random_strip_mode,seed_off,seed_strip,boundary,sublevel,interpolation,diff_dim_mode,timg,max_img_ind,has_strip_seed,has_off_seed={int($3)},{$4%2},{$5%3},${6-7},{$8%4},{abs($9)+1},{v=abs($10)+1;v==4?++v:v;},0,{$!},{$!-1},0,0
+
+if narg($seed_strip) has_strip_seed=1 fi
+if narg($seed_off)   has_off_seed=1   fi
 
 if ${is_percent\ $1} use_perc_off=1
 else
@@ -16007,7 +16010,7 @@ repeat $diff_dim_mode?$!-1:1
 
    if $random_offset_mode
 
-    if narg($seed_off)
+    if $has_off_seed
 
      $total_number_of_bars,1,1,{$modulo?1:2},>"begin(
 
@@ -16086,7 +16089,7 @@ repeat $diff_dim_mode?$!-1:1
 
     {$modulo?max(2,iM#-1+1):iM#-1},1,1,{$modulo?1:2},>"begin(
       const offset=$offset;
-      if(narg($seed_off),srand($seed_off););
+      if($has_off_seed,srand($seed_off););
      );
      a=u(-1,1)*offset;
      b=u(-1,1)*offset;
@@ -16097,7 +16100,8 @@ repeat $diff_dim_mode?$!-1:1
 
    f[$img_targets] "
    begin(
-    if(narg($seed_strip),srand($seed_strip););
+    const has_strip_seed=$has_strip_seed;
+    if(has_strip_seed,srand($seed_strip););
 
     const modulo=$modulo;
     const modulo_mode=$modulo_mode;
@@ -16190,7 +16194,7 @@ repeat $diff_dim_mode?$!-1:1
 
       const multi_strip_length=$total_number_of_bars;
 
-      narg($seed_strip)?(
+      has_strip_seed?(
        rand_v=expr('>begin(seed=$seed_strip;srand(seed);tbars=crop(#$number_of_bars);nbars=vector(#size(tbars),0);t=0;repeat(size(nbars),pos,nbars[pos]=t+=tbars[pos]);const num_angs=$num_angs;const ina=num_angs+1;k=0;);if(x==nbars[k]&&k<num_angs,++k;++seed;srand(seed););int(u(0,ina));',multi_strip_length);
       ):(
        rand_v=expr('begin(const ina=$num_angs+1;);int(u(0,ina));',multi_strip_length);
@@ -16213,7 +16217,7 @@ repeat $diff_dim_mode?$!-1:1
       const multi_strip_length=2*length+num_angs;
       const pos_neg_v_length=length;
 
-      narg($seed_strip)?(
+      has_strip_seed?(
 
        total_neg_zer_pos(v)=(v<<1)+1;
 
@@ -16260,7 +16264,7 @@ repeat $diff_dim_mode?$!-1:1
     ):
     random_strip_mode==1?(
      modulo?(
-      rand_v=expr('begin(if(narg($seed_strip),srand($seed_strip););const ina=$num_angs+1);int(u(0,ina));',$total_number_of_bars);
+      rand_v=expr('begin(if($has_strip_seed,srand($seed_strip););const ina=$num_angs+1);int(u(0,ina));',$total_number_of_bars);
 
       num_angs>1?(
 
@@ -16279,8 +16283,8 @@ repeat $diff_dim_mode?$!-1:1
        off_out(v)=rand_v[v];
       );
      ):(
-      neg_v=expr('<begin(if(narg($seed_strip),srand($seed_strip-1););const ina=$num_angs+1;);int(u(0,ina));',max_nbar_arr);
-      pos_v=expr('>begin(if(narg($seed_strip),srand($seed_strip+1););const ina=$num_angs+1;);int(u(0,ina));',max_nbar_arr);
+      neg_v=expr('<begin(if($has_strip_seed,srand($seed_strip-1););const ina=$num_angs+1;);int(u(0,ina));',max_nbar_arr);
+      pos_v=expr('>begin(if($has_strip_seed,srand($seed_strip+1););const ina=$num_angs+1;);int(u(0,ina));',max_nbar_arr);
       middle=int(u(0,num_angs+1));
       rand_v=[neg_v,middle,pos_v];
       off_out(v)=rand_v[v+nbars[k]];
