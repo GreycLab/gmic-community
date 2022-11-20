@@ -955,17 +955,16 @@ if $use_shape
   fi
 
   n. 0,1 autocrop. 0
+  
+  shape_dimensions_length={round($shape_size*$ratio)}
 
   if $fit_size
-   shape_image_ratio={w#-1/h#-1}
-   resize_width={1>$shape_image_ratio?w#-1*($shape_size/h#-1):$shape_size}
-   resize_height={1>$shape_image_ratio?$shape_size:h#-1*($shape_size/w#-1)}
-   r. {$resize_width*$ratio},{$resize_height*$ratio},1,1,5,0,.5,.5
-   r. $shape_size,$shape_size,1,1,0,0,.5,.5
+   resize2din. $shape_dimensions_length,$shape_dimensions_length,5
   else
-   r. {w#-1*(1/$ratio)},{h#-1*(1/$ratio)},1,1,0,0,.5,.5
-   r. $shape_size,$shape_size,1,1,5,0,.5,.5
+   resize. $shape_dimensions_length,$shape_dimensions_length,100%,100%,5
   fi
+  
+  resize $shape_size,$shape_size,100%,100%,0,0,.5,5
 
   cut. 0,1 n. 0,1
 
@@ -1678,14 +1677,16 @@ tens:=int($1%100/10)
 ones:=int($1%10)
 
 u ${arg\ $thousands+1,,M,MM,MMM}${arg\ $hundreds+1,,C,CC,CCC,CD,D,DC,DCC,DCCC,CM}${arg\ $tens+1,,X,XX,XXX,XL,L,LX,LXX,LXXX,XC}${arg\ $ones+1,,I,II,III,IV,V,VI,VII,VIII,IX}
-#@cli rep_roman2int: roman_numeral_string
+#@cli rep_roman2int: roman_numeral_string,is_strict={ 0=false | 1= true }
 #@cli : Return Roman Numeral as integer number.
 rep_roman2int:
+skip ${2=1}
 struppercase $1
 roman_num=${}
 
 eval "
  started=char_changed=old_char=old_pos=ans=num=0;
+ const is_strict=$2?1;
  roman_chars=['IVXLCDM'];
  const chars_count=size(roman_chars);
  num_vals=expr('(x&1?5:1)*10^(x>>1)',chars_count);
@@ -1704,8 +1705,10 @@ eval "
 
   pos=find(roman_chars,char,0,1);
 
-  if(pos-old_pos<-2,
-   run('error inv_char_gap');
+  if(is_strict,
+   if(pos-old_pos<-2,
+    run('error inv_char_gap');
+   );
   );
 
   old_pos=pos;
@@ -1727,69 +1730,72 @@ eval "
 
  if(ans>3999,run('error exc_val'););
 
- thousands=int(ans/1000);
- hundreds=int(ans%1000/100);
- tens=int(ans%100/10);
- ones=ans%10;
+ if(is_strict,
 
- place=0;
+  thousands=int(ans/1000);
+  hundreds=int(ans%1000/100);
+  tens=int(ans%100/10);
+  ones=ans%10;
+  place=0;
 
- test_vector=vector(#roman_num_length,0);
+  test_vector=vector(#roman_num_length,0);
 
- if(thousands,
-  copy(test_vector[0],'MMM',thousands);
-  place+=thousands;
- );
-
- if(hundreds,
-  hundreds==9||hundreds==4?(
-   copy(test_vector[place],(hundreds>5?'CM':'CD'),2);
-   place+=2;
-  ):
-  hundreds>4?(
-   num_of_char=hundreds-4;
-   copy(test_vector[place],'DCCC',num_of_char);
-   place+=num_of_char;
-  ):(
-   num_of_char=hundreds;
-   copy(test_vector[place],'CCC',num_of_char);
-   place+=num_of_char;
+  if(thousands,
+   copy(test_vector[0],'MMM',thousands);
+   place+=thousands;
   );
- );
 
- if(tens,
-  tens==9||tens==4?(
-   copy(test_vector[place],(tens>5?'XC':'XL'),2);
-   place+=2;
-  ):
-  tens>4?(
-   num_of_char=tens-4;
-   copy(test_vector[place],'LXXX',num_of_char);
-   place+=num_of_char;
-  ):(
-   num_of_char=tens;
-   copy(test_vector[place],'XXX',num_of_char);
-   place+=num_of_char;
+  if(hundreds,
+   hundreds==9||hundreds==4?(
+    copy(test_vector[place],(hundreds>5?'CM':'CD'),2);
+    place+=2;
+   ):
+   hundreds>4?(
+    num_of_char=hundreds-4;
+    copy(test_vector[place],'DCCC',num_of_char);
+    place+=num_of_char;
+   ):(
+    num_of_char=hundreds;
+    copy(test_vector[place],'CCC',num_of_char);
+    place+=num_of_char;
+   );
   );
- );
 
- if(ones,
-  ones==9||ones==4?(
-   copy(test_vector[place],(ones>5?'IX':'IV'),2);
-   place+=2;
-  ):
-  ones>4?(
-   num_of_char=ones-4;
-   copy(test_vector[place],'VIII',num_of_char);
-   place+=num_of_char;
-  ):(
-   num_of_char=ones;
-   copy(test_vector[place],'III',num_of_char);
-   place+=num_of_char;
+  if(tens,
+   tens==9||tens==4?(
+    copy(test_vector[place],(tens>5?'XC':'XL'),2);
+    place+=2;
+   ):
+   tens>4?(
+    num_of_char=tens-4;
+    copy(test_vector[place],'LXXX',num_of_char);
+    place+=num_of_char;
+   ):(
+    num_of_char=tens;
+    copy(test_vector[place],'XXX',num_of_char);
+    place+=num_of_char;
+   );
   );
- );
 
- if(roman_num!=test_vector,run('error inv_char_set'););
+  if(ones,
+   ones==9||ones==4?(
+    copy(test_vector[place],(ones>5?'IX':'IV'),2);
+    place+=2;
+   ):
+   ones>4?(
+    num_of_char=ones-4;
+    copy(test_vector[place],'VIII',num_of_char);
+    place+=num_of_char;
+   ):(
+    num_of_char=ones;
+    copy(test_vector[place],'III',num_of_char);
+    place+=num_of_char;
+   );
+  );
+
+  if(roman_num!=test_vector,run('error inv_char_set'););
+
+ );
 
  ans;"
 #@cli rep_output_jasc: filename
