@@ -15422,10 +15422,7 @@ done
 rep_sptbwgp: rep_shift_pixel_to_boundary_with_group_pixels $*
 #@cli rep_shift_pixel_to_boundary_with_group_pixels: 1<=_position<=1,_axis={ x,0=Horizontal | y,1=Vertical },0%<_influence_factor[%]<=100%,0<=_threshold<=100%,channel_mode
 #@cli : Shifts pixels to boundary by percentage using grouped pixels. position less than .5 means shift will be negative, and position greater than .5 means shift will be positive.
-#@cli :
 #@cli : If 'channel_mode' is position, cmyk mode is assumed. If negative, RGB is assumed. If negative, then always last channel would be used.
-#@cli :
-#@cli : Warning! Color values will still remain preserved for speed reason! If you see colors remaining on preview, their alpha are still zero anyway.
 #@cli : Default values: '_position=-1','_axis=1','_influence_factor=1','_threshold=0','_channel_mode=0'
 rep_shift_pixel_to_boundary_with_group_pixels:
 skip ${1=-1},${2=0},${3=1},${4=0},${5=0}
@@ -15433,34 +15430,23 @@ position,axis,influence,threshold,tcr={[cut(($1+1)/2,0,1),isnum($2)?[$2]:'$2'-'x
 
 if !$influence return fi
 
-
-
 if $axis==1
 
  position={1-$position}
+ src_img=x,pos
 
- draw_strip_a=x,0
- draw_strip_b=1,length
- src_img=x,points[p]
-
- if $influence==1
-  dst_img=x,insert_pos++
- else
-  dst_img=x,lerp(points[p],insert_pos++,$influence)
+ if $influence<1 dst_img=x,round(lerp(pos,insert_pos++,$influence))
+ else            dst_img=x,insert_pos++
  fi
 
  permute_arg=xczy
 
 elif $axis==0
 
- draw_strip_a=0,y
- draw_strip_b=length,1
- src_img=points[p],y
+ src_img=pos,y
 
- if $influence==1
-  dst_img=insert_pos++,y
- else
-  dst_img=lerp(points[p],insert_pos++,$influence),y
+ if $influence<1 dst_img=round(lerp(pos,insert_pos++,$influence)),y
+ else            dst_img=insert_pos++,y
  fi
 
  permute_arg=cyzx
@@ -15476,56 +15462,39 @@ fi
 
 foreach {
  if s==2||s>$tcr
-  alpha_channel={s-1}
 
-  +channels $alpha_channel
+  +channels {s-1}
 
   if iv#-1
 
    cmd_process_alpha[1]
-   [0]
+   {w#0},{h#0},{d#0},{s#0}
 
-   eval[1] :"begin(
-     const position=$position;
-     const length=s;
-     const target_spectrum=s#-1;
-     const d_ts=target_spectrum-1;
-     empty_vector=vector(#target_spectrum);
-     empty_strip=vector(#length);
-
-     position==1?(
-      insert_pos_point()=length-number_of_points;
-     ):
-     !position?(
-      insert_pos_point()=0;
-     ):(
-      insert_pos_point()=round(lerp(0,length-number_of_points,position));
-     );
-
+   fill[1] :"begin(
+    const position=$position;
+    const length=s;
+    position==1?(
+     insert_pos_point()=length-number_of_points;
+    ):
+    !position?(
+     insert_pos_point()=0;
+    ):(
+     insert_pos_point()=round(lerp(0,length-number_of_points,position));
     );
-
-    reference_position=number_of_points=0;
-    points=I;
-
-    repeat(length,p,
-     if(points[p],
-      ++number_of_points;
-      points[reference_position++]=p;
-     );
-    );
-
-    if(number_of_points&&number_of_points<length,
-
-     insert_pos=insert_pos_point();
-     draw(#-1,empty_strip,"$draw_strip_a",0,d_ts,"$draw_strip_b",1,1);
-
-     repeat(number_of_points,p,
+   );
+   points=I;
+   test=number_of_points=sum(points);
+   if(number_of_points,
+    insert_pos=insert_pos_point();
+    repeat(length,pos,
+     if(points[pos],
       I(#-1,"$dst_img")=I(#0,"$src_img");
+      --number_of_points;
      );
-
+     if(!number_of_points,break(););
     );
-    points;
-    "
+   );
+   points;"
 
    keep[-1]
 
