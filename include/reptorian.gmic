@@ -955,7 +955,7 @@ if $use_shape
   fi
 
   n. 0,1 autocrop. 0
-  
+
   shape_dimensions_length={round($shape_size*$ratio)}
 
   if $fit_size
@@ -963,7 +963,7 @@ if $use_shape
   else
    resize. $shape_dimensions_length,$shape_dimensions_length,100%,100%,5
   fi
-  
+
   resize $shape_size,$shape_size,100%,100%,0,0,.5,5
 
   cut. 0,1 n. 0,1
@@ -15420,147 +15420,91 @@ foreach
 done
 #@cli rep_sptbwgp: eq. to 'rep_shift_pixel_to_boundary_with_group_pixels' : (+)
 rep_sptbwgp: rep_shift_pixel_to_boundary_with_group_pixels $*
-#@cli rep_shift_pixel_to_boundary_with_group_pixels: -1<=_position<=1,_axis={ 0=Horizontal | 1=Vertical },0<=_influence_factor<=1,_threshold>=0,_channel_mode
+#@cli rep_shift_pixel_to_boundary_with_group_pixels: 1<=_position<=1,_axis={ x,0=Horizontal | y,1=Vertical },0%<_influence_factor[%]<=100%,0<=_threshold<=100%,channel_mode
 #@cli : Shifts pixels to boundary by percentage using grouped pixels. position less than .5 means shift will be negative, and position greater than .5 means shift will be positive.
-#@cli : Assign an argument to _channel_mode if you want to disable restricting effect on alpha channel or avoid manipulating 4 channels image in case of CMYKA image. Only use in rare cases!
-#@cli : Default values: '_position=-1','_axis=1','_influence_factor=1','_threshold=0','_channel_mode='
+#@cli : If 'channel_mode' is position, cmyk mode is assumed. If negative, RGB is assumed. If negative, then always last channel would be used.
+#@cli : Default values: '_position=-1','_axis=1','_influence_factor=1','_threshold=0','_channel_mode=0'
 rep_shift_pixel_to_boundary_with_group_pixels:
-skip ${1=-1},${2=1},${3=1},${4=0},${5=}
+skip ${1=-1},${2=0},${3=1},${4=0},${5=0}
+position,axis,influence,threshold,tcr={[cut(($1+1)/2,0,1),isnum($2)?[$2]:'$2'-'x',cut([$3,$4],0,1),$5>0?4:$5==0?3]}
 
-influence_factor={min(abs($3),1)}
+if !$influence return fi
 
-if $influence_factor&&$!
+if $axis==1
 
- any_channels=0
- tcr=3
- position={cut(sum($1,1)/2,0,1)}
+ position={1-$position}
+ src_img=x,pos
 
- if $2 position={1-$position} fi
+ if $influence<1 dst_img=x,round(lerp(pos,insert_pos++,$influence))
+ else            dst_img=x,insert_pos++
+ fi
 
- arg=""
+ permute_arg=xczy
 
- if narg($5)
-  if $5>0
-   tcr+=1
+elif $axis==0
+
+ src_img=pos,y
+
+ if $influence<1 dst_img=round(lerp(pos,insert_pos++,$influence)),y
+ else            dst_img=insert_pos++,y
+ fi
+
+ permute_arg=cyzx
+
+else error invalid_arg_2
+fi
+
+if $threshold
+ command cmd_process_alpha:"ge {"$threshold"*iM#-1} permute "$permute_arg
+else
+ command cmd_process_alpha:"gt 0 permute "$permute_arg
+fi
+
+foreach {
+ if s==2||s>$tcr
+
+  +channels {s-1}
+
+  if iv#-1
+
+   cmd_process_alpha[1]
+   {w#0},{h#0},{d#0},{s#0}
+
+   fill[1] :"begin(
+    const position=$position;
+    const length=s;
+    position==1?(
+     insert_pos_point()=length-number_of_points;
+    ):
+    !position?(
+     insert_pos_point()=0;
+    ):(
+     insert_pos_point()=round(lerp(0,length-number_of_points,position));
+    );
+   );
+   points=I;
+   number_of_points=sum(points);
+   if(number_of_points,
+    insert_pos=insert_pos_point();
+    repeat(length,pos,
+     if(points[pos],
+      I(#-1,"$dst_img")=I(#0,"$src_img");
+      --number_of_points;
+     );
+     if(!number_of_points,break(););
+    );
+   );
+   points;"
+
+   keep[-1]
+
   else
-   args.={abs($5)}
-   any_channels=1
+   remove[-1]
   fi
  fi
+}
 
- args.=,{abs($4)},$position,$influence_factor
-
- if $2 m "shift_pixels: new_rep_sptbwgp_shift_vertical "$args""
- else m "shift_pixels: new_rep_sptbwgp_shift_horizontal "$args""
- fi
-
- foreach { if s==2||s>$tcr||$any_channels shift_pixels fi }
-
- um shift_pixels
-
-fi
-
-new_rep_sptbwgp_shift_horizontal:
-skip "${1=}","${2=}","${3=0}"
-
-#$1==channel#
-#$2==tolerance#
-#$3==position#
-#$4==influence_factor#
-
-if narg($1)
- sh {$1%s}
-else
- sh {s-1}
-fi
-
-cond=>0
-
-if narg($2) if min($2,iM#-1) cond=>={min($2,iM#-1)} fi fi
-
-100%,100%,100%,{s#0}
-
-1,{h#1},{d#1},1,:sum([crop(#1,0,y,z,0,{w#1},1,1,1)]$cond)
-
-if iM#-1=={w#0}
- f.. :i(#-1,0,y)==w?I(#0);
-fi
-
-if $4==1 new_pixel_position=new_position
-else new_pixel_position=round(lerp(pixel_position,new_position,{$4}))
-fi
-
-f. :"begin(
-  const max_index=w#-2;
-  const shift_position=$3;
- );
- num_of_pixels=i%max_index;
- if(num_of_pixels,
-  pixel_position=0;
-  start_place_test=max_index-num_of_pixels;
-  new_position=int(shift_position*start_place_test);
-  do(
-   i(#1,pixel_position,y)"$cond"?(
-    I(#2,"$new_pixel_position",y)=I(#0,pixel_position,y);
-    ++new_position;
-    num_of_pixels--;
-   );
-   ++pixel_position;
-  ,num_of_pixels);
- );"
-
-k..
-
-new_rep_sptbwgp_shift_vertical:
-skip "${1=}","${2=}","${3=0}"
-
-#$1==channel#
-#$2==tolerance#
-#$3==position#
-#$4==influence_factor#
-
-if narg($1)
- sh {$1%s}
-else
- sh {s-1}
-fi
-
-cond=>0
-
-if narg($2) if min($2,iM#-1) cond=>={min($2,iM#-1)} fi fi
-
-100%,100%,100%,{s#0}
-
-{w#1},1,{d#1},1,:sum([crop(#1,x,0,z,0,1,{h#-1},1,1)]$cond)
-
-if iM#-1=={h#0}
- f.. :i(#-1,x,0)==h?I(#0);
-fi
-
-if $4==1 new_pixel_position=new_position
-else new_pixel_position=round(lerp(pixel_position,new_position,{$4}))
-fi
-
-f. :"begin(
-  const max_index=h#-2;
-  const shift_position=$3;
- );
- num_of_pixels=i%max_index;
- if(num_of_pixels,
-  pixel_position=0;
-  start_place_test=max_index-num_of_pixels;
-  new_position=int(shift_position*start_place_test);
-  do(
-   i(#1,x,pixel_position)"$cond"?(
-    I(#2,x,"$new_pixel_position")=I(#0,x,pixel_position);
-    ++new_position;
-    num_of_pixels--;
-   );
-   ++pixel_position;
-  ,num_of_pixels);
- );"
-
-k..
+uncommand cmd_process_alpha
 #@cli rep_sinowaterdist: (eq. to rep_sinusoidal_water_distortion)
 rep_sinowaterdist: rep_sinusoidal_water_distortion $*
 #@cli rep_sinusoidal_distortion: _xbalance>0,_ybalance>0,_scale>=0,_interpolation,_boundary_condition
@@ -20552,22 +20496,663 @@ foreach {
 }
 fx_rep_nebulous_preview:
 fx_rep_nebulous $*
-#@gui Grouped Pixel Axis-Based Shift:fx_rep_sptbwgp,fx_rep_sptbwgp_preview
+#@gui Grouped Pixel Axis-Based Shift:fx_rep_sptbwgp,fx_rep_sptbwgp_preview(1)
 #@gui:_=note("Based off MadJik's Paint.NET Gravity Plugin. New feature are shift position, and influence factor."),_=separator()
 #@gui:Shift Position (%)=float(0,-100,100)
 #@gui:Influence Factor (%)=float(0,0,100)
 #@gui:Threshold (%)=float(0,0,100)
 #@gui:Axis=choice(0,"Horizontal","Vertical")
 #@gui:_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"),Preview Split=point(50,50,0,0,200,200,200,0,10)_0
-#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2019/5/14</i>.</small>")
+#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2022/11/24</i>.</small>")
 fx_rep_sptbwgp:
-position={$1%}
-axis=$4
-threshold={$3%*255}
-influence={$2%}
-rep_sptbwgp $position,$axis,$influence,$threshold
+rep_sptbwgp {$1%},$4,{vec_arg=[${2-3}]/100}
 fx_rep_sptbwgp_preview:
 gui_split_preview "fx_rep_sptbwgp ${1-4}",${-3--1}
+#@gui Grouped Pixel Axis-Based Shift[Full Image]:fx_rep_sptbwgp_full,fx_rep_sptbwgp_preview_full(0)*
+#@gui:_=note("Based off MadJik's Paint.NET Gravity Plugin. New feature are shift position, and influence factor. Full Image means the preview is utilizing full-sized image, so you may experience slow-down with huge images!"),_=separator()
+#@gui:Shift Position (%)=float(0,-100,100)
+#@gui:Influence Factor (%)=float(100,0,100)
+#@gui:Threshold (%)=float(0,0,100)
+#@gui:Axis=choice(0,"Horizontal","Vertical")
+#@gui:Old X Shift Position (%)=float(0,-100,100)_0
+#@gui:Old X Influence Factor (%)=float(100,0,100)_0
+#@gui:Old X Threshold (%)=float(0,0,100)_0
+#@gui:Old Y Shift Position (%)=float(0,-100,100)_0
+#@gui:Old Y Influence Factor (%)=float(100,0,100)_0
+#@gui:Old Y Threshold (%)=float(0,0,100)_0
+#@gui:Old Axis=choice(0,"Horizontal","Vertical")_0
+#@gui:Contain Alpha=int(0,0,1)_0
+#@gui:Minimum Alpha Index=int(0,0,100000000)_0
+#@gui:Has Activated Post-Changes=bool(0)_0
+#@gui:_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"),Preview Split=point(50,50,0,0,200,200,200,0,10)_0
+#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2022/11/24</i>.</small>")
+fx_rep_sptbwgp_full:
+if !$12 return fi
+
+if narg($_persistent)
+  imgs={$!}
+  src_image={$imgs+1}
+
+  $_persistent
+
+  if $4 keep_named[$src_image--1] result_y
+  else  keep_named[$src_image--1] result_x
+  fi
+
+  repeat w#$alpha_indexes_list {
+    img_pos:=i(#$alpha_indexes_list,$>)
+
+    reverse[$img_pos,$src_image]
+    rm[$src_image]
+  }
+
+  rm[-1]
+else
+  position,axis,threshold,influence={[$1%,$4,$3%*255,$2%]}
+  rep_sptbwgp $position,$axis,$influence,$threshold
+fi
+fx_rep_sptbwgp_preview_full:
+max_image_index,threshold,old_axis,contain_alpha,started,changes,minimum_alpha_index,has_activated_post_changes:=[$!-1,$3%,$11,$12,0,0,$13,$14]
+
+old_x_shift,old_x_influence,old_x_threshold,\
+old_y_shift,old_y_influence,old_y_threshold=${5-10}
+
+if $2
+  if narg($_persistent)
+    if $contain_alpha
+
+      eval "
+        const post_changes_mode=$has_activated_post_changes;
+        const axis=$4;
+
+        post_changes_mode?(
+          user_input=[${1-3}];
+          vector_equality=user_input-(axis?[${8-10}]:[${5-7}]);
+        ):(
+          user_input=[${1-4}];
+          vector_equality=user_input-(axis?[${8-10},$old_axis]:[${5-7},$old_axis]);
+        );
+
+        pos_unequal=find(vector_equality,0,0,1);
+
+        changes=pos_unequal!=-1;
+
+        [changes,vector_equality[2]?1];
+        "
+
+        changes,threshold_change=${}
+
+
+      if $changes
+        has_activated_post_changes=1
+        $_persistent
+        contain_result_x,contain_result_y=narg($result_x),narg($result_y)
+
+        if $contain_result_x remove[result_x] fi
+        if $contain_result_y remove[result_y] fi
+
+        contain_thresholded_map:=narg($y_axis_generated_thresholded_map)||narg($x_axis_generated_thresholded_map)
+        activate_create_thresholded_map=0
+
+        if !$contain_thresholded_map&&$3
+          activate_create_thresholded_map=1
+        elif $threshold_change&&$3
+          remove[x_axis_generated_thresholded_map,y_axis_generated_thresholded_map]
+          activate_create_thresholded_map=1
+        fi
+
+        if $activate_create_thresholded_map
+          repeat w#$alpha_indexes_list {
+
+            img_pos,max_alp_val:=I(#$alpha_indexes_list,$>)
+
+            y_axis_alpha_list_index:=$alpha_indexes_list+1+(2*$>)
+            x_axis_alpha_list_index:=$y_axis_alpha_list_index+1
+
+            shared[$img_pos] {s#$img_pos-1}
+
+            {w#$y_axis_alpha_list_index},1,1,{s#$y_axis_alpha_list_index},"begin(
+                const ref_y_img_index=$y_axis_alpha_list_index;
+                const num_of_points=s;
+                const dec_num_of_points=num_of_points-1;
+                const threshold=$threshold*$max_alp_val;
+                empty_vector=vector(#num_of_points,0);
+              );
+              new_vector=empty_vector;
+              info=I#ref_y_img_index;
+              insertion_pos=0;
+              repeat(info[0],p,
+               pos=info[p+1];
+               if(i(#-1,x,pos,0,0)>=threshold,
+                 ++new_vector[0];
+                 new_vector[++insertion_pos]=pos;
+               );
+              );
+              new_vector;
+              "
+
+            name[-1] y_axis_generated_thresholded_map
+
+            1,{h#$x_axis_alpha_list_index},1,{s#$x_axis_alpha_list_index},"begin(
+                const ref_x_img_index=$x_axis_alpha_list_index;
+                const num_of_points=s;
+                const dec_num_of_points=num_of_points-1;
+                const threshold=$threshold*$max_alp_val;
+                empty_vector=vector(#num_of_points,0);
+              );
+              new_vector=empty_vector;
+              info=I#ref_x_img_index;
+              insertion_pos=0;
+              repeat(info[0],p,
+               pos=info[p+1];
+               if(i(#-2,pos,y,0,0)>=threshold,
+                 ++new_vector[0];
+                 new_vector[++insertion_pos]=pos;
+               );
+              );
+              new_vector;
+              "
+
+            name[-1] x_axis_generated_thresholded_map
+
+            shared[-2,-1] 0
+
+            max_x_alpha_count:=iM#-1
+            max_y_alpha_count:=iM#-2
+
+            remove[-5,-2,-1]
+
+            crop[-1] 0,0,0,0,0,{h#-1-1},0,$max_x_alpha_count
+            crop[-2] 0,0,0,0,{w#-2-1},0,0,$max_y_alpha_count
+          }
+          contain_thresholded_map=1
+        fi
+
+        if $3
+          repeat w#$alpha_indexes_list {
+            img_pos:=i(#$alpha_indexes_list,$>)
+
+            y_axis_thresholded_map_index:=$x_axis_alpha_list+1+(2*$>)
+            x_axis_thresholded_map_index:=$y_axis_thresholded_map_index+1
+
+            {w#$img_pos},{h#$img_pos},1,{s#$img_pos}
+
+            if $4 name[-1] result_y
+              {w#$y_axis_thresholded_map_index},1,1,1,:"begin(
+                  const src_img_index=$img_pos;
+                  const dst_img_index=$result_y;
+                  const ref_map=$y_axis_thresholded_map_index;
+                  const height=h#src_img_index;
+                  const influence_factor=$2%;
+                  const shift_position=(-1*$1)/200+.5;
+                  const use_alternative_shift_point=shift_position<1;
+                );
+                number_of_points=i(#ref_map);
+                if(number_of_points,
+                  start_pos=height-number_of_points;
+                  if(use_alternative_shift_point,
+                    start_pos=int(lerp(0,start_pos,shift_position));
+                  );
+                  repeat(number_of_points,rf,
+                    rf_pos=rf+1;
+                    src_point_position=i(#ref_map,x,0,0,rf_pos);
+                    dst_point_position=round(lerp(src_point_position,start_pos++,influence_factor));
+                    I(#dst_img_index,x,dst_point_position)=I(#src_img_index,x,src_point_position);
+                  );
+                );"
+            else  name[-1] result_x
+              1,{h#$x_axis_thresholded_map_index},1,1,:"begin(
+                  const src_img_index=$img_pos;
+                  const dst_img_index=$result_x;
+                  const ref_map=$x_axis_thresholded_map_index;
+                  const width=w#src_img_index;
+                  const influence_factor=$2%;
+                  const shift_position=$1/200+.5;
+                  const use_alternative_shift_point=shift_position<1;
+                );
+                number_of_points=i(#ref_map);
+                if(number_of_points,
+                  start_pos=width-number_of_points;
+                  if(use_alternative_shift_point,
+                    start_pos=int(lerp(0,start_pos,shift_position));
+                  );
+                  repeat(number_of_points,rf,
+                    rf_pos=rf+1;
+                    src_point_position=i(#ref_map,0,y,0,rf_pos);
+                    dst_point_position=round(lerp(src_point_position,start_pos++,influence_factor));
+                    I(#dst_img_index,dst_point_position,y)=I(#src_img_index,src_point_position,y);
+                  );
+                );"
+            fi
+
+            remove[-1]
+
+          }
+        else
+          repeat w#$alpha_indexes_list {
+            img_pos:=i(#$alpha_indexes_list,$>)
+
+            y_axis_alpha_list_pos:=$alpha_indexes_list+1+(2*$>)
+            x_axis_alpha_list_pos:=$y_axis_alpha_list_pos+1
+
+            {w#$img_pos},{h#$img_pos},1,{s#$img_pos}
+
+            if $4 name[-1] result_y
+              {w#$y_axis_alpha_list_pos},1,1,1,:"begin(
+                  const src_img_index=$img_pos;
+                  const dst_img_index=$result_y;
+                  const ref_map=$y_axis_alpha_list_pos;
+                  const height=h#src_img_index;
+                  const influence_factor=$2%;
+                  const shift_position=(-1*$1)/200+.5;
+                  const use_alternative_shift_point=shift_position<1;
+                );
+                number_of_points=i(#ref_map);
+                if(number_of_points,
+                  start_pos=height-number_of_points;
+                  if(use_alternative_shift_point,
+                    start_pos=int(lerp(0,start_pos,shift_position));
+                  );
+                  repeat(number_of_points,rf,
+                    rf_pos=rf+1;
+                    src_point_position=i(#ref_map,x,0,0,rf_pos);
+                    dst_point_position=round(lerp(src_point_position,start_pos++,influence_factor));
+                    I(#dst_img_index,x,dst_point_position)=I(#src_img_index,x,src_point_position);
+                  );
+                );"
+            else  name[-1] result_x
+              1,{h#$x_axis_alpha_list_pos},1,1,:"begin(
+                  const src_img_index=$img_pos;
+                  const dst_img_index=$result_x;
+                  const ref_map=$x_axis_alpha_list_pos;
+                  const width=w#src_img_index;
+                  const influence_factor=$2%;
+                  const shift_position=$1/200+.5;
+                  const use_alternative_shift_point=shift_position<1;
+                );
+                number_of_points=i(#ref_map);
+                if(number_of_points,
+                  start_pos=width-number_of_points;
+                  if(use_alternative_shift_point,
+                    start_pos=int(lerp(0,start_pos,shift_position));
+                  );
+                  repeat(number_of_points,rf,
+                    rf_pos=rf+1;
+                    src_point_position=i(#ref_map,0,y,0,rf_pos);
+                    dst_point_position=round(lerp(src_point_position,start_pos++,influence_factor));
+                    I(#dst_img_index,dst_point_position,y)=I(#src_img_index,src_point_position,y);
+                  );
+                );"
+            fi
+
+            remove[-1]
+          }
+        fi
+
+        if narg($y_axis_generated_thresholded_map)||narg($x_axis_generated_thresholded_map)
+          if $4 store[alpha_indexes_list,y_axis_alpha_list,x_axis_alpha_list,y_axis_generated_thresholded_map,x_axis_generated_thresholded_map,result_y] _persistent
+          else  store[alpha_indexes_list,y_axis_alpha_list,x_axis_alpha_list,y_axis_generated_thresholded_map,x_axis_generated_thresholded_map,result_x] _persistent
+          fi
+        else
+          if $4 store[alpha_indexes_list,y_axis_alpha_list,x_axis_alpha_list,result_y] _persistent
+          else  store[alpha_indexes_list,y_axis_alpha_list,x_axis_alpha_list,result_x] _persistent
+          fi
+        fi
+
+      fi
+    fi
+  else
+    started,has_activated_post_changes=1,0
+
+    to_automode
+
+    num_of_imgs={$!}
+
+    1 => temp_alpha_indexes_list
+
+    eval "
+      const temp_alpha_indexes_list=$temp_alpha_indexes_list;
+      contain_alpha=0;
+
+      repeat($num_of_imgs,p,
+        if(!(s#p&1),
+          contain_alpha=1;
+          da_push(#temp_alpha_indexes_list,p);
+        );
+      );
+
+      if(contain_alpha,da_freeze(#temp_alpha_indexes_list););
+      contain_alpha;
+      "
+
+    contain_alpha=${}
+
+    if $contain_alpha
+
+      1,1,1,2 => alpha_indexes_list
+
+      contain_alpha=0
+
+      repeat h#$temp_alpha_indexes_list {
+        img_pos:=i(#$temp_alpha_indexes_list,0,$>)
+
+        shared[$img_pos] {s#$img_pos-1}
+
+        if iv#-1
+          eval da_push(#$alpha_indexes_list,[$img_pos,{iM#-1}])
+          contain_alpha=1
+        fi
+
+        remove[-1]
+      }
+
+      if $contain_alpha eval da_freeze(#$alpha_indexes_list) fi
+
+      remove[temp_alpha_indexes_list]
+
+    fi
+
+    if $contain_alpha
+      minimum_alpha_index:=im#-1
+
+      resize[$alpha_indexes_list] {w#$alpha_indexes_list},1,100%,100%,-1
+
+      repeat w#$alpha_indexes_list {
+        img_pos:=i(#$alpha_indexes_list,$>)
+
+        shared[$img_pos] {s#$img_pos-1}
+
+        {w#-1},1,1,{h#-1+1},:"
+          alpha_info=vector(#s,0);
+          insertion_pos=0;
+
+          repeat(h#-1,pixel_position,
+            alpha_value=i(#-1,x,pixel_position,0,0);
+            if(alpha_value,
+              ++alpha_info[0];
+              alpha_info[++insertion_pos]=pixel_position;
+            );
+          );
+
+          alpha_info;"
+
+        name[-1] y_axis_alpha_list
+
+        1,{h#-2},1,{w#-2+1},:"
+          alpha_info=vector(#s,0);
+          insertion_pos=0;
+
+          repeat(w#-2,pixel_position,
+            alpha_value=i(#-2,pixel_position,y,0,0);
+
+            if(alpha_value,
+              ++alpha_info[0];
+              alpha_info[++insertion_pos]=pixel_position;
+            );
+          );
+
+          alpha_info;"
+
+        name[-1] x_axis_alpha_list
+
+        shared[-2,-1] 0
+
+        max_x_alpha_count:=iM#-1
+        max_y_alpha_count:=iM#-2
+
+        remove[-5,-2,-1]
+
+        crop[-1] 0,0,0,0,0,{h#-1-1},0,$max_x_alpha_count
+        crop[-2] 0,0,0,0,{w#-2-1},0,0,$max_y_alpha_count
+      }
+
+      if $threshold
+        repeat w#$alpha_indexes_list {
+
+          img_pos,max_alp_val:=I(#$alpha_indexes_list,$>)
+
+          y_axis_alpha_list_index:=$alpha_indexes_list+1+(2*$>)
+          x_axis_alpha_list_index:=$y_axis_alpha_list_index+1
+
+          shared[$img_pos] {s#$img_pos-1}
+
+          {w#$y_axis_alpha_list_index},1,1,{s#$y_axis_alpha_list_index},"begin(
+              const ref_y_img_index=$y_axis_alpha_list_index;
+              const num_of_points=s;
+              const dec_num_of_points=num_of_points-1;
+              const threshold=$threshold*$max_alp_val;
+              empty_vector=vector(#num_of_points,0);
+            );
+            new_vector=empty_vector;
+            info=I#ref_y_img_index;
+            insertion_pos=0;
+            repeat(info[0],p,
+             pos=info[p+1];
+             if(i(#-1,x,pos,0,0)>=threshold,
+               ++new_vector[0];
+               new_vector[++insertion_pos]=pos;
+             );
+            );
+            new_vector;
+            "
+
+          name[-1] y_axis_generated_thresholded_map
+
+          1,{h#$x_axis_alpha_list_index},1,{s#$x_axis_alpha_list_index},"begin(
+              const ref_x_img_index=$x_axis_alpha_list_index;
+              const num_of_points=s;
+              const dec_num_of_points=num_of_points-1;
+              const threshold=$threshold*$max_alp_val;
+              empty_vector=vector(#num_of_points,0);
+            );
+            new_vector=empty_vector;
+            info=I#ref_x_img_index;
+            insertion_pos=0;
+            repeat(info[0],p,
+             pos=info[p+1];
+             if(i(#-2,pos,y,0,0)>=threshold,
+               ++new_vector[0];
+               new_vector[++insertion_pos]=pos;
+             );
+            );
+            new_vector;
+            "
+
+          name[-1] x_axis_generated_thresholded_map
+
+          shared[-2,-1] 0
+
+          max_x_alpha_count:=iM#-1
+          max_y_alpha_count:=iM#-2
+
+          remove[-5,-2,-1]
+
+          crop[-1] 0,0,0,0,0,{h#-1-1},0,$max_x_alpha_count
+          crop[-2] 0,0,0,0,{w#-2-1},0,0,$max_y_alpha_count
+        }
+
+        repeat w#$alpha_indexes_list {
+          img_pos:=i(#$alpha_indexes_list,$>)
+
+          y_axis_thresholded_map_index:=$x_axis_alpha_list+1+(2*$>)
+          x_axis_thresholded_map_index:=$y_axis_thresholded_map_index+1
+
+          {w#$img_pos},{h#$img_pos},1,{s#$img_pos} .
+          name[-2] result_y
+          name[-1] result_x
+
+          {w#$y_axis_thresholded_map_index},1,1,1,:"begin(
+              const src_img_index=$img_pos;
+              const dst_img_index=$result_y;
+              const ref_map=$y_axis_thresholded_map_index;
+              const height=h#src_img_index;
+              const influence_factor=$2%;
+              const shift_position=(-1*$1)/200+.5;
+              const use_alternative_shift_point=shift_position<1;
+            );
+            number_of_points=i(#ref_map);
+            if(number_of_points,
+              start_pos=height-number_of_points;
+              if(use_alternative_shift_point,
+                start_pos=int(lerp(0,start_pos,shift_position));
+              );
+              repeat(number_of_points,rf,
+                rf_pos=rf+1;
+                src_point_position=i(#ref_map,x,0,0,rf_pos);
+                dst_point_position=round(lerp(src_point_position,start_pos++,influence_factor));
+                I(#dst_img_index,x,dst_point_position)=I(#src_img_index,x,src_point_position);
+              );
+            );"
+
+          rm[-1]
+
+          1,{h#$x_axis_thresholded_map_index},1,1,:"begin(
+              const src_img_index=$img_pos;
+              const dst_img_index=$result_x;
+              const ref_map=$x_axis_thresholded_map_index;
+              const width=w#src_img_index;
+              const influence_factor=$2%;
+              const shift_position=$1/200+.5;
+              const use_alternative_shift_point=shift_position<1;
+            );
+            number_of_points=i(#ref_map);
+            if(number_of_points,
+              start_pos=width-number_of_points;
+              if(use_alternative_shift_point,
+                start_pos=int(lerp(0,start_pos,shift_position));
+              );
+              repeat(number_of_points,rf,
+                rf_pos=rf+1;
+                src_point_position=i(#ref_map,0,y,0,rf_pos);
+                dst_point_position=round(lerp(src_point_position,start_pos++,influence_factor));
+                I(#dst_img_index,dst_point_position,y)=I(#src_img_index,src_point_position,y);
+              );
+            );"
+
+          rm[-1]
+        }
+
+      else
+
+        repeat w#$alpha_indexes_list {
+          img_pos:=i(#$alpha_indexes_list,$>)
+
+          y_axis_alpha_list_pos:=$alpha_indexes_list+1+(2*$>)
+          x_axis_alpha_list_pos:=$y_axis_alpha_list_pos+1
+
+          {w#$img_pos},{h#$img_pos},1,{s#$img_pos} .
+          name[-2] result_y
+          name[-1] result_x
+
+          {w#$y_axis_alpha_list_pos},1,1,1,:"begin(
+              const src_img_index=$img_pos;
+              const dst_img_index=$result_y;
+              const ref_map=$y_axis_alpha_list_pos;
+              const height=h#src_img_index;
+              const influence_factor=$2%;
+              const shift_position=(-1*$1)/200+.5;
+              const use_alternative_shift_point=shift_position<1;
+            );
+            number_of_points=i(#ref_map);
+            if(number_of_points,
+              start_pos=height-number_of_points;
+              if(use_alternative_shift_point,
+                start_pos=int(lerp(0,start_pos,shift_position));
+              );
+              repeat(number_of_points,rf,
+                rf_pos=rf+1;
+                src_point_position=i(#ref_map,x,0,0,rf_pos);
+                dst_point_position=round(lerp(src_point_position,start_pos++,influence_factor));
+                I(#dst_img_index,x,dst_point_position)=I(#src_img_index,x,src_point_position);
+              );
+            );"
+
+          rm[-1]
+
+          1,{h#$x_axis_alpha_list_pos},1,1,:"begin(
+              const src_img_index=$img_pos;
+              const dst_img_index=$result_x;
+              const ref_map=$x_axis_alpha_list_pos;
+              const width=w#src_img_index;
+              const influence_factor=$2%;
+              const shift_position=$1/200+.5;
+              const use_alternative_shift_point=shift_position<1;
+            );
+            number_of_points=i(#ref_map);
+            if(number_of_points,
+              start_pos=width-number_of_points;
+              if(use_alternative_shift_point,
+                start_pos=int(lerp(0,start_pos,shift_position));
+              );
+              repeat(number_of_points,rf,
+                rf_pos=rf+1;
+                src_point_position=i(#ref_map,0,y,0,rf_pos);
+                dst_point_position=round(lerp(src_point_position,start_pos++,influence_factor));
+                I(#dst_img_index,dst_point_position,y)=I(#src_img_index,src_point_position,y);
+              );
+            );"
+
+          rm[-1]
+
+        }
+
+      fi
+
+      if narg($y_axis_generated_thresholded_map)||narg($x_axis_generated_thresholded_map)
+        store[alpha_indexes_list,y_axis_alpha_list,x_axis_alpha_list,y_axis_generated_thresholded_map,x_axis_generated_thresholded_map,result_y,result_x] _persistent
+      else
+        store[alpha_indexes_list,y_axis_alpha_list,x_axis_alpha_list,result_y,result_x] _persistent
+      fi
+
+    else
+      rm[-1]
+      0 store. _persistent
+    fi
+  fi
+fi
+
+if $contain_alpha&&$2
+  keep[$minimum_alpha_index]
+  crop $_preview_x0,$_preview_y0,$_preview_x1,$_preview_y1
+
+  if $4 gui_split_preview "$_persistent keep[result_y] keep[0] crop $_preview_x0,$_preview_y0,$_preview_x1,$_preview_y1",${-3--1}
+  else  gui_split_preview "$_persistent keep[result_x] keep[0] crop $_preview_x0,$_preview_y0,$_preview_x1,$_preview_y1",${-3--1}
+  fi
+else
+  if $contain_alpha keep[$minimum_alpha_index] fi
+  crop $_preview_x0,$_preview_y0,$_preview_x1,$_preview_y1
+  gui_split_preview "return",${-3--1}
+fi
+
+if $started
+  old_x_shift,old_x_influence,old_x_threshold,\
+  old_y_shift,old_y_influence,old_y_threshold=${1-3},${1-3}
+else
+  if $4
+    old_y_shift,old_y_influence,old_y_threshold=${1-3}
+  else
+    old_x_shift,old_x_influence,old_x_threshold=${1-3}
+  fi
+fi
+
+old_axis=$4
+
+u "{$1}"\
+"{$2}"\
+"{$3}"\
+"{$4}"\
+"{"$old_x_shift"}"\
+"{"$old_x_influence"}"\
+"{"$old_x_threshold"}"\
+"{"$old_y_shift"}"\
+"{"$old_y_influence"}"\
+"{"$old_y_threshold"}"\
+"{"$old_axis"}"\
+"{"$contain_alpha"}"\
+"{"$minimum_alpha_index"}"\
+"{"$has_activated_post_changes"}"\
+"{$-3}"\
+"{$-2,$-1}"
 #@gui Binary Alternating Quaddro Texture [Basic]:rep_binary_quaddro_basic_gui,rep_binary_quaddro_basic_gui_preview(0)
 #@gui:_=note("This filter is a extended version of a filter found in<a href="https://forums.getpaint.net/topic/6845-asmageddon-tools-pack-v3/">Asmageddon Tools Pack v3</a>. Translated to G'MIC using a source code, and then extended. It is a mixture of two texture filters."),_=separator()
 #@gui:_=note("<b>Channel Processing</b>"),Texture Output=choice(0,"Grayscale","Hue","Degradation Mode"),_=separator()
