@@ -41,7 +41,6 @@
 */
 
 #include <string>
-#include "CImg.h"
 #include "gmic.h"
 #include "gmic_libc.h"
 
