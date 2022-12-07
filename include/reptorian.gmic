@@ -6547,15 +6547,24 @@ if $abs_min_img_val
 
  discard[-1] -1
 
- foreach[{crop(#-1)}] {
-  +lt 0
-  -[0] [1]
-  rm[1]
+ neg_img_list_pos,inc_neg_img_list_pos,number_of_negatives={neg_img_pos=$!-1;[neg_img_pos,neg_img_pos+1,w#-1]}
+ neg_img_list={crop(#-1)}
+
+ +lt[$neg_img_list] 0
+ +store[$inc_neg_img_list_pos--1] negative_images
+
+ repeat $number_of_negatives {
+  img_pos={i(#$neg_img_list_pos,0,$>)}
+
+  -[$img_pos] [$inc_neg_img_list_pos]
+  remove[$inc_neg_img_list_pos]
  }
 
-fi
+ store[-1] neg_img_list
 
-remove[-1]
+else
+ remove[-1]
+fi
 
 # 2. Create image to find the minimum and maximum values
 
@@ -6614,12 +6623,34 @@ $diff,1,1,1,"begin(
  output(int(rv));
  "
 
-# 4. Finally map reverse digit image map onto target images
+# 4. Map reverse digit image map onto target images
 -[^-2,-1] {im#-2}
 remove[-2]
 
 map[^-1] [-1],3
 remove[-1]
+
+# 5. If the input contains negative values, simply convert some pixels back to negatives
+
+if $abs_min_img_val
+ $neg_img_list
+
+ $negative_images
+
+ (1,-1)
+
+ map[$inc_neg_img_list_pos--2] [-1]
+ rm[-1]
+
+ repeat $number_of_negatives {
+  img_pos={i(#$neg_img_list_pos,0,$>)}
+
+  *[$img_pos] [$inc_neg_img_list_pos]
+  remove[$inc_neg_img_list_pos]
+ }
+
+ remove[-1]
+fi
 #@cli rep_tz: eq. to 'rep_tiled_zoom' : (+)
 rep_tz:rep_tiled_zoom $*
 #@cli rep_tiled_zoom: sqr_w>=0,_sqr_h>=0,_scale>=1,_boundary={ 0=none | 1=neumann | 2=periodic | 3=mirror }
