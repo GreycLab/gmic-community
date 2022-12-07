@@ -6526,21 +6526,100 @@ if $6
   fi
  fi
 fi
-#@cli rep_rvi : eq. to 'rep_reverse_integer' :(+)
-rep_rvi:rep_reverse_integer
-#@cli rep_reverse_integer :
-#@cli : Reverse integers of images.
-#@cli : (eq. to 'rep_rvi')\n
-rep_reverse_integer:
-f "
+#@cli rep_rd : eq. to 'rep_reverse_digits' :(+)
+rep_rd: rep_reverse_digits ${1-3}
+#@cli rep_reverse_digits: base>0,number_bounary_mode={ 0=regular | 1=periodic | 2=mirror },max_number_boundary>0
+#@cli : Reverse digits of image.
+#@cli : (eq. to 'rep_rd')
+#@cli : Default values: 'base=10','number_boundary_mode=0','max_number_boundary=255'
+rep_reverse_digits:
+skip ${1=10},${2=0},${3=255}
+check "(isint($1)&&$1>1)&&(isint($3)&&$3>0)"
+
+num_of_imgs={$!}
+
+# 1. Check if image contain negative values, if so, shift negative values by -1
+
+$num_of_imgs,1,1,2,min_val=im#x;[min_val,min_val<0?x:-1]; s. c
+abs_min_img_val={min_img_val=im#-2;min_img_val<0?abs(min_img_val)}
+
+if $abs_min_img_val
+
+ discard[-1] -1
+
+ foreach[{crop(#-1)}] {
+  +lt 0
+  -[0] [1]
+  rm[1]
+ }
+
+fi
+
+remove[-1]
+
+# 2. Create image to find the minimum and maximum values
+
+$num_of_imgs,1,1,2,"begin(
+  const abs_min_img_val=$abs_min_img_val;
+ );
+
+ min_img_val=i(#-1);
+ max_img_val=iM#x;
+
+ if(abs_min_img_val>max_img_val
+ ,[0,abs_min_img_val]
+ ,[min_img_val,max_img_val]
+ );
+ ;"
+
+diff={ceil(iM-im+1)}
+
+rm[-2]
+
+# 3. Create reverse digit image map
+$diff,1,1,1,"begin(
+
+  const min_val=int(im#-1);
+  const base=$1;
+  const number_boundary_choice=int($2)%3;
+
+  number_boundary_choice?(
+
+   const boundary_number=$3;
+
+   number_boundary_choice==2?(
+
+    const m2_boundary_number=boundary_number<<1;
+
+    output(v)=(
+     va=v%m2_boundary_number;
+     boundary_number-abs(boundary_number-va);
+    );
+
+   ):(
+    output(v)=v%boundary_number;
+   );
+
+  ):(
+   output(v)=v;
+  );
+
+ );
  rv=0;
- n=i;
- do(
-  rv=int(rv)*10+n%10;
-  n=int(n)/10;
- ,int(n)>0);
- int(rv);
+ n=x+min_val;
+ while(n,
+  rv=int(rv)*base+n%base;
+  n=int(n/base);
+ );
+ output(int(rv));
  "
+
+# 4. Finally map reverse digit image map onto target images
+-[^-2,-1] {im#-2}
+remove[-2]
+
+map[^-1] [-1],3
+remove[-1]
 #@cli rep_tz: eq. to 'rep_tiled_zoom' : (+)
 rep_tz:rep_tiled_zoom $*
 #@cli rep_tiled_zoom: sqr_w>=0,_sqr_h>=0,_scale>=1,_boundary={ 0=none | 1=neumann | 2=periodic | 3=mirror }
@@ -16299,15 +16378,15 @@ eval[-2] "
     break();
    );
   );
-  
+
   if(not_found,da_push(#-1,i););
  ,da_push(#-1,i);
  );
- 
+
  end(da_freeze(#-1););"
- 
-f. (i%360-180)/180*pi 
-rotate. -90 
+
+f. (i%360-180)/180*pi
+rotate. -90
 rm..
 #@cli rep_polkal: (eq. to rep_polar_kaleidoscope)
 rep_polkal:rep_polar_kaleidoscope $*
@@ -24042,26 +24121,32 @@ sh={$2%*$half_img_diag}
 rep_tiled_zoom $sw,$sh,$3,$4
 fx_rep_tz_preview:
 gui_split_preview "fx_rep_tz ${1-4}",${-3--1}
-#@gui Reverse Digits:fx_rep_rvi,fx_rep_rvi_preview(0)
-#@gui:_=note("Reverses digits of image. Used for glitch art.\n\n<small><b>Note:</b>Max-1 for Out-Of-Bound Mode is only applicable in float color space.</small>"),_=separator()
+#@gui Reverse Digits:fx_rep_rd,fx_rep_rd_preview(0)
+#@gui:_=note("Reverses digits of image. Used for glitch art.\n\n<small><b>Note:</b>Max-1 for Out-Of-Bound Mode is only applicable in float color space.</small>")
+#@gui:_=separator(),_=note("<b>Color and Alpha</b>")
 #@gui:Colour Space=choice(0,"RGB-8","SRGB-8","RYB-8","CMY","CMYK","HSI-8,"HSL-8","HSV-8","LAB-8","LCH-8","YCBCR-8","YIQ-8","YUV-8","YES-8","K1-8","Ohta-8")
 #@gui:Use Alpha?=bool(0)
-#@gui:Out-Of-Bound Mode=choice(0,"None","Max-1","Periodic","Continuous")
+#@gui:_=separator(),_=note("<b>Values</b>")
+#@gui:Base=int(10,2,50)
+#@gui:Out-Of-Bound Mode=choice(0,"None","Periodic","Continuous)
+#@gui:Cut Value?=bool(0)
 #@gui:_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"),Preview Split=point(50,50,0,0,200,200,200,0,10)_0
 #@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2020/9/26</i>.</small>")
-fx_rep_rvi:
+fx_rep_rd:
 if $1
  convert_colors_fwd=${arg\ $1,rgb2srgb,rgb2ryb,rgb2cmy,error,rgb2hsi8,rgb2hsl8,rgb2hsv8,rgb2lab8,rgb2lch8,rgb2ycbcr,rgb2yiq8,rgb2yuv8,rgb2yes8,rgb2k18,rgb2ohta8}
  convert_colors_bwd=${arg\ $1,srgb2rgb,ryb2rgb,cmy2rgb,error,hsi82rgb,hsl82rgb,hsv82rgb,lab82rgb,lch82rgb,ycbcr2rgb,yiq82rgb,yuv82rgb,yes82rgb,k182rgb,ohta82rgb}
 fi
 
+not_cmyk={$1!=4}
+
 foreach {
 
- tcr,convert_back=3,0
+ tcr,convert_back,contain_alpha=3,0,{s==2||s==4}
 
  if (s==3||s==4)&&$1
   convert_back=1
-  if $1!=4
+  if $not_cmyk
    $convert_colors_fwd
   else
    if s==3 tcr=4 rgb2cmyk
@@ -24070,19 +24155,14 @@ foreach {
   fi
  fi
 
- if $2 rep_rvi
-  if $3==1 cut. 0,255
-  elif $3==2 %. 255
-  elif $3==3 f. int(i/256)%2?255-i:i fi
- else sh 0,{$tcr-1} rep_rvi.
-  if $3==1 cut. 0,255
-  elif $3==2 %. 255
-  elif $3==3 f. int(i/256)%2?255-i:i fi
-  rm.
- fi
+ if $contain_alpha&&!$2 shared 0,{s-2} fi
+
+ rep_reverse_digits. ${3-4}
+ if $5&&!$4 cut. 0,255 fi
+ rm.
 
  if $convert_back
-  if $1!=4
+  if $not_cmyk
    $convert_colors_bwd
   else
    if s==4 cmyk2rgb
@@ -24090,10 +24170,16 @@ foreach {
    fi
   fi
  fi
-
 }
-fx_rep_rvi_preview:
-gui_split_preview "fx_rep_rvi ${1-3}",${-3--1}
+fx_rep_rd_preview:
+gui_split_preview "fx_rep_rd ${1-5}",${-3--1}
+u "{$1}"\
+"{$2}"\
+"{$3}"\
+"{$4}"\
+"{$5}_"{1+!$4}\
+"{$6}"\
+"{$7,$8}"
 #@gui Chirikov-Taylor: fx_rep_cstdmap,fx_rep_cstdmap_preview
 #@gui:_=note("Creates Chirikov-Taylor discrete map.")
 #@gui:_=separator(),_=note("<b>Main</b>")
