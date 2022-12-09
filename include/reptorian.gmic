@@ -6696,38 +6696,119 @@ rep_hsx_p_i:rep_hsx_poster_index $*
 #@cli : Author: Reptorian\n
 #@cli : Default values: _dithering=50%,_colorspace=3
 rep_hsx_poster_index:
-skip ${4=50%},${5=3}
+skip ${4=0%},${5=3}
 
-convert_colors_fwd=${arg\ 1+$5,rgb2hsi,rgb2hsl,rgb2hsv,rgb2hcy}
-convert_colors_bwd=${arg\ 1+$5,hsi2rgb,hsl2rgb,hsv2rgb,hcy2rgb}
+check "last_args=[${2-3}];inrange($1,2,360,1,1)&&!isin(0,(isint(last_args)&last_args>1))"
 
-$convert_colors_fwd
+hue_scale,\
+sat_scale,\
+lum_scale,\
+dithering,\
+cs_mode\
+={[360/$1,[${2-3}]-1,cut($4,0,1),int($5)%4+1]}
 
-hb={abs($1)+1}
-scb={abs($2)+1}
-lub={abs($3)+1}
+convert_colors_fwd=${arg\ $cs_mode,rgb2hsi,rgb2hsl,rgb2hsv,rgb2hcy}
+convert_colors_bwd=${arg\ $cs_mode,hsi2rgb,hsl2rgb,hsv2rgb,hcy2rgb}
 
-if $1<0||$1>360 error "0<="$"1<=360" fi
+if $4
 
-if $4<0
+ # Floyd-Steinberg Dithering Array
 
- f [round(i0/(360/($hb-1)))*(360/($hb-1)),round(i1*($scb-1))/($scb-1),round(i2*($lub-1))/($lub-1)]
+ fs_1R0D,\
+ fs_1L1D,fs_M01D,fs_1R1D\
+ ={([7,3,5,1]/16)*$dithering}
 
-else
+ foreach {
+  if !(s==3||s==4) continue fi
 
- $hb,$scb,$lub,3,[floor(360/($hb-1))*x,y/($scb-1),z/($lub-1)]
+  $convert_colors_fwd
 
- repeat $!-1 {
-  sh[$>] 0,2
-  index[-1] [-2],{$4},1
-  rm.
+  if s==4 shared 0,2 fi
+
+  fill. >"begin(
+
+    const width=w;
+    const height=h;
+
+    const hue_scale=$hue_scale;
+    const sat_scale=$sat_scale;
+    const lum_scale=$lum_scale;
+
+    const fs_1R0D=$fs_1R0D;
+    const fs_1L1D=$fs_1L1D;
+    const fs_M01D=$fs_M01D;
+    const fs_1R1D=$fs_1R1D;
+
+   );
+
+   old_color=I;
+
+   new_hue=round(old_color[0]/hue_scale)*hue_scale;
+   new_sat=round((old_color[1]*sat_scale))/sat_scale;
+   new_lum=round((old_color[2]*lum_scale))/lum_scale;
+
+   new_color=[new_hue,new_sat,new_lum];
+
+   diff_color=old_color-new_color;
+
+   J(#-1, 1,0)+=diff_color*fs_1R0D;
+
+   J(#-1,-1,1)+=diff_color*fs_1L1D;
+   J(#-1, 0,1)+=diff_color*fs_M01D;
+   J(#-1, 1,1)+=diff_color*fs_1R1D;
+
+   new_color;
+   "
+
+  keep[0]
+
+  $convert_colors_bwd
  }
 
- rm.
+else # No dithering
+
+ 360,1,1,1,x
+
+ if $1!=360
+  /. $hue_scale
+  round.
+  *. $hue_scale
+ fi
+
+ store. hue_bands
+
+ foreach {
+
+  if !(s==3||s==4) continue fi
+
+  $convert_colors_fwd
+
+  repeat 3 {
+
+   if $>
+    scale_val=${arg\ $>,$sat_scale,$lum_scale}
+
+    shared $>
+    *. $scale_val
+    round.
+    /. $scale_val
+
+    rm.
+   else
+    shared 0
+    $hue_bands
+
+    map.. .
+    rm[-2,-1]
+   fi
+
+  }
+
+  $convert_colors_bwd
+
+ }
 
 fi
-
-$convert_colors_bwd
 #@cli rep_mj_prn : eq. to 'rep_mj_pseudorandom_noise' : (+)
 rep_mj_prn:rep_mj_pseudorandom_noise $*
 #@cli rep_mj_pseudorandom_noise : _k1,_k2,_internal_shift,_ang,_px_size,_cx,_cy,_color_output,_kmode,_grid,_gridcol,_axis_thickness
@@ -24116,29 +24197,18 @@ u "{$1}"\
 "{$10}"\
 "{$11}"\
 "{$12}_"{$11?2:1}
-#@gui HSX Posterize/Index: fx_rep_p_i,fx_rep_p_i_preview
-#@gui:Hue Bands=int(10,1,100)
+#@gui HSX Posterize/Index: rep_hsx_poster_index,fx_rep_p_i_preview
+#@gui:Hue Bands=int(10,1,360)
 #@gui:Saturation Bands=int(10,1,100)
 #@gui:Luminosity Bands=int(10,1,100)
 #@gui:Dithering (%)=float(50,0,100)
-#@gui:Use rounded coordinates?=bool(0)
 #@gui:Colour Space=choice(0,"HSI","HSL","HSV","HCY")
 #@gui:_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"),Preview Split=point(50,50,0,0,200,200,200,0,10)_0
-#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2020/9/20</i>.</small>")
+#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2022/12/08</i>.</small>")
 fx_rep_p_i:
-if $5 rep_hsx_poster_index ${1-3},-1,$6
-else rep_hsx_poster_index ${1-3},$4%,$6
-fi
+rep_hsx_poster_index ${1-3},{$4%},$5
 fx_rep_p_i_preview:
-gui_split_preview "fx_rep_p_i ${1-6}",${-3--1}
-u "{$1}"\
-"{$2}"\
-"{$3}"\
-"{$4}_"{!$5?2:1}\
-"{$5}"\
-"{$6}"\
-"{$7}"\
-"{$8,$9}"
+gui_split_preview "fx_rep_p_i ${1-5}",${-3--1}
 #@gui Tiled Zoom: fx_rep_tz,fx_rep_tz_preview(0)
 #@gui:_=note("Create tiled zoom."),_=separator()
 #@gui:Square Width - Half Image-Diagonal(%)=float(10,1,100)
