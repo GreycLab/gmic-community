@@ -6526,21 +6526,133 @@ if $6
   fi
  fi
 fi
-#@cli rep_rvi : eq. to 'rep_reverse_integer' :(+)
-rep_rvi:rep_reverse_integer
-#@cli rep_reverse_integer :
-#@cli : Reverse integers of images.
-#@cli : (eq. to 'rep_rvi')\n
-rep_reverse_integer:
-f "
+#@cli rep_rd : eq. to 'rep_reverse_digits' :(+)
+rep_rd: rep_reverse_digits ${1-3}
+#@cli rep_reverse_digits: base>0,number_bounary_mode={ 0=regular | 1=periodic | 2=mirror },max_number_boundary>0
+#@cli : Reverse digits of image.
+#@cli : (eq. to 'rep_rd')
+#@cli : Default values: 'base=10','number_boundary_mode=0','max_number_boundary=255'
+rep_reverse_digits:
+skip ${1=10},${2=0},${3=255}
+check "(isint($1)&&$1>1)&&(isint($3)&&$3>0)"
+
+num_of_imgs={$!}
+
+# 1. Check if image contain negative values, if so, shift negative values by -1
+
+$num_of_imgs,1,1,2,min_val=im#x;[min_val,min_val<0?x:-1]; s. c
+abs_min_img_val={min_img_val=im#-2;min_img_val<0?abs(min_img_val)}
+
+if $abs_min_img_val
+
+ discard[-1] -1
+
+ neg_img_list_pos,inc_neg_img_list_pos,number_of_negatives={neg_img_pos=$!-1;[neg_img_pos,neg_img_pos+1,h#-1]}
+ neg_img_list={crop(#-1)}
+
+ +lt[$neg_img_list] 0
+ +store[$inc_neg_img_list_pos--1] negative_images
+
+ repeat $number_of_negatives {
+  img_pos={i(#$neg_img_list_pos,0,$>)}
+
+  -[$img_pos] [$inc_neg_img_list_pos]
+  remove[$inc_neg_img_list_pos]
+ }
+
+ store[-1] neg_img_list
+else
+ remove[-1]
+fi
+
+# 2. Create image to find the minimum and maximum values
+
+$num_of_imgs,1,1,2,"begin(
+  const abs_min_img_val=$abs_min_img_val;
+ );
+
+ min_img_val=i(#-1);
+ max_img_val=iM#x;
+
+ if(abs(min_img_val)>max_img_val
+ ,[0,abs_min_img_val]
+ ,[max(0,min_img_val),max_img_val]
+ );
+ ;"
+
+diff={ceil(iM-im+1)}
+
+rm[-2]
+
+# 3. Create reverse digit image map
+$diff,1,1,1,"begin(
+
+  const min_val=int(im#-1);
+  const base=$1;
+  const number_boundary_choice=int($2)%3;
+
+  number_boundary_choice?(
+
+   const boundary_number=$3;
+
+   number_boundary_choice==2?(
+
+    const m2_boundary_number=boundary_number<<1;
+
+    output(v)=(
+     va=v%m2_boundary_number;
+     boundary_number-abs(boundary_number-va);
+    );
+
+   ):(
+    output(v)=v%boundary_number;
+   );
+
+  ):(
+   output(v)=v;
+  );
+
+ );
  rv=0;
- n=i;
- do(
-  rv=int(rv)*10+n%10;
-  n=int(n)/10;
- ,int(n)>0);
- int(rv);
+ n=x+min_val;
+ while(n,
+  rv=int(rv)*base+n%base;
+  n=int(n/base);
+ );
+ output(int(rv));
  "
+
+# 4. Map reverse digit image map onto target images
+
+-[^-2,-1] {im#-2}
+remove[-2]
+
+map[^-1] [-1],3
+remove[-1]
+
+# 5. If the input contains negative values, simply convert some pixels back to negatives
+
+if $abs_min_img_val
+
+ $neg_img_list
+ neg_img_list_pos,inc_neg_img_list_pos={[$neg_img_list_pos,$inc_neg_img_list_pos]-1}
+
+ $negative_images
+
+ (1,-1)
+
+ map[$inc_neg_img_list_pos--2] [-1]
+ rm[-1]
+
+ repeat $number_of_negatives {
+  img_pos={i(#$neg_img_list_pos,0,$>)}
+
+  *[$img_pos] [$inc_neg_img_list_pos]
+  remove[$inc_neg_img_list_pos]
+ }
+
+ remove[-1]
+fi
 #@cli rep_tz: eq. to 'rep_tiled_zoom' : (+)
 rep_tz:rep_tiled_zoom $*
 #@cli rep_tiled_zoom: sqr_w>=0,_sqr_h>=0,_scale>=1,_boundary={ 0=none | 1=neumann | 2=periodic | 3=mirror }
@@ -6578,44 +6690,151 @@ if $sd!=1
 fi
 #@cli rep_hsx_p_i: eq. to 'rep_hsx_poster_index' : (+)
 rep_hsx_p_i:rep_hsx_poster_index $*
-#@cli rep_hsx_poster_index: if $4<0 <=hue_bands<=360,saturation_bands,luminosity_bands,n/a,_colorspace={ 0=hsi | 1=hsl | 2=hsv | 3=hcy } : else 0<=hue_bands<=360,saturation_bands,luminosity_bands,0<=_dithering<=1,_colorspace={ 0=hsi | 1=hsl | 2=hsv | 3=hcy }
+#@cli rep_hsx_poster_index: if $4<0 <=hue_bands<=360,saturation_bands,luminosity_bands,n/a,_colorspace={ 0=hsi | 1=hsl | 2=hsv | 3=hcy } : else 0<=hue_bands<=360,saturation_bands,luminosity_bands,0<=_dithering<=1,0<=start_hue<360,_colorspace={ 0=hsi | 1=hsl | 2=hsv | 3=hcy }
 #@cli : Posterize images using indexing and several variants of hsx models.\n
 #@cli : (eq. to 'rep_hsx_p_i')\n
 #@cli : Author: Reptorian\n
-#@cli : Default values: _dithering=50%,_colorspace=3
+#@cli : Default values: '_dithering=50%','start_hue=0','_colorspace=3'
 rep_hsx_poster_index:
-skip ${4=50%},${5=3}
+skip ${4=50%},${5=0},${6=2}
 
-convert_colors_fwd=${arg\ 1+$5,rgb2hsi,rgb2hsl,rgb2hsv,rgb2hcy}
-convert_colors_bwd=${arg\ 1+$5,hsi2rgb,hsl2rgb,hsv2rgb,hcy2rgb}
+check "last_args=[${2-3}];inrange($1,2,360,1,1)&&!isin(0,(isint(last_args)&last_args>1))"
 
-$convert_colors_fwd
+hue_scale,\
+sat_scale,\
+lum_scale,\
+dithering,\
+start_hue,\
+cs_mode\
+={[360/$1,[${2-3}]-1,cut($4,0,1),$5%360,int($6)%4+1]}
 
-hb={abs($1)+1}
-scb={abs($2)+1}
-lub={abs($3)+1}
+convert_colors_fwd=${arg\ $cs_mode,rgb2hsi,rgb2hsl,rgb2hsv,rgb2hcy}
+convert_colors_bwd=${arg\ $cs_mode,hsi2rgb,hsl2rgb,hsv2rgb,hcy2rgb}
 
-if $1<0||$1>360 error "0<="$"1<=360" fi
+if $4
 
-if $4<0
+ # Floyd-Steinberg Dithering Array
 
- f [round(i0/(360/($hb-1)))*(360/($hb-1)),round(i1*($scb-1))/($scb-1),round(i2*($lub-1))/($lub-1)]
+ fs_1R0D,\
+ fs_1L1D,fs_M01D,fs_1R1D\
+ ={([7,3,5,1]/16)*$dithering}
 
-else
+ foreach {
+  if !(s==3||s==4) continue fi
 
- $hb,$scb,$lub,3,[floor(360/($hb-1))*x,y/($scb-1),z/($lub-1)]
+  $convert_colors_fwd
 
- repeat $!-1 {
-  sh[$>] 0,2
-  index[-1] [-2],{$4},1
-  rm.
+  if $start_hue
+   shared. 0
+   -. $start_hue
+   %. 360
+   rm.
+  fi
+
+  if s==4 shared 0,2 fi
+
+  fill. >"begin(
+
+    const width=w;
+    const height=h;
+
+    const hue_scale=$hue_scale;
+    const sat_scale=$sat_scale;
+    const lum_scale=$lum_scale;
+
+    const fs_1R0D=$fs_1R0D;
+    const fs_1L1D=$fs_1L1D;
+    const fs_M01D=$fs_M01D;
+    const fs_1R1D=$fs_1R1D;
+
+   );
+
+   old_color=I;
+
+   new_hue=round(old_color[0]/hue_scale)*hue_scale;
+   new_sat=round((old_color[1]*sat_scale))/sat_scale;
+   new_lum=round((old_color[2]*lum_scale))/lum_scale;
+
+   new_color=[new_hue,new_sat,new_lum];
+
+   diff_color=old_color-new_color;
+
+   J(#-1, 1,0)+=diff_color*fs_1R0D;
+
+   J(#-1,-1,1)+=diff_color*fs_1L1D;
+   J(#-1, 0,1)+=diff_color*fs_M01D;
+   J(#-1, 1,1)+=diff_color*fs_1R1D;
+
+   new_color;
+   "
+
+  keep[0]
+
+  if $start_hue
+   shared 0
+   +. $start_hue
+   %. 360
+   rm.
+  fi
+
+  $convert_colors_bwd
  }
 
- rm.
+else # No dithering
+
+ 360,1,1,1,x
+
+ if $1!=360
+  /. $hue_scale
+  round.
+  *. $hue_scale
+ fi
+
+ store. hue_bands
+
+ foreach {
+
+  if !(s==3||s==4) continue fi
+
+  $convert_colors_fwd
+
+  repeat 3 {
+
+   if $>
+    scale_val=${arg\ $>,$sat_scale,$lum_scale}
+
+    shared $>
+    *. $scale_val
+    round.
+    /. $scale_val
+
+    rm.
+   else
+    shared 0
+    $hue_bands
+
+    if $start_hue
+     -.. $start_hue
+     %.. 360
+    fi
+
+    map.. .
+
+    if $start_hue
+     +.. $start_hue
+     %.. 360
+    fi
+
+    rm[-2,-1]
+   fi
+
+  }
+
+  $convert_colors_bwd
+
+ }
 
 fi
-
-$convert_colors_bwd
 #@cli rep_mj_prn : eq. to 'rep_mj_pseudorandom_noise' : (+)
 rep_mj_prn:rep_mj_pseudorandom_noise $*
 #@cli rep_mj_pseudorandom_noise : _k1,_k2,_internal_shift,_ang,_px_size,_cx,_cy,_color_output,_kmode,_grid,_gridcol,_axis_thickness
@@ -16299,15 +16518,15 @@ eval[-2] "
     break();
    );
   );
-  
+
   if(not_found,da_push(#-1,i););
  ,da_push(#-1,i);
  );
- 
+
  end(da_freeze(#-1););"
- 
-f. (i%360-180)/180*pi 
-rotate. -90 
+
+f. (i%360-180)/180*pi
+rotate. -90
 rm..
 #@cli rep_polkal: (eq. to rep_polar_kaleidoscope)
 rep_polkal:rep_polar_kaleidoscope $*
@@ -24005,28 +24224,18 @@ u "{$1}"\
 "{$11}"\
 "{$12}_"{$11?2:1}
 #@gui HSX Posterize/Index: fx_rep_p_i,fx_rep_p_i_preview
-#@gui:Hue Bands=int(10,1,100)
-#@gui:Saturation Bands=int(10,1,100)
-#@gui:Luminosity Bands=int(10,1,100)
+#@gui:Hue Bands=int(10,2,360)
+#@gui:Saturation Bands=int(10,2,100)
+#@gui:Luminosity Bands=int(10,2,100)
 #@gui:Dithering (%)=float(50,0,100)
-#@gui:Use rounded coordinates?=bool(0)
-#@gui:Colour Space=choice(0,"HSI","HSL","HSV","HCY")
+#@gui:Start Hue=float(0,0,360)
+#@gui:Colour Space=choice(2,"HSI","HSL","HSV","HCY")
 #@gui:_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"),Preview Split=point(50,50,0,0,200,200,200,0,10)_0
-#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2020/9/20</i>.</small>")
+#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2022/12/08</i>.</small>")
 fx_rep_p_i:
-if $5 rep_hsx_poster_index ${1-3},-1,$6
-else rep_hsx_poster_index ${1-3},$4%,$6
-fi
+rep_hsx_poster_index ${1-3},{$4%},${5-6}
 fx_rep_p_i_preview:
 gui_split_preview "fx_rep_p_i ${1-6}",${-3--1}
-u "{$1}"\
-"{$2}"\
-"{$3}"\
-"{$4}_"{!$5?2:1}\
-"{$5}"\
-"{$6}"\
-"{$7}"\
-"{$8,$9}"
 #@gui Tiled Zoom: fx_rep_tz,fx_rep_tz_preview(0)
 #@gui:_=note("Create tiled zoom."),_=separator()
 #@gui:Square Width - Half Image-Diagonal(%)=float(10,1,100)
@@ -24042,26 +24251,32 @@ sh={$2%*$half_img_diag}
 rep_tiled_zoom $sw,$sh,$3,$4
 fx_rep_tz_preview:
 gui_split_preview "fx_rep_tz ${1-4}",${-3--1}
-#@gui Reverse Digits:fx_rep_rvi,fx_rep_rvi_preview(0)
-#@gui:_=note("Reverses digits of image. Used for glitch art.\n\n<small><b>Note:</b>Max-1 for Out-Of-Bound Mode is only applicable in float color space.</small>"),_=separator()
+#@gui Reverse Digits:fx_rep_rd,fx_rep_rd_preview(0)
+#@gui:_=note("Reverses digits of image. Used for glitch art.\n\n<small><b>Note:</b>Max-1 for Out-Of-Bound Mode is only applicable in float color space.</small>")
+#@gui:_=separator(),_=note("<b>Color and Alpha</b>")
 #@gui:Colour Space=choice(0,"RGB-8","SRGB-8","RYB-8","CMY","CMYK","HSI-8,"HSL-8","HSV-8","LAB-8","LCH-8","YCBCR-8","YIQ-8","YUV-8","YES-8","K1-8","Ohta-8")
 #@gui:Use Alpha?=bool(0)
-#@gui:Out-Of-Bound Mode=choice(0,"None","Max-1","Periodic","Continuous")
+#@gui:_=separator(),_=note("<b>Values</b>")
+#@gui:Base=int(10,2,50)
+#@gui:Out-Of-Bound Mode=choice(0,"None","Periodic","Continuous)
+#@gui:Cut Value?=bool(0)
 #@gui:_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"),Preview Split=point(50,50,0,0,200,200,200,0,10)_0
 #@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2020/9/26</i>.</small>")
-fx_rep_rvi:
+fx_rep_rd:
 if $1
  convert_colors_fwd=${arg\ $1,rgb2srgb,rgb2ryb,rgb2cmy,error,rgb2hsi8,rgb2hsl8,rgb2hsv8,rgb2lab8,rgb2lch8,rgb2ycbcr,rgb2yiq8,rgb2yuv8,rgb2yes8,rgb2k18,rgb2ohta8}
  convert_colors_bwd=${arg\ $1,srgb2rgb,ryb2rgb,cmy2rgb,error,hsi82rgb,hsl82rgb,hsv82rgb,lab82rgb,lch82rgb,ycbcr2rgb,yiq82rgb,yuv82rgb,yes82rgb,k182rgb,ohta82rgb}
 fi
 
+not_cmyk={$1!=4}
+
 foreach {
 
- tcr,convert_back=3,0
+ tcr,convert_back,contain_alpha=3,0,{s==2||s==4}
 
  if (s==3||s==4)&&$1
   convert_back=1
-  if $1!=4
+  if $not_cmyk
    $convert_colors_fwd
   else
    if s==3 tcr=4 rgb2cmyk
@@ -24070,19 +24285,14 @@ foreach {
   fi
  fi
 
- if $2 rep_rvi
-  if $3==1 cut. 0,255
-  elif $3==2 %. 255
-  elif $3==3 f. int(i/256)%2?255-i:i fi
- else sh 0,{$tcr-1} rep_rvi.
-  if $3==1 cut. 0,255
-  elif $3==2 %. 255
-  elif $3==3 f. int(i/256)%2?255-i:i fi
-  rm.
- fi
+ if $contain_alpha&&!$2 shared 0,{s-2} fi
+
+ rep_reverse_digits. ${3-4}
+ if $5&&!$4 cut. 0,255 fi
+ rm.
 
  if $convert_back
-  if $1!=4
+  if $not_cmyk
    $convert_colors_bwd
   else
    if s==4 cmyk2rgb
@@ -24090,10 +24300,16 @@ foreach {
    fi
   fi
  fi
-
 }
-fx_rep_rvi_preview:
-gui_split_preview "fx_rep_rvi ${1-3}",${-3--1}
+fx_rep_rd_preview:
+gui_split_preview "fx_rep_rd ${1-5}",${-3--1}
+u "{$1}"\
+"{$2}"\
+"{$3}"\
+"{$4}"\
+"{$5}_"{1+!$4}\
+"{$6}"\
+"{$7,$8}"
 #@gui Chirikov-Taylor: fx_rep_cstdmap,fx_rep_cstdmap_preview
 #@gui:_=note("Creates Chirikov-Taylor discrete map.")
 #@gui:_=separator(),_=note("<b>Main</b>")
@@ -26755,52 +26971,166 @@ gui_split_preview "fx_rep_vibrance_ych $1",${-3--1}
 #@gui Image Dimensions Factors:_none_, fx_find_factors_of_images_preview(1)*
 #@gui:_=note("This tool is used to calculate factors of your image dimension. It is not used to change image.")
 #@gui:_=separator()
+#@gui:Image Index Position(%)=float(0,0,100)
+#@gui:Image Index=text("0")
 #@gui:Width Factors=_text("Width Factors will be calculated and inserted here")
 #@gui:Height Factors=_text("Height Factors will be calculated and inserted here")
 #@gui:Width and Height Factors=_text("Width and Height Factors will be calculated and inserted here")
-#@gui:_=separator()
 #@gui:Factors Information=_text(1,"Every factors can be copied and pasted from this box")
-#@gui:Image Width=int(1,1,1000000)_0
-#@gui:Image Height=int(1,1,1000000)_0
-#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2022/07/09</i>.</small>")
+#@gui:Image Index Position(%)=float(0,0,100)_0
+#@gui:Image Index=text("0")_0
+#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2022/12/11</i>.</small>")
 fx_find_factors_of_images_preview:
-img_w,img_h={[w#0,h#0]}
+skip "$*"
+check "isint($2)"
 
-if $img_w!=$-2||$img_h!=$-1||!narg($_persistent)
+n_imgs={$!}
+act_mult_imgs_mode={$n_imgs>1}
 
- width_factors=${rep_find_factors_of\ $img_w}
- height_factors=${rep_find_factors_of\ $img_h}
- width_height_factors=${rep_find_factors_of\ $img_w,$img_h}
+index_pos,index={[$1,$2%$n_imgs]}
 
- text_box="Image Width: "$img_w\n"Image Height: "$img_h\n"Image Dimensions: "$img_w
- text_box.=x
- text_box.=$img_h\n\n"Factors of Width: "$width_factors\n"Factors of Height: "$height_factors\n"Factors of Width and Height: "$width_height_factors
+if narg($_persistent)
 
- ($width_factors)
- ($height_factors)
- ($width_height_factors)
- ('$text_box')
- text_box={t}
+ if $act_mult_imgs_mode
 
- store[-4--1] _persistent
+  if $1!=$7
+   index={round(($n_imgs-1)*$1%)}
+   index_pos={$index/($n_imgs-1)*100}
+  elif $2!=$8
+   index_pos={$index/($n_imgs-1)*100}
+  fi
 
+  $_persistent
+
+  width_start_point:=i(#$width_factors_start_indexes,$index)
+  width_end_point:=$width_start_point+i(#$number_of_width_factors,$index)
+
+  height_start_point:=i(#$height_factors_start_indexes,$index)
+  height_end_point:=$height_start_point+i(#$number_of_height_factors,$index)
+
+  width_and_height_start_point:=i(#$width_and_height_factors_start_indexes,$index)
+  width_and_height_end_point:=$width_and_height_start_point+i(#$number_of_width_and_height_factors,$index)
+
+  crop[$width_factors_img] $width_start_point,{$width_end_point-1}
+  crop[$height_factors_img] $height_start_point,{$height_end_point-1}
+  crop[$width_and_height_factors_img] $width_and_height_start_point,{$width_and_height_end_point-1}
+
+  width_factors={crop(#$width_factors_img)}
+  height_factors={crop(#$height_factors_img)}
+  width_height_factors={crop(#$width_and_height_factors_img)}
+
+  text_box={t}
+
+  remove[-10--1]
+ else
+  $_persistent
+
+  width_factors={crop(#-4)}
+  height_factors={crop(#-3)}
+  width_height_factors={crop(#-2)}
+  text_box={t}
+  remove[-4--1]
+ fi
 else
+ text_box=""
+ index_pos={$index/($n_imgs-1)*100}
 
- $_persistent
- width_factors={crop(#-4)}
- height_factors={crop(#-3)}
- width_height_factors={crop(#-2)}
+ foreach {
+  if $act_mult_imgs_mode
+   if $> text_box.=\n fi
+
+   text_box.="Image "{`35`}$>\n
+   text_box.=-----------------------\n
+  fi
+
+  w,h={[w,h]}
+
+  temp_width_factors=${rep_find_factors_of\ $w}
+  temp_height_factors=${rep_find_factors_of\ $h}
+  temp_width_height_factors=${rep_find_factors_of\ $w,$h}
+
+  if $>==$index
+   width_factors=$temp_width_factors
+   height_factors=$temp_height_factors
+   width_height_factors=$temp_width_height_factors
+  fi
+
+  if $act_mult_imgs_mode
+   ($temp_width_factors) => width_factors_img
+   ($temp_height_factors) => height_factors_img
+   ($temp_width_height_factors) => width_and_height_factors_img
+  fi
+
+  text_box.="Image Width: "$w\n
+  text_box.="Image Height: "$h\n
+  text_box.="Image Dimensions: "$w{`120`}$h\n
+  text_box.=\n"Factors of Width: "$temp_width_factors\n
+  text_box.=\n"Factors of Height: "$temp_height_factors\n
+  text_box.=\n"Factors of Width and Height: "$temp_width_height_factors
+
+  if $act_mult_imgs_mode
+   text_box.=\n-----------------------\n
+  fi
+ }
+
+ if $act_mult_imgs_mode
+
+  local[width_factors_img] {
+   $!,1,1,1,w#x => number_of_width_factors
+   {w},1,1,1,>begin(v=0;);p=v;v+=i(#-1);p; => width_factors_start_indexes
+   append[^-2--1] x
+  }
+
+  local[height_factors_img] {
+   $!,1,1,1,w#x => number_of_height_factors
+   {w},1,1,1,>begin(v=0;);p=v;v+=i(#-1);p; => height_factors_start_indexes
+   append[^-2--1] x
+  }
+
+  local[width_and_height_factors_img] {
+   $!,1,1,1,w#x => number_of_width_and_height_factors
+   {w},1,1,1,>begin(v=0;);p=v;v+=i(#-1);p; => width_and_height_factors_start_indexes
+   append[^-2--1] x
+  }
+ fi
+
+ ('$text_box')
+
  text_box={t}
- rm[-4--1]
+
+ if $act_mult_imgs_mode
+  store[width_factors_img,\
+        height_factors_img,\
+        width_and_height_factors_img,\
+        number_of_width_factors,\
+        number_of_height_factors,\
+        number_of_width_and_height_factors,\
+        width_factors_start_indexes,\
+        height_factors_start_indexes,\
+        width_and_height_factors_start_indexes,\
+        -1] _persistent
+ else
+  ($width_factors)
+  ($height_factors)
+  ($width_height_factors)
+  move[-4] {$!}
+  store[-4--1] _persistent
+ fi
 
 fi
 
-u "{"$width_factors"}"\
+keep[$index]
+
+act_mult_imgs_mode<<=1
+
+u "{"$index_pos"}_"$act_mult_imgs_mode\
+"{"$index"}_"$act_mult_imgs_mode\
+"{"$width_factors"}"\
 "{"$height_factors"}"\
 "{"$width_height_factors"}"\
 "{"$text_box"}"\
-"{"$img_w"}"\
-"{"$img_h"}"
+"{"$index_pos"}"\
+"{"$index"}"
 #@gui Detailed Information:_none_,fx_rep_detailed_info_preview(0)*
 #@gui:User and Images Information=_text(1,"Every information can be found here")
 #@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2022/07/09</i>.</small>")
