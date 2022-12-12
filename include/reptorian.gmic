@@ -15496,7 +15496,9 @@ fi
 #@cli : Default value: 'shift_factor=0'
 #@cli : Author: Reptorian.
 rep_aspect_crop_2d:
-skip ${3=0}
+skip ${3=0},${4=}
+
+_glob_auto_use_same_shift_factors={narg($4)?1:0}
 
 check "$1>0&&$2>0"
 
@@ -15507,23 +15509,23 @@ check "$1>0&&$2>0"
 #       let new_b1 = new_b2 / a_ratio;             #
 ####################################################
 
-_glob_aspect_crop_ratio_2d_w,_glob_aspect_crop_ratio_2d_h,_glob_aspect_crop_2d_crop_shift_factor=${1-2},{(cut($3,-1,1)+1)/2}
+_glob_aspect_crop_ratio_2d_w,_glob_aspect_crop_ratio_2d_h,_glob_aspect_crop_2d_crop_shift_factor_a,_glob_aspect_crop_2d_crop_shift_factor_b=${1-2},{(cut(($_glob_auto_use_same_shift_factors?[$3,$4]:vector2($3)),-1,1)+1)/2}
+_glob_aspect_crop_2d_crop_shift_factor,_glob_arc2d_crop_ratio={[$_glob_aspect_crop_2d_crop_shift_factor_a,$_glob_aspect_crop_ratio_2d_h/$_glob_aspect_crop_ratio_2d_w]}
+
 
 if $_glob_aspect_crop_ratio_2d_w==$_glob_aspect_crop_ratio_2d_h
   m "cmd_arc_2d_crop :
     if w==h return fi
 
     if w>h
-      start_point={int($_glob_aspect_crop_2d_crop_shift_factor*(w-h))}
+      start_point={int($_glob_aspect_crop_2d_crop_shift_factor_a*(w-h))}
       crop $start_point,0,{$start_point+h-1},{h-1}
     else
-      start_point={int($_glob_aspect_crop_2d_crop_shift_factor*(h-w))}
+      start_point={int($_glob_aspect_crop_2d_crop_shift_factor_b*(h-w))}
       crop 0,$start_point,{w-1},{$start_point+w-1}
     fi
     "
 else
-
-  _glob_arc2d_crop_ratio={$_glob_aspect_crop_ratio_2d_h/$_glob_aspect_crop_ratio_2d_w}
 
   m "cmd_arc_2d_crop :
     ratio={h/w}
@@ -15531,6 +15533,10 @@ else
     if $ratio==$_glob_arc2d_crop_ratio return fi
 
     new_dim,mode={b=[w,h];aspect_ratio=$_glob_arc2d_crop_ratio;ny=min(b[0]*aspect_ratio,b[1]);ny<b[1]?[round(ny),1]:[round(b[1]/aspect_ratio),0];}
+    
+    if $_glob_auto_use_same_shift_factors
+     _glob_aspect_crop_2d_crop_shift_factor={$mode?$_glob_aspect_crop_2d_crop_shift_factor_b:$_glob_aspect_crop_2d_crop_shift_factor_a}
+    fi
 
     if $mode
      start_point={int($_glob_aspect_crop_2d_crop_shift_factor*(h-$new_dim))}
