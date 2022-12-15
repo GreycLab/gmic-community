@@ -47,6 +47,38 @@
 #@cli :: Reptorian's CLI Commands
 #
 #-------------------------------
+#@cli rep_nearest_ratio: value_a>0,value_b>0,_maximum_proposition_number>0,_output_whether_true_ratio={ 0=False | 1=True }
+#@cli : Return nearest ratio from 2 different values
+#@cli : Default value: '_maximum_divisor=0'
+rep_nearest_ratio:
+skip ${3=0},${4=0}
+check "!(find([${1-2}]>0,0,0,1)+1)&&isint($3)&&$3>=0"
+
+eval "
+ const nv=2+($4&1);
+ const max_prop_num=$3;
+ v=[${1-2}];
+ a=min(v);
+ b=max(v);
+ common_number=gcd(a,b);
+ c=b/common_number;
+ true_ratio=0;
+ !max_prop_num||c<max_prop_num?(
+  b=c;
+  a/=common_number;
+  true_ratio=1;
+  ans=v[0]>v[1]?[b,a]:[a,b];
+ ):(
+  ratio=a/b;
+  proposition_number=round(ratio*max_prop_num);
+  common_number=gcd(proposition_number,max_prop_num);
+  b=max_prop_num/common_number;
+  proposition_number/=common_number;
+  a=proposition_number;
+  ans=v[0]>v[1]?[b,a]:[a,b];
+ );
+ vectornv(ans,true_ratio);
+ "
 #@cli rep_red_acrylic_filter: [source_image],_luminosity_blend_factor>=0%,_green_cut>=0%,_green_visibility>=0%
 #@cli : Alter a image so that target image would be visible using a red acrylic plastic sheet as cover.
 rep_red_acrylic_filter:
@@ -15490,46 +15522,59 @@ else
 
  fi
 fi
-#@cli rep_aspect_crop_2d: _width_ratio>0,_height_ratio>0,-1<=_shift_factor[%]<=1
+#@cli rep_aspect_crop_2d: width_ratio>0,height_ratio>0,-1<=_shift_factor[%]<=1
 #@cli : Crop images based on specified aspect ratio.
 #@cli : Code for finding new dimension was provided by Sumruv in discord/generative. The code that was provided applies only in the case of ratio not equal to 1.
 #@cli : Default value: 'shift_factor=0'
 #@cli : Author: Reptorian.
 rep_aspect_crop_2d:
-skip ${3=0}
+skip ${3=0},${4=}
+
+_glob_auto_use_same_shift_factors={narg($4)?1:0}
 
 check "$1>0&&$2>0"
 
-_aspect_crop_ratio_w,_aspect_crop_ratio_h,_arc2d_crop_shift_factor=${1-2},{(cut($3,-1,1)+1)/2}
+####################################################
+#      Sumruv's Solution at discord/generative     #
+#       let a_ratio = a2 / a1;                     #
+#       let new_b2 = min(b1 * a_ratio, b2);        #
+#       let new_b1 = new_b2 / a_ratio;             #
+####################################################
 
-if $_aspect_crop_ratio_w==$_aspect_crop_ratio_h
+_glob_aspect_crop_ratio_2d_w,_glob_aspect_crop_ratio_2d_h,_glob_aspect_crop_2d_crop_shift_factor_a,_glob_aspect_crop_2d_crop_shift_factor_b=${1-2},{(cut(($_glob_auto_use_same_shift_factors?[$3,$4]:vector2($3)),-1,1)+1)/2}
+_glob_aspect_crop_2d_crop_shift_factor,_glob_arc2d_crop_ratio={[$_glob_aspect_crop_2d_crop_shift_factor_a,$_glob_aspect_crop_ratio_2d_h/$_glob_aspect_crop_ratio_2d_w]}
+
+
+if $_glob_aspect_crop_ratio_2d_w==$_glob_aspect_crop_ratio_2d_h
   m "cmd_arc_2d_crop :
     if w==h return fi
 
     if w>h
-      start_point={int($_arc2d_crop_shift_factor*(w-h))}
+      start_point={int($_glob_aspect_crop_2d_crop_shift_factor_a*(w-h))}
       crop $start_point,0,{$start_point+h-1},{h-1}
     else
-      start_point={int($_arc2d_crop_shift_factor*(h-w))}
+      start_point={int($_glob_aspect_crop_2d_crop_shift_factor_b*(h-w))}
       crop 0,$start_point,{w-1},{$start_point+w-1}
     fi
     "
 else
 
-  _arc2d_crop_ratio={$_aspect_crop_ratio_h/$_aspect_crop_ratio_w}
-
   m "cmd_arc_2d_crop :
     ratio={h/w}
 
-    if $ratio==$_arc2d_crop_ratio return fi
+    if $ratio==$_glob_arc2d_crop_ratio return fi
 
-    new_dim,mode={b=[w,h];aspect_ratio=$_arc2d_crop_ratio;ny=min(b[0]*aspect_ratio,b[1]);ny<b[1]?[round(ny),1]:[round(b[1]/aspect_ratio),0];}
+    new_dim,mode={b=[w,h];aspect_ratio=$_glob_arc2d_crop_ratio;ny=min(b[0]*aspect_ratio,b[1]);ny<b[1]?[round(ny),1]:[round(b[1]/aspect_ratio),0];}
+    
+    if $_glob_auto_use_same_shift_factors
+     _glob_aspect_crop_2d_crop_shift_factor={$mode?$_glob_aspect_crop_2d_crop_shift_factor_b:$_glob_aspect_crop_2d_crop_shift_factor_a}
+    fi
 
     if $mode
-     start_point={int($_arc2d_crop_shift_factor*(h-$new_dim))}
+     start_point={int($_glob_aspect_crop_2d_crop_shift_factor*(h-$new_dim))}
      crop 0,$start_point,{w-1},{$start_point+$new_dim-1}
     else
-     start_point={int($_arc2d_crop_shift_factor*(w-$new_dim))}
+     start_point={int($_glob_aspect_crop_2d_crop_shift_factor*(w-$new_dim))}
      crop $start_point,0,{$start_point+$new_dim-1},{h-1}
     fi
     "
@@ -27133,11 +27178,13 @@ u "{"$index_pos"}_"$act_mult_imgs_mode\
 "{"$index"}"
 #@gui Detailed Information:_none_,fx_rep_detailed_info_preview(0)*
 #@gui:User and Images Information=_text(1,"Every information can be found here")
+#@gui:Ratio Proposition Number (0 disables it)=int(16,0,256)
+#@gui:Ratio Proposition Number (0 disables it)=int(16,0,256)_0
 #@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2022/07/09</i>.</small>")
 fx_rep_detailed_info_preview:
 skip "$*"
 
-if narg($_persistent)
+if narg($_persistent)&&($2==$3)
 
  $_persistent
  str_inform={t}
@@ -27145,20 +27192,42 @@ if narg($_persistent)
 
 else
 
- str_inform="Host: "$_host\n"Operating System: "$_os\n"Flags: "$_flags\n"Process ID: "$_pid
+ s="Host: "$_host\n"Operating System: "$_os\n"Flags: "$_flags\n"Process ID: "$_pid
 
  foreach {
-  t_img_info=\n\n"- Image \#"{$>+1}" -"\n"Minimum Value: "{im}\n"Maximum Value: "{iM}\n"Average Value: "{ia}\n"Variance Value: "{iv}\n"Summation Value: "{is}\n"Product Value: "{ip}\n"Median Value: "{ic}\n"L2-Norm Value: "{in}
-  str_inform.=$t_img_info
+  w,h={[w,h]}
+
+  s.=\n\n"- Image \#"{$>+1}" -"
+  s.=\n"Dimensions: "$w{`120`}$h
+
+  a,b,true_ratio=${rep_nearest_ratio\ $w,$h,$2,1}
+
+  if $true_ratio
+   s.=\n"Aspect Ratio: "$a{`58`}$b
+  else
+   s.=\n"Aspect Ratio (Approximated): "$a{`58`}$b
+   s.=\n"Error Margin for approximated ratio: "{abs(w/h-$a/$b)}
+  fi
+
+  s.=\n"Minimum Value: "{im}
+  s.=\n"Maximum Value: "{iM}
+  s.=\n"Average Value: "{ia}
+  s.=\n"Variance Value: "{iv}
+  s.=\n"Summation Value: "{is}
+  s.=\n"Product Value: "{ip}
+  s.=\n"Median Value: "{ic}
+  s.=\n"L2-Norm Vlaue: "{in}
  }
 
- ('$str_inform')
+ ('$s')
  str_inform={t}
  store. _persistent
 
 fi
 
-u "{"$str_inform"}"
+u "{"$str_inform"}"\
+"{$2}"\
+"{$2}"
 #@gui Lavander Binary Map:fx_rep_lavander_binary_map,fx_rep_lavander_binary_map_preview(0)*
 #@gui:_=note("Based on the work of Lavander at discord/generative. Instruction on how it works is described at the bottom of this filter.")
 #@gui:_=separator(),_=note("<b>Main</b>")
