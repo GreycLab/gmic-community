@@ -515,19 +515,27 @@ local[-1] {
     if h<8 rm continue fi
 
     eval "
+     const commentary=$commentary;
      o=-1;
+
+     contain_hex_character(character)=
+      inrange(character,_'0',_'9',1,1)||
+      inrange(character,_'a',_'f',1,1)||
+      inrange(character,_'A',_'F',1,1);
+
      repeat(w#-1,p,
 
-      v=i(#-1,0,p);
+      char=i(#-1,0,p);
 
-      if(v==$commentary,break(););
+      if(char==commentary,break(););
 
-      inrange(v,48,57,1,1)||inrange(v,97,102,1,1)||inrange(v,65,70,1,1)?(
+      if(contain_hex_character(char),
        o=p;
        break();
       );
 
      );
+
      o;"
 
     if ${}==-1
@@ -586,7 +594,7 @@ if $str_length==3
   error "Cannot use Windows reserved filename"
  fi
 elif $str_length==4
- if (find('COMLPT',($str_stoi)[0,3],0,3)+1)&&inrange(($str_stoi)[3],{'0'},{'9'},1,1)
+ if (find('COMLPT',($str_stoi)[0,3],0,3)+1)&&inrange(($str_stoi)[3],_'0',_'9',1,1)
   error "Cannot use Windows reserved filename"
  fi
 fi
@@ -624,7 +632,7 @@ if h==3
   error "Cannot use Windows reserved filename"
  fi
 elif h==4
- if (find('COMLPT',(crop(#$temporary_string_image))[0,3],0,3)+1)&&inrange(i(#$temporary_string_image,0,3),{'0'},{'9'},1,1)
+ if (find('COMLPT',(crop(#$temporary_string_image))[0,3],0,3)+1)&&inrange(i(#$temporary_string_image,0,3),_'0',_'9',1,1)
   error "Cannot use Windows reserved filename"
  fi
 fi
@@ -1953,13 +1961,8 @@ rm
 rep_output_gpl:
 e[^-1] "Output palettes$? as GIMP palette file(s).(.gpl)"
 
-(71,73,77,80,32,80,97,108,101,116,116,101,10,35,80,97,108,101,116,116,101,32,78,97,109,101,58,32)
-
-init_header={t} rm.
-
-(10,35,67,111,108,111,114,115,58,32)
-
-init_colors_info={t} rm.
+init_header="GIMP Palette\n\#Palette Name: "
+init_colors_info="\n#Colors: "
 
 repeat $!
  if $!>1 filename=${"filename \"$1\",$>"} else filename="$1" fi
@@ -5110,31 +5113,39 @@ done
 #@cli :
 #@cli : Author: Reptorian.
 rep_hex2int8:
- strlowercase $1
+strlowercase $1
 
- ('${}')
+('${}')
 
- {int(w/2)},1,1,1,"begin(
-  from_char(v)=v>=48&&v<=57?v-48:v-87;
-  );
-  p=x*2;
-  from_char(i(#-1,p))*16+from_char(i(#-1,p+1));"
+if (w&1) error iseven(str_size)==F fi
 
- u {crop(#-1)} rm[-2,-1]
+{w>>1},1,1,1,"begin(
+  const _0=_'0';
+  const _9=_'9';
+  const char_ref_val=87;
+  from_char(v)=if(inrange(v,_0,_9,1,1),v-_0,v-char_ref_val);
+ );
+ p=x*2;
+ from_char(i(#-1,p))*16+from_char(i(#-1,p+1));"
+
+u {crop(#-1)} rm[-2,-1]
 #@cli rep_int82hex: 0<=8-bit_value<=255...
 #@cli : Convert 8-bit numberical argument(s) into hexadecimal representation, and then return the converted value.
 #@cli :
 #@cli : Author: Reptorian.
 rep_int82hex:
-{narg($*)*2},1,1,1,"begin(
+{narg($*)<<1},1,1,1,"begin(
+  const _0=_'0';
+  const char_ref_val=87;
   vchar=[$*];
-  to_char(v)=v>=0&&v<=9?48+v:87+v;
+  if(min(vchar)<0||max(vchar)>255,run('error invalid_number'););
+  to_char(v)=if(inrange(v,0,9,1,1),_0+v,char_ref_val+v);
  );
- p=int(x/2);
- x%2?(
-  to_char(int(vchar[p]%16));
+ p=x>>1;
+ x&1?(
+  to_char(vchar[p]%16);
  ):(
-  to_char(int(vchar[p]/16));
+  to_char(vchar[p]>>4);
  );"
 
 u {t} rm.
