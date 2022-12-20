@@ -726,7 +726,9 @@ eval "
  output;
  "
 
-if ${} rm. u 1,$pv
+if ${} 
+ rm. 
+ u 1,$pv
 else
  {prod(crop(0,0,0,1,1,h,1,1)+1)},1,1,1,"begin(
    const num_of_primes=h#-1;
@@ -7041,17 +7043,17 @@ rep_dla: rep_diffusion_limited_aggregation $*
 rep_diffusion_limited_aggregation:
 skip ${1=2},${2=100},${3=1},${4=0},${5=0},${6=1}
 
-__bg={$4?0:1}
+bg={$4?1:0}
 
 m "dla_target_2s : n 0,1 s. c * midpoint={avg(iM,im)} f. i>$midpoint?1"
 m "dla_target_3s : n 0,1 s c add / 3 midpoint={avg(iM,im)} f. i>$midpoint?1"
 m "dla_target_4s_plus : n 0,1 ts={s-1} s c add[^-1] /.. $ts * midpoint={avg(iM,im)} f. i>$midpoint?1"
 m "dla_target : if s==1 n 0,1 elif s==2 dla_target_2s elif s==3 dla_target_3s elif s>3 dla_target_4s_plus fi"
 m "dla_check_variance : tv=0 repeat s sh $> tv+={iv#-1} rm. if $tv break fi done u {$tv?1:0}"
-m "dla_clear_image : {w#0},{h#0},{d#0},1,$__bg rv[-1,0] rm."
+m "dla_clear_image : {w#0},{h#0},{d#0},1,"{$4?0:1}" rv[-1,0] rm."
 
 if abs($1)>1 m " dla_create_coordinate_map : +rep_noise_poissondisk_to_coordinates {abs($1)},4 round. m={int(h/$_cpus)} f. I(0,int(y/$_cpus)+(y%$_cpus)*$m,0);"
-else m "dla_create_coordinate_map : +rep_create_alternating_coordinates_map m={int(h/$_cpus)} f. I(0,int(y/$_cpus)+(y%$_cpus)*$m,0)"
+else m "dla_create_coordinate_map : +rep_diffusion_limited_aggregation_create_alternating_coordinates_map m={int(h/$_cpus)} f. I(0,int(y/$_cpus)+(y%$_cpus)*$m,0)"
 fi
 
 if $4 m "dla_expand : if $5!=0 +dilate_circ[0] {abs($5)} fi"
@@ -7070,96 +7072,151 @@ local[-1] {
 length_const_line=""
 dar_lines=""
 
-length_const_line.=begin(
-length_const_line.="const ww=w#0;"
-length_const_line.="const hh=h#0;"
-length_const_line.="const " length_const_line.=lim_atmp=$2;
-length_const_line.="const " length_const_line.=dlmode={($4%2)>0?1:0} length_const_line.=;
-length_const_line.="const " length_const_line.=use_border="$check_count";
+length_const_line="begin_t(
+ const ww=w#0;
+ const hh=h#0;
+ const lim_atmp="$2";
+ const dl_mode="{($4%2)>0?1:0}";
+ const use_border=$check_count;"
+
 length_const_line.=use_border?(
- repeat $n_threads
+
+ repeat $n_threads {
   insert_ref_pos={2+$n_threads+$>}
-  length_const_line.=check_and_insert_point_$>()=(i(#0,I(#$insert_ref_pos,0,refpos))!=i(#-1,I(#$insert_ref_pos,0,refpos)));
- done
+  length_const_line.=check_and_insert_point_$>()=(i(#0,i(#$insert_ref_pos,0,refpos))!=i(#-1,i(#$insert_ref_pos,0,refpos)));
+ }
+ 
 length_const_line.=):(
- repeat $n_threads
+
+ repeat $n_threads {
   insert_ref_pos={2+$n_threads+$>}
+  
   if $4 length_const_line.=check_and_insert_point_$>()=(i(#0,I(#$insert_ref_pos,0,refpos))<.001?1);
   else length_const_line.=check_and_insert_point_$>()=(i(#0,I(#$insert_ref_pos,0,refpos))>0.999?1);
-  fi
- done
+  fi  
+ }
+ 
 length_const_line.=);
 
-repeat $n_threads
+('"
+ x==N?(
+  repeat(vN,refpos,
+   if(check_and_insert_point_N(),
+    da_push(#A,I(#B,0,refpos));
+   );
+  );
+  do(n=0;
+   do(
+    temp_vec=I(#A,0,n);
+    xp=temp_vec[0];
+    yp=temp_vec[1];
+    if(C,
+     i(#0,xp%ww,yp%hh)=dl_mode;
+     if(da_size(#A),da_remove(#A,n););
+     --n;
+     attempts=0;
+    );
+    ++n;
+   ,n<da_size(#A)
+   );
+   repeat(da_size(#A),p,
+    temp_vec=I(#A,0,p);
+    px=temp_vec[0];
+    py=temp_vec[1];
+    pv=int(u(0,8));
+    npx=newpos_x[pv];
+    npy=newpos_y[pv];
+    I(#A,0,p)=[px+npx,py+npy];
+   ); 
+   ++attempts;
+   D
+  ,da_size(#A)&&(attempts<lim_atmp)
+  );
+ ) 
+"')
+
+if $3==3
+ replace_str. "D","altern=++altern%2;"
+else
+ replace_str. "D",""
+fi
+
+if $3==0 C_replace_str="
+  i(#0,xp-1,yp-1,0,0,0,2)<1||
+  i(#0,xp-1,yp+1,0,0,0,2)<1||
+  i(#0,xp+1,yp-1,0,0,0,2)<1||
+  i(#0,xp+1,yp+1,0,0,0,2)<1"
+elif $3==1 C_replace_str="
+  i(#0,xp-1,yp,0,0,0,2)<1||
+  i(#0,xp+1,yp,0,0,0,2)<1||
+  i(#0,xp,yp-1,0,0,0,2)<1||
+  i(#0,xp,yp+1,0,0,0,2)<1"
+elif $3==2 C_replace_str="
+  i(#0,xp-1,yp-1,0,0,0,2)<1||
+  i(#0,xp-1,yp+1,0,0,0,2)<1||
+  i(#0,xp+1,yp-1,0,0,0,2)<1||
+  i(#0,xp+1,yp+1,0,0,0,2)<1||
+  i(#0,xp-1,yp,0,0,0,2)<1||
+  i(#0,xp+1,yp,0,0,0,2)<1||
+  i(#0,xp,yp-1,0,0,0,2)<1||
+  i(#0,xp,yp+1,0,0,0,2)<1"
+elif $3==3 C_replace_str="
+  altern?(
+   i(#0,xp-1,yp-1,0,0,0,2)<1||
+   i(#0,xp-1,yp+1,0,0,0,2)<1||
+   i(#0,xp+1,yp-1,0,0,0,2)<1||
+   i(#0,xp+1,yp+1,0,0,0,2)<1
+  ):(
+   i(#0,xp-1,yp,0,0,0,2)<1||
+   i(#0,xp+1,yp,0,0,0,2)<1||
+   i(#0,xp,yp-1,0,0,0,2)<1||
+   i(#0,xp,yp+1,0,0,0,2)<1
+  )"
+fi
+
+if $4%2
+ ($C_replace_str)
+ replace_str. "2)<1","2)"
+ C_replace_str={t}
+ rm.
+fi
+
+replace_str. "C",$C_replace_str
+
+store. dar_lines_string
+
+repeat $n_threads {
 
  insert_dar_pos={$>+2}
  insert_ref_pos={2+$n_threads+$>}
 
- length_const_line.="const v"
- length_const_line.=$>=
- length_const_line.=h#$insert_ref_pos
- length_const_line.=;
-
- dar_lines.=x==
- dar_lines.=$>
- dar_lines.=?(
- dar_lines.=repeat(v$>,refpos,
- dar_lines.=if(check_and_insert_point_$>(),dar_insert(#$insert_dar_pos,I(#$insert_ref_pos,0,refpos)););
- dar_lines.=);
- dar_lines.=do(n=0;
- dar_lines.=do(
- dar_lines.=temp_vec=I(#$insert_dar_pos,0,n);
- dar_lines.=xp=temp_vec[0];
- dar_lines.=yp=temp_vec[1];
- dar_lines.=if(
-  if $4%2
-   if $3==0 dar_lines.=(i(#0,xp-1,yp-1,0,0,0,2)||i(#0,xp-1,yp+1,0,0,0,2))||(i(#0,xp+1,yp-1,0,0,0,2)||i(#0,xp+1,yp+1,0,0,0,2))
-   elif $3==1 dar_lines.=(i(#0,xp-1,yp,0,0,0,2)||i(#0,xp+1,yp,0,0,0,2))||(i(#0,xp,yp-1,0,0,0,2)||i(#0,xp,yp+1,0,0,0,2))
-   elif $3==2 dar_lines.=((i(#0,xp-1,yp-1,0,0,0,2)||i(#0,xp-1,yp+1,0,0,0,2))||(i(#0,xp+1,yp-1,0,0,0,2)||i(#0,xp+1,yp+1,0,0,0,2)))||((i(#0,xp-1,yp,0,0,0,2)||i(#0,xp+1,yp,0,0,0,2))||(i(#0,xp,yp-1,0,0,0,2)||i(#0,xp,yp+1,0,0,0,2)))
-   elif $3==3 dar_lines.=altern?(i(#0,xp-1,yp-1,0,0,0,2)||i(#0,xp-1,yp+1,0,0,0,2))||(i(#0,xp+1,yp-1,0,0,0,2)||i(#0,xp+1,yp+1,0,0,0,2)):(i(#0,xp-1,yp,0,0,0,2)||i(#0,xp+1,yp,0,0,0,2))||(i(#0,xp,yp-1,0,0,0,2)||i(#0,xp,yp+1,0,0,0,2))
-   fi
-  else
-   if $3==0 dar_lines.=(i(#0,xp-1,yp-1,0,0,0,2)<1||i(#0,xp-1,yp+1,0,0,0,2)<1)||(i(#0,xp+1,yp-1,0,0,0,2)<1||i(#0,xp+1,yp+1,0,0,0,2)<1)
-   elif $3==1 dar_lines.=(i(#0,xp-1,yp,0,0,0,2)<1||i(#0,xp+1,yp,0,0,0,2)<1)||(i(#0,xp,yp-1,0,0,0,2)<1||i(#0,xp,yp+1,0,0,0,2)<1)
-   elif $3==2 dar_lines.=((i(#0,xp-1,yp-1,0,0,0,2)<1||i(#0,xp-1,yp+1,0,0,0,2)<1)||(i(#0,xp+1,yp-1,0,0,0,2)<1||i(#0,xp+1,yp+1,0,0,0,2)<1))||((i(#0,xp-1,yp,0,0,0,2)<1||i(#0,xp+1,yp,0,0,0,2)<1)||(i(#0,xp,yp-1,0,0,0,2)<1||i(#0,xp,yp+1,0,0,0,2)<1))
-   elif $3==3 dar_lines.=altern?(i(#0,xp-1,yp-1,0,0,0,2)<1||i(#0,xp-1,yp+1,0,0,0,2)<1)||(i(#0,xp+1,yp-1,0,0,0,2)<1||i(#0,xp+1,yp+1,0,0,0,2)<1):(i(#0,xp-1,yp,0,0,0,2)<1||i(#0,xp+1,yp,0,0,0,2)<1)||(i(#0,xp,yp-1,0,0,0,2)<1||i(#0,xp,yp+1,0,0,0,2)<1)
-   fi
-  fi
- dar_lines.=,
- dar_lines.=i(#0,xp%ww,yp%hh)=dlmode;
- dar_lines.=dar_remove(#$insert_dar_pos,n);
- dar_lines.=--n;
- dar_lines.=attempts=0;
- dar_lines.=);
- dar_lines.=++n;
- dar_lines.=,n<dar_size(#$insert_dar_pos));
- dar_lines.=repeat(dar_size(#$insert_dar_pos),p,
- dar_lines.=temp_vec=I(#$insert_dar_pos,0,p);
- dar_lines.=px=temp_vec[0];
- dar_lines.=py=temp_vec[1];
- dar_lines.=pv=int(u(0,8));
- dar_lines.=npx=newpos_x[pv];
- dar_lines.=npy=newpos_y[pv];
- dar_lines.=I(#$insert_dar_pos,0,p)=[px+npx,py+npy];
- dar_lines.=);
- dar_lines.=++attempts;
- if $3==3 dar_lines.=altern=(altern+1)%2; fi
- dar_lines.=,dar_size(#$insert_dar_pos)&&(attempts<lim_atmp));
- dar_lines.=)
+ length_const_line.="const v"$>=h#$insert_ref_pos;
+ 
+ $dar_lines_string
+ 
+ replace_str. "N",$>
+ replace_str. "A",$insert_dar_pos
+ replace_str. "B",$insert_ref_pos
+ 
+ dar_lines.={t}
 
  if ($>!=$mt)
   dar_lines.=:
  else
   dar_lines.=;
  fi
+ 
+ rm.
 
-done
+}
 
-length_const_line.=newpos_x=[-1,0,1,-1,1,-1,0,1];
-length_const_line.=newpos_y=[-1,-1,-1,0,0,1,1,1];
-length_const_line.=);
-length_const_line.=attempts=0;
-if $3==3 length_const_line.=altern=round(u(1)); fi
+length_const_line.="
+ newpos_x=[-1,0,1,-1,1,-1,0,1];
+ newpos_y=[-1,-1,-1,0,0,1,1,1];
+ );
+ attempts=0;"
+ 
+if $3==3 length_const_line.=altern=round(u); fi
 
 foreach {
 
@@ -7195,11 +7252,11 @@ foreach {
  else
 
   dla_clear_image
-  set[0] {1-$__bg},50%,50%
+  set[0] $bg,50%,50%
 
  fi
 
- eval[1] :${-math_lib}$length_const_line$dar_lines
+ eval[1] :$length_const_line$dar_lines
 
  k[0]
 
@@ -7208,17 +7265,15 @@ foreach {
 }
 
 um dla_target,dla_target_2s,dla_target_3s,dla_target_4s_plus,dla_create_coordinate_map,dla_expand
-rep_create_alternating_coordinates_map:
+rep_diffusion_limited_aggregation_create_alternating_coordinates_map:
 
 1,1,1,2
 
-eval[0] ${-math_lib}"
+eval[0] "
  if(!((x%3==0)!=(y%3==0))*((x%3==0)||(y%3==0)),
-  dar_insert(#-1,[x,y]);
+  da_push(#-1,[x,y]);
  );
- end(
-  resize(#-1,1,dar_size(#-1),1,s(#-1),0);
- );"
+ end(da_freeze(#-1););"
 
 k.
 #@cli rep_blur_splinter: _length,_duplicates,_angle,_thickness,-1<=_balance<=1,_contrast,_boundary={ 0=None | 1=Neumann | 2=Periodic | 3=Mirror },_bisided={ 0=one-line | two-line }
