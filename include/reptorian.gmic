@@ -515,14 +515,27 @@ local[-1] {
     if h<8 rm continue fi
 
     eval "
+     const commentary=$commentary;
      o=-1;
+
+     is_hex_character(character)=
+      inrange(character,_'0',_'9',1,1)||
+      inrange(character,_'a',_'f',1,1)||
+      inrange(character,_'A',_'F',1,1);
+
      repeat(w#-1,p,
-      v=i(#-1,0,p);
-      inrange(v,48,57,1,1)||inrange(v,97,102,1,1)||inrange(v,65,70,1,1)?(
+
+      char=i(#-1,0,p);
+
+      if(char==commentary,break(););
+
+      if(is_hex_character(char),
        o=p;
        break();
       );
+
      );
+
      o;"
 
     if ${}==-1
@@ -567,6 +580,7 @@ local[-1] {
 }
 #@cli rep_correct_exp_ne: string
 #@cli : Return corrected file name for exporting files.
+#@cli : Note: Every single arguments applied to this command counts as a single string.
 rep_correct_exp_ne:
 
 str_inp="$*"
@@ -580,7 +594,7 @@ if $str_length==3
   error "Cannot use Windows reserved filename"
  fi
 elif $str_length==4
- if (find('COMLPT',($str_stoi)[0,3],0,3)+1)&&inrange(($str_stoi)[3],{'0'},{'9'},1,1)
+ if (find('COMLPT',($str_stoi)[0,3],0,3)+1)&&inrange(($str_stoi)[3],_'0',_'9',1,1)
   error "Cannot use Windows reserved filename"
  fi
 fi
@@ -603,7 +617,7 @@ eval "
   );
 
   v=='~'?(
-   I[#string_to_process,p]='l';
+   I[#string_to_process,p]='-';
   ):
   v=='.'?(
    I[#string_to_process,p]='_';
@@ -618,7 +632,7 @@ if h==3
   error "Cannot use Windows reserved filename"
  fi
 elif h==4
- if (find('COMLPT',crop(#$temporary_string_image,0,0,0,0,1,3,1,1),0,3)+1)&&inrange(i(#$temporary_string_image,0,3),{'0'},{'9'},1,1)
+ if (find('COMLPT',(crop(#$temporary_string_image))[0,3],0,3)+1)&&inrange(i(#$temporary_string_image,0,3),_'0',_'9',1,1)
   error "Cannot use Windows reserved filename"
  fi
 fi
@@ -712,7 +726,9 @@ eval "
  output;
  "
 
-if ${} rm. u 1,$pv
+if ${} 
+ rm. 
+ u 1,$pv
 else
  {prod(crop(0,0,0,1,1,h,1,1)+1)},1,1,1,"begin(
    const num_of_primes=h#-1;
@@ -863,49 +879,6 @@ if $auto_norm rep_sercirc_autonorm.. fi
 a[-2,-1] c
 
 rep_symmetrize_xy. $sym_mode
-#@cli rep_generate_concat_func: _max_var_count>=2
-#@cli : Return series of concat() function for use in math evaluators.
-#@cli :
-#@cli : Author : Reptorian.
-#@cli : Default values: '_max_var_count=2'
-rep_generate_concat_func:
-skip ${1=}
-
-length={narg($1)?max(2,abs($1)):2}
-
-({expr('x%2?44:97+x/2',$length*2-1)})
-
-rep_generate_concat_func_out=rep_generate_concat_func_nb(v)=v>1?1+int(log10(v)):1;
-
-n=$length
-
-for $n>1 {
-
- if $n==2
-
-  rep_generate_concat_func_outpart..=concat(a,b)=(ia=abs(int(a));ib=abs(int(b));ia*10^rep_generate_concat_func_nb(ib)+ib);
-
- else
-
-  rep_generate_concat_func_temp=concat({t})=concat(
-  +crop. 0,0,{w#-1-3},0
-  rep_generate_concat_func_temp.={t})*10^rep_generate_concat_func_nb( rm.
-
-  ({i(#-1,w-1)})
-
-  rep_generate_concat_func_temp.={t})+{t}; rm.
-  rep_generate_concat_func_outpart..=$rep_generate_concat_func_temp
-  r. {w-2},100%,100%,100%,0,0
-
- fi
-
- n-=1
-
-}
-
-rm.
-
-u $rep_generate_concat_func_out$rep_generate_concat_func_outpart
 #@cli rep_mitchell_concatenation: startnum_a,startnum_b,_base,_base_2,_method_a={ 0=sub | 1=add | 2=mul},_method_b={ 0=sub | 1=add | 2=mul},_pixel_size,[palette],[palette],_auto_resize_pal,_shape_id,_shape_ratio,_shape_angle,shape_dir,shape_repeat_mode,shape_fit,_shape_sub,_shape_option_1..._shape_option_n
 #@cli : Generates Kerry Mitchell Concatenation Art. Detailed explanation can be found at - http://www.kerrymitchell.art/spacefilling-blog/2013/11/concatenations.html
 #@cli : Default values: '_int_base=10','_method_a=0','_method_b=1','_palette=n/a','hex_bg_col=n/a','_shape=n/a'
@@ -1696,26 +1669,21 @@ repeat h#0 {
 }
 
 rm[-3--1]
-#@cli +rep_num2altbase: abs_num,base,start_num
-#@cli : Insert number in bases other than 10. Each digit is represented by the character at ASCII codepoint (start_num)+(digit value).
+#@cli rep_num2altbase: abs_num,base
+#@cli : Insert number in bases other than 10. Each numbers are represented as digits by themselves.
 +rep_num2altbase:
 
-num,base={abs($1)},{abs($2)}
-digits={1+int(log($num)/log($base))}
+number,base={int(abs([$1,$2]))}
 
-repeat $digits {
-
- rem={$num%$base}
- num/=$base
-
- ({int($rem)})
-
- if $>
-  rv[-2,-1]
-  a[-2,-1] x
- fi
-
-}
+{1+int(log($number)/log($base))},1,1,1,<"
+ begin(
+  const base=$base;
+  n=$number;
+ );
+ remainder=n%base;
+ n=int(n/base);
+ remainder;
+ "
 #@cli rep_int2roman: 1<=num<=3999
 #@cli : Return integer number as Roman Numberal
 rep_int2roman:
@@ -1947,13 +1915,8 @@ rm
 rep_output_gpl:
 e[^-1] "Output palettes$? as GIMP palette file(s).(.gpl)"
 
-(71,73,77,80,32,80,97,108,101,116,116,101,10,35,80,97,108,101,116,116,101,32,78,97,109,101,58,32)
-
-init_header={t} rm.
-
-(10,35,67,111,108,111,114,115,58,32)
-
-init_colors_info={t} rm.
+init_header="GIMP Palette\n\#Palette Name: "
+init_colors_info="\n#Colors: "
 
 repeat $!
  if $!>1 filename=${"filename \"$1\",$>"} else filename="$1" fi
@@ -2021,7 +1984,7 @@ skip ${4=0},${5=},${6=0},${7=0}
 $=p
 
 if isnum($4) axis={$4%3}
-else axis={'$4'-120}
+else axis={_'$4'-_'x'}
 fi
 
 dir_axis=${arg\ $axis+1,x,y,z}
@@ -2067,7 +2030,7 @@ rm.
 a[-$2--1] $dir_axis
 
 if $7 mirror. $dir_axis fi
-#@cli +rep_hitomezashi : "str_a","str_b",_upscale_pixel>=1,[colors_a palette],[colors_b stray_palette],_shift_color,_boundary={ 0=Periodic | 1=Continuous },0<=_symmetry_mode<=3,_stray_color_seed,stray_col_a,...stray_col_n,border_size,border_col_a,...,border_col_n,frames : "str_a","str_b",upscale_pixel>=1,colors_a={ hex | value~ },colors_b={ hex | value~ },0<=_symmetry_mode<=3,border_size,border_col_a,...border_col_n
+#@cli rep_hitomezashi : "str_a","str_b",_upscale_pixel>=1,[colors_a palette],[colors_b stray_palette],_shift_color,_boundary={ 0=Periodic | 1=Continuous },0<=_symmetry_mode<=3,_stray_color_seed,stray_col_a,...stray_col_n,border_size,border_col_a,...,border_col_n,frames : "str_a","str_b",upscale_pixel>=1,colors_a={ hex | value~ },colors_b={ hex | value~ },0<=_symmetry_mode<=3,border_size,border_col_a,...border_col_n
 #@cli : Create Hitomezashi Stitch Pattern.
 #@cli :
 #@cli : Note: The number of stray_color and number of border color depends on the number of channels to be used. For example, in the case of palette, it depends on number of channels per palette. In case of hex, then it depends on number of characters divided by two. Finally, if you insert wave at the end, there is only one.
@@ -2483,12 +2446,12 @@ rm[-4--2] # Keep only the Hitomezashi Pattern
 #@cli rep_contains_wave_at_end : "str"
 #@cli : Return whether it contains a wave at end.
 #@cli : Author: Reptorian.
-rep_contains_wave_at_end: skip "${1=}" if narg($1) u {a=['$1'];(a)[size(a)-1]==126} else u 0 fi
+rep_contains_wave_at_end: skip "${1=}" if narg($1) u {a=['$1'];(a)[size(a)-1]==_'~'} else u 0 fi
 #@cli rep_random_binary: num_of_chars
 #@cli : Return randomly generated binary number based on number of characters.
 #@cli :
 #@cli : Author : Reptorian.
-rep_random_binary: {max(2,abs($1))},1,1,1,int(u(0,2))+48 u {t} rm.
+rep_random_binary: {max(2,abs($1))},1,1,1,int(u(0,2))+_'0' u {t} rm.
 #@cli rep_sym_xy: eq. to 'rep_symmetrize_xy'. : (+)
 rep_sym_xy: rep_symmetrize_xy $1
 #@cli rep_symmetrize_xy: 0<=mode<=3
@@ -3127,7 +3090,7 @@ check "$8!=0"
 +rep_ncr_combinations:
 skip ${3=x}
 
-check "($1>0&&$2>0)&&(isint($1)&&isint($2))&&inrange(('$3')[0],120,122,1,1)"
+check "($1>0&&$2>0)&&(isint($1)&&isint($2))&&inrange(_'$3',_'x',_'z',1,1)"
 
 if $1==$2 1,1,1,$1,c return fi
 
@@ -3137,7 +3100,7 @@ fi
 
 if $choices==1 $n_items,1,1,1,x return fi
 
-num_combs,axis={permut($choices,$n_items,0)},{'$3'-120}
+num_combs,axis={permut($choices,$n_items,0)},{_'$3'-_'x'}
 
 if $num_combs>16777216 error excess_combs fi
 
@@ -3287,10 +3250,10 @@ check "[${1--2}]==int([${1--2}])"
 if find(abs([${1--2}]),0,0,1)+1 error inv_num fi
 
 if narg($-1)
- if v='$-1';a=size(v)==1;b=inrange((v)[0],120,122,1,1);!(a&&b)
+ if v='$-1';a=size(v)==1;b=inrange((v)[0],_'x',_'z',1,1);!(a&&b)
   error inv_axis_inp
  fi
- axis={'$-1'-120}
+ axis={_'$-1'-_'x'}
 else
  axis=1
 fi
@@ -3375,7 +3338,7 @@ eval "
 +rep_full_combinations:
 skip ${2=x}
 
-check "inrange($1,0,8,1,1)&&$1==int($1)&&inrange(('$2')[0],120,122,1,1)"
+check "inrange($1,0,8,1,1)&&$1==int($1)&&inrange(_'$2',_'x',_'z',1,1)"
 
 if !$1||$1==1 1 return fi
 
@@ -3383,7 +3346,7 @@ if $1>5 mode=:
 else mode=>
 fi
 
-num_of_combinations,axis={$1^$1},{'$2'-120}
+num_of_combinations,axis={$1^$1},{_'$2'-_'x'}
 
 if $axis==2   out_dim=1,1,$num_of_combinations
 elif $axis==1 out_dim=1,$num_of_combinations,1
@@ -3476,11 +3439,11 @@ fi
 +rep_combinations:
 skip ${3=x}
 
-check "($1>0&&isint($1))&&($2>0&&isint($2))&&inrange(('$3')[0],120,122,1,1)"
+check "($1>0&&isint($1))&&($2>0&&isint($2))&&inrange(_'$3',_'x',_'z',1,1)"
 
 if !$2 $1 return fi
 
-num_of_combinations,axis={$2^$1},{'$3'-120}
+num_of_combinations,axis={$2^$1},{_'$3'-_'x'}
 
 if $num_of_combinations>3125 mode=:
 else mode=>
@@ -3587,7 +3550,7 @@ skip ${2=x}
 
 check "inrange($1,0,8,1,1)&&$1==int($1)&&inrange(('$2')[0],120,122,1,1)"
 
-axis,fact_size={'$2'-120},{fact($1)}
+axis,fact_size={_'$2'-_'x'},{fact($1)}
 
 if $axis==2 out_dim=1,1,$fact_size
 elif $axis==1 out_dim=1,$fact_size,1
@@ -3641,12 +3604,10 @@ else
 
  permutation_number={$2%fact($num_of_items)}
 
- 1
+ 1,{$num_of_items+1},1,1,y
 
  eval "
   const num_of_items=$num_of_items;
-
-  da_push(#-1,"{expr('x',$num_of_items)}");
   new_arr=vector(#num_of_items,0);
 
   fn=num_of_items-1;
@@ -3705,8 +3666,9 @@ fi
 #@cli : number_list must be in the form of 0,1,2,3.... , but can be in any order.
 rep_inverse_permutation:
 if $#>1
- if sort([$*])==expr('x',$#)
-  if [$*]==expr('x',$#) u 0
+ ordered={expr('x',$#)}
+ if sort([$*])==[$ordered]
+  if [$*]==[$ordered] u $ordered
   else
    ($*)
    {$#}
@@ -3720,15 +3682,25 @@ else u 0
 fi
 #@cli rep_inverse_permute_str: permutation_string
 #@cli : Return the inverse permutation_string for command permute
-#@cli : 'permutation' is a combination of the character set {x|y|z|c},
+#@cli : 'permutation_string' is a combination of the character set {x|y|z|c},
 #@cli : e.g. 'xycz', 'cxyz', ...
 rep_inverse_permute_str:
-check "sort('$*')==[99,120,121,122]"
-(120,121,122,99)
-({'$*'})
-f. (i==99?123:i)-120
-(${rep_inverse_permutation\ {crop(#-1)}})
-f. i(#-3,i)
+check "sort('$*')=='cxyz'"
+x={'x'}
+axis_list=xyzc
+
+if '$*'=='$axis_list' return fi
+
+('$axis_list') => axis_list
+({'$*'}) => user_axis_list_permutation
+
+set[user_axis_list_permutation] {$x+3},{xm}
+-[user_axis_list_permutation] $x
+
+(${rep_inverse_permutation\ {crop(#-1)}}) => inverse_permute_map
+
+map[inverse_permute_map] [axis_list]
+
 u {t}
 rm[-3--1]
 #@cli rep_generate_all_images_combinations:[images]
@@ -3850,7 +3822,7 @@ $dims,1,$ns,$col
 1,1,1,5 #Modifiable Rectangle Array
 1,1,1,5 #Unmodifiable Rectangle Array
 
-eval ${-math_lib}"
+eval "
  if(narg($7),srand($7););
  const ww=w#-3-1;
  const hh=h#-3-1;
@@ -3878,7 +3850,7 @@ eval ${-math_lib}"
 
  !(width_check||height_check)?run('error inv_dim');
 
- dar_insert(#-2,[0,ww,0,hh,0]);
+ da_push(#-2,[0,ww,0,hh,0]);
 
  sub_column(v,point)=(
   ri=int(u(1,max_split))+1;
@@ -3888,7 +3860,7 @@ eval ${-math_lib}"
   diff=ex-sx;
   bound_check=diff>test_boundary;
   skip=0;
-  dar_remove(#-2,point);
+  da_remove(#-2,point);
   if(bound_check,
    ds=diff/mri;
    if(mri>1&&ds<=test_boundary,
@@ -3910,9 +3882,9 @@ eval ${-math_lib}"
        if(!(v[3]-v[2]),rb=1;);
       );
       (rb||(iter==max_iter))?(
-       dar_insert(#-1,[p,v[1],py,iter]);
+       da_push(#-1,[p,v[1],py,iter]);
       ):(
-       dar_insert(#-2,[p,v[1],py,iter]);
+       da_push(#-2,[p,v[1],py,iter]);
       );
      ):
      !ri_ind?(
@@ -3920,9 +3892,9 @@ eval ${-math_lib}"
       np=min(max(sx,round(u(p,mx))),ex);
       vp=[p,np];
       (rb||(iter==max_iter))?(
-       dar_insert(#-1,[vp,py,iter]);
+       da_push(#-1,[vp,py,iter]);
       ):(
-       dar_insert(#-2,[vp,py,iter]);
+       da_push(#-2,[vp,py,iter]);
       );
       p=np+1;
       if(p>=ex,skip=1;);
@@ -3932,16 +3904,16 @@ eval ${-math_lib}"
       np=min(max(p+internal_space,round(u(p,mx))),ex);
       vp=[min(p,ex),np];
       (rb||(iter==max_iter))?(
-       dar_insert(#-1,[vp,py,iter]);
+       da_push(#-1,[vp,py,iter]);
       ):(
-       dar_insert(#-2,[vp,py,iter]);
+       da_push(#-2,[vp,py,iter]);
       );
       p=np+1;
      );
     );
-   ,dar_insert(#-1,v);
+   ,da_push(#-1,v);
    );
-  ,dar_insert(#-1,v);
+  ,da_push(#-1,v);
   );
  );
 
@@ -3953,7 +3925,7 @@ eval ${-math_lib}"
   diff=ey-sy;
   bound_check=diff>test_boundary;
   skip=0;
-  dar_remove(#-2,point);
+  da_remove(#-2,point);
   if(bound_check,
    ds=diff/mri;
    if(mri>1&&ds<=test_boundary,
@@ -3975,9 +3947,9 @@ eval ${-math_lib}"
        if(!(v[1]-v[0]),rb=1;);
       );
       (rb||(iter==max_iter))?(
-       dar_insert(#-1,[px,p,v[3],iter]);
+       da_push(#-1,[px,p,v[3],iter]);
       ):(
-       dar_insert(#-2,[px,p,v[3],iter]);
+       da_push(#-2,[px,p,v[3],iter]);
       );
      ):
      !ri_ind?(
@@ -3985,9 +3957,9 @@ eval ${-math_lib}"
       np=min(max(sy,round(u(p,my))),ey);
       vp=[p,np];
       (rb||(iter==max_iter))?(
-       dar_insert(#-1,[px,vp,iter]);
+       da_push(#-1,[px,vp,iter]);
       ):(
-       dar_insert(#-2,[px,vp,iter]);
+       da_push(#-2,[px,vp,iter]);
       );
       p=np+1;
       if(p>=ey,skip=1;);
@@ -3997,16 +3969,16 @@ eval ${-math_lib}"
       np=min(max(p+internal_space,round(u(p,my))),ey);
       vp=[min(p,ey),np];
       (rb||(iter==max_iter))?(
-       dar_insert(#-1,[px,vp,iter]);
+       da_push(#-1,[px,vp,iter]);
       ):(
-       dar_insert(#-2,[px,vp,iter]);
+       da_push(#-2,[px,vp,iter]);
       );
       p=np+1;
      );
     );
-   ,dar_insert(#-1,v);
+   ,da_push(#-1,v);
    );
-  ,dar_insert(#-1,v);
+  ,da_push(#-1,v);
   );
  );
 
@@ -4028,8 +4000,8 @@ eval ${-math_lib}"
 
  arr_point=0;
 
- while(dar_size(#-2),
-  p_ind=int(u(dar_size(#-2)));
+ while(da_size(#-2),
+  p_ind=int(u(da_size(#-2)));
   cv=I[#-2,p_ind];
 
   u(0,1)<.5?(
@@ -4042,18 +4014,28 @@ eval ${-math_lib}"
   if(arr_point>=arr_limit,break());
  );
 
- resize(#-2,1,dar_size(#-2),1,4,0);
- resize(#-1,1,dar_size(#-1),1,4,0);"
+ da_freeze(#-2);
+ da_freeze(#-1);"
 
 a[-2,-1] y
 
-eval. :${-math_lib}"begin_t(
+eval. :"begin_t(
   const ww=w#-2-1;
   const hh=h#-2-1;
   const border_size=$border_size;
   const b_a=floor(border_size/2);
   const b_b=ceil(border_size/2);
   const contain_border=$border_size?1;
+  
+  hsv2rgb(I)=(
+   ref(I,_I);
+   _I[0]%=360;
+   _I[1]=cut(_I[1],0,1);
+   _I[2]=cut(_I[2],0,1);
+   _c=_I[2]*_I[1];
+   _x=_c*(1-abs((_I[0]/60)%2-1));
+   (arg(1 + int(_I[0]/60),[_c,_x,0],[_x,_c,0],[0,_c,_x],[0,_x,_c],[_x,0,_c],[_c,0,_x])+=_I[2] - _c)*=255;
+  );
 
   $8&&!narg($10)?(
    $ns>1?(
@@ -5104,31 +5086,39 @@ done
 #@cli :
 #@cli : Author: Reptorian.
 rep_hex2int8:
- strlowercase $1
+strlowercase $1
 
- ('${}')
+('${}')
 
- {int(w/2)},1,1,1,"begin(
-  from_char(v)=v>=48&&v<=57?v-48:v-87;
-  );
-  p=x*2;
-  from_char(i(#-1,p))*16+from_char(i(#-1,p+1));"
+if (w&1) error is_even(str_size)==F fi
 
- u {crop(#-1)} rm[-2,-1]
+{w>>1},1,1,1,"begin(
+  const _0=_'0';
+  const _9=_'9';
+  const char_ref_val=87;
+  from_char(v)=if(inrange(v,_0,_9,1,1),v-_0,v-char_ref_val);
+ );
+ p=x*2;
+ from_char(i(#-1,p))*16+from_char(i(#-1,p+1));"
+
+u {crop(#-1)} rm[-2,-1]
 #@cli rep_int82hex: 0<=8-bit_value<=255...
-#@cli : Convert 8-bit numberical argument(s) into hexadecimal representation, and then return the converted value.
+#@cli : Convert 8-bit numberical argument(s) into hexadecimal representation.
 #@cli :
 #@cli : Author: Reptorian.
 rep_int82hex:
-{narg($*)*2},1,1,1,"begin(
+{narg($*)<<1},1,1,1,"begin(
+  const _0=_'0';
+  const char_ref_val=87;
   vchar=[$*];
-  to_char(v)=v>=0&&v<=9?48+v:87+v;
+  if(min(vchar)<0||max(vchar)>255,run('error invalid_number'););
+  to_char(v)=if(inrange(v,0,9,1,1),_0+v,char_ref_val+v);
  );
- p=int(x/2);
- x%2?(
-  to_char(int(vchar[p]%16));
+ p=x>>1;
+ x&1?(
+  to_char(vchar[p]%16);
  ):(
-  to_char(int(vchar[p]/16));
+  to_char(vchar[p]>>4);
  );"
 
 u {t} rm.
@@ -5177,11 +5167,14 @@ check (abs($4)!=0)&&($!==1)&&(w#-1>1&&h#-1>1&&d#-1>1)
 
 strlowercase $1
 ab_string=${}
-('$ab_string') -. 97
+a:=_'a'
 
-include_a={im#-1==0}
-include_b={find(crop(#-1),1,0,1)!=-1}
-include_c={iM#-1==2}
+('$ab_string') -. $a
+
+include_a,\
+include_b,\
+include_c\
+={[im==0,find(crop(#-1),1,0,1)!=-1,iM==2]}
 
 if im#-1<0||iM#-1>2 error invalid_char_found! fi
 if !($include_a&&$include_b&&$include_c) error invalid_string fi
@@ -5189,17 +5182,9 @@ if !($include_a&&$include_b&&$include_c) error invalid_string fi
 ab_string={crop(#-1)}
 rm.
 
-mode=0
-use_double_u=0
-use_hex_mode=0
+mode,use_double_u,use_hex_mode,sub=0,{abs($3)+1}
 
-sub={abs($3)+1}
-
-ow={w}
-oh={h}
-od={d}
-nw={round(w*$sub)}
-nh={round(h*$sub)}
+ow,oh,od,nw,nh={[w,h,d,round([w,h]*$sub)]}
 
 if narg($9)||narg($10)
 
@@ -5538,25 +5523,24 @@ check "abs($4)!=0"
 
 strlowercase $1
 ab_string=${}
-('$ab_string') -. 97
+a:=_'a'
 
-if im#-1<0||iM#-1>2 error invalid_char_found! fi
+('$ab_string') -. $a
 
-include_a={im#-1==0}
-include_b={find(crop(#-1),1,0,1)!=-1}
-include_c={iM#-1==2}
+if im#<0||iM#>2 error invalid_char_found! fi
 
-case_d1={!($include_a&&$include_b)}
-case_dn={!(!$case_d1&&$include_c)}
+include_a,\
+include_b,\
+include_c\
+={[im==0,find(crop(#-1),1,0,1)!=-1,iM==2]}
+
+
+case_d1,case_dn={[!($include_a&&$include_b),!(!$case_d1&&$include_c)]}
 
 ab_string={crop(#-1)}
 rm.
 
-mode=0
-use_double_u=0
-use_hex_mode=0
-
-sub={abs($3)+1}
+mode,use_double_u,use_hex_mode,sub=0,{abs($3)+1}
 
 if narg($8)||narg($9)
 
@@ -7062,17 +7046,17 @@ rep_dla: rep_diffusion_limited_aggregation $*
 rep_diffusion_limited_aggregation:
 skip ${1=2},${2=100},${3=1},${4=0},${5=0},${6=1}
 
-__bg={$4?0:1}
+bg={$4?1:0}
 
 m "dla_target_2s : n 0,1 s. c * midpoint={avg(iM,im)} f. i>$midpoint?1"
 m "dla_target_3s : n 0,1 s c add / 3 midpoint={avg(iM,im)} f. i>$midpoint?1"
 m "dla_target_4s_plus : n 0,1 ts={s-1} s c add[^-1] /.. $ts * midpoint={avg(iM,im)} f. i>$midpoint?1"
 m "dla_target : if s==1 n 0,1 elif s==2 dla_target_2s elif s==3 dla_target_3s elif s>3 dla_target_4s_plus fi"
 m "dla_check_variance : tv=0 repeat s sh $> tv+={iv#-1} rm. if $tv break fi done u {$tv?1:0}"
-m "dla_clear_image : {w#0},{h#0},{d#0},1,$__bg rv[-1,0] rm."
+m "dla_clear_image : {w#0},{h#0},{d#0},1,"{$4?0:1}" rv[-1,0] rm."
 
 if abs($1)>1 m " dla_create_coordinate_map : +rep_noise_poissondisk_to_coordinates {abs($1)},4 round. m={int(h/$_cpus)} f. I(0,int(y/$_cpus)+(y%$_cpus)*$m,0);"
-else m "dla_create_coordinate_map : +rep_create_alternating_coordinates_map m={int(h/$_cpus)} f. I(0,int(y/$_cpus)+(y%$_cpus)*$m,0)"
+else m "dla_create_coordinate_map : +rep_diffusion_limited_aggregation_create_alternating_coordinates_map m={int(h/$_cpus)} f. I(0,int(y/$_cpus)+(y%$_cpus)*$m,0)"
 fi
 
 if $4 m "dla_expand : if $5!=0 +dilate_circ[0] {abs($5)} fi"
@@ -7091,96 +7075,151 @@ local[-1] {
 length_const_line=""
 dar_lines=""
 
-length_const_line.=begin(
-length_const_line.="const ww=w#0;"
-length_const_line.="const hh=h#0;"
-length_const_line.="const " length_const_line.=lim_atmp=$2;
-length_const_line.="const " length_const_line.=dlmode={($4%2)>0?1:0} length_const_line.=;
-length_const_line.="const " length_const_line.=use_border="$check_count";
+length_const_line="begin_t(
+ const ww=w#0;
+ const hh=h#0;
+ const lim_atmp="$2";
+ const dl_mode="{($4%2)>0?1:0}";
+ const use_border=$check_count;"
+
 length_const_line.=use_border?(
- repeat $n_threads
+
+ repeat $n_threads {
   insert_ref_pos={2+$n_threads+$>}
-  length_const_line.=check_and_insert_point_$>()=(i(#0,I(#$insert_ref_pos,0,refpos))!=i(#-1,I(#$insert_ref_pos,0,refpos)));
- done
+  length_const_line.=check_and_insert_point_$>()=(i(#0,i(#$insert_ref_pos,0,refpos))!=i(#-1,i(#$insert_ref_pos,0,refpos)));
+ }
+ 
 length_const_line.=):(
- repeat $n_threads
+
+ repeat $n_threads {
   insert_ref_pos={2+$n_threads+$>}
+  
   if $4 length_const_line.=check_and_insert_point_$>()=(i(#0,I(#$insert_ref_pos,0,refpos))<.001?1);
   else length_const_line.=check_and_insert_point_$>()=(i(#0,I(#$insert_ref_pos,0,refpos))>0.999?1);
-  fi
- done
+  fi  
+ }
+ 
 length_const_line.=);
 
-repeat $n_threads
+('"
+ x==N?(
+  repeat(vN,refpos,
+   if(check_and_insert_point_N(),
+    da_push(#A,I(#B,0,refpos));
+   );
+  );
+  do(n=0;
+   do(
+    temp_vec=I(#A,0,n);
+    xp=temp_vec[0];
+    yp=temp_vec[1];
+    if(C,
+     i(#0,xp%ww,yp%hh)=dl_mode;
+     if(da_size(#A),da_remove(#A,n););
+     --n;
+     attempts=0;
+    );
+    ++n;
+   ,n<da_size(#A)
+   );
+   repeat(da_size(#A),p,
+    temp_vec=I(#A,0,p);
+    px=temp_vec[0];
+    py=temp_vec[1];
+    pv=int(u(0,8));
+    npx=newpos_x[pv];
+    npy=newpos_y[pv];
+    I(#A,0,p)=[px+npx,py+npy];
+   ); 
+   ++attempts;
+   D
+  ,da_size(#A)&&(attempts<lim_atmp)
+  );
+ ) 
+"')
+
+if $3==3
+ replace_str. "D","altern=++altern%2;"
+else
+ replace_str. "D",""
+fi
+
+if $3==0 C_replace_str="
+  i(#0,xp-1,yp-1,0,0,0,2)<1||
+  i(#0,xp-1,yp+1,0,0,0,2)<1||
+  i(#0,xp+1,yp-1,0,0,0,2)<1||
+  i(#0,xp+1,yp+1,0,0,0,2)<1"
+elif $3==1 C_replace_str="
+  i(#0,xp-1,yp,0,0,0,2)<1||
+  i(#0,xp+1,yp,0,0,0,2)<1||
+  i(#0,xp,yp-1,0,0,0,2)<1||
+  i(#0,xp,yp+1,0,0,0,2)<1"
+elif $3==2 C_replace_str="
+  i(#0,xp-1,yp-1,0,0,0,2)<1||
+  i(#0,xp-1,yp+1,0,0,0,2)<1||
+  i(#0,xp+1,yp-1,0,0,0,2)<1||
+  i(#0,xp+1,yp+1,0,0,0,2)<1||
+  i(#0,xp-1,yp,0,0,0,2)<1||
+  i(#0,xp+1,yp,0,0,0,2)<1||
+  i(#0,xp,yp-1,0,0,0,2)<1||
+  i(#0,xp,yp+1,0,0,0,2)<1"
+elif $3==3 C_replace_str="
+  altern?(
+   i(#0,xp-1,yp-1,0,0,0,2)<1||
+   i(#0,xp-1,yp+1,0,0,0,2)<1||
+   i(#0,xp+1,yp-1,0,0,0,2)<1||
+   i(#0,xp+1,yp+1,0,0,0,2)<1
+  ):(
+   i(#0,xp-1,yp,0,0,0,2)<1||
+   i(#0,xp+1,yp,0,0,0,2)<1||
+   i(#0,xp,yp-1,0,0,0,2)<1||
+   i(#0,xp,yp+1,0,0,0,2)<1
+  )"
+fi
+
+if $4%2
+ ($C_replace_str)
+ replace_str. "<1",""
+ C_replace_str={t}
+ rm.
+fi
+
+replace_str. "C",$C_replace_str
+
+store. dar_lines_string
+
+repeat $n_threads {
 
  insert_dar_pos={$>+2}
  insert_ref_pos={2+$n_threads+$>}
 
- length_const_line.="const v"
- length_const_line.=$>=
- length_const_line.=h#$insert_ref_pos
- length_const_line.=;
-
- dar_lines.=x==
- dar_lines.=$>
- dar_lines.=?(
- dar_lines.=repeat(v$>,refpos,
- dar_lines.=if(check_and_insert_point_$>(),dar_insert(#$insert_dar_pos,I(#$insert_ref_pos,0,refpos)););
- dar_lines.=);
- dar_lines.=do(n=0;
- dar_lines.=do(
- dar_lines.=temp_vec=I(#$insert_dar_pos,0,n);
- dar_lines.=xp=temp_vec[0];
- dar_lines.=yp=temp_vec[1];
- dar_lines.=if(
-  if $4%2
-   if $3==0 dar_lines.=(i(#0,xp-1,yp-1,0,0,0,2)||i(#0,xp-1,yp+1,0,0,0,2))||(i(#0,xp+1,yp-1,0,0,0,2)||i(#0,xp+1,yp+1,0,0,0,2))
-   elif $3==1 dar_lines.=(i(#0,xp-1,yp,0,0,0,2)||i(#0,xp+1,yp,0,0,0,2))||(i(#0,xp,yp-1,0,0,0,2)||i(#0,xp,yp+1,0,0,0,2))
-   elif $3==2 dar_lines.=((i(#0,xp-1,yp-1,0,0,0,2)||i(#0,xp-1,yp+1,0,0,0,2))||(i(#0,xp+1,yp-1,0,0,0,2)||i(#0,xp+1,yp+1,0,0,0,2)))||((i(#0,xp-1,yp,0,0,0,2)||i(#0,xp+1,yp,0,0,0,2))||(i(#0,xp,yp-1,0,0,0,2)||i(#0,xp,yp+1,0,0,0,2)))
-   elif $3==3 dar_lines.=altern?(i(#0,xp-1,yp-1,0,0,0,2)||i(#0,xp-1,yp+1,0,0,0,2))||(i(#0,xp+1,yp-1,0,0,0,2)||i(#0,xp+1,yp+1,0,0,0,2)):(i(#0,xp-1,yp,0,0,0,2)||i(#0,xp+1,yp,0,0,0,2))||(i(#0,xp,yp-1,0,0,0,2)||i(#0,xp,yp+1,0,0,0,2))
-   fi
-  else
-   if $3==0 dar_lines.=(i(#0,xp-1,yp-1,0,0,0,2)<1||i(#0,xp-1,yp+1,0,0,0,2)<1)||(i(#0,xp+1,yp-1,0,0,0,2)<1||i(#0,xp+1,yp+1,0,0,0,2)<1)
-   elif $3==1 dar_lines.=(i(#0,xp-1,yp,0,0,0,2)<1||i(#0,xp+1,yp,0,0,0,2)<1)||(i(#0,xp,yp-1,0,0,0,2)<1||i(#0,xp,yp+1,0,0,0,2)<1)
-   elif $3==2 dar_lines.=((i(#0,xp-1,yp-1,0,0,0,2)<1||i(#0,xp-1,yp+1,0,0,0,2)<1)||(i(#0,xp+1,yp-1,0,0,0,2)<1||i(#0,xp+1,yp+1,0,0,0,2)<1))||((i(#0,xp-1,yp,0,0,0,2)<1||i(#0,xp+1,yp,0,0,0,2)<1)||(i(#0,xp,yp-1,0,0,0,2)<1||i(#0,xp,yp+1,0,0,0,2)<1))
-   elif $3==3 dar_lines.=altern?(i(#0,xp-1,yp-1,0,0,0,2)<1||i(#0,xp-1,yp+1,0,0,0,2)<1)||(i(#0,xp+1,yp-1,0,0,0,2)<1||i(#0,xp+1,yp+1,0,0,0,2)<1):(i(#0,xp-1,yp,0,0,0,2)<1||i(#0,xp+1,yp,0,0,0,2)<1)||(i(#0,xp,yp-1,0,0,0,2)<1||i(#0,xp,yp+1,0,0,0,2)<1)
-   fi
-  fi
- dar_lines.=,
- dar_lines.=i(#0,xp%ww,yp%hh)=dlmode;
- dar_lines.=dar_remove(#$insert_dar_pos,n);
- dar_lines.=--n;
- dar_lines.=attempts=0;
- dar_lines.=);
- dar_lines.=++n;
- dar_lines.=,n<dar_size(#$insert_dar_pos));
- dar_lines.=repeat(dar_size(#$insert_dar_pos),p,
- dar_lines.=temp_vec=I(#$insert_dar_pos,0,p);
- dar_lines.=px=temp_vec[0];
- dar_lines.=py=temp_vec[1];
- dar_lines.=pv=int(u(0,8));
- dar_lines.=npx=newpos_x[pv];
- dar_lines.=npy=newpos_y[pv];
- dar_lines.=I(#$insert_dar_pos,0,p)=[px+npx,py+npy];
- dar_lines.=);
- dar_lines.=++attempts;
- if $3==3 dar_lines.=altern=(altern+1)%2; fi
- dar_lines.=,dar_size(#$insert_dar_pos)&&(attempts<lim_atmp));
- dar_lines.=)
+ length_const_line.="const v"$>=h#$insert_ref_pos;
+ 
+ $dar_lines_string
+ 
+ replace_str. "N",$>
+ replace_str. "A",$insert_dar_pos
+ replace_str. "B",$insert_ref_pos
+ 
+ dar_lines.={t}
 
  if ($>!=$mt)
   dar_lines.=:
  else
   dar_lines.=;
  fi
+ 
+ rm.
 
-done
+}
 
-length_const_line.=newpos_x=[-1,0,1,-1,1,-1,0,1];
-length_const_line.=newpos_y=[-1,-1,-1,0,0,1,1,1];
-length_const_line.=);
-length_const_line.=attempts=0;
-if $3==3 length_const_line.=altern=round(u(1)); fi
+length_const_line.="
+ newpos_x=[-1,0,1,-1,1,-1,0,1];
+ newpos_y=[-1,-1,-1,0,0,1,1,1];
+ );
+ attempts=0;"
+ 
+if $3==3 length_const_line.=altern=round(u); fi
 
 foreach {
 
@@ -7216,11 +7255,11 @@ foreach {
  else
 
   dla_clear_image
-  set[0] {1-$__bg},50%,50%
+  set[0] $bg,50%,50%
 
  fi
 
- eval[1] :${-math_lib}$length_const_line$dar_lines
+ eval[1] :$length_const_line$dar_lines
 
  k[0]
 
@@ -7229,17 +7268,15 @@ foreach {
 }
 
 um dla_target,dla_target_2s,dla_target_3s,dla_target_4s_plus,dla_create_coordinate_map,dla_expand
-rep_create_alternating_coordinates_map:
+rep_diffusion_limited_aggregation_create_alternating_coordinates_map:
 
 1,1,1,2
 
-eval[0] ${-math_lib}"
+eval[0] "
  if(!((x%3==0)!=(y%3==0))*((x%3==0)||(y%3==0)),
-  dar_insert(#-1,[x,y]);
+  da_push(#-1,[x,y]);
  );
- end(
-  resize(#-1,1,dar_size(#-1),1,s(#-1),0);
- );"
+ end(da_freeze(#-1););"
 
 k.
 #@cli rep_blur_splinter: _length,_duplicates,_angle,_thickness,-1<=_balance<=1,_contrast,_boundary={ 0=None | 1=Neumann | 2=Periodic | 3=Mirror },_bisided={ 0=one-line | two-line }
@@ -10122,7 +10159,8 @@ rep_trigmap: rep_trigonometry_map $*
 rep_trigonometry_map:
 skip ${1=1},${2=0},${3=1},${4=0},${5=1},${6=1},${7=0},${8=1}
 if $1==0 error ""$"1!=0==f" fi
-f "begin(const trigmode=$2%15;
+f "begin(
+  const trigmode=$2%15;
   trigmode==0? chan_form(a)=(sin(a*pi)+1)/2:
   trigmode==1? chan_form(a)=(cos(a*pi)+1)/2:
   trigmode==2? chan_form(a)=(sin(a*pi+pi)^3+1)/2:
@@ -10843,8 +10881,7 @@ rep_mj_newf:rep_madjik_newton_fractal $*
 rep_madjik_newton_fractal:
 skip ${1=16},${2=0},${3=0},${4=128},${5=9},${6=0},${7=75},${8=5},${9=10},${10=50},${11=50},${12=45},${13=0},${14=0},${15=0}
 foreach
- ww={w}
- hh={h}
+ ww,hh={[w,h]}
 
  r {max(w,h)*2},{max(w,h)*2},1,3
 
@@ -11453,51 +11490,25 @@ foreach {
 }
 #@cli rep_cr: eq. to 'rep_cr'. : (+)
 rep_cr: rep_channels_range
-#@cli rep_2d_channels_ranges:
+#@cli rep_channels_range:
 #@cli : Return the minimal and maximum values per channels in a image.\n
 #@cli : Author: Reptorian.
 rep_channels_range:
 if $!>1 error "Cannot be used on more than 1 images!" fi
-repeat s {
- if $>==0
-  sh $>
+num_chans={s}
 
-  minv={im#-1}
-  maxv={iM#-1}
+repeat $num_chans { shared[0] $> }
 
-  cv=[$minv,$maxv]
-  rm.
+u {expr('p=1+(x>>1);x&1?iM#p:im#p;',$num_chans<<1)}
 
- else
-  sh $>
-
-  minv={im#-1}
-  maxv={iM#-1}
-
-  tcv=[$minv,$maxv]
-  cv=[$cv,$tcv]
-  rm.
-
- fi
-}
-u {"chv="$cv";(chv)"}
+rm[-$num_chans--1]
 #@cli rep_ol: eq. to 'rep_orientation_list'. : (+)
 #@cli : Return dimensions of selected images.
 rep_ol: rep_orientation_list
 #@cli rep_orientation_list:
 #@cli : Return orientation of selected images.
 #@cli : (eq. to rep_ol).
-rep_orientation_list: _rep_orientation_list
-_rep_orientation_list:
-ti={$!}
-
-u {"ro=vector$ti(0);
- for (k=0,k<$ti,++k,
-  if(h#k>w#k
-  ,ro[k]=1
-  ,ro[k]=0);
- );
- (ro)"}
+rep_orientation_list: u {expr('h#x>w#x',$!)}
 #@cli rep_recpoltrans: eq. to 'rep_rectangular_polar_transformation'. : (+)
 rep_recpoltrans: rep_rectangular_polar_transformation $*
 #@cli rep_rectangular_polar_transformation : -1>=_xpos<=1,-1>=_ypos<=1,_from_to={ -3=to_inverted_rectangular_polar_preserved_details | -2=from_rectangular_polar_preserved_details_to_cartesian | -1=to_inverted_rectangular_polar | 0=to_rectangular_polar | 1=to_rectangular_polar_preserved_details| 2=from_preserved_details_inverted_rectangular_polar },orientation_0={ 0=landscape | 1=portrait },...,orientation_n
@@ -12766,9 +12777,6 @@ if $1 rv[0,-1] rv[0,-2] fi
 
 if !$4 to_gray[0] fi
 
-rep_aspect_crop_2d[^0] {w#0},{h#0}
-
-r[^0] {w#0},{h#0},100%,100%,3
 a[^0] z
 n[0] 0,$2
 r[^0] 100%,100%,$2,100%,3
@@ -15783,6 +15791,7 @@ foreach {
   else
    remove[-1]
   fi
+
  fi
 }
 
@@ -17280,7 +17289,7 @@ fi
 
 foreach
 
- ww,hh={w},{h}
+ ww,hh={[w,h]}
 
  iw,ih={int($4*[$ww,$hh])}
 
@@ -17306,11 +17315,11 @@ foreach
   const ang=pi*($13/180);
   const cos_ang=cos(ang);
   const sin_ang=sin(ang);
-  const ox=$11*cos_ang-$12*sin_ang;
-  const oy=$11*sin_ang+$12*cos_ang;
   const dx=$5;
   const dy=$6;
   const rpi=($10?pi:1);
+  const ox=$11*rpi;
+  const oy=$12*rpi;
   const srpi=rpi*$7;
   const szx=$8*srpi;
   const szy=$9*srpi;
@@ -17584,8 +17593,8 @@ foreach
  );
  xx=(x-half_width)/sx;
  yy=(y-half_height)/sy;
- zx=szx*((xx*cos_ang-yy*sin_ang)+ox);
- zy=szy*((xx*sin_ang+yy*cos_ang)+oy);
+ zx=szx*((xx*cos_ang-yy*sin_ang))+ox;
+ zy=szy*((xx*sin_ang+yy*cos_ang))+oy;
  zx&&zy?(
   vx=zx;
   vy=zy;
@@ -22210,9 +22219,9 @@ gui_split_preview "gui_rep_acb $*",${-3--1}
 #@gui:Distortion X-[dx]=float(0,-50,50)
 #@gui:Distortion Y-[dy]=float(0,-50,50)
 #@gui:_=separator(),_=note("<b>Transformations</b>"),_=note("- Scaling -")
-#@gui:Scaling XY-Axis=float(1,.1,15)
-#@gui:Scaling X-Axis=float(1,.1,15)
-#@gui:Scaling Y-Axis=float(1,.1,15)
+#@gui:Scaling XY-Axis=float(1,.01,15)
+#@gui:Scaling X-Axis=float(1,.01,15)
+#@gui:Scaling Y-Axis=float(1,.01,15)
 #@gui:PI-Based Scaling=bool(1)
 #@gui:_=separator(),_=note("- Displacement -")
 #@gui:Offset X-Transformation=float(0,-5,5)
