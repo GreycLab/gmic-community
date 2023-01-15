@@ -47,6 +47,218 @@
 #@cli :: Reptorian's CLI Commands
 #
 #-------------------------------
+
+#@cli rep_tuppers_self_K: apply_pre_negation={ 0=false | 1=true }
+#@cli : Generate K values from images. Also, threshold image for users to check what it would look like.
+#@cli : Default values: 'apply_pre_negation=1'
+rep_tuppers_self_K:
+skip ${1=1}
+
+n0={'0'}
+
+foreach
+
+ if !(s&1) to_graya s c /. 255 *
+ else to_gray
+ fi
+
+ if !iv
+  if $> out.=,0
+  else out=0
+  fi
+ fi
+
+ height={h}
+
+ gt {(im+iM)/2}
+ +store. image
+ if $1 negate fi
+
+ rotate 90
+ unroll x
+ crop {xM},100%
+ numbers_of_binaries={w}
+
+ (1)
+
+ if i(#0,w#0-1)
+  name[-1] rep_tuppers_self_K_one
+ fi
+
+ repeat $numbers_of_binaries-1 {
+  1
+
+  eval.. <"begin(carry_over=0;);
+   new_number=carry_over+i*2;
+   da_insert(#-1,0,new_number%10);
+   carry_over=int(new_number/10);
+   end(
+    if(carry_over,da_insert(#-1,0,1););
+    resize(#-1,da_size(#-1),1,1,1,-1);
+   );
+   "
+
+  if i(#0,$<) name[-1] rep_tuppers_self_K_one fi
+ }
+
+ keep_named rep_tuppers_self_K_one
+
+ 100%,{$!},1,1
+
+ repeat $!-1 {
+  image[-1] [$>],1~,$>
+ }
+
+ keep[-1]
+
+ 100%,1,1,1 1
+
+ f[1] <"begin(
+   const height=h#0;
+   carry_over=0;
+  );
+  n=carry_over+sum(crop(#0,x,0,0,0,1,height,1,1,0));
+  carry_over=int(n/10);
+  n%10;
+  end(
+   if(carry_over,
+    i(#2,0,0,0)=carry_over;
+   );
+  );"
+
+ remove[0]
+
+ if i
+  ('{i}') -. $n0
+  rv[-3,-1]
+  a[-3,-1] x
+ fi
+
+ fill[0] <"begin(
+   const height=$height;
+   carry_over=0;
+  );
+  n=carry_over+i*height;
+  carry_over=int(n/10);
+  n%10;
+  end(
+   if(carry_over,
+    i(#-1,0,0,0,0)=carry_over;
+   );
+  );
+  "
+
+ if i
+  ('{i}') -. $n0
+  rv[-3,-1]
+  a[-3,-1] x
+ fi
+
+ keep[0]
+
+ + $n0
+
+ if $> out.=,{t}
+ else out={t}
+ fi
+
+ rm $image
+
+done
+
+status $out
+#@cli rep_tuppers_self: _K>=h,_apply_negate={ 0=false | 1=true }
+#@cli : Generates output of K onto a single image.
+#@cli : Note: _K must be a integer number equal or greater to the height of image.
+#@cli : Default values: '_K=96093937991.....','apply_negate=1'
+rep_tuppers_self:
+skip ${1=960939379918958884971672962127852754715004339660129306651505519271702802395266424689642842174350718121267153782770623355993237280874144307891325963941337723487857735749823926629715517173716995165232890538221612403238855866184013235585136048828693337902491454229288667081096184496091705183454067827731551705405381627380967602565625016981482083418783163849115590225610003652351370343874461848378737238198224849863465033159410054974700593138339226497249461751545728366702369745461014655997933798537483143786841806593422227898388722980000748404719},${2=1}
+if $!!=1 error n_imgs_inv fi
+if d>1 error imgs_dims_inv fi
+
+fill "y+x*h" mirror. x
+
+decimal_number=$1
+
+('$decimal_number')
+
+if im<_'0'||iM>_'9' error inv_text_\$1 fi
+
+if w#-1<h#-2?$1<h#-2
+ fill[-2] {$2?1}
+ remove[-1]
+ return
+fi
+
+remove[-1]
+
+1x2
+
+eval "
+ number='$1';
+ const divisor=h#0;
+ const n_size=size(number);
+ const n_0=_'0';
+ index=0;
+ dividend=number[index]-n_0;
+
+ while(dividend<divisor,
+  dividend=dividend*10+(number[++index]-n_0);
+ );
+
+ while(n_size>index,
+  da_push(#-1,int(dividend/divisor)+n_0);
+  dividend=(dividend%divisor)*10+(number[++index]-n_0);
+ );
+
+ da_push(#-2,(i[#-1,da_size(#-1)-1]-n_0)&1);
+ ds=da_size(#-1);
+ ds?da_freeze(#-1);
+ "
+
+decimal_number={t}
+
+repeat inf {
+ rm. 1
+
+ eval "
+  number='"$decimal_number"';
+  const divisor=2;
+  const n_size=size(number);
+  const n_0=_'0';
+  index=0;
+  dividend=number[index]-n_0;
+
+  while(dividend<divisor,
+   dividend=dividend*10+(number[++index]-n_0);
+  );
+
+  while(n_size>index,
+   da_push(#-1,int(dividend/divisor)+n_0);
+   dividend=(dividend%divisor)*10+(number[++index]-n_0);
+  );
+
+  ds=da_size(#-1);
+
+  if(ds,
+   da_push(#-2,(i[#-1,da_size(#-1)-1]-n_0)&1);
+   ds?da_freeze(#-1);
+  );
+
+  ds;
+  "
+
+  if !${} break fi
+  decimal_number={t}
+}
+
+remove[-1]
+eval da_freeze(#-1)
+
+map[-2] [-1]
+remove[-1]
+
+if $2 negate fi
 #@cli rep_nearest_ratio: value_a>0,value_b>0,_maximum_proposition_number>0,_output_whether_true_ratio={ 0=False | 1=True }
 #@cli : Return nearest ratio from 2 different values
 #@cli : Default value: '_maximum_divisor=0'
@@ -722,13 +934,16 @@ eval "
  output=da_size(#-1)==1&&v==start_v?v:0;
  da_freeze(#-1);
 
- if(output,run('pv=',v););
+ if(output,
+  set('pv',v);
+ );
+
  output;
  "
 
 if ${}
  rm.
- u 1,$pv
+ status 1,$pv
 else
  {prod(crop(0,0,0,1,1,h,1,1)+1)},1,1,1,"begin(
    const num_of_primes=h#-1;
@@ -746,10 +961,10 @@ else
   result[x]=prod(primes_list^m);
   0;
   end(
-   run('v=',v2s(sort(result)));
+   set('v',v2s(sort(result)));
   );
   "
- rm[-2,-1] u $v
+ rm[-2,-1] status $v
 fi
 rep_gcd_multiple_numbers:
 eval >"
@@ -4342,7 +4557,7 @@ rep_exp_sig_adj: rep_exponential_sigmoid_adjustment $*
 #@cli :
 #@cli : Author: Reptorian.
 rep_exponential_sigmoid_adjustment:
-skip ${3=0},${4=1}
+skip ${2=0},${3=0},${4=1}
 
 check {abs($4)!=0}
 
@@ -13762,7 +13977,7 @@ repeat $# {
  fi fi
 
  +_pal_$mode
- 
+
  if $> out.=,$mode
  else out=$mode
  fi
@@ -25740,8 +25955,8 @@ elif [${6-23}]!=[${30-47}]
    b=(vec_b)[3*p,3];
    a!=b?(
     v=p;
-    run('col_a=',v2s(a));
-    run('col_b=',v2s(b));
+    set('col_a',v2s(a));
+    set('col_b',v2s(b));
     break();
    );
   );
@@ -28070,7 +28285,6 @@ u "{$1}"\
 #@gui:Luminosity Blend=float(0,0,100)
 #@gui:Green Cut Point=float(0,0,100)
 #@gui:Green Visibility=float(100,0,100)
-#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2022/09/12</i>.</small>")
 #@gui:Use Imported Image?=bool(0)_0
 #@gui:Image Location=file()_0
 #@gui:Use Reference Layer=bool(0)_0
@@ -28078,6 +28292,7 @@ u "{$1}"\
 #@gui:Luminosity Blend=float(0,0,100)_0
 #@gui:Green Cut Point=float(0,0,100)_0
 #@gui:Green Visibility=float(100,0,100)_0
+#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2022/09/12</i>.</small>")
 fx_rep_red_acrylic_filter:
 skip "${2=}","${9=}"
 
@@ -28136,6 +28351,197 @@ u "{$1}"\
 "{$5}"\
 "{$6}"\
 "{$7}"
+#@gui Tupper's Self-Referential Formula:fx_rep_self_referential_formula,fx_rep_self_referential_formula_preview(1)*
+#@gui:_=note("This filter is to be seen as a showcase filter.\n\n<b>Note</b> - To get the most feature of this filter, you must use a single image of size 106x17.\n\n<b>Warning!</b> - Do not use on images that are not much larger than 106x17. Due to the lack of BIGINT support inside G'MIC, the implementation is quite slow.")
+#@gui:_=separator(),_=note("<b>Main</b>")
+#@gui:Mode=choice(1,"Generate Image from K","Find K from Images")
+#@gui:Mode=choice(1,"Generate Image from K","Find K from Images")_0
+#@gui:K Input=choice(0,"User","Tupper's Self-Referential Formula","Euler's Identity","Pacman","Sick App Bro! - Daves")
+#@gui:K Input=choice(0,"User","Tupper's Self-Referential Formula","Euler's Identity","Pacman","Sick App Bro! - Daves")_0
+#@gui:K Value=text(1,"0")
+#@gui:K Value=text("0")_0
+#@gui:Predefined K value=text(1,"0")
+#@gui:Predefined K value=text("0")_0
+#@gui:Copy from Stored K Value=button()
+#@gui:Negate after using K-Input result?=bool(1)
+#@gui:Negate after using K-Input result?=bool(1)_0
+#@gui:K Values from Image(s)=text(1,"1")
+#@gui:Stored K value(s) from Images=text(1,"1")_0
+#@gui:Pre-Negation?=bool(1)
+#@gui:Pre-Negation?=bool(1)_0
+#@gui:Allow Examples=bool(1)_0
+#@gui:Allow Mode Switch?=bool(1)_0
+#@gui:Started=bool(0)_0
+#@gui:_=separator(),_=note("<b><u>Details</u></b>")
+#@gui:_=note("Tupper's Self Referential Formula refers to a formula which refers to itself when a specific value is assigned. This was founded by Jeff Tupper.\n\nK Values for pre-defined K Inputs are based from <a href="https://keelyhill.github.io/tuppers-formula/">Tupper's Self-Referential Formula Playground</a> and <a href="http://campus.lakeforest.edu/trevino/Tupper_Paper.pdf">Tupper Paper</a> by Margaret Fortman.")
+#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2023/01/11</i>.</small>")
+fx_rep_self_referential_formula:
+skip "$*" rm $_persistent
+
+if $1 remove_named tuppers_image_mode_0
+else remove_named tuppers_self_image_base
+fi
+
+* 255
+fx_rep_self_referential_formula_preview:
+skip "$*"
+
+mode_K_a=$1
+mode_K_b=$2
+
+k_a=$5
+k_b=$6
+
+predefined_K=$8
+
+copy_from_stored_value=$9
+negate_after_using_k_input_a=$10
+negate_after_using_k_input_b=$11
+
+k_value_from_images="$13"
+pre_negation_a=$14
+pre_negation_b=$15
+allow_example=$16
+allow_mode_switch=$17
+started=$18
+
+user_mode_a={$allow_example?$3}
+user_mode_b={$allow_example?$4}
+
+mode_K_diff,\
+K_diff,\
+negate_after_K_input_diff,\
+user_diff,\
+pre_negation_diff,\
+copy_from_stored_K_value\
+={[$mode_K_a!=$mode_K_b,'$k_a'!='$k_b',$negate_after_using_k_input_a!=$negate_after_using_k_input_b,$user_mode_a!=$user_mode_b,$pre_negation_a!=$pre_negation_b,$9]}
+
+activate_changes={$mode_K_diff||$K_diff||$negate_after_K_input_diff||$user_diff||$pre_negation_diff||$copy_from_stored_K_value}
+
+if $started&&narg($_persistent)
+ if $activate_changes
+  if $mode_K_a
+   if $pre_negation_diff
+    rm $_persistent
+    rep_tuppers_self_K[tuppers_self_image_base] $pre_negation_a
+    store _persistent
+
+    ('${}')
+
+    if !$allow_mode_switch
+     replace_str ",","\n\n"
+    fi
+
+    k_value_from_images={t}
+    rm
+   fi
+  else
+   if $negate_after_K_input_diff
+    rm $_persistent
+    negate[tuppers_image_mode_0]
+    store _persistent
+   else
+    width,height={[w,h]}
+    rm $_persistent
+    store temporary_image
+    $width,$height
+
+    if $user_diff||$mode_K_diff
+     if $user_mode_a
+      predefined_K=${arg\ $user_mode_a,960939379918958884971672962127852754715004339660129306651505519271702802395266424689642842174350718121267153782770623355993237280874144307891325963941337723487857735749823926629715517173716995165232890538221612403238855866184013235585136048828693337902491454229288667081096184496091705183454067827731551705405381627380967602565625016981482083418783163849115590225610003652351370343874461848378737238198224849863465033159410054974700593138339226497249461751545728366702369745461014655997933798537483143786841806593422227898388722980000748404719,395237837253173619377196292693949302406153931873024916260538490717335936871532361396117451541392229602948889604348128275446264586897474193776400465275167777832622157773372879463606146128022620285693891540788235229239672405060120203686774511468011972485984983535894919421543461759499096362152894616017344239642743391778941134500105852623176726707340602287941750635663845779675174278129608159631247023276032,1162909606774227786762360554904656873467005634722346243123857684508335800080212296528535403972500597220234608121734983386023291518966099546891430040655179625172067449629161883859511896818291049959507502002794829515164438990867773160767189319641778161093019870270482668056135958042158788515967843798733586173623987894941361961956503217167249393827582112256509171868414221167242597679368110852891933106118102448936895420986905619254557683605421985950220457144259359231632456877367983992190446749365022925067669913265323579719756925062086656,1843812769630219797102194898630589042838024531800431544407803208699762220759288686771851688175304525277287596637929619481851566234761209320517998687008822582390183399326187543197624279014134019615905245154166656477378450656137074612544163896000320136805982694616420881365676363963235184229519627621212049120298076086417612215067181351396556381877005473113076180736051591032787133962681831575450591579944470027127255325865144199772221608835705143631909500064802696725673323645838019575905814384115925441812137010043170716647424}
+      rep_tuppers_self $predefined_K,$negate_after_using_k_input_a
+     else
+      rep_tuppers_self $k_a,$negate_after_using_k_input_a
+     fi
+    fi
+
+    if $K_diff
+     rep_tuppers_self $k_a,$negate_after_using_k_input_a
+    fi
+
+    if $copy_from_stored_K_value
+     rep_tuppers_self $k_value_from_images,$negate_after_using_k_input_a
+    fi
+
+    name tuppers_image_mode_0
+
+    $temporary_image
+    temporary_image,activate_changes=0
+    store _persistent
+   fi
+  fi
+ fi
+else
+ n_imgs={$!}
+ mode_K_a=1
+ negate_after_using_k_input=$pre_negation_a
+
+ if $!>1
+  allow_mode_switch=0
+  reverse
+ fi
+
+ eval "
+  standard_image_size=[106,17];
+  allow_example=1;
+  repeat($n_imgs,img_id,
+   if([w#img_id,h#img_id]!=standard_image_size,
+    allow_example=0;
+    break();
+   );
+  );
+  allow_example;
+  "
+
+ allow_example=${}
+
+ rep_tuppers_self_K $pre_negation_a
+
+ name tuppers_self_image_base
+ store _persistent
+
+ if $allow_mode_switch
+  k_a,k_b,k_value_from_images=${}
+ else
+  ('${}')
+  replace_str ",","\n\n"
+  k_value_from_images={t}
+  rm
+ fi
+
+fi
+
+rm $_persistent
+
+if $mode_K_a
+ remove_named tuppers_image_mode_0
+ if !$allow_mode_switch
+  append y
+ fi
+else
+ remove_named tuppers_self_image_base
+fi
+
+* 255
+
+u "{"$mode_K_a"}_"{$allow_mode_switch*2}\
+"{"$mode_K_a"}"\
+"{"$user_mode_a"}_"{!$mode_K_a?$allow_example*2}\
+"{"$user_mode_a"}"\
+"{"$k_a"}_"{2*(!$mode_K_a&&!$user_mode_a)}\
+"{"$k_a"}"\
+"{"$predefined_K"}_"{(!$mode_K_a&&$user_mode_a)*2}\
+"{"$predefined_K"}"\
+"{0}_"{!$mode_K_a?1+('$k_a'!='$k_value_from_images')}\
+"{"$negate_after_using_k_input_a"}_"{2*!$mode_K_a}\
+"{"$negate_after_using_k_input_a"}"\
+"{"$k_value_from_images"}_"{$mode_K_a?2}\
+"{"$k_value_from_images"}"\
+"{"$pre_negation_a"}_"{$mode_K_a?2}\
+"{"$pre_negation_a"}"\
+"{"$allow_example"}"\
+"{"$allow_mode_switch"}"\
+"{1}"
 ######################
 
 # Local Variables:
