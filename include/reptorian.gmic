@@ -70,71 +70,43 @@ foreach
 
  height={h}
 
+ if $height<2 error inv_dimension_[$>] fi
+
  gt {(im+iM)/2}
  +store. image
  if $1 negate fi
 
  rotate 90
  unroll x
- crop {xM},100%
- numbers_of_binaries={w}
+ crop {xM+1},100%
 
- (1)
+ 1
 
- if i(#0,w#0-1)
-  name[-1] rep_tuppers_self_K_one
- fi
-
- repeat $numbers_of_binaries-1 {
-  1
-
-  eval.. <"begin(carry_over=0;);
-   new_number=carry_over+i*2;
-   da_insert(#-1,0,new_number%10);
-   carry_over=int(new_number/10);
-   end(
-    if(carry_over,da_insert(#-1,0,1););
-    resize(#-1,da_size(#-1),1,1,1,-1);
-   );
-   "
-
-  if i(#0,$<) name[-1] rep_tuppers_self_K_one fi
- }
-
- keep_named rep_tuppers_self_K_one
-
- 100%,{$!},1,1
-
- repeat $!-1 {
-  image[-1] [$>],1~,$>
- }
-
- keep[-1]
-
- 100%,1,1,1 1
-
- f[1] <"begin(
-   const height=h#0;
-   carry_over=0;
+ eval[-2] >"begin(
+   da_push(#-1,1);
   );
-  n=carry_over+sum(crop(#0,x,0,0,0,1,height,1,1,0));
-  carry_over=int(n/10);
-  n%10;
+
+  max_index=da_size(#-1)-1;
+  carry_over=0;
+
+  repeat(da_size(#-1),pos,
+   dec_digit_pos=max_index-pos;
+   new_number=(i[#-1,dec_digit_pos]<<1)+carry_over;
+   carry_over=int(new_number/10);
+   i[#-1,dec_digit_pos]=new_number%10;
+  );
+
+  if(carry_over,da_insert(#-1,0,1););
+  if(i,++i[#-1,da_size(#-1)-1]);
+
   end(
-   if(carry_over,
-    i(#2,0,0,0)=carry_over;
-   );
-  );"
+   resize(#-1,da_size(#-1),1,1,1,-1);
+  );
+  "
 
- remove[0]
+ remove[-2]
 
- if i
-  ('{i}') -. $n0
-  rv[-3,-1]
-  a[-3,-1] x
- fi
-
- fill[0] <"begin(
+ fill <"begin(
    const height=$height;
    carry_over=0;
   );
@@ -143,20 +115,17 @@ foreach
   n%10;
   end(
    if(carry_over,
-    i(#-1,0,0,0,0)=carry_over;
+    set('carry_over',carry_over);
    );
-  );
-  "
-
- if i
-  ('{i}') -. $n0
-  rv[-3,-1]
-  a[-3,-1] x
- fi
-
- keep[0]
+  );"
 
  + $n0
+
+ if $carry_over
+  ('{$carry_over}')
+  reverse
+  append x
+ fi
 
  if $> out.=,{t}
  else out={t}
@@ -1206,7 +1175,7 @@ if $use_shape
 
   cut. 0,1 n. 0,1
 
-  avgc={avg(crop(#-1))}
+  avgc={ia#-1}
 
   if $tile_boundary
    if $tile_boundary==1
@@ -2637,7 +2606,7 @@ fi
 #@cli :
 #@cli : Author: Reptorian.
 +rep_binary_hitomezashi:
-skip "${3=}" #If there is no 3rd argument, then $3 is treated as null. So therefore, 2 arguments.
+skip "${3=}" # If there is no 3rd argument, then $3 is treated as null. So therefore, 2 arguments.
 
 (1,0,0,0,0,0,1,1,1,1,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,1,0,0,1,0,0,1,0,0,0,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,0,0,0,0,0,0,0,0,1,1,1,0,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,0,1,0,1,1,1,0,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1,0,1,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,1) # rules
 
@@ -6826,8 +6795,7 @@ $num_of_imgs,1,1,2,"begin(
  if(abs(min_img_val)>max_img_val
  ,[0,abs_min_img_val]
  ,[max(0,min_img_val),max_img_val]
- );
- ;"
+ );"
 
 diff={ceil(iM-im+1)}
 
@@ -7247,7 +7215,7 @@ fi
 rm.
 #@cli rep_dla : eq. to 'rep_diffusion_limited_aggregation' : (+)
 rep_dla: rep_diffusion_limited_aggregation $*
-#@cli rep_diffusion_limited_aggregation: _attempts>1,_mode,0<=spread_factor<=1,_stem_color={ 0=dark | 1=light },_border,_initial_point_mode={ 0=less_dense | 1=more_dense },_preserve_silhouette={ 0=maskless | 1=mask }
+#@cli rep_diffusion_limited_aggregation: _attempts>1,_mode,0<=_spread_factor<=1,_stem_color={ 0=dark | 1=light },_border,_initial_point_mode={ 0=less_dense | 1=more_dense },_preserve_silhouette={ 0=maskless | 1=mask }
 #@cli : Generate Diffusion Limited Aggregation
 #@cli : (eq. to 'rep_dla').
 #@cli :
@@ -7260,7 +7228,7 @@ rep_dla: rep_diffusion_limited_aggregation $*
 #@cli : '_preserve_silhouette' is only applicable on images with variance.
 #@cli :
 #@cli : Author: Reptorian.
-#@cli : Default values: '_attempts=100','_mode=1','_spread_factor=0','_stem_color=1','_border=0','_initial_point_mode=1','_preserve_silhouette=1'
+#@cli : Default values: '_attempts=100','_mode=0','_spread_factor=0','_stem_color=0','_border=0','_initial_point_mode=0','_preserve_silhouette=1'
 rep_diffusion_limited_aggregation:
 skip ${1=100},${2=0},${3=0},${4=0},${5=0},${6=0},${7=1}
 
