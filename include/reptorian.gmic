@@ -8868,7 +8868,8 @@ um pass2endimage k[-1]
 #@cli : Shuffle Bit Planes according to the order of index specified by user.
 rep_bitplane_shuffle:
 skip ${2=0}
-if !$! error no_imgs fi
+number_of_images={$!}
+if !$number_of_images error no_imgs fi
 
 num_of_ind,direction,all_channels={$#-2},{$1&1},{!$2}
 size_of_map={2^$num_of_ind}
@@ -8882,10 +8883,28 @@ if $order==$whole_numbers return fi
 
 if !$direction order=[${rep_inverse_permutation\ ${3--1}}] fi
 
-use_map={$!==1?whds>$size_of_map:(use_map=sum=0;repeat($!,k,sum+=whds#k;if(sum>$size_of_map,use_map=1;break();););use_map;);}
+eval "
+ const size_of_map=$size_of_map;
+ const nimg=$number_of_images;
+
+ if(nimg==1,
+  use_map=whds>size_of_map;
+ ,
+  use_map=sum=0;
+  repeat(nimg,img_index,
+   sum+=whds#img_index;
+   if(sum>size_of_map,
+    use_map=1;
+    break();
+   );
+  );
+ );
+
+ set('use_map',use_map);
+ "
 
 if $use_map
- $size_of_map,1,1,1,[sum((x>>$whole_numbers&1)<<$order)];
+ $size_of_map,1,1,1,sum((x>>$whole_numbers&1)<<$order);
  if $all_channels
   map[^-1] [-1]
   rm.
