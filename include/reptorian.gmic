@@ -49,7 +49,7 @@
 #-------------------------------
 
 #@cli rep_num2base_float_max: number
-#@cli : Create a image which represent a number in base 16777216.
+#@cli : Create a image which represent a positive integer number in base 16777216. Used for emulating BIGINT process.
 +rep_num2base_float_max:
 eval set('max_num',1<<53)
 user_number,base_float=$1,{1<<24}
@@ -206,6 +206,7 @@ rep_tuppers_self:
 skip ${1=960939379918958884971672962127852754715004339660129306651505519271702802395266424689642842174350718121267153782770623355993237280874144307891325963941337723487857735749823926629715517173716995165232890538221612403238855866184013235585136048828693337902491454229288667081096184496091705183454067827731551705405381627380967602565625016981482083418783163849115590225610003652351370343874461848378737238198224849863465033159410054974700593138339226497249461751545728366702369745461014655997933798537483143786841806593422227898388722980000748404719},${2=1}
 if $!!=1 error n_imgs_inv fi
 if d>1 error imgs_dims_inv fi
+if $1<h error inv_inp fi
 
 fill "y+x*h" mirror. x
 
@@ -223,71 +224,49 @@ fi
 
 remove[-1]
 
-1x2
+1
 
 eval "
  number='$1';
  const divisor=h#0;
  const n_size=size(number);
- const n_0=_'0';
+ const _0=_'0';
+ const _9=_'9';
+
+ if(find(inrange(number,_0,_9,1,1),0,0,1)+1,
+  run('error inv_char_det');
+ );
+
  index=0;
- dividend=number[index]-n_0;
+ dividend=number[index]-_0;
 
  while(dividend<divisor,
-  dividend=dividend*10+(number[++index]-n_0);
+  dividend=dividend*10+(number[++index]-_0);
  );
 
  while(n_size>index,
-  da_push(#-1,int(dividend/divisor)+n_0);
-  dividend=(dividend%divisor)*10+(number[++index]-n_0);
+  da_push(#-1,int(dividend/divisor)+_0);
+  dividend=(dividend%divisor)*10+(number[++index]-_0);
  );
 
- da_push(#-2,(i[#-1,da_size(#-1)-1]-n_0)&1);
- ds=da_size(#-1);
- ds?da_freeze(#-1);
+ da_freeze(#-1);
  "
 
-decimal_number={t}
++rep_num2base_float_max {t} remove[-2]
 
-repeat inf {
- rm. 1
+{24*(w-1)+int(log2(i(#-1,w-1)))+1}
 
- eval "
-  number='"$decimal_number"';
-  const divisor=2;
-  const n_size=size(number);
-  const n_0=_'0';
-  index=0;
-  dividend=number[index]-n_0;
+eval[-2] "
+ point=x*24;
+ digit=i;
+ while(digit,
+  i(#-1,point++)=digit&1;
+  digit>>=1;
+ );
+ "
 
-  while(dividend<divisor,
-   dividend=dividend*10+(number[++index]-n_0);
-  );
-
-  while(n_size>index,
-   da_push(#-1,int(dividend/divisor)+n_0);
-   dividend=(dividend%divisor)*10+(number[++index]-n_0);
-  );
-
-  ds=da_size(#-1);
-
-  if(ds,
-   da_push(#-2,(i[#-1,da_size(#-1)-1]-n_0)&1);
-   ds?da_freeze(#-1);
-  );
-
-  ds;
-  "
-
-  if !${} break fi
-  decimal_number={t}
-}
-
-remove[-1]
-eval da_freeze(#-1)
-
-map[-2] [-1]
-remove[-1]
+map[-3] [-1]
+remove[-2,-1]
 
 if $2 negate fi
 #@cli rep_nearest_ratio: value_a>0,value_b>0,_maximum_proposition_number>0,_output_whether_true_ratio={ 0=False | 1=True }
