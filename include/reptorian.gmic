@@ -48,6 +48,68 @@
 #
 #-------------------------------
 
+#@cli rep_num2base_float_max: number
+#@cli : Create a image which represent a positive integer number in base 16777216. Used for emulating BIGINT process.
++rep_num2base_float_max:
+eval set('max_num',1<<53)
+user_number,base_float=$1,{1<<24}
+
+('$1') fill[-1] inrange(i,_'0',_'9',1,1) if !im error inv_char_det fi rm.
+
+1
+
+if $user_number>$max_num
+
+ do
+  eval "
+   const _0=_'0';
+   dividend='"$user_number"';
+   res=0;
+   repeat(size(dividend),p,
+    res=(res*10+(dividend[p]-_0))%$base_float;
+   );
+   da_push(#-1,res);
+   "
+
+  1
+
+  eval "
+   number='"$user_number"';
+   const divisor=$base_float;
+   const n_size=size(number);
+   const _0=_'0';
+   index=0;
+   dividend=number[index]-_0;
+
+   while(dividend<divisor,
+    dividend=dividend*10+(number[++index]-_0);
+   );
+
+   while(n_size>index,
+    da_push(#-1,int(dividend/divisor)+_0);
+    dividend=(dividend%divisor)*10+(number[++index]-_0);
+   );
+
+   da_freeze(#-1);
+   "
+
+  user_number={t}
+  remove[-1]
+
+ while $user_number>$base_float
+
+fi
+
+eval "
+ const base_float=$base_float;
+ user_number=$user_number;
+
+ do(
+  da_push(#-1,user_number%base_float);
+  user_number=int(user_number/base_float);
+ ,user_number);
+
+ resize(#-1,da_size(#-1),1,1,1,-1);"
 #@cli rep_tuppers_self_K: apply_pre_negation={ 0=false | 1=true }
 #@cli : Generate K values from images. Also, threshold image for users to check what it would look like.
 #@cli : Default values: 'apply_pre_negation=1'
@@ -144,6 +206,7 @@ rep_tuppers_self:
 skip ${1=960939379918958884971672962127852754715004339660129306651505519271702802395266424689642842174350718121267153782770623355993237280874144307891325963941337723487857735749823926629715517173716995165232890538221612403238855866184013235585136048828693337902491454229288667081096184496091705183454067827731551705405381627380967602565625016981482083418783163849115590225610003652351370343874461848378737238198224849863465033159410054974700593138339226497249461751545728366702369745461014655997933798537483143786841806593422227898388722980000748404719},${2=1}
 if $!!=1 error n_imgs_inv fi
 if d>1 error imgs_dims_inv fi
+if $1<h error inv_inp fi
 
 fill "y+x*h" mirror. x
 
@@ -161,71 +224,49 @@ fi
 
 remove[-1]
 
-1x2
+1
 
 eval "
  number='$1';
  const divisor=h#0;
  const n_size=size(number);
- const n_0=_'0';
+ const _0=_'0';
+ const _9=_'9';
+
+ if(find(inrange(number,_0,_9,1,1),0,0,1)+1,
+  run('error inv_char_det');
+ );
+
  index=0;
- dividend=number[index]-n_0;
+ dividend=number[index]-_0;
 
  while(dividend<divisor,
-  dividend=dividend*10+(number[++index]-n_0);
+  dividend=dividend*10+(number[++index]-_0);
  );
 
  while(n_size>index,
-  da_push(#-1,int(dividend/divisor)+n_0);
-  dividend=(dividend%divisor)*10+(number[++index]-n_0);
+  da_push(#-1,int(dividend/divisor)+_0);
+  dividend=(dividend%divisor)*10+(number[++index]-_0);
  );
 
- da_push(#-2,(i[#-1,da_size(#-1)-1]-n_0)&1);
- ds=da_size(#-1);
- ds?da_freeze(#-1);
+ da_freeze(#-1);
  "
 
-decimal_number={t}
++rep_num2base_float_max {t} remove[-2]
 
-repeat inf {
- rm. 1
+{24*(w-1)+int(log2(i(#-1,w-1)))+1}
 
- eval "
-  number='"$decimal_number"';
-  const divisor=2;
-  const n_size=size(number);
-  const n_0=_'0';
-  index=0;
-  dividend=number[index]-n_0;
+eval[-2] "
+ point=x*24;
+ digit=i;
+ while(digit,
+  i(#-1,point++)=digit&1;
+  digit>>=1;
+ );
+ "
 
-  while(dividend<divisor,
-   dividend=dividend*10+(number[++index]-n_0);
-  );
-
-  while(n_size>index,
-   da_push(#-1,int(dividend/divisor)+n_0);
-   dividend=(dividend%divisor)*10+(number[++index]-n_0);
-  );
-
-  ds=da_size(#-1);
-
-  if(ds,
-   da_push(#-2,(i[#-1,da_size(#-1)-1]-n_0)&1);
-   ds?da_freeze(#-1);
-  );
-
-  ds;
-  "
-
-  if !${} break fi
-  decimal_number={t}
-}
-
-remove[-1]
-eval da_freeze(#-1)
-
-map[-2] [-1]
-remove[-1]
+map[-3] [-1]
+remove[-2,-1]
 
 if $2 negate fi
 #@cli rep_nearest_ratio: value_a>0,value_b>0,_maximum_proposition_number>0,_output_whether_true_ratio={ 0=False | 1=True }
@@ -617,7 +658,7 @@ _vibrance_factor_ych={cut($1,-1,1)}
 if !$_vibrance_factor_ych return fi
 
 if $_vibrance_factor_ych>0
- m "vibrance_ych_adj :
+ command "vibrance_ych_adj :
   f \"begin(
     const vibrance_factor=$_vibrance_factor_ych;
    );
@@ -628,7 +669,7 @@ if $_vibrance_factor_ych>0
  "
 else
  _abs_vibrance_factor_adj={1-abs($_vibrance_factor_ych)}
- m "vibrance_ych_adj : * $_abs_vibrance_factor_adj"
+ command "vibrance_ych_adj : * $_abs_vibrance_factor_adj"
 fi
 
 foreach {
@@ -661,7 +702,7 @@ foreach {
  rm.
 }
 
-um vibrance_ych_adj
+uncommand vibrance_ych_adj
 #@cli rep_import_pdn_txt: file_a...file_z...,_discard_alpha={ 0=keep | 1=discard_alpha | 2=auto }
 #@cli : Import PDN Palette (.txt)
 #@cli : There can be as many files. This import file relative to your current directory.
@@ -957,7 +998,7 @@ skip ${3=2},${4=2},${5=1},${6=1},${7=0},${8=0},${9=},${10=0},${11=1}
 
 pts,num_of_repeats,muldiv_coeff_a,muldiv_coeff_b,muldiv_oper_a,muldiv_oper_b,use_old_x,sublevel,seed,_auto_norm,sym_mode=${1-4},{$5%2},{$6%2},{$7%2},{abs($8)+1},$9,{int(abs($10))},{($11%2)*3}
 
-m "rep_sercirc_autonorm: +erode. $_auto_norm +dilate.. $_auto_norm cut[-3] {iM#-2},{im#-1} rm[-2,-1]"
+command "rep_sercirc_autonorm: +erode. $_auto_norm +dilate.. $_auto_norm cut[-3] {iM#-2},{im#-1} rm[-2,-1]"
 
 pts*=$sublevel
 
@@ -2230,7 +2271,7 @@ $=argpos
 pixel_size,colors_a,colors_b,use_remove_image={max(int($3)*100,100)}%,${4-5},1
 use_rescale={$pixel_size!=1}
 
-m "generate_border :
+command "generate_border :
  if narg($""*)>1 out_color=[$""*]
  else out_color=$""1
  fi
@@ -2300,7 +2341,7 @@ m "generate_border :
 # );
    \""
 
-m "generate_border_depth :
+command "generate_border_depth :
  if narg($""*)>1 out_color=[$""*]
  else out_color=$""1
  fi
@@ -2479,7 +2520,7 @@ fi
 
 if $use_remove_image rm.. fi
 
-um generate_border,generate_border_depth
+uncommand generate_border,generate_border_depth
 +_rep_colorize_binary_hitomezashi:
 skip "${1=}","${2=}","${3=0}","${4=0}","${5=}","${6=}"
 
@@ -2784,17 +2825,17 @@ skip ${2=45},${3=.5},${4=2},${5=1},${6=1},${7=128},${8=0}
 _rep_er_radius,_rep_er_angle,_rep_er_sigma,_rep_er_scale,relief_mode,_use_graymode,_rep_er_bias,max_alp_ind=${1-5},{!$6},$7,{$8?5:4}
 
 if $_use_graymode
- m "process_alpha_case : split_opacity process_er_filter.. a c"
- m "end_relief : +.. . rm."
+ command "process_alpha_case : split_opacity process_er_filter.. a c"
+ command "end_relief : +.. . rm."
 else
- m "process_alpha_case : sh 0,{s-2} process_er_filter. rm."
- m "end_relief : add"
+ command "process_alpha_case : sh 0,{s-2} process_er_filter. rm."
+ command "end_relief : add"
 fi
 
 if $relief_mode
- m "process_er_filter : +_rep_steerable_gaussian_convolve $_rep_er_radius,$_rep_er_angle,$_rep_er_sigma,$_rep_er_scale,$_use_graymode end_relief"
+ command "process_er_filter : +_rep_steerable_gaussian_convolve $_rep_er_radius,$_rep_er_angle,$_rep_er_sigma,$_rep_er_scale,$_use_graymode end_relief"
 else
- m "process_er_filter : +_rep_steerable_gaussian_convolve $_rep_er_radius,$_rep_er_angle,$_rep_er_sigma,$_rep_er_scale,$_use_graymode +. $_rep_er_bias k."
+ command "process_er_filter : +_rep_steerable_gaussian_convolve $_rep_er_radius,$_rep_er_angle,$_rep_er_sigma,$_rep_er_scale,$_use_graymode +. $_rep_er_bias k."
 fi
 
 foreach {
@@ -2803,7 +2844,7 @@ foreach {
  fi
 }
 
-um process_alpha_case,process_er_filter,end_relief
+uncommand process_alpha_case,process_er_filter,end_relief
 +_rep_steerable_gaussian_convolve:
 
 sg,theta,sigma,M={max(5,int(abs($1)))},{deg2rad($2)},$3,{3*$3}
@@ -3140,7 +3181,7 @@ if $animation_mode
  rescale_back={$6>0}
 
  __sub={abs($6)+1}
- m "generate_three_coupled: +_rep_three_coupled_oscillators_animation $1,$__k_a_1,$__k_b_1,$__k_a_2,$__k_b_2,$__sub,${7-14}"
+ command "generate_three_coupled: +_rep_three_coupled_oscillators_animation $1,$__k_a_1,$__k_b_1,$__k_a_2,$__k_b_2,$__sub,${7-14}"
 
 else
  if narg($2) __k_a=$2
@@ -3154,7 +3195,7 @@ else
  rescale_back={$4>0}
  __sub={abs($4)+1}
 
- m "generate_three_coupled: +_rep_three_coupled_oscillators_static_out $1,$__k_a,$__k_b,$__sub,${5-8}"
+ command "generate_three_coupled: +_rep_three_coupled_oscillators_static_out $1,$__k_a,$__k_b,$__sub,${5-8}"
 
 fi
 
@@ -3168,7 +3209,7 @@ foreach {
 
 }
 
-um generate_three_coupled
+uncommand generate_three_coupled
 +_rep_three_coupled_oscillators_animation:
 check "$13!=0&&$14!=0"
 
@@ -5109,12 +5150,12 @@ foreach
  if s==4 sh 0,2 fi
 
  if s<3
-  m "rainbowify : {w},{h},100%,{s==2?4:3},\"$""1\""
-  m "end_out : k."
+  command "rainbowify : {w},{h},100%,{s==2?4:3},\"$""1\""
+  command "end_out : k."
   calc_v="i(#0,x,y,z,0)"
  else
-  m "rainbowify : fill. \"$""1\""
-  m "end_out : k[0]"
+  command "rainbowify : fill. \"$""1\""
+  command "end_out : k[0]"
   calc_v=avg(I)
  fi
 
@@ -5155,7 +5196,7 @@ foreach
 
  end_out
 
- um rainbowify,end_out
+ uncommand rainbowify,end_out
 
 done
 #@cli rep_w_rgb82gray: eq. to 'rep_weighted_rgb82gray' : (+)
@@ -5185,60 +5226,61 @@ foreach
  fi
 
  if s==1
-  m "calc_gray_image : fill. \"$""1\""
+  command "calc_gray_image : fill. \"$""1\""
   single_channel_mode=1
  else
-  m "calc_gray_image : {w},{h},100%,1,\"$""1\""
+  command "calc_gray_image : {w},{h},100%,1,\"$""1\""
  fi
 
- calc_gray_image "begin(
-  const red_weight_init=$1;
-  const green_weight_init=$2;
-  const blue_weight_init=$3;
-  const total_weight=red_weight_init+green_weight_init+blue_weight_init;
-  if($4,
-   const red_weight=red_weight_init/total_weight;
-   const green_weight=green_weight_init/total_weight;
-   const blue_weight=blue_weight_init/total_weight;
-  ,
-   const red_weight=red_weight_init;
-   const green_weight=green_weight_init;
-   const blue_weight=blue_weight_init;
-  );
-  rescale_color=[red_weight,green_weight,blue_weight];
-  (!$5&&!$6)?(
-   calc_gray()=sum(I#-1*rescale_color);
-  ):
-  $5&&$6?(
-   calc_gray()=(
-    col_ref=I#-1;
-    start_col_ref=col_ref*rescale_color;
-    minval=cut(lerp(sum(start_col_ref),min(col_ref),$5),0,255);
-    maxval=cut(lerp(sum(start_col_ref),max(col_ref),$6),0,255);
-    balval=lerp(minval,maxval,$7);
+ calc_gray_image "
+  begin(
+   const red_weight_init=$1;
+   const green_weight_init=$2;
+   const blue_weight_init=$3;
+   const total_weight=red_weight_init+green_weight_init+blue_weight_init;
+   if($4,
+    const red_weight=red_weight_init/total_weight;
+    const green_weight=green_weight_init/total_weight;
+    const blue_weight=blue_weight_init/total_weight;
+   ,
+    const red_weight=red_weight_init;
+    const green_weight=green_weight_init;
+    const blue_weight=blue_weight_init;
    );
-  ):(
-   $6?(
+   rescale_color=[red_weight,green_weight,blue_weight];
+   (!$5&&!$6)?(
+    calc_gray()=sum(I#-1*rescale_color);
+   ):
+   $5&&$6?(
     calc_gray()=(
      col_ref=I#-1;
      start_col_ref=col_ref*rescale_color;
+     minval=cut(lerp(sum(start_col_ref),min(col_ref),$5),0,255);
      maxval=cut(lerp(sum(start_col_ref),max(col_ref),$6),0,255);
+     balval=lerp(minval,maxval,$7);
     );
    ):(
-    calc_gray()=(
-     col_ref=I#-1;
-     start_col_ref=I#-1*rescale_color;
-     minval=cut(lerp(sum(start_col_ref),min(col_ref),$5),0,255);
+    $6?(
+     calc_gray()=(
+      col_ref=I#-1;
+      start_col_ref=col_ref*rescale_color;
+      maxval=cut(lerp(sum(start_col_ref),max(col_ref),$6),0,255);
+     );
+    ):(
+     calc_gray()=(
+      col_ref=I#-1;
+      start_col_ref=I#-1*rescale_color;
+      minval=cut(lerp(sum(start_col_ref),min(col_ref),$5),0,255);
+     );
     );
    );
+   abs($9)?(
+    calc_gray_output()=cut(calc_gray(),0,255);
+   ):(
+    calc_gray_output()=cut(calc_gray()+$8,0,255);
+   );
   );
-  abs($9)?(
-   calc_gray_output()=cut(calc_gray(),0,255);
-  ):(
-   calc_gray_output()=cut(calc_gray()+$8,0,255);
-  );
- );
- calc_gray_output();"
+  calc_gray_output();"
 
  if abs($9)
   if $9>0
@@ -5263,8 +5305,42 @@ foreach
 
  use_merge_back=0
 
- um calc_gray_image
+ uncommand calc_gray_image
 done
+#@cli rep_int8args2hexargs: num_of_hexadecimal_numbers_per_values,value_1,value_2,....
+#@cli : Return the hexadecimal representations of numberical arguments.
+#@cli :
+#@cli : Author: Reptorian.
+#@cli : $ echo ${rep_int8args2hexargs\ 3,250,100,220,255,85,110}
+#@cli : $ echo ${rep_int8args2hexargs\ 2,250,100,220,255,85,110}
+#@cli : $ echo ${rep_int8args2hexargs\ 1,250,100,220,255,85,110}
+rep_int8args2hexargs:
+check "$#>2&&isint($1)&&$1>0"
+number_of_int_args={$#-1}
+
+if $number_of_int_args%$1 error !(narg(\$\{2--1\})%"$"1)==F fi
+
+{($number_of_int_args<<1)+int($number_of_int_args/$1)-1},1,1,1,"begin(
+  const color_size=$1;
+  const separator_position=color_size<<1;
+  const section_size=separator_position+1;
+  const comma=_',';
+  const _0=_'0';
+  const char_ref_val=_'a'-10;
+  vints=[${2--1}];
+  if(min(vints)<0||max(vints)>0xff,run('error inval_num'););
+  to_char(v)=if(inrange(v,0,9,1,1),_0+v,char_ref_val+v);
+ );
+ color_section=int(x/section_size);
+ val_pos=x%section_size;
+ val_pos!=separator_position?(
+  num_arg_pos=(val_pos>>1)+color_section*color_size;
+  decimal_number=vints[num_arg_pos];
+  val_pos&1?to_char(decimal_number%16):to_char(decimal_number>>4);
+ ):comma;
+ "
+
+status {t} rm.
 #@cli rep_hex2int8: hexadecimal_string
 #@cli : Convert a hexadecimal argument into 8-bit representation, and then return the converted value.
 #@cli :
@@ -5279,7 +5355,7 @@ if (w&1) error is_even(str_size)==F fi
 {w>>1},1,1,1,"begin(
   const _0=_'0';
   const _9=_'9';
-  const char_ref_val=87;
+  const char_ref_val=_'a'-10;
   from_char(v)=if(inrange(v,_0,_9,1,1),v-_0,v-char_ref_val);
  );
  p=x*2;
@@ -5293,7 +5369,7 @@ u {crop(#-1)} rm[-2,-1]
 rep_int82hex:
 {narg($*)<<1},1,1,1,"begin(
   const _0=_'0';
-  const char_ref_val=87;
+  const char_ref_val=_'a'-10;
   vchar=[$*];
   if(min(vchar)<0||max(vchar)>255,run('error invalid_number'););
   to_char(v)=if(inrange(v,0,9,1,1),_0+v,char_ref_val+v);
@@ -5491,11 +5567,11 @@ if narg($9)||narg($10)
    use_double_u=1
    if narg($11)&&narg($12)
     if narg($13)
-     if ($13%3)==2 m "cs_out: lch82rgb"
-     elif ($13%3)==1 m "cs_out: lab82rgb"
-     else m "cs_out: hsl82rgb"
+     if ($13%3)==2 command "cs_out: lch82rgb"
+     elif ($13%3)==1 command "cs_out: lab82rgb"
+     else command "cs_out: hsl82rgb"
      fi
-    else m "cs_out: hsl82rgb"
+    else command "cs_out: hsl82rgb"
     fi
     $11,1,1,3,u(0,255)
     $12,1,1,3,u(0,255)
@@ -5509,11 +5585,11 @@ if narg($9)||narg($10)
    if ('$9'=='u')||('$10'=='u')
     mode=3
     if narg($11)
-     if ($11%3)==2 m "cs_out: lch82rgb"
-     elif ($11%3)==1 m "cs_out: lab82rgb"
-     else m "cs_out: hsl82rgb"
+     if ($11%3)==2 command "cs_out: lch82rgb"
+     elif ($11%3)==1 command "cs_out: lab82rgb"
+     else command "cs_out: hsl82rgb"
      fi
-    else m "cs_out: hsl82rgb"
+    else command "cs_out: hsl82rgb"
     fi
     if narg($12) srand $12 fi
     if '$9'=='u'
@@ -5662,7 +5738,7 @@ k.
 
 s z r $ow,$oh,1,100%,6
 
-um cs_out
+uncommand cs_out
 #@cli rep_mlfrac: eq. to 'rep_markus_lyapunov_fractal : (+)
 rep_mlfrac: rep_markus_lyapunov_fractal $*
 #@cli rep_markus_lyapunov_fractal: abc_string,abc_string_repeats,_sublevel>=0,0%<_view_size[%]<=100%,0%<=_pos_x[%]<=100%,0%<=_pos_y[%]<=100%,0%<=_pos_z[%]<=100%,additional_arguments(see below)
@@ -5868,11 +5944,11 @@ if narg($8)||narg($9)
 
    if narg($10)&&narg($11)
     if narg($12)
-     if ($12%3)==2 m "cs_out: lch82rgb"
-     elif ($12%3)==1 m "cs_out: lab82rgb"
-     else m "cs_out: hsl82rgb"
+     if ($12%3)==2 command "cs_out: lch82rgb"
+     elif ($12%3)==1 command "cs_out: lab82rgb"
+     else command "cs_out: hsl82rgb"
      fi
-    else m "cs_out: hsl82rgb"
+    else command "cs_out: hsl82rgb"
     fi
 
     $10,1,1,3,u(0,255)
@@ -5891,11 +5967,11 @@ if narg($8)||narg($9)
     mode=3
 
     if narg($10)
-     if ($10%3)==2 m "cs_out: lch82rgb"
-     elif ($10%3)==1 m "cs_out: lab82rgb"
-     else m "cs_out: hsl82rgb"
+     if ($10%3)==2 command "cs_out: lch82rgb"
+     elif ($10%3)==1 command "cs_out: lab82rgb"
+     else command "cs_out: hsl82rgb"
      fi
-    else m "cs_out: hsl82rgb"
+    else command "cs_out: hsl82rgb"
     fi
 
     if narg($11) srand $11 fi
@@ -6080,7 +6156,7 @@ foreach
 
 done
 
-um cs_out
+uncommand cs_out
 
 u {$include_c+1}
 #@cli rep_randgradbar : eq. to 'rep_random_gradient_bars' : (+)
@@ -7235,21 +7311,21 @@ skip ${1=100},${2=0},${3=0},${4=0},${5=0},${6=0},${7=1}
 maximum_iterations,pixel_detection_mode,spread_factor,stem_color,border_size,initial_coordinates_map_mode,preserve_silhouette_mode={[abs($1),int($2)%4,cut(abs($3),0,1),!$4,round(abs($5)),$6?1,$7?1]}
 inv_stem_color,use_altern_text,n_threads={[!$stem_color,$pixel_detection_mode==3]},$_cpus
 
-m "dla_target_1s:
+command "dla_target_1s:
    ge {avg(iM,im)}
   "
-m "dla_target_2s:
+command "dla_target_2s:
     normalize 0,1
     split[-1] c *
     ge {avg(iM,im)}
   "
-m "dla_target_3s:
+command "dla_target_3s:
     normalize 0,1
     split c
     add / 3
     ge {avg(iM,im)}
   "
-m "dla_target_4s:
+command "dla_target_4s:
     normalize 0,1
     ts={s-1}
     split c
@@ -7257,14 +7333,14 @@ m "dla_target_4s:
     /[-1] $ts *
     ge {avg(iM,im)}
   "
-m "dla_target:
+command "dla_target:
     if s==1   dla_target_1s
     elif s==2 dla_target_2s
     elif s==3 dla_target_3s
     else      dla_target_4s
     fi
   "
-m "dla_check_variance:
+command "dla_check_variance:
     tv=0
 
     repeat s {
@@ -7279,7 +7355,7 @@ m "dla_check_variance:
 
     status {$tv?1:0}
   "
-m "dla_clear_image:
+command "dla_clear_image:
    {w#0},{h#0},1,1,"$stem_color"
    rv[-1,0]
    rm.
@@ -7518,7 +7594,7 @@ foreach
 
 done
 
-um dla_target,dla_target_1s,dla_target_2s,dla_target_3s,dla_target_4s,dla_check_variance,dla_clear_image
+uncommand dla_target,dla_target_1s,dla_target_2s,dla_target_3s,dla_target_4s,dla_check_variance,dla_clear_image
 +dla_create_coordinate_map:
 if $1
  row_a={ceil(h/2)}
@@ -7554,13 +7630,13 @@ if $2<3 error \$\2>2==F fi
 start_ang={$3}
 angs_per_dups={360/$2}
 
-m "average_output: ti=$! add / $ti"
+command "average_output: ti=$! add / $ti"
 
-if $5==-1 m "output_splinter : min"
-elif $5<0&&$5>-1 m "output_splinter : +average_output +min[^-1] f. lerp(i#-2,i,abs($5)) k."
-elif $5==0 m "output_splinter : average_output"
-elif $5>0&&$5<1 m "output_splinter : +average_output +max[^-1] f. lerp(i#-2,i,$5) k."
-elif $5==1 m "output_splinter : max"
+if $5==-1 command "output_splinter : min"
+elif $5<0&&$5>-1 command "output_splinter : +average_output +min[^-1] f. lerp(i#-2,i,abs($5)) k."
+elif $5==0 command "output_splinter : average_output"
+elif $5>0&&$5<1 command "output_splinter : +average_output +max[^-1] f. lerp(i#-2,i,$5) k."
+elif $5==1 command "output_splinter : max"
 else error (-1<=\$\6<=1)=F
 fi
 
@@ -7589,7 +7665,7 @@ foreach {
  output_splinter
 
 }
-um output_splinter
+uncommand output_splinter
 #@cli rep_splinter_blur_convolve_map: _length,_thickness,_angle,_contrast,_bisided={ 0=one-line | two-line }
 #@cli : Create a convolve map for directional blur. This enables one to create a convolve map for one-direction motion blur.
 #@cli : Default values: '_length=10%','_thickness=5%','_angle=0','_bisided=1'
@@ -8697,7 +8773,7 @@ display_overlay_image=1
 util_insertion=0
 __ci=1
 
-m "pass2endimage : pass[{$__ci}] 0 shift. $""1,$""2 blend alpha"
+command "pass2endimage : pass[{$__ci}] 0 shift. $""1,$""2 blend alpha"
 
 paint_mode=0
 insert_duplicate_start=1
@@ -8863,7 +8939,7 @@ do
  wait
 while {*}" && "!{*,ESC}
 
-um pass2endimage k[-1]
+uncommand pass2endimage k[-1]
 #@cli rep_bitplane_shuffle: direction={ 0=backward | 1=forward },color_channel_only={ 0=all_channels | 1=color_channel_only },index_0...index_inf
 #@cli : Shuffle Bit Planes according to the order of index specified by user.
 rep_bitplane_shuffle:
@@ -8998,7 +9074,7 @@ if $2==0||$2==1
  dimensions_info=[{expr('p=int(x/3);arg(x%3+1,w#p,h#p,d#p);',$image_count);}]
 fi
 
-m "apply_filter:$1"
+command "apply_filter:$1"
 
 if abs($2)>=0&&abs($2)<=2
  foreach {
@@ -9142,20 +9218,20 @@ if narg($8)||narg($9)||narg($10)
  if narg($8) __r_col={min(abs($8),255)} else __r_col=0 fi
  if narg($9) __g_col={min(abs($9),255)} else __g_col=0 fi
  if narg($10) __b_col={min(abs($10),255)} else __b_col=0 fi
- m "xalp : drgba $__r_col,$__g_col,$__b_col"
+ command "xalp : drgba $__r_col,$__g_col,$__b_col"
 else
- m "xalp : drgba"
+ command "xalp : drgba"
 fi
 
-m "xalpa: xalp to_a"
+command "xalpa: xalp to_a"
 
-m "out2display : skip ${""1=},${""2=},${""3=},${""4=1},${""5=1},${""6=},${""7=},${""8=},${""9=},${""10=} if narg($""1) if $""1 $__bg rv blend alpha fi fi xalp if narg($""6) if narg($""2)&&narg($""3)&&narg($""4)&&narg($""5) {$""4},{$""5},1,{s#0},i(#-1,$""2+x,$""3+y) f. begin(ww=w-1;hh=h-1;);(x<(2+narg($""7))||x>ww-2)||(y<(2+narg($""7))||y>hh-2)?(xor($""6,i)>128?0:255):i j[0] [-1],$""2,$""3 rm. if narg($""8)&&narg($""9)&&narg($""10) if $""8==0||$""8>2 {$""4},{$""5},1,{s#0},i(#0,$__nw+($__min_tile*$""9)-$""2+x-$""4,$""3+y) f. begin(ww=w-1;hh=h-1;);(x<(2+narg($""7))||x>ww-2)||(y<(2+narg($""7))||y>hh-2)?(xor($""6,i)>128?0:255):i j[0] [-1],{$__nw+($__min_tile*$""9)-$""2-$""4},$""3 rm. fi if $""8==1||$""8>2 {$""4},{$""5},1,{s#0},i(#0,$""2+x,$__nh+($__min_tile*$""10)-$""3+y-$""5) f. begin(ww=w-1;hh=h-1;);(x<(2+narg($""7))||x>ww-2)||(y<(2+narg($""7))||y>hh-2)?(xor($""6,i)>128?0:255):i j[0] [-1],$""2,{$__nh+($__min_tile*$""10)-$""3-$""5} rm. fi if $""8==2||$""8>2 {$""4},{$""5},1,{s#0},i(#0,$__nw+($__min_tile*$""9)-$""2+x-$""4,$__nh+($__min_tile*$""10)-$""3+y-$""5) f. begin(ww=w-1;hh=h-1;);(x<(2+narg($""7))||x>ww-2)||(y<(2+narg($""7))||y>hh-2)?(xor($""6,i)>128?0:255):i j[0] [-1],{$__nw+($__min_tile*$""9)-$""2-$""4},{$__nh+($__min_tile*$""10)-$""3-$""5} rm. fi fi fi fi if narg($""7) f[0] begin(ww=w-1;hh=h-1;);(x%$__min_tile==0||y%$__min_tile==0)||(x==ww||y==hh)?$""7:i fi"
+command "out2display : skip ${""1=},${""2=},${""3=},${""4=1},${""5=1},${""6=},${""7=},${""8=},${""9=},${""10=} if narg($""1) if $""1 $__bg rv blend alpha fi fi xalp if narg($""6) if narg($""2)&&narg($""3)&&narg($""4)&&narg($""5) {$""4},{$""5},1,{s#0},i(#-1,$""2+x,$""3+y) f. begin(ww=w-1;hh=h-1;);(x<(2+narg($""7))||x>ww-2)||(y<(2+narg($""7))||y>hh-2)?(xor($""6,i)>128?0:255):i j[0] [-1],$""2,$""3 rm. if narg($""8)&&narg($""9)&&narg($""10) if $""8==0||$""8>2 {$""4},{$""5},1,{s#0},i(#0,$__nw+($__min_tile*$""9)-$""2+x-$""4,$""3+y) f. begin(ww=w-1;hh=h-1;);(x<(2+narg($""7))||x>ww-2)||(y<(2+narg($""7))||y>hh-2)?(xor($""6,i)>128?0:255):i j[0] [-1],{$__nw+($__min_tile*$""9)-$""2-$""4},$""3 rm. fi if $""8==1||$""8>2 {$""4},{$""5},1,{s#0},i(#0,$""2+x,$__nh+($__min_tile*$""10)-$""3+y-$""5) f. begin(ww=w-1;hh=h-1;);(x<(2+narg($""7))||x>ww-2)||(y<(2+narg($""7))||y>hh-2)?(xor($""6,i)>128?0:255):i j[0] [-1],$""2,{$__nh+($__min_tile*$""10)-$""3-$""5} rm. fi if $""8==2||$""8>2 {$""4},{$""5},1,{s#0},i(#0,$__nw+($__min_tile*$""9)-$""2+x-$""4,$__nh+($__min_tile*$""10)-$""3+y-$""5) f. begin(ww=w-1;hh=h-1;);(x<(2+narg($""7))||x>ww-2)||(y<(2+narg($""7))||y>hh-2)?(xor($""6,i)>128?0:255):i j[0] [-1],{$__nw+($__min_tile*$""9)-$""2-$""4},{$__nh+($__min_tile*$""10)-$""3-$""5} rm. fi fi fi fi if narg($""7) f[0] begin(ww=w-1;hh=h-1;);(x%$__min_tile==0||y%$__min_tile==0)||(x==ww||y==hh)?$""7:i fi"
 
-m "pass2tile : skip ${""4=2} pass$""1 $""4 f[0] i(#-1,$""2+x,$""3+y) rm."
+command "pass2tile : skip ${""4=2} pass$""1 $""4 f[0] i(#-1,$""2+x,$""3+y) rm."
 
-m "tile2canvas : skip ${""4=0} pass$""1 0 +f. i(#0,$""2+x,$""3+y) if !$""4 rv[-2,-1] fi blend[-2,-1] alpha j[0] [-1],$""2,$""3 rm."
+command "tile2canvas : skip ${""4=0} pass$""1 0 +f. i(#0,$""2+x,$""3+y) if !$""4 rv[-2,-1] fi blend[-2,-1] alpha j[0] [-1],$""2,$""3 rm."
 
-m "tile2canvas_r : +f. 0 j[0] [-1],$""1,$""2 rm. tile2canvas[0] [-1],$""1,$""2,$""3"
+command "tile2canvas_r : +f. 0 j[0] [-1],$""1,$""2 rm. tile2canvas[0] [-1],$""1,$""2,$""3"
 
 if $!==1
     ttw={ceil(w#0/$__min_tile)}
@@ -9191,25 +9267,25 @@ else
     error "$!==1=F"
 fi
 
-m "tile2canvas_sym : pass$""1 0 +f. i(#0,$""2+x,$""3+y) if $""8==0||$""8==3 [1] if $""7 mirror. x fi +f. i(#0,$__nw+($__min_tile*$""9)-$""4-$""2+x,$""3+y) fi if $""8==1||$""8==3 [1] if $""7 mirror. y fi +f. i(#0,$""2+x,$__nh+($__min_tile*$""10)-$""5-$""3+y) fi if $""8==2||$""8==3 [1] if $""7 rotate. 180 fi +f. i(#0,$__nw+($__min_tile*$""9)-$""4-$""2+x,$__nh+($__min_tile*$""10)-$""5-$""3+y) fi if $""8==3 if !$""6 rv[-8,-7] rv[-6,-5] fi blend[-8,-7] alpha blend[-6,-5] alpha fi if !$""6 rv[-4,-3] rv[-2,-1] fi blend[-4,-3] alpha blend[-2,-1] alpha if $""8==3 j[0] [-4],$""2,$""3 j[0] [-3],{$__nw+($__min_tile*$""9)-$""4-$""2},$""3 j[0] [-2],$""2,{$__nh+($__min_tile*$""10)-$""5-$""3} j[0] [-1],{$__nw+($__min_tile*$""9)-$""4-$""2},{$__nh+($__min_tile*$""10)-$""5-$""3} k[0] else j[0] [-2],$""2,$""3 if $""8==0 j[0] [-1],{$__nw+($__min_tile*$""9)-$""4-$""2},$""3 elif $""8==1 j[0] [-1],$""2,{$__nh+($__min_tile*$""10)-$""5-$""3} elif $""8==2 j[0] [-1],{$__nw+($__min_tile*$""9)-$""4-$""2},{$__nh+($__min_tile*$""10)-$""5-$""3} fi rm[-2,-1] fi"
+command "tile2canvas_sym : pass$""1 0 +f. i(#0,$""2+x,$""3+y) if $""8==0||$""8==3 [1] if $""7 mirror. x fi +f. i(#0,$__nw+($__min_tile*$""9)-$""4-$""2+x,$""3+y) fi if $""8==1||$""8==3 [1] if $""7 mirror. y fi +f. i(#0,$""2+x,$__nh+($__min_tile*$""10)-$""5-$""3+y) fi if $""8==2||$""8==3 [1] if $""7 rotate. 180 fi +f. i(#0,$__nw+($__min_tile*$""9)-$""4-$""2+x,$__nh+($__min_tile*$""10)-$""5-$""3+y) fi if $""8==3 if !$""6 rv[-8,-7] rv[-6,-5] fi blend[-8,-7] alpha blend[-6,-5] alpha fi if !$""6 rv[-4,-3] rv[-2,-1] fi blend[-4,-3] alpha blend[-2,-1] alpha if $""8==3 j[0] [-4],$""2,$""3 j[0] [-3],{$__nw+($__min_tile*$""9)-$""4-$""2},$""3 j[0] [-2],$""2,{$__nh+($__min_tile*$""10)-$""5-$""3} j[0] [-1],{$__nw+($__min_tile*$""9)-$""4-$""2},{$__nh+($__min_tile*$""10)-$""5-$""3} k[0] else j[0] [-2],$""2,$""3 if $""8==0 j[0] [-1],{$__nw+($__min_tile*$""9)-$""4-$""2},$""3 elif $""8==1 j[0] [-1],$""2,{$__nh+($__min_tile*$""10)-$""5-$""3} elif $""8==2 j[0] [-1],{$__nw+($__min_tile*$""9)-$""4-$""2},{$__nh+($__min_tile*$""10)-$""5-$""3} fi rm[-2,-1] fi"
 
-m "tile2canvas_r_sym : +f. 0 j[0] [-1],$""1,$""2 if $""6==3||$""6==0 j[0] [-1],{$__nw+($__min_tile*$""7)-$""3-$""1},$""2 fi if $""6==3||$""6==1 j[0] [-1],$""1,{$__nh+($__min_tile*$""8)-$""4-$""2} fi if $""6==3||$""6==2 j[0] [-1],{$__nw+($__min_tile*$""7)-$""3-$""1},{$__nh+($__min_tile*$""8)-$""4-$""2} fi rm. if $""5&&($""6==3||$""6==0) +mirror[1] x fi if $""5&&($""6==3||$""6==1) +mirror[1] y fi if $""5&&($""6==3||$""6==2) +rotate[1] 180 fi if $""6==3 tile2canvas[0] [{$""5?-4:1}],$""1,$""2 tile2canvas[0] [{$""5?-3:1}],{$__nw+($__min_tile*$""7)-$""3-$""1},$""2 tile2canvas[0] [{$""5?-2:1}],$""1,{$__nh+($__min_tile*$""8)-$""4-$""2} tile2canvas[0] [{$""5?-1:1}],{$__nw+($__min_tile*$""7)-$""3-$""1},{$__nh+($__min_tile*$""8)-$""4-$""2} k[0,1] else tile2canvas[0] [1],$""1,$""2 if $""6==0 tile2canvas[0] [{$""5?2:1}],{$__nw+($__min_tile*$""7)-$""3-$""1},$""2 elif $""6==1 tile2canvas[0] [{$""5?2:1}],$""1,{$__nh+($__min_tile*$""8)-$""4-$""2} elif $""6==2 tile2canvas[0] [{$""5?2:1}],{$__nw+($__min_tile*$""7)-$""3-$""1},{$__nh+($__min_tile*$""8)-$""4-$""2} fi k[0,1] fi"
+command "tile2canvas_r_sym : +f. 0 j[0] [-1],$""1,$""2 if $""6==3||$""6==0 j[0] [-1],{$__nw+($__min_tile*$""7)-$""3-$""1},$""2 fi if $""6==3||$""6==1 j[0] [-1],$""1,{$__nh+($__min_tile*$""8)-$""4-$""2} fi if $""6==3||$""6==2 j[0] [-1],{$__nw+($__min_tile*$""7)-$""3-$""1},{$__nh+($__min_tile*$""8)-$""4-$""2} fi rm. if $""5&&($""6==3||$""6==0) +mirror[1] x fi if $""5&&($""6==3||$""6==1) +mirror[1] y fi if $""5&&($""6==3||$""6==2) +rotate[1] 180 fi if $""6==3 tile2canvas[0] [{$""5?-4:1}],$""1,$""2 tile2canvas[0] [{$""5?-3:1}],{$__nw+($__min_tile*$""7)-$""3-$""1},$""2 tile2canvas[0] [{$""5?-2:1}],$""1,{$__nh+($__min_tile*$""8)-$""4-$""2} tile2canvas[0] [{$""5?-1:1}],{$__nw+($__min_tile*$""7)-$""3-$""1},{$__nh+($__min_tile*$""8)-$""4-$""2} k[0,1] else tile2canvas[0] [1],$""1,$""2 if $""6==0 tile2canvas[0] [{$""5?2:1}],{$__nw+($__min_tile*$""7)-$""3-$""1},$""2 elif $""6==1 tile2canvas[0] [{$""5?2:1}],$""1,{$__nh+($__min_tile*$""8)-$""4-$""2} elif $""6==2 tile2canvas[0] [{$""5?2:1}],{$__nw+($__min_tile*$""7)-$""3-$""1},{$__nh+($__min_tile*$""8)-$""4-$""2} fi k[0,1] fi"
 
-m "addsym2display : tlx={w#0/2+($""2/2)*$""3-2} tly={h#0/2+($""2/2)*$""4-2} if $""1<2 if $""1==0 4,{h#0},1,{s#0},begin(ww=w-1;dp=$""1<2?0:1;lp=dp+1;);x==0||x==ww?dp:lp elif $""1==1 {w#0},4,1,{s#0},begin(hh=h-1;dp=$""1<2?0:1;lp=dp+1;);y==0||y==hh?dp:lp fi *. 255 if $""1==0 j[0] [-1],$tlx,0 else j[0] [-1],0,$tly fi k[0] else ntlx={$tlx+3} ntly={$tly+3} f[0] ((x>=$tlx&&x<=$ntlx)||(y>=$tly&&y<=$tly+3))?((x==$tlx||x==$ntlx)||(y==$tly||y==$ntly)?0:255):i fi"
+command "addsym2display : tlx={w#0/2+($""2/2)*$""3-2} tly={h#0/2+($""2/2)*$""4-2} if $""1<2 if $""1==0 4,{h#0},1,{s#0},begin(ww=w-1;dp=$""1<2?0:1;lp=dp+1;);x==0||x==ww?dp:lp elif $""1==1 {w#0},4,1,{s#0},begin(hh=h-1;dp=$""1<2?0:1;lp=dp+1;);y==0||y==hh?dp:lp fi *. 255 if $""1==0 j[0] [-1],$tlx,0 else j[0] [-1],0,$tly fi k[0] else ntlx={$tlx+3} ntly={$tly+3} f[0] ((x>=$tlx&&x<=$ntlx)||(y>=$tly&&y<=$tly+3))?((x==$tlx||x==$ntlx)||(y==$tly||y==$ntly)?0:255):i fi"
 
-m "filter_to_selected_row_column: if $__altmode_orientation $__isr f[0] i(#-1,floor((y+$__pmin*$__min_tile)/$__min_tile),0,0,0)?i:0 else $__isc f[0] i(#-1,floor((x+$__pmin*$__min_tile)/$__min_tile),0,0,0)?i:0 fi k[0]"
+command "filter_to_selected_row_column: if $__altmode_orientation $__isr f[0] i(#-1,floor((y+$__pmin*$__min_tile)/$__min_tile),0,0,0)?i:0 else $__isc f[0] i(#-1,floor((x+$__pmin*$__min_tile)/$__min_tile),0,0,0)?i:0 fi k[0]"
 
-m "out2display_alt : skip ${""1=},${""2=},${""3=},${""4=},${""5=} if $__altmode_orientation?$__vmax_y:$__vmax_x sh {s-1} if $__altmode_orientation $__isr f.. i(#-1,floor(y/$__min_tile),0,0,0)?i:i*.625 else $__isc f.. i(#-1,floor(x/$__min_tile),0,0,0)?i:i*.625 fi rm[-2,-1] fi if narg($""1) if $""1 $__bg rv blend alpha fi fi xalp if narg($""2) if $__altmode_orientation $__isr {w#0},{h#0},1,1,i(#-1,floor(y/$__min_tile),0,0,0)?1:0 else $__isc {w#0},{h#0},1,1,i(#-1,floor(x/$__min_tile),0,0,0)?1:0 fi f. ($__altmode_orientation?i(#-2,floor(y/$__min_tile),0,0,0):i(#-2,floor(x/$__min_tile),0,0,0))?!(i&&(j(-2,-2,0,0)&&j(-2,-1,0,0)&&j(-2,0,0,0)&&j(-2,1,0,0)&&j(-2,2,0,0)&&j(-1,-2,0,0)&&j(-1,-1,0,0)&&j(-1,0,0,0)&&j(-1,1,0,0)&&j(-1,2,0,0)&&j(1,-2,0,0)&&j(1,-1,0,0)&&j(1,0,0,0)&&j(1,1,0,0)&&j(1,2,0,0)&&j(2,-2,0,0)&&j(2,-1,0,0)&&j(2,0,0,0)&&j(2,1,0,0)&&j(2,2,0,0)&&j(0,-2,0,0)&&j(0,-1,0,0)&&j(0,1,0,0)&&j(0,2,0,0))) if narg($""3) f. !($__altmode_orientation?i(#-2,floor(x/$__min_tile),0,0,0):i(#-2,floor(y/$__min_tile),0,0,0))?(i?(j(-1,0)||j(0,-1))):i fi rm.. f[0] i(#-1,x,y,z,0)?(xor(i(#-1,x,y,z,0)*$__trackpadcol_alt,i)>128?0:255):i rm. fi if narg($""4)||narg($""5) if $__altsymmetry_mode if $__altmode_orientation {w#0},{$__min_tile},1,{s#0},i(#0,x,$""5+y) {w#0},{$__min_tile},1,{s#0},i(#0,x,$__nh+($__altsymmetry_posy-1)*$__min_tile-$""5+y) f[-2,-1] begin(ww=w-1;hh=h-1;);(x<(2+narg($""3))||x>ww-2)||(y<(2+narg($""3))||y>hh-2)?(xor($__trackpadcol_alt,i)>128?0:255):i j... [-2],0,$""5 j... [-1],0,{h#0+($__altsymmetry_posy-1)*$__min_tile-$""5} else {$__min_tile},{h#0},1,{s#0},i(#0,$""4+x,y) {$__min_tile},{h#0},1,{s#0},i(#0,$__nw+($__altsymmetry_posx-1)*$__min_tile-$""4+x,y) f[-2,-1] begin(ww=w-1;hh=h-1;);(x<(2+narg($""3))||x>ww-2)||(y<(2+narg($""3))||y>hh-2)?(xor($__trackpadcol_alt,i)>128?0:255):i j... [-2],$""4,0 j... [-1],{w#0+($__altsymmetry_posx-1)*$__min_tile-$""4},0 fi rm[-2,-1] else if $__altmode_orientation {w#0},{$__min_tile},1,{s#0},i(#0,x,$""5+y) f. begin(ww=w-1;hh=h-1;);(x<(2+narg($""3))||x>ww-2)||(y<(2+narg($""3))||y>hh-2)?(xor($__trackpadcol_alt,i)>128?0:255):i j.. [-1],0,$""5 else {$__min_tile},{h#0},1,{s#0},i(#0,$""4+x,y) f. begin(ww=w-1;hh=h-1;);(x<(2+narg($""3))||x>ww-2)||(y<(2+narg($""3))||y>hh-2)?(xor($__trackpadcol_alt,i)>128?0:255):i j.. [-1],$""4,0 fi rm. fi fi if narg($""3) f. begin(ww=w-1;hh=h-1;);(x%$__min_tile==0||y%$__min_tile==0)||(x==ww||y==hh)?$""3:i fi"
+command "out2display_alt : skip ${""1=},${""2=},${""3=},${""4=},${""5=} if $__altmode_orientation?$__vmax_y:$__vmax_x sh {s-1} if $__altmode_orientation $__isr f.. i(#-1,floor(y/$__min_tile),0,0,0)?i:i*.625 else $__isc f.. i(#-1,floor(x/$__min_tile),0,0,0)?i:i*.625 fi rm[-2,-1] fi if narg($""1) if $""1 $__bg rv blend alpha fi fi xalp if narg($""2) if $__altmode_orientation $__isr {w#0},{h#0},1,1,i(#-1,floor(y/$__min_tile),0,0,0)?1:0 else $__isc {w#0},{h#0},1,1,i(#-1,floor(x/$__min_tile),0,0,0)?1:0 fi f. ($__altmode_orientation?i(#-2,floor(y/$__min_tile),0,0,0):i(#-2,floor(x/$__min_tile),0,0,0))?!(i&&(j(-2,-2,0,0)&&j(-2,-1,0,0)&&j(-2,0,0,0)&&j(-2,1,0,0)&&j(-2,2,0,0)&&j(-1,-2,0,0)&&j(-1,-1,0,0)&&j(-1,0,0,0)&&j(-1,1,0,0)&&j(-1,2,0,0)&&j(1,-2,0,0)&&j(1,-1,0,0)&&j(1,0,0,0)&&j(1,1,0,0)&&j(1,2,0,0)&&j(2,-2,0,0)&&j(2,-1,0,0)&&j(2,0,0,0)&&j(2,1,0,0)&&j(2,2,0,0)&&j(0,-2,0,0)&&j(0,-1,0,0)&&j(0,1,0,0)&&j(0,2,0,0))) if narg($""3) f. !($__altmode_orientation?i(#-2,floor(x/$__min_tile),0,0,0):i(#-2,floor(y/$__min_tile),0,0,0))?(i?(j(-1,0)||j(0,-1))):i fi rm.. f[0] i(#-1,x,y,z,0)?(xor(i(#-1,x,y,z,0)*$__trackpadcol_alt,i)>128?0:255):i rm. fi if narg($""4)||narg($""5) if $__altsymmetry_mode if $__altmode_orientation {w#0},{$__min_tile},1,{s#0},i(#0,x,$""5+y) {w#0},{$__min_tile},1,{s#0},i(#0,x,$__nh+($__altsymmetry_posy-1)*$__min_tile-$""5+y) f[-2,-1] begin(ww=w-1;hh=h-1;);(x<(2+narg($""3))||x>ww-2)||(y<(2+narg($""3))||y>hh-2)?(xor($__trackpadcol_alt,i)>128?0:255):i j... [-2],0,$""5 j... [-1],0,{h#0+($__altsymmetry_posy-1)*$__min_tile-$""5} else {$__min_tile},{h#0},1,{s#0},i(#0,$""4+x,y) {$__min_tile},{h#0},1,{s#0},i(#0,$__nw+($__altsymmetry_posx-1)*$__min_tile-$""4+x,y) f[-2,-1] begin(ww=w-1;hh=h-1;);(x<(2+narg($""3))||x>ww-2)||(y<(2+narg($""3))||y>hh-2)?(xor($__trackpadcol_alt,i)>128?0:255):i j... [-2],$""4,0 j... [-1],{w#0+($__altsymmetry_posx-1)*$__min_tile-$""4},0 fi rm[-2,-1] else if $__altmode_orientation {w#0},{$__min_tile},1,{s#0},i(#0,x,$""5+y) f. begin(ww=w-1;hh=h-1;);(x<(2+narg($""3))||x>ww-2)||(y<(2+narg($""3))||y>hh-2)?(xor($__trackpadcol_alt,i)>128?0:255):i j.. [-1],0,$""5 else {$__min_tile},{h#0},1,{s#0},i(#0,$""4+x,y) f. begin(ww=w-1;hh=h-1;);(x<(2+narg($""3))||x>ww-2)||(y<(2+narg($""3))||y>hh-2)?(xor($__trackpadcol_alt,i)>128?0:255):i j.. [-1],$""4,0 fi rm. fi fi if narg($""3) f. begin(ww=w-1;hh=h-1;);(x%$__min_tile==0||y%$__min_tile==0)||(x==ww||y==hh)?$""3:i fi"
 
-m "out2display_alt_perp : skip ${""3=},${""4=} if narg($""3) if $""3 $__bg rv blend alpha fi fi xalp if $__altmode_orientation $__isr {w#0},{$__pdiff*$__min_tile},1,{s#0},i(#-1,floor(y/$__min_tile)+$__pmin,0,0,0) f. i?(!(j(-2,-2)&&j(-2,-1)&&j(-2,0)&&j(-2,1)&&j(-2,2)&&j(-1,-2)&&j(-1,-1)&&j(-1,0)&&j(-1,1)&&j(-1,2)&&j(0,-2)&&j(0,-1)&&j(0,1)&&j(0,2)&&j(1,-2)&&j(1,-1)&&j(1,0)&&j(1,1)&&j(1,2)&&j(2,-2)&&j(2,-1)&&j(2,0)&&j(2,1)&&j(2,2))?(xor($__trackpadcol_alt,i(#0,x,$""2+y))>128?0:255):i(#0,x,$""2+y)):i(#0,x,$""2+y); j[0] [-1],0,$""2 else $__isc {$__pdiff*$__min_tile},{h#0},1,{s#0},i(#-1,floor(x/$__min_tile)+$__pmin,0,0,0) f. i?(!(j(-2,-2)&&j(-2,-1)&&j(-2,0)&&j(-2,1)&&j(-2,2)&&j(-1,-2)&&j(-1,-1)&&j(-1,0)&&j(-1,1)&&j(-1,2)&&j(0,-2)&&j(0,-1)&&j(0,1)&&j(0,2)&&j(1,-2)&&j(1,-1)&&j(1,0)&&j(1,1)&&j(1,2)&&j(2,-2)&&j(2,-1)&&j(2,0)&&j(2,1)&&j(2,2))?(xor($__trackpadcol_alt,i(#0,$""1+x,y))>128?0:255):i(#0,$""1+x,y)):i(#0,$""1+x,y); j[0] [-1],$""1,0 fi rm[-2,-1] if narg($""4) f. begin(ww=w-1;hh=h-1;);(x%$__min_tile==0||y%$__min_tile==0)||(x==ww||y==hh)?$""4:i fi"
+command "out2display_alt_perp : skip ${""3=},${""4=} if narg($""3) if $""3 $__bg rv blend alpha fi fi xalp if $__altmode_orientation $__isr {w#0},{$__pdiff*$__min_tile},1,{s#0},i(#-1,floor(y/$__min_tile)+$__pmin,0,0,0) f. i?(!(j(-2,-2)&&j(-2,-1)&&j(-2,0)&&j(-2,1)&&j(-2,2)&&j(-1,-2)&&j(-1,-1)&&j(-1,0)&&j(-1,1)&&j(-1,2)&&j(0,-2)&&j(0,-1)&&j(0,1)&&j(0,2)&&j(1,-2)&&j(1,-1)&&j(1,0)&&j(1,1)&&j(1,2)&&j(2,-2)&&j(2,-1)&&j(2,0)&&j(2,1)&&j(2,2))?(xor($__trackpadcol_alt,i(#0,x,$""2+y))>128?0:255):i(#0,x,$""2+y)):i(#0,x,$""2+y); j[0] [-1],0,$""2 else $__isc {$__pdiff*$__min_tile},{h#0},1,{s#0},i(#-1,floor(x/$__min_tile)+$__pmin,0,0,0) f. i?(!(j(-2,-2)&&j(-2,-1)&&j(-2,0)&&j(-2,1)&&j(-2,2)&&j(-1,-2)&&j(-1,-1)&&j(-1,0)&&j(-1,1)&&j(-1,2)&&j(0,-2)&&j(0,-1)&&j(0,1)&&j(0,2)&&j(1,-2)&&j(1,-1)&&j(1,0)&&j(1,1)&&j(1,2)&&j(2,-2)&&j(2,-1)&&j(2,0)&&j(2,1)&&j(2,2))?(xor($__trackpadcol_alt,i(#0,$""1+x,y))>128?0:255):i(#0,$""1+x,y)):i(#0,$""1+x,y); j[0] [-1],$""1,0 fi rm[-2,-1] if narg($""4) f. begin(ww=w-1;hh=h-1;);(x%$__min_tile==0||y%$__min_tile==0)||(x==ww||y==hh)?$""4:i fi"
 
-m "keeperase_rowcolumn : if $__altmode_orientation $__isr if $""1 f.. i(#-1,floor(y/$__min_tile),0,0,0)?i:0 else f.. i(#-1,floor(y/$__min_tile),0,0,0)?0:i fi else $__isc if $""1 f.. i(#-1,floor(x/$__min_tile),0,0,0)?i:0 else f.. i(#-1,floor(x/$__min_tile),0,0,0)?0:i fi fi rm."
+command "keeperase_rowcolumn : if $__altmode_orientation $__isr if $""1 f.. i(#-1,floor(y/$__min_tile),0,0,0)?i:0 else f.. i(#-1,floor(y/$__min_tile),0,0,0)?0:i fi else $__isc if $""1 f.. i(#-1,floor(x/$__min_tile),0,0,0)?i:0 else f.. i(#-1,floor(x/$__min_tile),0,0,0)?0:i fi fi rm."
 
-m "shift_rowcolumn : if $__altmode_orientation $__isr if !($__shiftboundary>0&&$__shiftboundary<4) f[0] i(#-1,floor(y/$__min_tile),0,0,0)?j(-$""1,0,0,0,0,$__shiftboundary-($__shiftboundary?2)):i; else f[0] begin(ww=w-1;);i(#-1,floor(y/$__min_tile),0,0,0)?i(x-$""1>ww?((w-$__min_tile)+($__shiftboundary==3?(floor((x-$""1-w)/$__min_tile)%2?(x-w)%$__min_tile:$__min_tile-(x-w)%$__min_tile-1):(($__shiftboundary-1)?($__min_tile-(x-w)%$__min_tile-1):(x-w)%$__min_tile))):(x-$""1>=0?x-$""1:($__shiftboundary==3?(floor((x-$""1)/$__min_tile)%2?($__min_tile-x%$__min_tile):x%$__min_tile):(($__shiftboundary-1)?($__min_tile-x%$__min_tile):x%$__min_tile))),y):i; fi else $__isc if !($__shiftboundary>0&&$__shiftboundary<4) f[0] i(#-1,floor(x/$__min_tile),0,0,0)?j(0,-$""2,0,0,0,$__shiftboundary-($__shiftboundary?2)):i; else f[0] begin(hh=h-1;);i(#-1,floor(x/$__min_tile),0,0,0)?i(x,y-$""2>hh?((h-$__min_tile)+($__shiftboundary==3?(floor((y-$""2-h)/$__min_tile)%2?(y-h)%$__min_tile:$__min_tile-(y-h)%$__min_tile-1):(($__shiftboundary-1)?($__min_tile-(y-h)%$__min_tile-1):(y-h)%$__min_tile))):(y-$""2>=0?y-$""2:($__shiftboundary==3?(floor((y-$""2)/$__min_tile)%2?($__min_tile-y%$__min_tile):y%$__min_tile):(($__shiftboundary-1)?($__min_tile-y%$__min_tile):y%$__min_tile)))):i; fi fi rm."
+command "shift_rowcolumn : if $__altmode_orientation $__isr if !($__shiftboundary>0&&$__shiftboundary<4) f[0] i(#-1,floor(y/$__min_tile),0,0,0)?j(-$""1,0,0,0,0,$__shiftboundary-($__shiftboundary?2)):i; else f[0] begin(ww=w-1;);i(#-1,floor(y/$__min_tile),0,0,0)?i(x-$""1>ww?((w-$__min_tile)+($__shiftboundary==3?(floor((x-$""1-w)/$__min_tile)%2?(x-w)%$__min_tile:$__min_tile-(x-w)%$__min_tile-1):(($__shiftboundary-1)?($__min_tile-(x-w)%$__min_tile-1):(x-w)%$__min_tile))):(x-$""1>=0?x-$""1:($__shiftboundary==3?(floor((x-$""1)/$__min_tile)%2?($__min_tile-x%$__min_tile):x%$__min_tile):(($__shiftboundary-1)?($__min_tile-x%$__min_tile):x%$__min_tile))),y):i; fi else $__isc if !($__shiftboundary>0&&$__shiftboundary<4) f[0] i(#-1,floor(x/$__min_tile),0,0,0)?j(0,-$""2,0,0,0,$__shiftboundary-($__shiftboundary?2)):i; else f[0] begin(hh=h-1;);i(#-1,floor(x/$__min_tile),0,0,0)?i(x,y-$""2>hh?((h-$__min_tile)+($__shiftboundary==3?(floor((y-$""2-h)/$__min_tile)%2?(y-h)%$__min_tile:$__min_tile-(y-h)%$__min_tile-1):(($__shiftboundary-1)?($__min_tile-(y-h)%$__min_tile-1):(y-h)%$__min_tile))):(y-$""2>=0?y-$""2:($__shiftboundary==3?(floor((y-$""2)/$__min_tile)%2?($__min_tile-y%$__min_tile):y%$__min_tile):(($__shiftboundary-1)?($__min_tile-y%$__min_tile):y%$__min_tile)))):i; fi fi rm."
 
-m "place_rowcolumn : if $__altmode_orientation if $__altplace_replacemode $__isr pass$""1 0 {w#-1},{h#-1},1,1,i(#-2,floor(y/$__min_tile)+$__pmin,0,0,0) j[0] [-2],0,$""3,0,0,1,[-1],1 else pass$""1 0 {w#0},{h#0},1,{s#0},j(#-1,0,-$""3) rm.. if $__altplacebackmode rv fi blend alpha fi else if $__altplace_replacemode $__isc pass$""1 0 {w#-1},{h#-1},1,1,i(#-2,floor(x/$__min_tile)+$__pmin,0,0,0) j[0] [-2],$""2,0,0,0,1,[-1],1 else pass$""1 0 {w#0},{h#0},1,{s#0},j(#-1,-$""2,0) rm.. if $__altplacebackmode rv fi blend alpha fi fi k[0]"
+command "place_rowcolumn : if $__altmode_orientation if $__altplace_replacemode $__isr pass$""1 0 {w#-1},{h#-1},1,1,i(#-2,floor(y/$__min_tile)+$__pmin,0,0,0) j[0] [-2],0,$""3,0,0,1,[-1],1 else pass$""1 0 {w#0},{h#0},1,{s#0},j(#-1,0,-$""3) rm.. if $__altplacebackmode rv fi blend alpha fi else if $__altplace_replacemode $__isc pass$""1 0 {w#-1},{h#-1},1,1,i(#-2,floor(x/$__min_tile)+$__pmin,0,0,0) j[0] [-2],$""2,0,0,0,1,[-1],1 else pass$""1 0 {w#0},{h#0},1,{s#0},j(#-1,-$""2,0) rm.. if $__altplacebackmode rv fi blend alpha fi fi k[0]"
 
-m "fill_tiles2canvas : if $__fill_boundary==0 f[0] i(#-1,x%w#-1,y%h#-1) elif $__fill_boundary==1 f[0] i(#-1,int(x/w#-1)%2?w#-1-1-x%w#-1:x%w#-1,int(y/h#-1)%2?h#-1-1-y%h#-1:y%h#-1) elif $__fill_boundary==2 f[0] i(#-1,int(x/w#-1)%2?w#-1-1-x%w#-1:x%w#-1,y%h#-1) elif $__fill_boundary==3 f[0] i(#-1,x%w#-1,int(y/h#-1)%2?h#-1-1-y%h#-1:y%h#-1) fi"
+command "fill_tiles2canvas : if $__fill_boundary==0 f[0] i(#-1,x%w#-1,y%h#-1) elif $__fill_boundary==1 f[0] i(#-1,int(x/w#-1)%2?w#-1-1-x%w#-1:x%w#-1,int(y/h#-1)%2?h#-1-1-y%h#-1:y%h#-1) elif $__fill_boundary==2 f[0] i(#-1,int(x/w#-1)%2?w#-1-1-x%w#-1:x%w#-1,y%h#-1) elif $__fill_boundary==3 f[0] i(#-1,x%w#-1,int(y/h#-1)%2?h#-1-1-y%h#-1:y%h#-1) fi"
 
 v +
 e[] "\n Instruction on how to work with interactive windows.\n
@@ -12185,21 +12261,21 @@ size_2=2
 
 __iter=2
 
-m "swap: rv[-2,-1]"
-m "join: a[-2,-1] $""1"
+command "swap: rv[-2,-1]"
+command "join: a[-2,-1] $""1"
 
 center_point={$5>1?int($5/2)}
 
 if $5>1
- m "ins_north: ns={$__size_n*$5} $ns,$ns,1,1,$__iter swap join y"
- m "ins_south: ns={$__size_n*$5} $ns,$ns,1,1,$__iter join y"
- m "ins_west: ns={$__size_n*$5} $ns,$ns,1,1,$__iter swap join x"
- m "ins_east: ns={$__size_n*$5} $ns,$ns,1,1,$__iter join x"
+ command "ins_north: ns={$__size_n*$5} $ns,$ns,1,1,$__iter swap join y"
+ command "ins_south: ns={$__size_n*$5} $ns,$ns,1,1,$__iter join y"
+ command "ins_west: ns={$__size_n*$5} $ns,$ns,1,1,$__iter swap join x"
+ command "ins_east: ns={$__size_n*$5} $ns,$ns,1,1,$__iter join x"
 else
- m "ins_north: $__size_n,$__size_n,1,1,$__iter swap join y"
- m "ins_south: $__size_n,$__size_n,1,1,$__iter join y"
- m "ins_west: $__size_n,$__size_n,1,1,$__iter swap join x"
- m "ins_east: $__size_n,$__size_n,1,1,$__iter join x"
+ command "ins_north: $__size_n,$__size_n,1,1,$__iter swap join y"
+ command "ins_south: $__size_n,$__size_n,1,1,$__iter join y"
+ command "ins_west: $__size_n,$__size_n,1,1,$__iter swap join x"
+ command "ins_east: $__size_n,$__size_n,1,1,$__iter join x"
 fi
 
 na={$2?4:2}
@@ -12294,7 +12370,7 @@ do
 
  __iter+=1
 while $__iter<$iter_lim
-um swap,join,ins_north,ins_south,ins_west,ins_east
+uncommand swap,join,ins_north,ins_south,ins_west,ins_east
 #@cli rep_gv: eq. to 'rep_glass_vignette'. : (+)
 rep_gv: rep_glass_vignette $*
 #@cli rep_glass_vignette: refraction,_refraction_power,_len_size=1,_chromatic_aberration,-100%<=_preliminary_shift_x<=100%,-100%<=_preliminary_shift_y<=100%,_image_additional_zoom>0,-360<=_image_angle<=360,_distortion_scale_x,_distortion_scale_y,_distortion_scale_xy>0,-360<=_distortion_angle<=360,_distortion_offset_x,_distortion_offset_y,_subpixel>0,0<=_colorspace<=1,_boundary={ 0=none | 1=neumann | 2=periodic | 3=mirror },_interpolation={ 0=nearest | 1=average | 2=linear | 3=grid | 4=bicubic | 5=lanczos }
@@ -12836,7 +12912,7 @@ fi
 
 ts={size($channel_ord)}
 
-m "axis_func: f \"begin(
+command "axis_func: f \"begin(
   const ww=w-1;
   const hh=h-1;
   const cx=ww/2;
@@ -12866,7 +12942,7 @@ m "axis_func: f \"begin(
  iy=calc_iy(y);
  surface=surface()/sublevel;\""
 
-m "diagonal_func: f \"begin(
+command "diagonal_func: f \"begin(
   const ww=w-1;
   const hh=h-1;
   const cx=ww/2;
@@ -12933,7 +13009,7 @@ foreach {
  if $sublevel r $ow,$oh,1,100%,$interpolation fi
 }
 
-um diagonal_func,axis_func
+uncommand diagonal_func,axis_func
 #@cli rep_shape_brick: brick_width>0,brick_height>0,_mortar_width>0,_mortar_height>0,_outline>=0,_bevel>=0,_bevel_style= { 0=round | 1=inverse_round | 2=diamond },-1>=_shift_val>=1,_shift_direction= { 0=horizontal | 1=vertical },_flip_offset= { 0= Do Not Flip | 1= Flip },_subpixel_processing_level>=0
 #@cli : 'brick_width' - Width of brick(s)
 #@cli : 'brick_height' - Height of brick(s)
@@ -13388,7 +13464,7 @@ _frblur_iter_ang,_frblur_shift_ang,_ti,_frblur_dist={(2*pi)/$1},{deg2rad($3)},{a
 
 if $6
 
- m "rep_frblur_sdaxy_add :
+ command "rep_frblur_sdaxy_add :
   100%,100%,100%,100% .
 
   $1,1,1,2,\"begin(
@@ -13410,7 +13486,7 @@ else
 
  if $5 # Boundary
 
-  m "rep_frblur_sdaxy_add :
+  command "rep_frblur_sdaxy_add :
    dist={ceil($""1)}
 
    100%,100%,100%,100%
@@ -13436,7 +13512,7 @@ else
 
  else # No Boundary
 
-  m "rep_frblur_sdaxy_add :
+  command "rep_frblur_sdaxy_add :
    100%,100%,100%,100%
 
    $1,1,1,2,\"begin(
@@ -13453,7 +13529,7 @@ else
 
 fi
 
-m "rep_frblur_alp :
+command "rep_frblur_alp :
  sh 0,{s-2}
  sh.. {s}
 
@@ -13468,7 +13544,7 @@ m "rep_frblur_alp :
 
  sh 0,{s-2} sh.. {s} f.. I/(i0#-1?i0#-1:1) *. {$maxa/iM#-1} rm[-2,-1]"
 
-m "rep_frblur_nalp : rep_frblur_sdaxy_add $""1 / $_ti"
+command "rep_frblur_nalp : rep_frblur_sdaxy_add $""1 / $_ti"
 
 foreach {
  if ${is_percent\ $2} dist={abs($2)*norm(w,h)/2}
@@ -13505,7 +13581,7 @@ foreach {
 
 }
 
-um rep_frblur_sdaxy_add,rep_frblur_alp,rep_frblur_nalp
+uncommand rep_frblur_sdaxy_add,rep_frblur_alp,rep_frblur_nalp
 #@cli rep_ncee: _distance>0,0<=_angle<=360,boundary_condition={ 0=none | 1=neumann | 2=periodic | 3=mirror },_interpolation={ 0=nearest_neighbor | 1=linear },_contrast>=0,_process_alpha={ 0=do_not_process_alpha | 1=process_alpha },_color_space,_blend_mode,0<=_blend_opacity[%]<=1
 #@cli : Default value: 'boundary_condition=3','interpolation=1','contrast=1','process_alpha=1','color_space=0','blend_mode=1','blend_opacity=100%'\n
 #@cli : Author: Reptorian.
@@ -13515,7 +13591,7 @@ skip ${3=3},${4=1},${5=1},${6=1},${7=0},${8=1},${9=1}
 convert_colors_fwd=${arg\ $7+1,,rgb2ryb,rgb2cmy,rgb2cmyk,rgb2hsi8,rgb2hsl8,rgb2hsv8,rgb2lab8,rgb2lch8,rgb2yiq8,rgb2yuv8,rgb2xyz8,rgb2yes8,rgb2k18,rgb2ohta8}
 convert_colors_bwd=${arg\ $7+1,,ryb2rgb,cmy2rgb,cmyk2rgb,hsi82rgb,hsl82rgb,hsv82rgb,lab82rgb,lch82rgb,yiq82rgb,yuv82rgb,xyz82rgb,yes82rgb,k182rgb,ohta82rgb}
 
--m "MergeChoice : $""=_mode" -MergeChoice "add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor","edges","error"
+-command "MergeChoice : $""=_mode" -MergeChoice "add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor","edges","error"
 
 to_a
 
@@ -14964,7 +15040,7 @@ if ${is_image_arg\ $1} use_pal_image=1
 else use_pal_image=0
 fi
 
-m "convert_first_arg_to_mul_args :
+command "convert_first_arg_to_mul_args :
 
   ('$1')
 
@@ -14981,7 +15057,7 @@ m "convert_first_arg_to_mul_args :
 
   u $_bit_depths"
 
-m "index_from_bitmaps :
+command "index_from_bitmaps :
 
   t_bit_depths:=[$_bit_depths]+1
 
@@ -15170,7 +15246,7 @@ else
 
 fi
 
-um convert_first_arg_to_mul_args,index_from_bitmaps
+uncommand convert_first_arg_to_mul_args,index_from_bitmaps
 #@cli +rep_bayer_threshold_map: iteration,_normalize,_load_preserved_map
 #@cli : Create Bayer Threshold Map
 +rep_bayer_threshold_map:
@@ -15848,7 +15924,7 @@ _glob_aspect_crop_2d_crop_shift_factor,_glob_arc2d_crop_ratio={[$_glob_aspect_cr
 
 
 if $_glob_aspect_crop_ratio_2d_w==$_glob_aspect_crop_ratio_2d_h
-  m "cmd_arc_2d_crop :
+  command "cmd_arc_2d_crop :
     if w==h return fi
 
     if w>h
@@ -15861,7 +15937,7 @@ if $_glob_aspect_crop_ratio_2d_w==$_glob_aspect_crop_ratio_2d_h
     "
 else
 
-  m "cmd_arc_2d_crop :
+  command "cmd_arc_2d_crop :
     ratio={h/w}
 
     if $ratio==$_glob_arc2d_crop_ratio return fi
@@ -15884,7 +15960,7 @@ fi
 
 foreach { cmd_arc_2d_crop }
 
-um cmd_arc2d_crop
+uncommand cmd_arc2d_crop
 #@cli rep_nebulous: _main_surf_xy_factor>0,_main_surf_x_factor>0,_main_surf_y_factor>0,-100<=_x_center[%]<=100,-100<=_y_center[%]<=100,0<=_fxyangle<=360,_wave,0<=_lighting_angle<=360,_disturbance>=0,_distx,_disty,0<=_distangle<=360,_disturbance_mode={ 0= do_not_scale | 1=scale_by_axisfact },_color={ 0=gray | 1=color },_alpha_base={ 0=None | 1=hard_light | 2=hard_shade | 3=soft_light | 4=soft_light },_subpixelevel>=0,subpixelprocessingmethod={ 0=Average | 1=Linear | 2=Grid | 3=Bicubic | 4=Lanczos }
 #@cli : Creates a Nebulous texture inspired by its Paint.NET plugin equivalent made by MadJik.\n
 #@cli : '_main_surf_xy_factor' - Amount of waves by xy-axis.
@@ -25769,7 +25845,7 @@ use_persistence={narg($_persistent)&&([$2,$4,$26,$27]==[$49,$66,$68,$69])&&([$_p
 rm
 if !$use_persistence $_preview_area_width,$_preview_area_height fi
 
-m "draw_points :
+command "draw_points :
   eval[1] \"begin(
     const radius=9;
     const colsize=sqr(radius)*3;
@@ -25792,7 +25868,7 @@ m "draw_points :
   \"
  "
 
-m "gen_pt_info :
+command "gen_pt_info :
 
  width,height={w#0},{h#0}
 
@@ -25829,7 +25905,7 @@ m "gen_pt_info :
 
  draw_points "
 
-m "gen_col_info :
+command "gen_col_info :
 
  if w==2
 
@@ -26037,7 +26113,7 @@ fi
 
 num_of_col={w+1}
 
-um draw_points,gen_pt_info,gen_pt_info_alt,gen_col_info
+uncommand draw_points,gen_pt_info,gen_pt_info_alt,gen_col_info
 
 k[0,-1]
 
@@ -27654,7 +27730,7 @@ if !narg($_persistent) started=0 fi
 if $70||$77||$78 _num_of_colors=$33 fi
 
 if $act_rand_map
- m "fx_rep_lavander_binary_map_create_palette:
+ command "fx_rep_lavander_binary_map_create_palette:
     $_num_of_colors,1,1,3,\"begin(
       srand($_fx_rep_lavander_binary_map_seed);
       const max_index=w-1;
@@ -27711,9 +27787,9 @@ else
   elif $_num_of_colors==3 _color_info=(${34-36};${37-39};${40-42})
   fi
 
-  m fx_rep_lavander_binary_map_create_palette:$_color_info
+  command fx_rep_lavander_binary_map_create_palette:$_color_info
 
- else m "fx_rep_lavander_binary_map_create_palette: 0"
+ else command "fx_rep_lavander_binary_map_create_palette: 0"
  fi
 
 fi
@@ -28135,7 +28211,7 @@ if $use_persistent
 
 fi
 
-um fx_rep_lavander_binary_map_create_palette
+uncommand fx_rep_lavander_binary_map_create_palette
 
 if $86 selectable_cli_command_text=$cli_command_text_with_slash
 else selectable_cli_command_text=$cli_command_text

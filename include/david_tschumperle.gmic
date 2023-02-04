@@ -1898,6 +1898,122 @@ fx_frame_round_old :
   frame_round ${1-8}
   if $9 frame_blur $1,{min(99,$1+$9)},$3,$10,$11% fi
 
+#--------------------------------------------------
+# Viewer of volumetric binary shapes as 3D surfels.
+#--------------------------------------------------
+view_surfels3d :
+
+  # Generate volumetric image.
+  nm={n}
+  +distance. 0 *. -1 +. 1 *. .. +distance.. 1 +[-2,-1] round. 0.1 # Last channel : used for threshold
+  l[0] { expand_xyz. 1,0 b. 4,0 g xyz,0,0 shrink_xyz 1 a c n 0,255 } # RGB colors
+  a c
+  => img
+
+  # Init variables and display window.
+  m:=round(0.75*min({*,u,v})) w[] $m,$m,0,$nm" ("{img,w}x{img,h}x{img,d}")"
+  axes3d 60 => axes3d
+  (1,0,0,0;0,1,0,0;0,0,1,0) store. pose3d
+  posx,posy,zoom_factor=50,50,1
+  T=1
+
+  # Start event loop.
+  do
+
+    # Generate 3D object.
+    if !0$img3d
+      if {img,s==1} +f[img] 164 [img] lfacts=0.75,1,1.25 # Only threshold value -> constant color
+      elif {img,s==3} [img] +norm. gt. 0 *. -inf lfacts=0.9,1,1.1 # Only RGB color, no threshold
+      else +s[img] c,-{img,s-1} lfacts=0.9,1,1.1 # Color + threshold
+      fi
+      lt. $T *[-2,-1]
+      to_rgb. surfels3d. $lfacts
+      l. { s3d. c.. 0,255 a y }
+      box3d {img,[w,h,d]} -3d. 0.5,0.5,0.5 col3d. 255,255,255 p3d. 1 o3d. 0.25 +3d[-2,-1]
+      => img3d
+    fi
+
+    # Generate background.
+    update_bg:=!0$bg
+    if 0$bg" && "{0$bg,[w,h]!=[{*,w,h}]} update_bg=1 fi
+    if $update_bg
+      (0,0,0;0,0,100;100,0,50) permute. cyzx r. {*,w,h},1,3,3
+      => bg
+    fi
+
+    # Display 3D object.
+    +-3d[img3d] {img,[w,h,d]/2} *3d. {img,0.65*$zoom_factor*min({*,w,h})/max(w,h,d)}
+    $pose3d p={^} rm.
+    pose3d. $p +j3d[bg] .,$posx%,$posy%,0,1,2,1,1 rm..
+    +pose3d[axes3d] $p j3d.. .,{-2,[80,h-80]},0,0.75,3,0,0,200 rm.
+    to. "Threshold: "{_$T},,,3%
+    w. rm.
+
+    # Manage key events.
+    if {*,-ARROWUP} T+=0.2 rmn img3d
+    elif {*,-ARROWDOWN} T-=0.2 rmn img3d
+    elif {*,-PAGEUP} T+=5 rmn img3d
+    elif {*,-PAGEDOWN} T-=5 rmn img3d
+    fi
+    T={_round($T,0.1)}
+
+    # Manage object rotation/zoom/pan.
+    mx,my,mb={*,x,y,b}
+    is_CTRL={{*,CTRLLEFT}" || "{*,CTRLRIGHT}}
+    if $mx>=0 # Manage mouse-drag
+      if $mb
+        if !narg($mx0) mx0,my0,mx1,my1=$mx,$my,$mx,$my else mx1,my1=$mx,$my fi
+      else
+        if narg($mx0) rmn render fi
+        mx0,my0,mx1,my1=
+      fi
+    fi
+    if narg($mx1)" && "($mx0!=$mx1" || "$my0!=$my1)
+      if $mb&1" && "!$is_CTRL # Rotation
+        rotation3d[] {"
+          const w2 = "{*,w}"/2;
+          const h2 = "{*,h}"/2;
+          const R = 0.375*min("{*,w,h}");
+          const u0 = "$mx0" - w2;
+          const v0 = "$my0" - h2;
+          const u1 = "$mx1" - w2;
+          const v1 = "$my1" - h2;
+          n0 = norm(u0,v0);
+          nu0 = n0>R?u0*R/n0:u0;
+          nv0 = n0>R?v0*R/n0:v0;
+          nw0 = sqrt(max(0,R^2 - nu0^2 - nv0^2));
+          n1 = norm(u1,v1);
+          nu1 = n1>R?u1*R/n1:u1;
+          nv1 = n1>R?v1*R/n1:v1;
+          nw1 = sqrt(max(0,R^2 - nu1^2 - nv1^2));
+          u = nv0*nw1 - nw0*nv1;
+          v = nw0*nu1 - nu0*nw1;
+          w = nv0*nu1 - nu0*nv1;
+          n = norm(u,v,w);
+          [ u,v,w,-asin(n/R^2)*180/pi ]"}
+        $pose3d m*[-2,-1] store. pose3d
+        mx0,my0=$mx1,$my1
+      elif $mb&4" || "($mb&1" && "$is_CTRL) # Pan
+        posx,posy={"
+          const px = "$mx1-$mx0+$posx*{*,w}%";
+          const py = "$my1-$my0+$posy*{*,h}%";
+          cut([ px*100/"{*,w}", py*100/"{*,h}" ],0,100)"}
+        mx0,my0=$mx1,$my1
+      elif $mb&2 # Zoom with mouse button
+        fact={1+($my0-$my1)/100}
+        zoom_factor*=$fact
+        mx0,my0=$mx1,$my1
+      fi
+    fi
+    if {*,o} # Zoom with mousewheel
+      fact={1+{*,-o}/10}
+      zoom_factor*=$fact
+    fi
+
+    wait
+  while {*}" && "!{*,ESC}
+  rm
+
 # Local Variables:
 # mode: sh
 # End:
