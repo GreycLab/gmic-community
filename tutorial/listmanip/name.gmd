@@ -1,95 +1,267 @@
-# name (=>, nm)
+># name (=>, nm)
 
 %% x "mkdir -p img" %%
 
-|![name](images/hello.png)|''-name'' associates each of a collection of images, selected by the command's [right hand decorator](https://G'MIC.eu/tutorial/command_decorations.html) with  a _name_, one from a series of string arguments. Commonly:\n\n1. there is The command labels selections for reference during execution of G'MIC scripts and for managing layer properties of host applications like Gimp or Krita. Naming conventions differ between these two contexts. See [The Host Application Use Case](https://G'MIC.eu/oldtutorial/_name.html#HostApplicationUseCase). Since this command is frequently used to label selections containing one image, it is easy to misconstrue its purpose to just that of labeling single images. As misconstructions go, it is mostly harmless, but malfeasance lies mainly with the mental blocks erected in the minds of G'MIC script writers who forget the benefits of classifying any number of related images under one meaningful name.
+|![name](images/hello.png)|''-name'' associates collections of images with labels. The idiom:\n\n      `… name <label> …`\n\nis so pervasive that the uninitiated might take `-name` to be the Tagger of Images. This is not an entirely false idea and is a convenient simplification, but glides over the underlying notions of labels and image collections. These provide the command with much of its power.\n\nMany-to-one groupings of images under names — _collections_ —, evince relationships among images that frequently arise in more labyrinthine scripts. Names furnish signposts in such circumstances.
 
-Formally, the label _<name>_ may be written with any characters supported by the host computer, but if the intent is to use labels as named selections in [command decorators](https://G'MIC.eu/tutorial/command_decorations.html) or image parameters, contexts where __\[__ and __\]__ selection operators apply, then G'MIC further restricts character usage to the class __\[a-zA-Z0-9\_\]__ and such names cannot begin with a numeric.
+Once associated, images stay in their collections until either deleted or enrolled in other collections. Until such an occurence, putting a collection label into a selection decorator pulls in all of the collection's images. The script writer does not have to worry about where these images are; named collections retain linkages to their constituents no matter where they fall in the list. In addition to this persistence, an aptly chosen label can register a collection's purposes, further documenting a script writer's intent regarding the collected images.
 
-G'MIC scripts operating within the context of a host application plug-in may use ''-name'' to communicate with the host for setting layer properties, including setting the layer's name in the host application. This host layer name is not the same as the label that ''-name'' sets; In fact, the G'MIC script writer uses ''-name'' to label the image with a string composed according to a simple syntax that resembles calling functions. The host application retrieves this G'MIC-produced "script-like label" and executes internal functions to set position, layer modes, opacity and the host application layer name, which can be, and usually are, quite different than the G'MIC label. See The [Host Application Use Case](https://G'MIC.eu/oldtutorial/_name.html#HostApplicationUseCase) for details.
+There are two association schemes:
+|- 1.    | __Enroll one or more images into a specific collection.__ In this scheme, the selection decorator chooses the images to be enrolled and the argument identifies the target collection. `-name` interprets its argument as a single label — even if it has the appearance of a comma-separted argument list.
+|        (a)|If the label does not reference any existing collection, a new collection is created and the selected images become its inaugural members.
+|        (b)|Otherwise, a collection matches the label and the selected images join those already in the collection.
+|        (c)|Enrolling an image — yet again — into a collection in which it is already present is a harmless and inconsequential redundancy that performs no operation.
+|        (d)|Enrolling an image belonging to another collection moves it from the former to the latter. An image may be enrolled, at most, in only one collection at a time.
+|        (e)|After the naming operation completes, the indices comprising `-name`'s selection decorator play no further rôle. In particular, labels name collections, not selections.
+| 2.     | __Enroll a sequence of images into a corresponding sequence of collections.__ In this scheme, `-name` either has an empty selection decorator or no decorator at all. Its comma-separated argument list enumerates one or more collections that need not exist; the label of a particular collection may also appear more than once. `-name` attempts to distribute the last _N_ images across an argument list of _N_ collections, one-to-one, in the order that collections appear in the argument list. The length of the image list, _M_, may differ from that of the argument list, _N_: for _M_ < _N_, images are deficient; the last _N – M_ collections do not enroll an image. For _M_ > _N_, collections are deficient; the first _M – N_ images are not enrolled in collections. Through these means, script writers may devise any number of distribution schemes of images to collections.
+
+It is not uncommon to mistakenly mix schemes and write: `-name[` _<selected_images> _ `] foo,bar,baz` in anticipation of distributing the selected images across three collections labeled `foo`, `bar` and `baz`. Instead, `-name` chooses the first scheme, because the selection decorator is not empty, and searches for a collection with the label `foo,bar,baz`. If it finds such, the selected images are enrolled in that one collection. Otherwise `-name` creates a new collection, `foo,bar,baz`, and the selected images become its inaugural members. To achive the desired aim, the script writer can bracket `-name` in a `-local` block, as so: `-local[` _<selected_images>_ `] -name foo,bar,baz -done` This creates a localized image list comprised only of the selected images. An undecorated `-name` command will then follow the second scheme and distribute the last three images on the local list to the three collections.
 
 ## Selection Label
-The sample image, rose, becomes an image in the named selection BlurMe. At some subsequent point in the pipeline, all members of the BlurMe named selection are selected for blurring. It so happens that there is only one member of the named selection which is affected by this operation.
+The sample image, rose, becomes an image in the collection `BlurMe`. At some subsequent point in the pipeline, all members of the `BlurMe` collection are selected for blurring. It so happens that there is only one member of the collection, so only one image is affected by this operation.
 ===
 %%  -sp rose,300 nm. BlurMe -b[BlurMe] 4 %%
 ~~~
-gmic                                \
-    -sample rose                    \
-    -name BlurMe                    \
-    -blur[BlurMe] 4                 \
-    -output[BlurMe] blurredrose.png \
+blurrose :
+    -sample rose
+    -name BlurMe
+    -blur[BlurMe] 4
+    -output[BlurMe] blurredrose.png
 ~~~
 ===
+`-name BlurMe` constitutes the command's simplest use: to all appearances, it tags images with names. The greater elaboration that `BlurMe` is a label to a collection that has one member — a rose — is a technicality too far. In a script that has just four lines there is little chance for confusion. Given the starkness of this example, there are those who would go further and eliminate the `-name` command entirely, being content to refer to the image through its index. Further still, abandon the selection decorator entirely. With but one item on the list, there can be no doubt upon what the `-blur` command operates. The need for a grouping command like `-name` arises with complexity. When a script writer finds herself mis-populating selection decorators more often than not, then the `-name` command should come to mind. 
+
+## Substitution Sequence
+The [substitution string](https://gmic.eu/reference/substitution_rules.html#top) `{<imageindex>,n}` replaces references to image indices with the name of the image — nèe the collection label — if the indexed image occupies a collection, or, failing that, the filename, _sans_ path, from which the image originated, or — failing even that — the default `[unnamed]` string:
+===
+~~~
+namestuff :
+   1
+   -input images/ampersand.svg
+   [-1]
+   -name. theampersand
+   -repeat $!
+      -echo "Image "{\$>}" is: "{$>,n}"."
+   -done
+
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Input black image at position 0 (1 image 1x1x1x1).
+[gmic]-1./ Input file 'images/ampersand.svg' at position 1 (1 image 256x256x1x1).
+[gmic]-2./ Input copy of image [1] at position 2 (1 image 256x256x1x1).
+[gmic]-3./ Set name of image [2] to 'theampersand'.
+Image 0 is: [unnamed].
+Image 1 is: images/ampersand.svg.
+Image 2 is: theampersand.
+~~~
+===
+
 ## Position Tracking
-Once an image is a member of a named selection it retains that association even though it changes its position on the image list. For the following example, the first item on the image list becomes associated with the named selection "AmpersandMe." The image is then is displaced to the second slot on the list but remains in the named selection "AmpersandMe" regardless of this displacement; references to "AmpersandMe" continue to select the image further down the pipeline.
+Once an image is a member of a collection it retains that association even though it changes its position on the image list. For the following example, the first item on the image list becomes associated with the collection `AmpersandMe.` That image then transits to the second position in the image list, though it remains in the collection `AmpersandMe`. References to `AmpersandMe` continue to select the displaced image further down the pipeline.
 ===
-%% 300,250,1,3 nm. AmpersandMe i[0] images/ampersand.svg nm[0] TheAmpStamp r2dx[TheAmpStamp] 64,5 n[TheAmpStamp] 0,1 oneminus[TheAmpStamp] l[AmpersandMe,TheAmpStamp] noise[AmpersandMe] 0.03,2 shift[AmpersandMe] 0,0,0,1.375,2,1 convolve[AmpersandMe] [TheAmpStamp],1,1 done n 0,255 rm[TheAmpStamp] %%
+%% 300,250,1,3 nm. AmpersandMe i[0] images/ampersand.svg nm[0] TheAmpStamp r2dx[TheAmpStamp] 64,5 n[TheAmpStamp] 0,1 oneminus[TheAmpStamp] noise[AmpersandMe] 0.03,2 shift[AmpersandMe] 0,0,0,1.375,2,1 convolve[AmpersandMe] [TheAmpStamp],1,1 n 0,255 rm[TheAmpStamp] %%
 ~~~
-gmic                                            \
-   -input 300,250,1,3                           \
-   -name[0] AmpersandMe                         \
-   -input[0] images/ampersand.svg               \
-   -name[0] TheAmpStamp                         \
-   -r2dx[TheAmpStamp] 64,5                      \
-   -normalize[TheAmpStamp] 0,1                  \
-   -oneminus[TheAmpStamp]                       \
-   -local[AmpersandMe,TheAmpStamp]              \
-       -noise[AmpersandMe] 0.03,2               \
-       -shift[AmpersandMe] 0,0,0,1.375,2,1      \
-       -convolve[AmpersandMe] [TheAmpStamp],1,1 \
-   -done                                        \
-   -normalize 0,{2^8-1}                         \
-   -remove[TheAmpStamp]                         \
+ampstamper :
+   -input 300,250,1,3
+   -name[0] AmpersandMe
+   -input[0] images/ampersand.svg
+   -name[0] TheAmpStamp
+   -resize2dx[TheAmpStamp] 64,5
+   -normalize[TheAmpStamp] 0,1
+   -oneminus[TheAmpStamp]
+   -noise[AmpersandMe] 0.03,2               # Add impulse spikes
+   -shift[AmpersandMe] 0,0,0,1.375,2,1      # Bleed RGB across channels
+   -convolve[AmpersandMe] [TheAmpStamp],1,1 # Propagate ampersand
+   -normalize 0,{2^8-1}
+   -remove[TheAmpStamp]
    -output[AmpersandMe] amped.png
 ~~~
 ===
-## One Association at a Time
-An image cannot be associated with more than one named selection at a time. If an image is subsequently enrolled in a different named selection, it loses its association with the previous one.
+The ''-convolve'' command replaces single-pixel impulses with the convolution kernel: here an image of the 1911 Goudy Bookletter ampersand. This is not unlike a rubber stamp working over a sheet of paper. Naming the kernal image `TheAmpStamp` gives a clear, if whimsical, indication of its role as the "rubber stamp". Similarly, `AmpersandMe` identifies the receiver image that will be stamped all over with ampersands. Immediately, confusion is reduced; the script writer is relieved from doing clockwork arithmetic to track where the rubber stamp and receiver are on the image list. The script is easier to comprehend, as the names furnish cues about what image is being processed.
 
+## One Association at a Time
+An image cannot be associated with more than one collection at a time. If an image is subsequently enrolled in a different collection, it loses its association with the previous one. If the previous collection loses all images then it disappears and subsequent references to it raise errors:
 ===
 ~~~
-gmic                                   \
-   -sample rose                        \
-   -name[0] BlurMe                     \
-   -input[0] [-1],[-1],[-1],[-1],255*u \
-   -name[0-–1] Granfalloon             \
-   -blur[BlurMe] 4                     \
+disappear:
+   -sample rose
+   -name[0] BlurMe
+   -input[0] [-1],[-1],[-1],[-1],u(255)
+   # A forgotten decoration selector on 
+   # 'name' enrolls all images on the list
+   # into the Granfalloon collection.
+   # BlurMe empties and disappears.
+   -name Granfalloon
+   # Throwing an exception here…
+   -blur[BlurMe] 4
    -output[BlurMe] rose.png
 ~~~
 ===
-With the inclusion of all images on the list within the named selection __Granfalloon__, the rose image ceases its association with __BlurMe__. Since the rose image is the only member of that named selection, the named selection __BlurMe__ ceases to exist and subsequent references to it raise an exception. Had there been other members of BlurMe, the named selection would have persisted but the rose image would not have been blurred or saved.
+With the enrollment of all images on the list into the `Granfalloon` collection, the rose image ceases its association with `BlurMe`. Since the rose image was the only member of `BlurMe`, that collection ceases to exist. Subsequent references to it raise exceptions. Had there been other members of `BlurMe`, the collection would have persisted but the rose image would not have been blurred or saved.
 
-## Named Selections in Script Documentation
-While it may not materially add anything to image processing, naming selections can ease the grouping of images subject to identical processing. Once such related images have been isolated to a named selection, there is little need for clock arithmetic to figure out what images are going to be subject to a particular set of commands and where they might be on the image list. The following script groups identical Goudy 1911 ampersands into separate selections named after colors, so that the ampersands may be colored in the manner of the selection name to which they belong. With the selections named, it is straightforward to introduce correct group of ampersands to the corresponding coloring routine. It is far easier to identify the purpose of a named selection than the underlying numeric form of the selction, which aids in documenting code. `threshold[TheAmp] 0.5` quickly conveys what is being operated on – `threshold[-1] 0.5`, not so much.
+## Collections in Script Documentation
+While it may not materially add anything to image processing, enrolling images into collections can ease the grouping of images subject to identical processing. Once such related images have been linked to a collection, there is little need for clock arithmetic to figure out what images are going to be affected by particular commands and where they might be on the image list. The following script groups identical Goudy 1911 Bookletter ampersands into separate collections named after colors, so that the ampersands may be colored in the manner of the collection to which they belong. With named collections, it is straightforward to introduce the correct group of ampersands to the matching coloring routine. It is far easier to identify the purpose of an aptly named collection and its images; `threshold[TheAmp] 0.5` quickly conveys what is being operated on – `threshold[-1] 0.5`, not so much.
 
-%% (32,215,130,90,215^51,64,210,125,180^100,90,37,220,63) nm. Colormap images/ampersand.svg nm. TheAmp r2dx. 256,1 n. 0,1 oneminus. -threshold. 0.5 [TheAmp]x12 nm[1--1:4] Red nm[2--1:4] Green nm[3--1:4] Blue nm[4--1:4] Yellow l[Colormap,Red] map[Red] [Colormap] done l[Colormap,Blue] mul[Blue] 3 -map[Blue] [Colormap] -done l[Colormap,Green] mul[Green] 2 -map[Green] [Colormap] -done l[Colormap,Yellow] mul[Yellow] 4 -map[Yellow] [Colormap] -done rm[Colormap] a x n 0,255 r2dx. 25%,5 %%
 ===
+%% (32,215,130,90,215^51,64,210,125,180^100,90,37,220,63) =>. Colormap images/ampersand.svg =>. TheAmp r2dx. 256,1 n. 0,1 oneminus. -threshold. 0.5 [TheAmp]x12 =>[1--1:4] Red =>[2--1:4] Green =>[3--1:4] Blue =>[4--1:4] Yellow map[Red] [Colormap] *[Green] 2 -map[Green] [Colormap] *[Blue] 3 -map[Blue] [Colormap] *[Yellow] 4 -map[Yellow] [Colormap] rm[Colormap] a x n 0,255 r2dx. 25%,5 %%
+
 ~~~
-gmic                                                                        \
-   -input '(32,215,130,90,215^51,64,210,125,180^100,90,37,220,63)'          \
-   -name[0] Colormap                                                        \
-   -input images/ampersand.svg                                              \
-   -name[-1] TheAmp                                                         \
-   -r2dx[TheAmp] 256,1                                                      \
-   -normalize[TheAmp] 0,1                                                   \
-   -oneminus[TheAmp]                                                        \
-   -threshold[TheAmp] 0.5                                                   \
-   [TheAmp]x12                                                              \
-   -name[1--1:4] Red                                                        \
-   -name[2--1:4] Green                                                      \
-   -name[3--1:4] Blue                                                       \
-   -name[4--1:4] Yellow                                                     \
-   -local[Colormap,Red] -map[Red] [Colormap] -done                          \
-   -local[Colormap,Blue] -mul[Blue] 3 -map[Blue] [Colormap] -done           \
-   -local[Colormap,Green] -mul[Green] 2 -map[Green] [Colormap] -done        \
-   -local[Colormap,Yellow] -mul[Yellow] 4 -map[Yellow] [Colormap] -done     \
-   -remove[Colormap]                                                        \
-   -append x                                                                \
-   -normalize. 0,255                                                        \
-   -r2dx. 25%,5                                                             \
+multicolor :
+   -input '(32,215,130,90,215^51,64,210,125,180^100,90,37,220,63)'
+   -name[0] Colormap
+   -input images/ampersand.svg
+   -name[-1] TheAmp
+   -resize2dx[TheAmp] 256,1
+   -normalize[TheAmp] 0,1
+   -oneminus[TheAmp]
+   -threshold[TheAmp] 0.5
+   [TheAmp]x12
+   -name[1--1:4] Red
+   -name[2--1:4] Green
+   -name[3--1:4] Blue
+   -name[4--1:4] Yellow
+   -map[Red] [Colormap]
+   -mul[Green]  2 -map[Green]  [Colormap]
+   -mul[Blue]   3 -map[Blue]   [Colormap]
+   -mul[Yellow] 4 -map[Yellow] [Colormap]
+   -remove[Colormap]
+   -append x
+   -normalize. 0,255
+   -resize2dx. 25%,5
    -output. img/multicoloramp.png
 ~~~
 ===
+
+## Naming and Classifying Images
+In our never-ending quest to publish a Siggraph paper, our interests have been piqued by the relationship between image saturation and blurring. Herewith, a simple tool that distributes images to collections based on their saturation.
+
+To investigate saturation, a conversion to an HSV or HSL colorspace immediately suggests itself, but we'd like to survey hundreds — verily thousands — of images; we want to keep per-image manipulation to a minimum, so we are leary of time-consuming colorspace conversions.  
+
+Statistics to the rescue. Saturated images exhibit large variations among R, G and B components; the hallmark of a saturated color is a deficieny in at least one or two RGB components compared to the remaining. On the other hand, unsaturated colors have components that are more-or-less the same: `R≈G≈B≈average`.
+
+Statisticians measure "clustering" around averages through [Variance](https://en.wikipedia.org/wiki/Variance). An ensemble exhibits large variance if its data points tend to fall far from the ensemble's average; the distribution curve is wide and low. On the other hand, high and narrow distributions, with data points tending to fall very near the average, only have small variance. And there is a boon for us: G'MIC calculates image variance automatically; we only have to fetch it to use it — hardly any manipulation at all. The [Mathematics function](https://gmic.eu/reference/mathematical_expressions.html#specific_functions) `stats(#_index)[3]` reports this variance; it is the fourth element in the fourteen element statistical profile vector associated with every image.
+
+`classifybyvariance` uses this detail to enroll images in one of five collections, labeled to reflect degrees of variance, but which for us proxies image saturation:
+
+__satools.gmic:__
+~~~
+classifybyvariance :
+   -foreach {
+            var={stats(#0)[3]}
+            -if "$var>1000"
+               -name. satmax
+            -elif "$var<=1000 && $var>667"
+               -name. sat
+            -elif "$var<=667 && $var>333"
+               -name. nominal
+            -elif "$var<=333  && $var>67"
+               -name. unsat
+            -else
+               -name. unsatmax
+            -fi
+    }
+~~~
+When `classifybyvariance` operates, it enrolls all images referenced by its selection decorator in the collection that best reflects its variance. At the end, all selected images will sport one of five names. Or, by a more refined tenet, all selected images will be in one of five saturation collections.
+
+~~~
+reportsat :
+   -named "satmax"   smx={size([${}])}
+   -named "sat"      sat={size([${}])}
+   -named "nominal"  nom={size([${}])}
+   -named "unsat"    uns={size([${}])}
+   -named "unsatmax" umx={size([${}])}
+   -status "   Max Saturated:\t"$smx",\n
+              Saturated:\t\t"$sat",\n
+	      Neither, Nor:\t"$nom",\n
+	      Unsaturated:\t\t"$uns",\n
+	      Uncolored:\t\t"$umx
+~~~
+`reportsat` harnesses ''-named'', which lists indices of all images having a given name. We count the size of such lists to get the collections' population counts.
+
+On to our research! We survey one hundred random pixel images, blurred by 3
+
+~~~
+
+$ gmic                                        \
+   -command satools.gmic                      \
+   -verbose -                                 \
+   -repeat 100                                \
+      -input 6,6,1,3,'[u(255),u(255),u(255)]' \
+   -done                                      \
+   -resize 180,180,1,3,1                      \
+   -blur 3                                    \
+   -classifybyvariance                        \
+   -verbose +                                 \
+   -echo ${-reportsat}                        \
+   -remove
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Input custom command file 'satools.gmic' (2 new, total: 4897).
+   Max Saturated:	100,
+   Saturated:		0,
+   Neither, Nor:	0,
+   Unsaturated:		0,
+   Uncolored:		0
+[gmic]-100./ Remove images [0,1,2,(...),97,98,99] (0 images left).
+[gmic]-0./ End G'MIC interpreter.
+
+~~~
+
+One hundred random pixel images, blurred by 30
+
+~~~
+
+…<see above>…
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Input custom command file 'satools.gmic' (2 new, total: 4897).
+   Max Saturated:	5,
+   Saturated:		41,
+   Neither, Nor:	54,
+   Unsaturated:		0,
+   Uncolored:		0
+[gmic]-100./ Remove images [0,1,2,(...),97,98,99] (0 images left).
+[gmic]-0./ End G'MIC interpreter.
+
+~~~
+
+One hundred random pixel images, blurred by 60
+
+~~~
+…<see above>…
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Input custom command file 'satools.gmic' (2 new, total: 4897).
+   Max Saturated:	0,
+   Saturated:		6,
+   Neither, Nor:	51,
+   Unsaturated:		43,
+   Uncolored:		0
+[gmic]-100./ Remove images [0,1,2,(...),97,98,99] (0 images left).
+[gmic]-0./ End G'MIC interpreter.
+
+~~~
+So: blur goes up; saturation goes down. No surprises: Blurring arises by visiting every pixel and replacing it with a weighted average of itself and its "immediate neighbors", the weights dropping off with increased distance from the pixel and a particular neighbor. The amount of blurring sets the size of the neighborhood. In any case, averaging of values erodes the differences among them; variance necessarily follows suite. 
+
+Central to our survey tool is the idea of classifying images by some numerically tractable property. Here, it is Variance. It could be something else. The mechanism at work doesn't care.`-name`'s ability to create and maintain collections can be applied to any numeric image property or values derived from such. At the end of the day we have images so named as to reflect shared properties. If we need to quickly fetch such images for further processing, we have a hook — the collection's label — that can isolate the images we want no matter where they are on the image list.
+
+And even in storage. It is worth noting that ''-store'' preserves image names. Restoring images to the list also restores it name, re-establishing the collection if necessary.   
+
+## Invoking Host Application Layer Operations
+Collection labels can be employed to convey layer manipulation instructions — _Layer Operations_ — to a G'MIC plug-in host. If a script writer is composing a G'MIC script to run in a host application plug-in, then the label of a collection can be harnessed to convey some simple layer management instructions to a host like Gimp or Krita:
+
+~~~
+…
+-name 'mode(grainmerge),opacity(50),pos(30,50),name(GrainyLayer)'.
+…
+~~~
+Notionally, this adds the last item on the image list to a collection with a label that looks like a script, with "functions" separated by commas and with no white space anywhere in the script. This particular example, a part of a G'MIC script running inside of a `gmic-qt` plug-in, requests the host to set the layer's blending mode to `grainmerge`, opacity to `50` (in a range of `0` ⇒ `100`), the upper left corner of the layer to `x=30` pixels, `y=50` pixels, and the name of the layer in the host application to `GrainyLayer`. This application host layer name is unrelated to G'MIC collection names or the images that inhabit them.
+
+The `gmic-qt` plug-in supports four layer manipulation functions:
+|-    |__Layer Op__|__Parameter Type__|__Description__
+|1.   |mode|Blend mode|Identical to the modes of the G'MIC ''-blend'' command.
+|2.   |name|String|Sets the name of the layer in the host application. Unrelated to arguments given to `-name`.
+|3.   |opacity|numeric 0⇒100|Sets the opacity of the layer. `0` is fully transparent; `100` is fully opaque.
+|4.   |pos|comma separated numeric pair|Positions the upper left hand corner of the layer to _<x>,<y>_.
+
+These are operational only in the context of the `gmic-qt` plug-in. They effect their operations when the plug-in user presses the `OK` button widget in the UI.
+
 
 # Command reference
 ===
@@ -98,8 +270,4 @@ gmic -h name
 """
 ===
 
-
-|1.  |The command associates the collection of images referenced by _<selection>_ with the label _<name>_.
-|2.  |The images become members of a named selection that _<name>_ identifies. Its shortcut is ''-nm''.
-
-Updated: 06-March-2021 13:23 UTC Commit: af5405e3a2cb
+Updated: 04-February-2023 16:31 UTC Commit: f492b9711905e4c0dacaa47e1dc2dc54e6dda677

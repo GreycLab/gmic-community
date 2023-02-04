@@ -1,38 +1,30 @@
 # Command Decorations
-===
-|%% images/select.png r2dy 300 %%
-|*You. Yes. I mean you.*
-===
-By default, commands operate on all images in the image list, aka the _stack_. Often that is not what we want.
 
-The stack can, and often will, contain many items. As we ''-input'' or otherwise conjure images, the interpreter places them in sequence, assigning indices to them starting from zero as it goes along.
-
-| 1.  |Non-negative indices designate images with respect to the beginning of the stack. That is, 0, 1, 3 designate the first, second and fourth image.
-| 2.  |Negative indices designate images with respect to the end of the stack, i. e., –1, –2, –3 designate the last, penultimate and third from the last image. In a stack of four images, both –1 and 3 designate the same image, the last one in the stack. –4 and 0 designate the first image.
+| %% images/select.png r2dy 300 %% \n                    *1. You. Yes. I mean you.*|By default, commands operate on all images on the _image list_, aka the _stack_. Often that is not what we want. What we want, most times, is to operate on select images. In G'MIC the basis for such discriminations are image indices, reflecting images' positions on the stack.\n\nAs we ''-input'' or otherwise conjure up images, G'MIC places them on the stack and assigns indices as it goes. These indices start from zero and increment by one.\n\nThat said, both positive and negative indices can address images:\n 1.  Non-negative indices designate images from the beginning of the stack. 0, 1, 3 designate the first, second and fourth image.\n 2.  Negative indices designate images from the end of the stack.  –1, –2, –3 designate the last, penultimate and third from the last image. In a stack having four images, both –1 and 3 designate the last image on the stack; –4 and 0 designate the first image.
 
 ## Image Selection
 
-G'MIC allows us to decorate commands on their right hand sides with selections that restrict the scope of a command to a subset of items in the image list. Square brackets immediately to the right of the command, with no separating white space, may contain collections of image selecting indices. Thus, the pipeline:
+G'MIC recognizes decorations on a command's right hand side. _Selections_, restricting the scope of a command's operation, appear in square brackets immediately to the right of the command, with no separating white space from the command to the opening square bracket and no white space within the selection. Selections contain collections of image indices, either direct references, or — discussed later — indirect references coupling through _names_. This collection behaves like a _set_. By this, collections are not sequenced. While we may write indices in some order, such ordering has no significance. Nor does repeating indices have any effect. It is as if the recurring index is listed only once. Thus, in this pipeline fragment operating on an image list with five items:
 ~~~
-noise[0] 0.5,2 blur[2] 10 diffusiontensors[–1] 0,1,0.7,2.3
+…noise[0] 0.5,2 blur[2] 10 diffusiontensors[–1,4] 0,1,0.7,2.3…
 ~~~
-applies noise only to just the first image on the stack, then blurs just the third and generates diffusion tensors from the last.
+G'MIC applies noise only to the first image on the stack, then blurs the third and generates diffusion tensors from the last. Note the last selection: it cites the same image twice, so the diffusiontensors command operates only on the last image.
 
-This illustration notwithstanding, selection notation is extensive. Selection syntax has expressions for selecting single or multiple images, ranges of images, every other, every third, or, generally, every n-th image, relative to the beginning or end of the stack, relative to the size of the overall stack, relative to named collections, and all images except the ones designated by a selection. It is easy (and probably inevitable) to select images which are not on the stack, an error.
+This illustration notwithstanding, selection notation is extensive. Selection syntax has expressions for selecting single or multiple images, ranges of images, every other, every third, or, generally, every _n-th_ image, relative to the beginning or end of the stack, relative to the size of the overall stack, relative to named collections, and all images except the ones designated by a selection. It is easy (and probably inevitable) to select images which don't exist, an error.
 
-Here are the ways to restrict to selected images the action of some fictive command called `-foo`:
+Here are the ways to restrict some fictive command called `-foo` to operate only on selected images:
 
-|+ __Type__ | __Template__ | __Description__
+|- __Type__ | __Template__ | __Description__
 | **Everything** | `-foo` | Operates on every image on the stack.
-| **Left Single** | `-foo[n]` | Operates on image 'n+1', counting from the beginning of the stack. `[0]` is a common idiom demarking the first image on the stack. Example: `-foo[3]` operates on the fourth image on the stack.
-| **Right Single** | `-foo[–n]` | Operates on image '–n', counting from the end of the stack. `[–1]` is a common idiom demarking the last image on the stack. Example: `-foo[–2]` operates on the penultimate image in the stack.
-| **Enumerated** | `-foo[a,–b,...z]` | Comma separated indices. Operates on specific images. Indices may have negative signs; these are counted from the end of the stack. Example: `-foo[0,2,–1]` operates on the first, third and last image on the stack.
-| **Range** | `-foo[a-b]` | Hyphenated indices. Operates on images in the range from `a` to `b` inclusive. Example: `-foo[3-5]` operates on the fourth, fifth and sixth images. `-foo[–3-–1]` operates on the third from the last, next to the last and last images.
+| **Left Single** | `-foo[n]` | Operates on image `n+1`, counting from the beginning of the stack. `[0]` is a common idiom demarking the first image on the stack. Example: `-foo[3]` operates on the fourth image on the stack.
+| **Right Single** | `-foo[–n]` | Operates on image `–n`, counting from the end of the stack. `[–1]` is a common idiom demarking the last image on the stack. Example: `-foo[–2]` operates on the penultimate image in the stack.
+| **Enumerated** | `-foo[a,–b,…z]` | Comma separated indices. Operates on specific images. Indices may have negative signs and selections can be mixes of positive and negative indices. Example: `-foo[0,2,–1]` operates on the first, third and last image on the stack.
+| **Range** | `-foo[a-b]` | Hyphenated indices. Operates on images in the range from `a` to `b` inclusive. Example: `-foo[3-5]` operates on the fourth, fifth and sixth images. `-foo[–3-–1]` operates on the third from the last, next to the last and last images. Note that should `a > b` `-foo[a-b]` still works. `-foo[5-3]` still operates on the fourth, fifth and sixth images. 
 | **Relative Range** | `-foo[a%-b%]` | Hyphenated percentages. Operates on image ranges specified through relative positions, with `100%` designating the last position on the stack, however large it may be. Example: `-foo[50%-100%]` operates on images on the upper half of the stack.
-| **Modulo n** | `-foo[<Range>:n]` | Given a range of images, operates on every n-th image in the range. `-foo[:n]` is an error. Example: `-foo[0-–1:3]` operates on every third image on the stack. `-foo[50%-100%:2]` operates on every even-indexed image on the upper half of the stack.
+| **Modulo n** | `-foo[<Range>:n]` | Given a range of images, operates on every `n-th` image in the range. `-foo[:n]` is an error. Example: `-foo[0-–1:3]` operates on every third image on the stack. `-foo[50%-100%:2]` operates on every even-indexed image on the upper half of the stack.
 | **Except** | `-foo[^<selection>]` | Caret preceding a selection. Operates on all images except those in the selection. Example: `-foo[^0]` operates on all images except the first one. `-foo[^0-–1:2]` operates on every odd-indexed image on the stack.
-| **Names** | `-foo[<label>]` | Operates on images designated by name `<label>`, an alphanumeric string which begins with a letter. Raises an error if `<label>` has not been defined. Use `name[<selection>] <label>` to establish an equivalence between `<label>` and the images identified by `<selection>`. Observe that the `<selection>` itself has no lasting significance; it serves only in the moment to designate which images belong to the set `<label>`. See the following example.
-| **Enumerated Names** | `-foo[<label-1>,...]` | Operate on images designates by a series of labels which must already be defined. The overall selection is the union of the individual labeled collections.
+| **Names** | `-foo[<label>]` | Operates on images in the collection designated by the name `<label>`, an alphanumeric string which begins with a letter. Raises an error if `<label>` is not a defined collection. Use `name[<selection>] <label>` to establish an equivalence between `<label>` and the the collection of images chosen by `<selection>`. Observe that: (1) `<selection>` is significant only in enrolling images into collections; that selection has no lasting significance; and (2) an image can be enrolled in _at most_ one collection. Images enrolled in one collection are removed from any others.
+| **Enumerated Names** | `-foo[<label-1>,…]` | Operates on the union of images enrolled in a series of collections. These collections must already be defined.
 
 ===
 %% 1,1,1,3 [0]x3 name[0--1:2] Evens input[0] 1,1,1,3 name[0] IAmFirst fill_color[Evens] 255,0,127 fill_color[IAmFirst] 0,127,255 _parse_cli_images %%
@@ -40,14 +32,21 @@ Here are the ways to restrict to selected images the action of some fictive comm
 *Example: Evens are odd.*
 ===
 ~~~
-gmic -input 1,1,1,3 [0]x3 -name[0-–1:2] Evens -input[0] 1,1,1,3 -name[0] IAmFirst -fill_color[Evens] 255,0,127 -fill_color[IAmFirst] 0,127,255
+evenareodds:
+   -input 1,1,1,3
+   [0]x3
+   -name[0-–1:2] Evens
+   -input[0] 1,1,1,3
+   -name[0] IAmFirst
+   -fill_color[Evens] 255,0,127
+   -fill_color[IAmFirst] 0,127,255
 ~~~
 
-This pipeline paints only odd-numbered stack items with a kind of magenta, despite what the label `Evens` implies; that label spoke to Truth only in a moment and fell out of step when `-input[0] 1,1,1,3` executed.
+This pipeline paints only odd-numbered stack items with a kind of magenta, despite what the label `Evens` propounds; that label Spoke to Truth only in a moment; it fell out of step when `-input[0] 1,1,1,3` ran and shifted the hitherto evenly indexed images to the odds.
 
-It is possible to mix types in selections, thus `-foo[1,3,5-–1]`, mixing an enumeration and range, selects the second, fourth, and sixth through the last image.
+It is possible to mix selection types, thus `-foo[1,3,5-–1]`, mixing an enumeration and range, selecting the second, fourth, and sixth through the last image.
 
-It is also possible that images may be designated more than once, as in `-foo[0-–1:2,2,4,6]`, which selects all the images with even indices on the stack, then explicity selects the images corresponding to indices 2, 4 and 6.  G'MIC regards the collection of indices in selections as sets of distinct elements, so images are not selected twice, nor is there any relevance to the order of indices. `-foo[0,1,2]`, `-foo[2,1,0]`, `-foo[2-0]`, `-foo[0,1,0,2,1,2]` all select the first three images on the stack.
+And, as previously noted, it is also possible that images may be designated more than once in some selection, as in `-foo[0-–1:2,2,4,6]`, which selects all the images with even indices on the stack, then explicity selects the images corresponding to indices 2, 4 and 6.  G'MIC regards the collection of indices in selections as sets of distinct, unenumerated items. Images are not selected twice, nor is there any relevance to their order. `-foo[0,1,2]`, `-foo[2,1,0]`, `-foo[2-0]`, `-foo[0,1,0,2,1,2]` all select the first three images.
 
 Here are some common examples:
 
@@ -67,18 +66,24 @@ Selections in isolation also support a multiplier postfix, the example already s
 
 Commands may be decorated on the lefthand side. Hyphens optionally distinguish commands from other items. Omit them for brevity; include them for clarity. It so happens that the command line interpreter silently strips lefthand hyphens as an early step in command interpretation. Hyphens serve only the Goddess of Readability, but in the cause of diminishing command line confusion they serve her well. Lefthand `+` decorations, however, have "copy first" semantics and matter for transformative commands: those that take selected images as inputs, transform image content and then produce an output.
 
-| 1. |Transformative commands without hyphens or with single hyphens will replace the images they select.
-| 2. |Transformative commands decorated with `+` on the lefthand side first copy the images they select. The new images go on the end of the stack. The command then operates on those copies.
-| 3. |Non-transformative commands, such as `name`, throw an error with lefthand `+` decorations.
-
-Non-transformative commands are those which implement aspects of G'MIC program flow or management of the environment; they do not operate on the contents of images. We have seen one example already. ''-name'' labels an image collection but does not otherwise transform those so labeled. Writing `+name…` throws an exception.
+| 1. |Transformative commands without hyphens or with single hyphens will replace the images they select with versions having transformed content.
+| 2. |Transformative commands decorated with `+` on the lefthand side first copy the images they select, the copies go to the end of the stack in the same relative order as their antecedents. The command then operates on those copies.
+| 3. |Non-transformative commands, such as `name` or flow control commands — administrative in nature — throw an error when prefixed with lefthand `+` decorations.
 
 ## Command Line Anatomy
 
 Consider how this command line builds an image list:
 
 ~~~
-$ gmic 256,256,1,3 noise[–1] 0.05,2 +bandpass[–1] 0.0005,0.001 +threshold[–1] 30% +negate[–1] thinning[–1] -normalize[^0] 0,255 output mystack.cimg
+gmic                          \
+   256,256,1,3                \
+   noise[-1] 0.05,2           \
+   +bandpass[-1] 0.0005,0.001 \
+   +threshold[-1] 30%         \
+   +negate[-1]                \
+   -thinning[-1]              \
+   -normalize[^0] 0,255       \
+   o mystack.cimg
 ~~~
 
 | 1. | `256,256,1,3` conjures up a 256x256x1x3 pixel image with three channels, initially solid black, establishing a stack with one image. The ''-input'' command is implied.
@@ -86,9 +91,9 @@ $ gmic 256,256,1,3 noise[–1] 0.05,2 +bandpass[–1] 0.0005,0.001 +threshold[�
 | 3. | The `+bandpass[–1]` command, with a `+` left hand decorator, duplicates the image at the end of the stack and operates on that, leaving a new last image with the low-frequency components of the previous image. There are now two images on the stack.
 | 4. | Similarly, `+threshold[–1]` copies the last image (`+`), then applies a bilevel reduction to each channel of what is now the last image. This leaves three images on the stack.
 | 5. | `+negate[–1]` Again a copy-modify of the last image (`+`) inverting color-and-values. The stack now has four images. 
-| 6. | `thinning[–1]` morphologically thins the last image, leaving behind the 'morphological spines' of the contiguous, non-black regions of the former version. Observe that the former version is gone, replaced by the thinned version now occupying the end of the stack. Four images remain on the stack.
-| 7. | `-normalize[^0]`, with an optional hyphen, replaces all images on the list, except the first one, with corresponding versions where the intensity range of each channel is remapped to the range 0 – 255. The image list still has four images. Had we decorated this command with '+', the stack would have had seven images, the second, third and fourth images followed by their normalized versions in positions five, six and seven.
-| 8. | We save the entire stack via `output` in the file `mystack.cimg`, where files of type `.cimg` are of the [native G'MIC format](https://gmic.eu/tutorial/images_as_data_sets.html#nothing). Just prior to this output, however, the four images on the stack look like this:
+| 6. | `-thinning[–1]` — with a `-` prefix — morphologically thins the last image, leaving behind the 'morphological spines' of the contiguous, non-black regions of the former version. Observe that the former version is gone, replaced by the thinned version now occupying the end of the stack. Four images remain on the stack. We could have done without the `-` prefix, but sometimes it helps to be reminded what pipeline items are.
+| 7. | `-normalize[^0]`, also with an optional (redundant) hyphen, replaces all images on the list, except the first one, with corresponding versions where the intensity range of each channel is remapped to the range 0 – 255, see ''-normalize''. The image list still has four images. Had we decorated this command with `+`, the stack would have acquired seven images, the second, third and fourth images followed by their normalized versions in positions five, six and seven.
+| 8. | `o` is shortcut for `-output`. Frequently-used G'MIC commands have shortcut spellings; most are one character. With accumulating experience, G'MIC scripters gravitate to shortcuts. But shortcuts perplex beginners. Through most tutorials, we will avoid shortcuts.\n\nWith this shortcut, we save the entire stack vian `output` command to the file `mystack.cimg`, where files of type `.cimg` are of the [native G'MIC format](https://gmic.eu/tutorial/images_as_data_sets.html#nothing). Just prior to this output, however, the four images on the stack look like this:
 
 ===
 %% 256,256,1,3 noise[-1] 0.05,2 +bandpass[-1] 0.0005,0.001 +threshold[-1] 30% +negate[-1] thinning[-1] normalize[^0] 0,255 output img/mystack.cimg _parse_cli_images %%
@@ -103,7 +108,11 @@ For practical purposes, `mystack.cimg` is the stack on ice. We may restore it mi
 ===
 
 ~~~
-gmic -input mystack.cimg -blend[-2,-1] luminance -keep[-1] -output crossedblobs.png
+gmic                        \
+   -input mystack.cimg      \
+   -blend[-2,-1] luminance  \
+   -keep[-1]                \
+   -output crossedblobs.png
 ~~~
 
 ## Shorthand Selection Notation
@@ -116,18 +125,4 @@ It is very common to operate on the last, penultimate, and third-from-last image
 
 G'MIC supports this shorthand notation only as a command decoration, not in any other place where a selection might be used, as an implied copy or as an argument to another command. Nor do pips work in selection expressions. The fictive command `-foo[0,...]` will not operate on the first and third-from-last image.
 
-## Common Idiomata
-
-It is not uncommon to see these repeating idiomata:
-
----
-- `...+foo[–1] <parameter list> +bar[–1] <parameter list>...`: Constructs a progression of the effects of a series of commands; the images accumulates effects from left to right....
----
-- `+foo[0] <parameter list> +bar[0] <parameter list>...`: Illustrates the effect of different commands on one image.
----
-- `+foo[<range>] <parameter list>`: Illustrates the effect of one command on a range of images.
----
-- `+foo <parameter list>`: Illustrates the effect of one command on all images.
----
-
-| __Updated:__ |  18 September 2022 15:29 UTC Commit: 55696ab09f3d
+| __Updated:__ |  27 January 27 2023 12:15 UTC Commit: 8409068829f1
