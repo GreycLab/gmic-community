@@ -15504,77 +15504,275 @@ else
 
 fi
 #@cli modf: eq. to 'modular_formula'. : (+)
-modf: if ${is_image_arg\ $3} pass$3 0 modular_formula $1,$2,[-1] rm.
-else modular_formula ${1-3}
+modf:
+max_img_ind={$!-1}
+modf_arg2,modf_arg3=${2-3}
+
+if ${is_image_arg\ $2}
+ pass$2 1
+ name[-1] max_channel_image
+ modf_arg2=[$max_channel_image]
 fi
-#@cli modular_formula : operation,max_channel_value,channel_value(%) : operation,max_channel_value,[image]
-#@cli : Apply modular formulas into selected images. 'channel_value' can be values outside the channel ranges of image.\n
-#@cli : (eq. to 'modf').\n
-#@cli : operation can be { 0=modulo | 1=modulo continuous | 2=divisive | 3=divisive continuous | 4=additive | 5=additive continuous}\n
+
+if ${is_image_arg\ $3} 
+ pass$3 1
+ name[-1] channel_values_image
+ modf_arg3=[$channel_values_image]
+fi
+
+modular_formula[0-$max_img_ind] $1,$modf_arg2,$modf_arg3
+keep[0-$max_img_ind]
+#@cli modular_formula : operation,max_channel_value={ float_value | [image] },channel_values={ float_value(%) | [image] }
+#@cli : Apply modular formulas into selected images. 'channel_value' can be values outside the channel ranges of image.
+#@cli : When using a image argument to max_channel_value, the dimension should be equal to the spectrum of target images.
+#@cli : When using a image argument to channel_value, it can be single spectrum or equal to the spectrum of target images.
+#@cli : (eq. to 'modf').
+#@cli : operation can be { 0=modulo | 1=modulo_continuous | 2=divisive | 3=divisive_continuous | 4=additive | 5=additive_continuous}
+#@cli : In addition, the operation variable can be the corresponding string as argument.
 #@cli : Author: Reptorian.
 modular_formula:
-if ${is_image_arg\ $3} arg_img=-2 e[] "Apply modular formulas using image as reference for variable value."
-else arg_img=-1 e[] "Apply modular formulas using {$3*abs($2)} as variable value. "
+if isint($1)
+ modular_mode={int($1)%6}
+else
+  modulo,modulo_continuous,divisive,divisive_continuous,additive,additive_continuous=0,1,2,3,4,5
+  modular_mode=$$1
+  if !narg($modular_mode) error invalid_input fi
 fi
-if $1<0||$1>5 error ""$"1<6||"$"1>=0 => F" fi
-if $1!=int($1) error ""$"1!=INT" fi
-if $arg_img==-2 pass$3 1 fi
-f[0-{$arg_img}] "begin(eps=10^-8;image=1;skip=1;);
- if(image,
-  if("$arg_img"==-2
-   ,var3_mod=i#-1/abs($2);
-   ,var3_mod=$3;image-=1;
+
+max_images_index,utilize_max_channel_image,utilize_channel_values_image={$!-1},0,0
+
+if ${is_image_arg\ $2}
+ pass$2 1
+ name[-1] max_channel_image
+ if find(crop(#-1),0,0,1)+1 error invalid_max_chan_val_set fi
+ utilize_max_channel_image=1
+ if s==1 max_channel={i} fi
+else
+ if !$2 error invalid_max_chan_val fi
+fi
+
+if ${is_image_arg\ $3}
+ pass$3 1
+ name[-1] channel_values_image
+ utilize_channel_values_image=1
+else
+ use_percent_mode=${is_percent\ $3}
+ if !$3
+  if $modular_mode==2||$modular_mode>3 return
+  else
+   foreach { 100%,100%,100%,100% rm.. } return
+  fi
+ fi
+fi
+
+fill[0-$max_images_index] "begin(
+  const modular_mode=$modular_mode;
+  const epsilon=1E-13;
+  const utilize_max_channel_image=$utilize_max_channel_image;
+
+  if(utilize_max_channel_image,
+   const max_channel_reference=$max_channel_image;
+
+   whds#max_channel_reference==1?(
+    const max_channel=$max_channel;
+    const max_channel_mod=max_channel+epsilon;
+    const double_max_channel=max_channel*2;
+    const use_max_channel_array=0;
+   ):(
+    max_channel=crop(#max_channel_reference);
+    max_channel_mod=max_channel+epsilon;
+    double_max_channel=max_channel*2;
+    const use_max_channel_array=1;
+   );
+  ,
+   const max_channel=$2;
+   const max_channel_mod=max_channel+epsilon;
+   const double_max_channel=max_channel*2;
+   const use_max_channel_array=0;
   );
-  if(!var3_mod,var3_mod=eps);
-  maxnum=$1<2?var3_mod*abs($2)+eps:abs($2)+eps;
-  var3_mod=var3_mod*abs($2);
-  mf(a)=a-maxnum*floor(a/maxnum);
-  amf(a)=(if(floor(a/maxnum)%2,(maxnum-eps)-mf(a),mf(a)));
- );
- if(skip,skip-=1;
-   if($1>3,
-    if(!($1%2)
-      ,calc(a)=mf(a+var3_mod);
-      ,calc(a)=amf(a+var3_mod);
+
+  if($utilize_channel_values_image,
+   const channel_values_reference=$channel_values_image;
+   const spectrum_size_of_channel_values_reference=s#channel_values_reference;
+   const multispectrum_mode=spectrum_size_of_channel_values_reference>1;
+
+   multispectrum_mode?(
+    multiplier()=(
+     channels_values=I#channel_values_reference;
+     nonzero_values=!!channels_values;
+     zero_values=!channels_values;
+     channels_values+=zero_values;
+     result_multiplier();
+    );0;
+   ):(
+    multiplier()=(
+     channel_value=i(#channel_values_reference,x,y,z,0);
+     channel_value?max_channel/channels_values;
+    );0;
+   );
+
+   modular_mode==0?(
+    multispectrum_mode?(
+     modular_output()=(
+      channels_values=abs(I#channel_values_reference);
+      multiplier=!!channels_values;
+      (I%(channels_values+epsilon)*multiplier)%max_channel_mod;
      );
-   ,if($1>1,
-    if(!($1%2)
-      ,calc(a)=mf(a*(abs($2)/var3_mod));
-      ,calc(a)=amf(a*(abs($2)/var3_mod));
+    ):(
+     modular_output()=(
+      channel_value=i(#channel_values_reference,x,y,z,0);
+      channel_value?I%(channel_value+epsilon)%max_channel_mod;
      );
-   ,if(!($1%2)
-      ,calc(a)=mf(a);
-      ,calc(a)=amf(a);
+    );
+   ):
+   modular_mode==1?(
+    multispectrum_mode?(
+     modular_output()=(
+      channels_values=I#channel_values_reference;
+      multiplier=!!channels_values;
+      channels_values+=epsilon*(1-multiplier);
+      a=I%(channels_values*2)%max_channel_mod;
+      multiplier*(channels_values-abs(channels_values-a));
+     );
+    ):(
+     modular_output()=(
+      channel_value=i(#channel_values_reference,x,y,z,0);
+      channel_value?(
+       double_channel_value=channel_value*2;
+       a=I%double_channel_value;
+       channel_value-abs(channel_value-a);
+      );
+     );
+    );
+   ):
+   modular_mode==2?(
+    multispectrum_mode?(
+     result_multiplier()=nonzero_values*(max_channel/channels_values)+zero_values;
+     modular_output()=(I*multiplier())%max_channel_mod;
+    ):(
+     modular_output()=(
+      channel_value=i(#channel_values_reference,x,y,z,0);
+      channel_value?(
+       (I*(max_channel/channel_value))%max_channel_mod;
+      ):I;
+     );
+    );
+   ):
+   modular_mode==3?(
+    multispectrum_mode?(
+     result_multiplier()=nonzero_values*(max_channel/channels_values);
+     modular_output()=(
+      a=(I*multiplier())%double_max_channel;
+      max_channel-abs(max_channel-a);
+     );
+    ):(
+     modular_output()=(
+      channel_value=i(#channel_values_reference,x,y,z,0);
+      channel_value?(
+       a=(I*(max_channel/channel_value))%double_max_channel;
+       max_channel-abs(max_channel-a);
+      );
+     );
+    );
+   ):
+   modular_mode==4?(
+    multispectrum_mode?(
+     modular_output()=(I+I#channel_values_reference)%max_channel_mod;
+    ):(
+     modular_output()=(I+i(#channel_values_reference,x,y,z,0))%max_channel_mod;
+    );
+   ):(
+    multispectrum_mode?(
+     modular_output()=(
+      a=(I+I#channel_values_reference)%double_max_channel;
+      max_channel-abs(max_channel-a);
+     );
+    ):(
+     modular_output()=(
+      a=(I+i(#channel_values_reference,x,y,z,0))%double_max_channel;
+      max_channel-abs(max_channel-a);
      );
     );
    );
- );
- calc(i);
- end(if(!image,
-   maxnum=maxnum;
-   var3_mod=var3_mod;
-  );
-  if(!skip;
-   if($1>3,
-    if(!($1%2)
-      ,calc(a)=mf(a+var3_mod);
-      ,calc(a)=amf(a+var3_mod);
+  ,
+   const use_percent_mode=$use_percent_mode;
+   const divisive_mode=inrange(modular_mode,2,3,1,1);
+
+   if(divisive_mode,
+    use_percent_mode?(
+     const multiplier=1/$3;
+    ):(
+     utilize_max_channel_image?(
+      multiplier=max_channel/$3;
+     ):(
+      const multiplier=max_channel/$3;
      );
-   ,if($1>1,
-    if(!($1%2)
-      ,calc(a)=mf(a*(abs($2)/var3_mod));
-      ,calc(a)=amf(a*(abs($2)/var3_mod));
+    );
+   ,
+    use_percent_mode?(
+     use_max_channel_array?(
+      channels_values=max_channel*$3;
+      if(modular_mode&1,
+       double_channels_values=channels_values*2;
+      );
+      sum_channels_values_eps=channels_values+epsilon;
+     ):(
+      const channels_values=max_channel*$3;
+      if(modular_mode&1,
+       const double_channels_values=channels_values;
+      );
+      const sum_channels_values_eps=channels_values+epsilon;
      );
-   ,if(!($1%2)
-      ,calc(a)=mf(a);
-      ,calc(a)=amf(a);
+    ):(
+     use_max_channel_array?(
+      channels_values=vector(#s,$3);
+      if(modular_mode&1,
+       double_channels_values=channel_values*2;
+      );
+      sum_channels_values_eps=channels_values+epsilon;
+     ):(
+      const channels_values=$3;
+      if(modular_mode&1,
+       double_channels_values=channels_values*2;
+      );
+      const sum_channels_values_eps=channels_values+epsilon;
      );
     );
    );
+
+   modular_mode==0?(
+    modular_output()=I%sum_channels_values_eps%max_channel_mod;
+   ):
+   modular_mode==1?(
+    modular_output()=(
+     a=I%double_channels_values;
+     channels_values-abs(channels_values-a);
+    );
+   ):
+   modular_mode==2?(
+    modular_output()=(I*multiplier)%max_channel_mod;
+   ):
+   modular_mode==3?(
+    modular_output()=(
+     a=(I*multiplier)%double_max_channel;
+     max_channel-abs(max_channel-a);
+    );
+   ):
+   modular_mode==4?(
+    modular_output()=(I+channels_values)%max_channel_mod;
+   ):(
+    modular_output()=(
+     a=(I+channels_values)%double_max_channel;
+     max_channel-abs(max_channel-a);
+    );
+   );
   );
+
  );
-"
-replace_nan 0
+ modular_output();
+ "
+
+keep[0-$max_images_index]
 if $arg_img==-2 rm. fi
 #@cli rep_bchstatfunc: eq. to 'rep_by_channel_statistical_function'. : (+)
 rep_bchstatfunc : rep_by_channel_statistical_function $*
