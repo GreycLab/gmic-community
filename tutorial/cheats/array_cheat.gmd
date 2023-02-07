@@ -1,84 +1,81 @@
 %% x "mkdir -p img" rm %%
 |+ [Cheat Home](cheatsheet.html) | [Custom Cheat](custom_cheat.html) | [Display Cheat](display_cheat.html) | [Debug Cheat](debug_cheat.html) |**Array Cheat**|                    
 |                    |                    |                    |                    |                    |                    
-### Cheat #5: Arrays: Command line and Math Expressions
-__TL;DR:__ Notation to address ordered sequences of things on the command line and in the Math Expression parser, and moving between the two.
-= expressrefresh
-### Brief Refresher on Substitutions
-Command line variables stem from G'MIC's [Substitution Rules](https://gmic.eu/reference/substitution_rules.html#top). Brief refresher:
-| 1.  |Create a substitution|… 'twelvesquared=144' …
-| 2.  |Use a substitution|… 'echo $twelvesquared' …
+### Cheat #5: Pixel and Array Assessors
+__TL;DR:__ Vectors live in math expressons; the square bracket assessor returns subvectors from a given starting index, subvector width and stride size. Image pixels also have a suare bracket accessor, but the pixel accessor takes an offset and a boundary policy flag. It is easy to confuse the two, what with square brackets cuing different kinds of accessors.
+
+??? Substitution Rules
+### Substitutions
+|- 1.  |G'MIC's [Substitution Rules](https://gmic.eu/reference/substitution_rules.html#top) define a set of `{ <string> }` directives. The string directs G'MIC to follow one of a number of rules that can produce nothing ("Not-a-Number," or _nan_), one alphanumeric value or a series of such, the last separated by commas.
+|      a.  |For example, a common directive is a feature substitution rule that pairs an optional image index with a [Mathematical Expression](https://gmic.eu/reference/mathematical_expressions.html#top). In the absence of an image index, the last image on the list, `[-1]`, is assumed. G'MIC executes the mathematical expression in the context of the given image; the last statement of the mathematical expression may produce _nan_, a scalar or a mathematical vector. G'MIC replaces such curly-brace bracketed constructs with the results of the directive, without the curly braces, transcribing mathematical vectors into lists of comma separated values.
+|      b.  |While (a.) has placed an emphasis on the mathematical expression feature substitution rule, there are other kinds of directives and feature substitution rules that may appear within curly braces. For example, G'MIC replaces `{n}`, the image name feature substitution rule, with the name of the last image on the list, if it has one, or its file of origination, if there is one, or the special `[unamed]` indicator otherwise. G'MIC substitutes `{ <pipeline> }` with the return status of a pipeline of commands. Consult [Substitution Rules](https://gmic.eu/reference/substitution_rules.html#top) for the full set of directives.
+| 2.  |G'MIC interprets `=`, as an _assignment operator_. This operator establishes a lefthand side _variable_ as representing a (typically extensive) right hand side value: a _nan_, scalar or a list of values. The right hand side may be an explicit value or value list, or a directive within curly braces that G'MIC follows. With the right hand side evaluated, `=` assigns the outcome to the left hand side. From this point in the pipeline forward, a dollar sign `$` prepended to the variable prompts G'MIC to substitute it for the assigned right hand value.
+|      a.  |G'MIC recognizes assignments according to particular _visibility scopes_, more simply "scopes". Depending on the presence, and number of, prepended underscores to a variable name, G'MIC limits recognition of assignments to _local_, _global_ or '_cross-thread_' visibility scopes.
+|            i.  |Without prepended underscores, the visibility of an assignment is limited to the "local scope", that of processing of the current pipeline. Should G'MIC discover that a pipeline item references a custom command, it _enters a new scope_ — that of the custom command — and effectively "forgets" the assignments made during what is now the "parent context" or "parent scope." These parent-based assignments remain masked until G'MIC completes the pipeline defined by custom command and returns from it to the parent context, where the hitherto masked assignments become visible again. By extension, when G'MIC completes the current pipeline and exits from it — perhaps to its parent context, perhaps to the operating system shell — all the local variable assignments are deleted.
+|           ii.  |With one prepended underscore, the variable becomes visible in all scope contexts that appear in a run of a G'MIC interpreter in one CPU thread. A global variable defined in one custom command is visible to all other custom commands. To the uninitiated, this seems a boon. In `… _foo=4 … echo "The value of Foo is: "$_foo` can retrieve the value assigned to `$_foo` almost no matter where the reference occurs. We can cease worrying about scope! Alas! the practice replaces one set of bothers with another, even worse set. The uninitiated soon discover that initialization protocols need to be worked out; apart from programmer's memory, there is no enforcement or control over the order that commands may be invoked, and what happens when one such command is invoked before shared global variables have been assigned initial values. There are limited cases where shared state outweighs the bother of shared state; none rank high in the list of best practices.
+|          iii.  ||With two prepended underscores, the variable becomes visible in all scope contexts that appear in a run of the G'MIC interpreter across all CPU threads created by the interpretor. To the perils of globally visible variables, the programmer is given those of thread synchronization and locking. There are only very limited circumstances where such are worth the management trouble.
+|      b.  |Locally scoped variables are the safest, least problematic and most common form of command line variables. That they disappear when they fall out of scope is a feature, not a bug. In a well-designed command, the locally scoped variables, few in number, serve the script-writer's immediate and transitory needs. He need not focus on anything else. On leaving a scope, G'MIC deletes the locals, a kind of garbage collection that keeps the interpreter lean.
+| 3.  |When G'MIC enters a scope, either the initial command line or a custom command, it is tasked to interpret a new pipeline. This goes through two phases:
+|      a.  |The interpreter first itemizes, or _decomposes_ the text, roughly splitting on whitespaces, obtaining an itemized list.
+|      b.  |The interpreter then enters a new scope and processes the items one at a time. On each iteration, G'MIC attempts to classify the current item as one of (i) A variable assignment: G'MIC processes the right hand side. (ii) A command: G'MIC consults an internally maintained lookup table to attempt to match the item to a known command or a shortcut version of the command, or (iii) a comma-separated argument list. G'MIC consults the classification of the previous pipeline item. If it is a command, G'MIC associates the argument list with that command. If the previous item is not a command, G'MIC infers the presence of an implied ''-input'' command and associates the argument with that. In each case, G'MIC may encounter curly braces delimiting a directive or a variable prepended with a dollar sign; G'MIC expands these substitutions first before undertaking to classify the current pipeline item. If a mathematical expression embeds substitutable elements, G'MIC expands these first, then invokes the mathematical expression parser. That parser never "sees" substitutable elements _per se_, only the results of their expansions.  
+#### Examples:
+| 1.  |Create a substitution|… `twelvesquared=144` …|… `evens={V=vector256(0);fill(V,i,i*2);V}` …
+| 2.  |Use a substitution|… `echo $twelvesquared` …|… `16,16,1,1,$evens` …
+
+===
 ~~~
 $ gmic twelvesquared=144 echo $twelvesquared
 [gmic]-0./ Start G'MIC interpreter.
 [gmic]-0./ Set local variable 'twelvesquared=144'.
 [gmic]-0./ 144
 [gmic]-0./ End G'MIC interpreter.
-~~~
-* Equating a lefthand string with a righthand item through a `=` operator sets up a _substitution_.
-* From such a declaration forward, G'MIC substitutes occurences of '$ _<lefthand_item>_' with '_<righthand_item>_.'
-* Such substitutions underlie G'MIC _command line variables_. These may have _global_ or _local_ visiblity. A _scope_ constitutes the current, in-progress G'MIC pipeline, along with the substitutions which the command line processor can act upon (i.e., are 'visible') while operating on the current pipeline. See [Debuggery](https://gmic.eu/tutorial/debug_cheat.html#debuggery) for further remarks on how G'MIC _enters_ and _exits_ various _scopes_. 
-* _Global_: prepend the lefthand string with an underscore character: '_visibleeverywhere=42'. Even when subsequently entering the scopes custom commands, no matter how deep they may be from the declaration, G'MIC will substitute occurences of '$_visibleeverywhere' with '42'.
-* _Local_: 'visibleincurrentscopeonly=26', the default scope when omitting a prepended underscore. Note line two of the shell log. When subsequently entering scopes of custom commands, the definition of '$visibleincurrentscopeonly' disappears from the deeper scope. Similarly, the definition of '$visibleincurrentscopeonly' disappears when G'MIC exits the scope of its declaration. While it may seem contrary to common sense, the self-effacing nature of local variables is a feature, not a bug. Practically, most variables are meaningful only in the immediate scope of their use and have no business in deeper or shallower ones: that means you may reuse meaningful local variable names in other scopes without undue ambiguity. In contrast, global variables are forever and trip up scripters after their declarations are forgotten, giving rise to subtle, hard-to-detect bugs. Best practice: use global variables only when you really, _really_ have to.
-= mathexpjit
-### Substitutions with the Math Expression JIT processor
-G'MIC performs substitutions very early in the process of analyzing command line items. This has consequence in scripts where math expressions live. 
-~~~
-$ gmic constantfive=5 count={V=vector$constantfive(0);fill(V,k,V[k]=k)} echo $count
+
+$ gmic evens={V=vector256(0);fill(V,i,i*2);V} 16,16,1,1,$evens name. Ramp
 [gmic]-0./ Start G'MIC interpreter.
-[gmic]-0./ Set local variable 'constantfive=5'.
-[gmic]-0./ Set local variable 'count=0,1,2,3,4'.
-[gmic]-0./ 0,1,2,3,4
+[gmic]-0./ Set local variable 'evens=0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,4(...).
+[gmic]-0./ Input image at position 0, with values '0,2,4,6,8,10,12,14,16,18,20,22,2(...)94,496,498,500,502,504,506,508,510' (1 image 16x16x1x1).
+[gmic]-1./ Set name of image [0] to 'Ramp'.
+[gmic]-1./ Display image [0] = 'Ramp'.
+[0] = 'Ramp':
+  size = (16,16,1,1) [1024 b of float32].
+  data = (0,2,4,6,8,10,12,14,16,18,20,22,(...),488,490,492,494,496,498,500,502,504,506,508,510).
+  min = 0, max = 510, mean = 255, std = 148.09, coords_min = (0,0,0,0), coords_max = (15,15,0,0).
+~~~
+%% evens={V=vector256(0);fill(V,i,i*2);V} 16,16,1,1,$evens =>. Ramp n[Ramp] 0,255 r2dx[Ramp] {w*16},1 %%
+*Ramp*
+===
+???
+
+G'MIC's pipeline variables are essentially labels for underlying things or lists of things. These can be created with assignment (`=`) operators and, later in the pipeline, recalled with a dereference (`$`) operator. Labels represent lists of alphanumerics, comma-separated, where the list can be one thing.
+
+|- Creation | Use
+|`somenumber=4| echo "Some_Number: "$somenumber"."
+| gausscurve='{V=vector16(0);fill(V,k,gauss((k/7.5)-1,0.25,1));V}'|echo "Curve Plots: "$gausscurve|echo "Gaussian plots: "$gausscurve
+
+===
+~~~
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Set local variable 'somenumber=4'.
+[gmic]-0./ Some_Number: 4.
+[gmic]-0./ End G'MIC interpreter.
+
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Set local variable 'gausscurve=0.00053532090305954147,0.0039205118451014877,0.0216042247247774(...).
+[gmic]-0./ Gaussian plots: 0.00053532090305954147,0.0039205118451014877,0.021604224724777483,0.089578121179371598,0.27946830428366071,0.6560402987039744,1.1587662110459314,1.5400274983840558,1.5400274983840558,1.1587662110459314,0.65604029870397484,0.27946830428366093,0.089578121179371528,0.021604224724777483,0.0039205118451014877,0.00053532090305954147
 [gmic]-0./ End G'MIC interpreter.
 ~~~
-Awful lot going on here. Let's unpack this.
-| 1.  |We are declaring _two_ substitutions, one for '$constantfive', the second for '$count'.
-| 2.  |First item: The declaration for '$constantfive' is easy to digest. _Immediately_ after this declaration, wherever G'MIC "sees" '$constantfive', it substitutes it with '5'. Mark our word: _Immediately_. The first substitution, item one of the pipeline, is for '$constantfive'; it is ready for use by the time G'MIC takes up the second item on the pipeline, the declaration for the substitution 'count'
-| 3.  |In the declaration of 'count', what's going on with the right hand side? Hint: G'MIC already knows how to substitute occurences of '$constantfive' with '5':
-|   a.   |Brackets '{}' signal G'MIC to summon the 'Just In Time' (JIT) math processor to process the intervening string, presumably a properly composed [math expression](https://gmic.eu/reference/mathematical_expressions.html#top) and, barring JIT errors,  to substitute the bracketed string with the results of JIT math processing. That results becomes the right hand side in the declaration for 'count'. 
-|   b.   |Before invoking the math processor, G'MIC scans the math expression for possible substitutions, finds '$constantfive' and replaces it with '5'.
-|   c.   |When G'MIC invokes the math processor, that facility "sees" not 'vector$constantfive' but 'vector5', the math function which creates five element vectors. The math processor is _wholly unaware_ of the substitution. In fact, the math processor is wholly unaware of G'MIC. It leads an uncomplicated life; it just processes the strings it is given, just as they are given to it.
-|   d.   |In conducting its uncomplicated life, the math processor observes the ';' statement separator operator: the math expression consists of two statements. The first statement assigns symbol 'V' a five element vector, all elements '0'. The second statement fills that vector with the ascending sequence '0,1,2,3,4'. See [Specific functions](https://gmic.eu/reference/mathematical_expressions.html#specific_functions) and [New useful features in math parser, planned in 2.9.8](https://discuss.pixls.us/t/new-useful-features-in-math-parser-planned-in-2-9-8/24910)for the care and feeding of 'fill()' and other math processing functions.
-|   e.   |The second math processor statement seems to have forgotten to assign anything to anything. It is the way of the math processor to pass whatever the results of the last statement may be to the parent context: the G'MIC command line processor, to wit, a swan song: "I am done. That string you gave me is a valid math expression and the last statement in that expression reduces to a vector '[0,1,2,3,4]' Do with it what you will. I am cleaning up now, deallocating resources, and I am ceasing to exist."
-| 4.  |G'MIC does what it will. Having no innate notion of a vector, G'MIC sees it as a comma separated list of five items, '0,1,2,3,4' This is a right hand side that it can understand; it assigns the list to the left hand name for the substitution. Thereafter, '$count' resolves to '0,1,2,3,4' wherever the former may be seen.
-| 5.  |Recall that substitutions are _immediate_. The follow-on command, 'echo' "sees" not '$count', but '0,1,2,3,4', which it duly echos to the G'MIC shell log.
-= constmath
-### Substitution and 'const' math expressions 
-'3b' GMIC preprossessing of math expressions, looking for possible substitutions within such and replacing them with their declared values, is more useful than it first seems.
+===
 
-The math expression processor embodies the the notion of a 'const' symbol:
-~~~
-const fivemetercircumference=5*pi;
-~~~
-So long as the right hand side reduces to a fixed numeric quantity during JIT compilation — a _known value_ at compilation time — then the JIT compiler can readily replace all occurences of symbol 'fivemetercircumference' with the numeric 15.70796 or thereabouts, as the product of five and π, are both known fixed quantities at compilation time. If the math processor establishes that a symbol can be associated with a known numeric that _never changes_ throughout a math expression lifetime, the math processor then essentially replaces the symbol with the numeric, which can simplify and speed up math expression processing.
+There are few array management resources available to the G'MIC interpreter; lists of alphanumerics are array-like, but not arrays. Array access is not the interpreter's long suite. That lies with the Mathematics E  
 
-Well, that is all well and good — until one wants to cheat:
-~~~
-gmic                                                                  \
-   eval "                                                             \
-          for(                                                        \
-               k=2,                                                   \
-               k<7,                                                   \
-               k=k+1,                                                 \
-               V=vector(#k,0);                                        \
-               fill(V,j,V[j]=2*j+3);                                  \
-               … # Do various things with our very own flexi-vector V \
-             )                                                        \
-        "                                                             \
-[gmic]-0./ Start G'MIC interpreter.
-[gmic]-0./ Evaluate expression '(...)' and assign it to status.
-[gmic]-0./ *** Error *** Command 'eval': Function 'vector()': First argument (of type 'scalar') is not a constant, in expression 'for(
-~~~
-G'MIC big, red letter message is its gentle way of observing that the iterator variable, 'k' can't possibly be a known constant value at compile time; assuredly, the variable changes during iteration in the run-time phase. But the creation function 'vector(# _<size>_,…)' most assuredly _does_ require a constant first argument because, in its current implementation, the math processor needs to establish all of its storage requirements up front, during compile time. So one cannot do dynamic vectors in this way. For that, consider [Dynamic arrays](https://gmic.eu/reference/mathematical_expressions.html#dynamic_arrays) where the math expression parser hijacks an image to furnish backing store for arrays that seem to adjust their sizes as elements are added or removed.
 
-Dynamic arrays aside, one may salvage the broken approach with this:
-~~~
- gmic                            \
-   -repeat 5,k                   \
-   kay={\$k+1}                   \
-   -eval  "const kayiter = $kay; \
-          V=vector(#kayiter,0);  \
-          fill(V,j,V[j]=2*j+3);  \
-         "                       \
-   -done
-~~~
+|  **67** | __Vector Accessor Function:__ `CPX[0,3,1]` is an example of a _vector accessor function_, which extracts subvectors from source vectors. The present example copies _+r_, _±θ_ and _±2πf_ from `CPX` to the ''-fill'' return vector.\n\nThe accessor function's three arguments, `[0,3,1]`, correspond to `[ <starting index>, <subvector length>, <step> ]`. The first argument marks the index in the source vector where the subvector starts. It is the only required argument and, used in isolation, simply extracts a single item from the source vector. The second argument, if present, sets the subvector's length. Thus `V=[0,1,2,3,4,5,6,7,8,9]`; `SV=V[5,3]` sets `SV` to `[5,6,7]`, the three item subvector beginning at index = `5`. The third argument, if present, sets the _step_, and defaults to increments of one item. Thus `V=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];V[0,4,4]` retrieves the subvector `[0,4,8,12]`, the four item subvector starting at index `0` in the source vector and consisting of every fourth item thereafter until a length of four items is obtained.\n\nA vector accessor function can only read vectors; it cannot write them. This precludes its use on the left hand side of an assignment. For that, consider `copy()`, which can transcribe a subvector from a source to a destination vector, or sequencing a new vector's content within a pair of square brackets, as done in line **67**.
+
+
+
+
+
+
+
+|  **63** | __Pixel Accessors:__ Assigning `I` to `CPX` is not a (redundant) assignment of one vector to another, rather it is the creation of a vector from a _pixel accessor function_. The right hand side, `I`, is the pixel accessor; see [Specific Functions](https://gmic.eu/reference/mathematical_expressions.html#specific_functions), bullet points 5 – 10. There is a square-bracket form of the pixel accessor function; its signature, `I[#_ind,offset,offset,_boundary_conditions], differs from the square-bracketed form applied to vectors: `V[ <starting index>, <subvector length>, <step> ]`. The aim here is to remap the pixel to the vector, `CPX,` so as to harness vector accessor function instead. See **67** following. This particular pixel accessor, `I` unadorned, lacks an explicit argument decorator, so the default is in play: `I(#ind,x,y,z,interpolation,boundary_conditions)` where `x`, `y`, and `z` are the predefined math expression variables that, under image iteration, assume the current image column, row and depth values.\n\nBy default, pixel accessors reference the current image. An optional "hashtag-identifier" initial argument explicitly identifies an access source by an image list index or image name: `#2` identifies the third image on the list, counting from the beginning (remember: zero-indexed: 0,1,2!); `#-3` identifies the third image counting from the end of the list. `#$bluishimag` identifies the image named `bluishimag`, should one exist. If there is no image that is so named, or if any of the access identifiers reach beyond the extent of the image list, you cop yourself an access error.\n\nYou can access in-between pixels. That is, pixel coordinates `x`, `y` and `z` may be reals with fractional parts — you access the void between pixels! What happens then? An _interpolation_ takes place through one of three flavors: `0:nearest neighbor`; the interpolator reports the value of the nearest pixel along each image axis; `1:linear`; the interpolator reports the value taken from a linear ramp between the two actual neighboring pixels; `2:cubic`; the interpolator reports the value taken from a cubic spline intersecting the two actual neighboring pixels. See [Pixel Accessors: Kinds of interpolation](#interpolation).\n\nYou can access off-image pixels; perhaps you have overidden `x` with a value far exceeding the image width. What happens then? You apply boundary policy via `boundary conditions:` `0:dirichlet`, the off-pixel is black, `1:neumann`, the off-pixel is the same as the nearest edge pixel, `2:periodic`, images repeat out to infinity along all axes; the off-pixel assumes the value of wherever it is in this repeating cycle, or `3:mirror`, edges are mirror axes where images flip, and flip again out to infinity; the off-pixel assumes the value of wherever it is in this mirror repeating cycle. See [Images Have Edges: Now What?](https://gmic.eu/tutorial/images_have_edges_now_what.html) for the deep dive.\n\nSome pixel accessor functions use a square-bracket decorator, these intended to reference images as if they were one dimensional arrays: `I[_#ind,offset,_boundary_conditions]`. It is easy to confuse this notation with accessing items of a vector, also using square brackets, and, by extended confusion, taking `I` to be a vector. Don't confuse this square bracket flavored pixel accessor with  _vector accessors_, described later; see **67**.
+
