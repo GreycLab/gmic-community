@@ -2,37 +2,77 @@
 |+ [Cheat Home](cheatsheet.html) | [Custom Cheat](custom_cheat.html) | [Display Cheat](display_cheat.html) | [Debug Cheat](debug_cheat.html) | [Array Cheat](array_cheat.html) |**Substitution Cheat**
 |                    |                    |                    |                    |                    |                    
 ### Cheat #6: Substitutions
-__TL;DR:__ G'MIC substitutes directives, bracketed with curley braces, `{}`, and pipeline variables, created on assignments `=` and accessed though dollar sign prefixes, `$` as a first step in analyzing a pipeline item. G'MIC attempts to expand all directives and pipeline variables that are parts of an item before proceeding with its identification: a command reference, argument list or variable assignment.
+__TL;DR:__ You want to retrieve values from the imaging environment and make some calculations. _Example:_ direct G'MIC to compute an ascending ramp from zero to unity, steps being equal to an image's width in pixels. Stash this list in a variable with an easy-to-remember name. Use it later in many other places.
+~~~
+ … -input 16,16,1,1 ramp={0,expr('x/(w-1)',w)} … -echo "Ramp: "$ramp …
 
-G'MIC [substitution rules](https://gmic.eu/reference/substitution_rules.html#top) parallel counterparts found in Bash shell programming. There are directives, bracketed by `{}`, and pipeline variables, created through assignments, `=` and queried through dereferencing operators, `$`. A host of predefined pipeline variables permit access to the interpreter's environment, the image list and the images on the list.    
+[gmic]-0./ Input black image at position 0 (1 image 16x16x1x1).
+Ramp: 0,0.066666670143604279,0.13333334028720856,0.20000000298023224,0.26666668057441711,0.3333333432674408,0.40000000596046448,0.46666666865348816,0.53333336114883423,0.60000002384185791,0.66666668653488159,0.73333334922790527,0.80000001192092896,0.86666667461395264,0.93333333730697632,1
+~~~
+The formula within curly braces is a [math expression](https://gmic.eu/reference/mathematical_expressions.html#top). It computes a ramp of values based on the first image. It is one kind of substitution, a _directive_, that performs an off-to-one-side calculation. G'MIC substitutes the curly-braced expression for its results: a list of numerics running from zero to one. `=` is an assignment operator that defines a _pipeline variable_: a place to stash a value for reuse. Here, G'MIC stashes the results of the directive. Later, a dereference operator, `$`, pulls the pre-computed value, a comma-separated list of numerics, from the pipeline variable that has the key name: `ramp`. This retrieval is another kind of substitution, one prompted by `$`, swapping in the value for the given pipeline variable key name: `ramp`. Use `$ramp` time and again whenever and wherever a list of values ascending from zero to one may be needed.
+
+#### Basics
+Substitution — aliasing a shorthand key for a more complex value — is an essential operational aspect of the G'MIC pipeline interpreter; it is very similar in its features to UNIX/Linux shell programming. Quality time with the [Bash reference manual](https://www.gnu.org/software/bash/manual/bash.html) pays dividends in G'MIC pipeline processing insights.
+
+The G'MIC pipeline interpreter supports two kinds of substitutions: (1) _Directives_, bracketed with curly braces, `{}`, and (2) _Pipeline variables_, a key-value pair created through assignments `=` and retrieved through dereferences `$`. The following illustrates both forms in a slightly different variant of the previous example:
+
+~~~
+$ gmic ramp={V=vector(#16,0);fill(V,k,k++);V} -echo "Ramp: "$ramp"."
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Set local variable 'ramp=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15'.
+Ramp: 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15.
+[gmic]-0./ End G'MIC interpreter.
+~~~
+
+Some observations:
+
+|- 1.  |G'MIC attempts to expand all directives and pipeline variables that are parts of an item before proceeding further.
+| 2.  |The assignment operator `=` associates its righthand side with a new pipeline variable `ramp`.
+| 3.  |The righthand side has a pair of curly braces bracketing an _image feature directive_. This particular directive embodies a [Mathematical Expression](https://gmic.eu/reference/mathematical_expressions.html#top).
+| 4.  |G'MIC's pipeline interpreter invokes the math expression processor to satisfy the directive. The math processor generates a sixteen element vector, the numeric sequence `0–15`.
+| 5.  |G'MIC's pipeline interpreter receives the vector from the math expression processor and maps it to a comma-separated list of values, substituting the curly-braced directive with that list of values.
+| 6.  |Now finished with righthand side substitutions, G'MIC's pipeline interpreter assigns the key, `ramp`, to the righthand value, the comma-separated list of numeric characters: `0–15`. Observe "value", singular. The righthand value is, first and foremost, a string. As with Bash shell programming, pipeline variables basically traffic in strings. Beyond-the-basics interpretation follows on, giving rise to notions of "numeric" and "alphabetic" characters, but it is useful to remember the origin of things.\n\nThis completes the definition of a key-value pair. Henceforth, dereferencing `$ramp` will induce its substitution with the comma-separated list, the value.
+| 7.  |During the course of evaluating the next pair of items in the pipeline, the command `-echo` and its string argument: `"Ramp: "$ramp"."`, the G'MIC pipeline interpreter discovers a dereference operator, `$` operating on the key `ramp`.
+| 8.  |G'MIC's pipeline interpreter looks up the key `ramp` and retrieves the associated comma-separated list of values, `0–15`. The interpreter substitutes that for the `$ramp` pipeline variable, completing the string argument of `-echo`. This exemplifies the substitution of pipeline variables with their assigned values — at the most basic, a string. It is the second kind of substitution occuring in G'MIC scripts.
+| 9.  |Once defined, pipeline variables are available for immediate use in follow-on statements, so it is common for already-defined pipeline variables to appear in follow-on directives. `… gratio={(1+sqrt(5))/2} … grsteps={GR=vector(#32,0);fill(GR,k,k++);$gratio*GR}` In preparing to evaluate the right hand side of `grsteps=…` the G'MIC pipeline interpreter substitutes for `$gratio` the numeric `≈1.618034` for the scaling factor of vector `GR`. Following on, the mathematical interpreter does not see — and has no knowledge of — the pipeline variable `$gratio`; it sees instead the constant `≈1.618034`.
+|10.  |The terminally curious may pause over the flurry of double quotes, `"` comprising the string argument to `-echo`. These are so arranged as to situate the pipeline variable `$ramp` inside a hole of the surrounding string. The basis for this is the double-quote's power to make _string literals_, so that characters that might otherwise be regarded as operators are simply just taken to be simple characters: `{}` and `$` lose their powers. For `$` to function as an operator, it needs to be lifted out of the string literal. To achieve this, the argument to `-echo` is broken into three strings: (1) "Ramp: ", (2) the string value to which pipeline variable `$ramp` resolves, and (3) "." (period). After G'MIC substitutes `$ramp` for the comma-separated list of values it represents, the pipeline interpreter concatenates the three sub-strings into a single string argument for `-echo`.
+|11.  |The power of double quotes to mask `$` does not extend to the `:` operator, which associates a left hand name to a right hand pipeline template — the gist of [adding a custom command](https://gmic.eu/reference/adding_custom_commands.html#top). When defining a custom command, the `$`-expressions continue to operate within double-quoted strings. Recall that the right hand side of a command definition is not executing in the moment, but is a "pigeon-holed specification". During the course of constructing this specification, `$`-expressions insert "hooks" that can only be expanded later on when the custom command is executing and has an actual argument list, the particulars of which isn't known during the custom command's definition. `$`-expressions provide a substitution mechanism for the construction phase of a custom command.
+|12.  |It is easy to dereference a pipeline variable before assigning anything to it. This is probably not useful. In such cases, the default value is an empty string.
+
+#### Directives
+Curly braces reference specific kinds of directives, of which mathematical expressions are but one type. Image feature directives `{ <image index>,<feature type>:<list delimiter> }` are a class of directives that retrieve metrics about images. In the absence of an <image index>, the last image on the list, `[-1]` is assumed. An optional <list delimiter> overrides the default comma for <featue types> that return multiple values. <feature type> is a one character code that selects a specific feature. If absent, then the mathematical expression feature type is assumed and pre-defined image variables supported by the math processor are derived from the given <image index>. Other directives furnish string formatting, such as expressing strings as character code sequences and vice-versa. `${"<pipeline>"}`, the dereference operator preceding a curly brace pair, executes a pipeline of G'MIC commands. The G'MIC's pipeline interpreter replaces this directive with the status returned by the subsidiary pipeline. Consult [Substitution Rules](https://gmic.eu/reference/substitution_rules.html#top) for the full set of directives.
+
+#### Visibility
+Substitutions based on assignments and dereferences `=` and `$` are in force only in the context of a currently operating pipeline — the pipeline interpreter's [current scope](debug_cheat.html). G'MIC maintains per-scope substitution tables. Normally, the table of one scope is not available to others. Finishing the currently operating pipeline or entering a new scope induces G'MIC to take up the substitution table for _that_ scope.
+
+Prepending keys with underscores, as in `_iamglobal=4`, creates globally visible pipeline variables. These become entries in a substitution table visible to all scopes in a single thread of execution. `$_iamglobal` induces G'MIC to substitute `4` where ever the dereference may be encountered. There are circumstances where this is necessary but is usually more trouble than it is worth. To avoid using global variables before their definitions, script authors become obliged to worry about execution order. This becomes increasingly difficult as scripts grow more labyrinthine.
+
+Prepending a key with a double underscore, as `__iammultithreaded=4`, creates a global pipeline variable accessible across all CPU threads. There are even less common circumstances where this is necessary, but adds to the script authors' previous concerns about initialization those of thread concurrency. The vast majority of purposes are served by pipeline variables with lifetimes limited to the current scope, and usefully disappear with the scope's exit — never to create global or cross-thread bothers.
 
 #### Examples:
 
-The first example illustrates the simplest, but probably most common form, of substitution: assigning a scalar value to a pipeline variable. From that juncture forward, the dereferencing operator, `$` induces G'MIC to substitute `$twelvesquared` for `144.` In common with Bash shell programming, G'MIC pre-assigns variables `$0, $1, $2,… ` argument list elements.
+|- 1.  |… `twelvesquared=144 -echo $twelvesquared` …
+|     |The simplest, but probably most common form of substitution: assigning a scalar value to a pipeline variable. From that juncture forward, the dereferencing operator, `$` induces G'MIC to substitute value `144` for pipeline variable `twelvesquared`, wherever `$twelvesquared` may be encountered.
 
-The second example illustrates a [Mathematical Expression](https://gmic.eu/reference/mathematical_expressions.html#top) directive generating a vector of even numbers; when G'MIC completes processing the directive, an assignment operator `=` sets the pipeline variable `evens` to a comma-separated list of values copied from the math vector `V`. With the directive completing, the mathematical environment disappears, `$evens` referencing its surviving outcome. 
-
-The third example illustrates the image feature directive `^`, which generates a vector from all image pixels, copying pixels in row major order. This and the previous Mathematical Expression directive, along with the other image feature directives, all take an optional first parameter, an image index, to which the directive can refer when extracting features. When omitted, the image index defaults to `[-1]`, the last image on the list.
-
-|-     |Create a substitution|Use a substitution
-| 1.  |… `twelvesquared=144` …|… `echo $twelvesquared` … 
-| 2.  |… `evens={V=vector256(0);fill(V,i,i*2);V}`  …|… `16,16,1,1,$evens` …
-| 3.  |… `-input 8,8,1,3 -plasma. 3,4,2 pixels={^}` …|… `echo "Image pixels: "$pixels` …
-
+??? Shell log
 ===
-*twelvesquared*
 ~~~
-$ gmic twelvesquared=144 echo $twelvesquared
 [gmic]-0./ Start G'MIC interpreter.
 [gmic]-0./ Set local variable 'twelvesquared=144'.
 [gmic]-0./ 144
 [gmic]-0./ End G'MIC interpreter.
 ~~~
-|- * 1. Assign to a variable, "twelvesquared", a single numeric value, the square of twelve. *
+===
+???
 
-*evens*
+|-     | %% evens={V=vector256(0);fill(V,i,i*2);V} 16,16,1,1,$evens =>. Ramp n[Ramp] 0,255 r2dx[Ramp] {w*16},1 %%
+|     | *Ramp*
+| 2.  |… `evens={V=vector256(0);fill(V,i,i*2);V} -input 16,16,1,1,$evens name. Ramp` …
+|     |An image feature directive that induces the G'MIC pipeline interpreter to invoke the math processor; that processor executes the given mathematical expression, one that generates a vector of even numbers. When the math processor finishes, the G'MIC pipeline interpreter replaces the curly-bracketed directive with the results of the mathematical expression. The assignment operator `=` induces the pipeline processor to key `evens` to the comma-separated list of values.
+
+??? Shell log
+===
 ~~~
-$ gmic evens={V=vector256(0);fill(V,i,i*2);V} 16,16,1,1,$evens name. Ramp
 [gmic]-0./ Start G'MIC interpreter.
 [gmic]-0./ Set local variable 'evens=0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,4(...).
 [gmic]-0./ Input image at position 0, with values '0,2,4,6,8,10,12,14,16,18,20,22,2(...)94,496,498,500,502,504,506,508,510' (1 image 16x16x1x1).
@@ -43,36 +83,40 @@ $ gmic evens={V=vector256(0);fill(V,i,i*2);V} 16,16,1,1,$evens name. Ramp
   data = (0,2,4,6,8,10,12,14,16,18,20,22,(...),488,490,492,494,496,498,500,502,504,506,508,510).
   min = 0, max = 510, mean = 255, std = 148.09, coords_min = (0,0,0,0), coords_max = (15,15,0,0).
 ~~~
-|- %% evens={V=vector256(0);fill(V,i,i*2);V} 16,16,1,1,$evens =>. Ramp n[Ramp] 0,255 r2dx[Ramp] {w*16},1 %%
-| *Ramp*
-| * 2. Assign to a variable, "evens", a 256 element vector generated by a mathematical expression directive, fills with a ramp of ascending, even values. *
+===
+???
 
-*pixels*
+|-     | %% 8,8,1,3 -plasma. 3,4,2 n. 0,255 r2dx. {w*32},1 %%
+|     |  *Pixels*
+| 3.  |… `-input 8,8,1,3 -plasma. 3,4,2 pixels={0,^} -echo "Image pixels: "$pixels` …
+|     |The image feature directive `^` generates a vector from all image pixels of the first image on the list, transferring pixels by row major order.
+
+??? Shell log
+===
 ~~~
-$ gmic 8,8,1,3 plasma. 3,4,2 pixels={^} echo "Image pixels: "$pixels
 [gmic]-0./ Start G'MIC interpreter.
 [gmic]-0./ Input black image at position 0 (1 image 8x8x1x3).
 [gmic]-1./ Draw plasma fractal on image [0], with alpha 3, beta 4 and scale 2.
-[gmic]-1./ Set local variable 'pixels=-7.84271765,-5.36902952,3.36026835,15.0955048,20.7314415,11.7737751(...).
-Image pixels: -7.84271765,-5.36902952,3.36026835,15.0955048,20.7314415,11.7737751…
+[gmic]-1./ Set local variable 'pixels=11.2169676,4.59088182,7.590343,-10.5732336,-9.50189209,1.20468259,5(...).
+Image pixels: 11.2169676,4.59088182,7.590343,-10.5732336,-9.50189209,1.20468259,5.45177269,13.2510109,7.01207304,0.892325103,-3.06885791,-2.01743364,2.85147595,-4.49253178,-4.7349925,4.79816914,0.389464557,3.75407934,6.34122658,2.48102403,8.01900578,1.75538063,-3.87695026,-0.168754324,3.86112714,7.64547253,6.62067032,11.2111902,-3.01287627,1.8057394,10.2950239,14.4105511,12.0953293,18.4264812,12.3238888,18.441761,4.8574605,16.6738224,8.50226116,11.144639,1.83220029,18.1088428,12.5607595,12.4272251,12.7978725,15.7697153,-6.24995708,-3.5504055,8.42337322,0.65712893,1.93150711,3.58656621,0.45475027,8.34954548,7.72124863,-3.80045056,-2.3227365,-3.85137272,1.23340094,-9.97413254,-5.67019367,3.79658508,10.6057014,7.3957448,13.1903706,10.382699,17.4708157,13.8037224,13.5885611,14.380271,8.37650204,7.60944414,6.98922968,-2.54120231,12.7063551,10.7196445,-4.00450802,-4.88739014,0.149167717,6.40421534,1.66830003,-8.95758629,11.5653238,0.353949428,0.978261113,-4.47347879,9.06638145,2.15009141,-8.23377609,-11.6811419,5.96821928,0.726653039,4.04493809,-7.97460222,0.867262542,-5.01687717,-11.3673201,-12.0862646,9.27751827,1.6368506,0.17305994,3.54917979,-4.8267417,-5.98163509,0.0895609781,-9.48274994,5.0197401,3.17452741,1.71898699,15.5376015,16.8220596,11.2079077,2.8039608,1.30378425,-6.718822,-1.37951422,13.9116392,22.9094601,12.6275473,15.6462126,-9.86057472,-4.79434681,-6.58964682,7.22438765,2.04079938,11.5171576,9.42183399,3.97338247,-6.87711287,8.44608116,3.85517001,23.3198185,3.86654019,-3.24127245,2.25965261,4.62338448,-8.34078312,5.56830072,6.82106972,9.42463303,14.3545141,-5.68110418,1.5083642,-9.38332844,1.84118843,14.8499336,7.76010227,6.19025421,14.688426,5.04829788,-3.72724104,5.55324268,11.8170738,10.3393764,0.639865935,10.1748676,-1.87375772,0.407522112,-7.35853577,1.90484583,6.94888163,17.3602219,13.985919,0.445212603,-2.37235928,6.29095697,5.03118753,0.225121334,7.68333101,17.4418983,5.68180466,9.76714039,-5.30418015,-5.13265657,8.73878574,15.7083015,21.8646011,22.704546,12.6219053,15.7124691,6.35798073,-2.57680416,3.18525434,15.3773556,6.72455645,15.0618172,14.365572,8.87962818,16.4975986,2.3600862,13.0604219,8.38191128
+[gmic]-1./ Display image [0] = '[unnamed]'.
+[0] = '[unnamed]':
+  size = (8,8,1,3) [768 b of float32].
+  data = (11.217,4.59088,7.59034,-10.5732,-9.50189,1.20468,5.45177,13.251;7.01207,0.892325,-3.06886,-2.01743,(...),6.35798,-2.5768,3.18525,15.3774;6.72456,15.0618,14.3656,8.87963,16.4976,2.36009,13.0604,8.38191).
+  min = -12.0863, max = 23.3198, mean = 4.77317, std = 7.9388, coords_min = (1,4,0,1), coords_max = (3,0,0,2).
 ~~~
-|- %% 8,8,1,3 -plasma. 3,4,2 n. 0,255 r2dx. {w*32},1 %%
-| *Pixels*
-| * 3. Assign to a variable, "pixels", the contents of the last image on the list, using the image feature directive: `{^}` *
 ===
+???
 
-#### Substitution Context
-Substitution takes place when G'MIC has been given a raw string, purporting to be a pipeline, and has already blocked it out into a sequence of items. This is the initial _decomposition_ phase of a new pipeline. With a decomposition of items in hand, G'MIC then establishes a new scope and iterates down the item list. For each item, G'MIC attempts to determine if it is a command, an argument list or a substitution assignment.
+#### When do substitutions take place?
+Substitution takes place when G'MIC has been given a raw string, purporting to be a pipeline, and has already blocked it out into a sequence of items. This is the initial _decomposition_ phase of a new pipeline. With a decomposition of items in hand, G'MIC then establishes a new scope and iterates down the item list. It is when G'MIC is performing this item-by-item process that it searches for directives and dereferencing operators and acts upon them to produce a fully expanded command line item.
 
-Running a small pipeline with the G'MIC in debug mode illustrates these phases. See [Debug Cheat](debug_cheat.html) for more information.
-|- 1.   |`item[3]` shows a Mathematical Expression directive constituting the right hand side of an assignment, this to initialize the pipeline variable `evens`. When G'MIC encounters the curley-brackets and determines that the directive contains a mathematical expression, it invokes the math expression parser. A comma-separated list of 256 numerals returns from this environment, which G'MIC assigns to `evens`.
-| 2.   |Later in the iteration, at `item[5]`, G'MIC discovers an argument list; it pairs this with the ''-input'' command. G'MIC also discovers `$evens` and executes the dereferencing command, retriving the 256 element list of numeric values that `evens` references. This furnishes the `-input` command with 260 arguments, the first four dimensioning a 16×16, single-slice, single channel image with 256 pixel initializers following on. G'MIC populates the image with these in row-major order.   
-| 3.   |When in debug mode, the G'MIC interpreter shows how every substitution expands to some final value: observe the `->` expansion notation. The first expansion occured with item[3]: G'MIC called the the mathematical expression parser and substituted the results for the directive, finally assigning it to the pipeline variable `evens` Two items further down, G'MIC encounters the dereferencing of `$evens`; performs a lookup with `evens` as a key, and obtains the 256 item list of numerics, which it takes to be pixel-by-pixel initializer arguments.     
-
+|- 1,  |Running a small pipeline with the G'MIC in debug mode illustrates the command line decomposition and the subsequent entry into the initial scope, comprised of an itemized pipeline, with unexpanded items awaiting further processing. At the outset, G'MIC injects a standard initializer hook at the beginning of the pipeline, `-cli_start,` intended for specific routines that an administrator might wish to run for every invocation of the `gmic` shell command. It defaults to an empty command. During the course of visiting each of the following itemizations, G'MIC searchs for any `{}` directives or `$` dereferencing operators and expands these substitutions, obtaining the complete item. See [Debug Cheat](debug_cheat.html) for more information.
 ~~~
 $ gmic debug evens='{V=vector256(0);fill(V,i,i*2);V}' -input 16,16,1,1,$evens -name Ramp
-[gmic]-0./ Start G'MIC interpreter (in debug mode).<gmic>-0./ Initial command line: 'cli_start , debug evens={V=vector256(0);fill(V,i,i*2);V} -input 16,16,1,1,$evens -name Ramp'.
-<gmic>./ Decompose command line into 8 items: 
+[gmic]-0./ Start G'MIC interpreter (in debug mode).
+<gmic>-0./ Initial command line: 'cli_start , debug evens={V=vector256(0);fill(V,i,i*2);V} -input 16,16,1,1,$evens -name Ramp'.
+<gmic>./ Decompose command line into 8 items:
 <gmic>./   item[0] = 'cli_start'
 <gmic>./   item[1] = ','
 <gmic>./   item[2] = 'debug'
@@ -81,7 +125,12 @@ $ gmic debug evens='{V=vector256(0);fill(V,i,i*2);V}' -input 16,16,1,1,$evens -n
 <gmic>./   item[5] = '16,16,1,1,$evens'
 <gmic>./   item[6] = '-name'
 <gmic>./   item[7] = 'Ramp'
-
+…
+~~~
+|- 2.   |`item[3]` shows a mathematical expression directive on the right hand side of an assignment, this to initialize the pipeline variable `evens`. When G'MIC encounters the curley-brackets and determines that the directive contains a mathematical expression, it invokes the math processor. A comma-separated list of 256 numerals returns from this environment, which G'MIC assigns to `evens`.
+| 3.   |Later in the iteration, at `item[5]`, G'MIC discovers an argument list; it pairs this with the ''-input'' command. G'MIC also discovers `$evens` and executes the dereferencing command, retriving the 256 element list of numeric values that `evens` references. This furnishes the `-input` command with 260 arguments, the first four dimensioning a 16×16, single-slice, single channel image with 256 pixel initializers following on. G'MIC populates the image with these in row-major order.
+~~~
+…
 <gmic>-0./ Enter scope './'.
 <gmic>-0./ Item[0]: 'cli_start', selection [].
 <gmic>-0./ Found custom command 'cli_start: ' (takes no arguments).
@@ -99,24 +148,27 @@ $ gmic debug evens='{V=vector256(0);fill(V,i,i*2);V}' -input 16,16,1,1,$evens -n
 [gmic]-1./ Display image [0] = 'Ramp'.
 [0] = 'Ramp':
   size = (16,16,1,1) [1024 b of float32].
-  data = 0x5642fdc761a0 = (0,2,4,6,8,10,12,14,16,18,20,22,(...),488,490,492,494,496,498,500,502,504,506,508,510).
+  data = 0x5605789091a0 = (0,2,4,6,8,10,12,14,16,18,20,22,(...),488,490,492,494,496,498,500,502,504,506,508,510).
   min = 0, max = 510, mean = 255, std = 148.09, coords_min = (0,0,0,0), coords_max = (15,15,0,0).
-<gmic>-1./ Exit scope './'.
-
-[gmic]-1./ End G'MIC interpreter.
-
+…
 ~~~
+|- 4.   |When in debug mode, the G'MIC interpreter shows how every substitution expands to some final value: observe the `->` expansion notation. The first expansion occured with item[3]: G'MIC called the the mathematical expression parser and substituted the results for the directive, finally assigning it to the pipeline variable `evens` Two items further down, G'MIC encounters the dereferencing of `$evens`; performs a lookup with `evens` as a key, and obtains the 256 item list of numerics, which it takes to be pixel-by-pixel initializer arguments.
 
-#### Substitutions
+??? Substitutions: The Gory Details
+
 |- 1.  |G'MIC's Substitution Rules define a set of `{ <string> }` directives. The string directs G'MIC to follow one of a number of rules that can produce nothing ("Not-a-Number," or _nan_), one alphanumeric value or a series of such, the last separated by commas. G'MIC executes the directive within the curly braces and, upon completion, replaces the cury-braced expression with the results of the directive. Mathematical Expressions are an oft-used kind of directive, but their are others providing string conversions, pipeline-within-pipeline execution, access to image features and access to display features.
 |      a.  |For example, a common directive is a feature substitution rule that pairs an optional image index with a [Mathematical Expression](https://gmic.eu/reference/mathematical_expressions.html#top). In the absence of an image index, the last image on the list, `[-1]`, is assumed. G'MIC executes the mathematical expression in the context of the given image; the last statement of the mathematical expression may produce _nan_, a scalar or a mathematical vector. G'MIC replaces such curly-brace bracketed constructs with the results of the directive, without the curly braces, transcribing mathematical vectors into lists of comma separated values.
-|      b.  |While (a.) has placed an emphasis on the mathematical expression feature substitution rule, there are other kinds of directives and feature substitution rules that may appear within curly braces. For example, G'MIC replaces `{n}`, the image name feature substitution rule, with the name of the last image on the list, if it has one, or its file of origination, if there is one, or the special `[unamed]` indicator otherwise. G'MIC substitutes `{ <pipeline> }` with the return status of a pipeline of commands. Consult [Substitution Rules](https://gmic.eu/reference/substitution_rules.html#top) for the full set of directives.
+|      b.  |While (a.) has placed an emphasis on the mathematical expression feature substitution rule, there are other kinds of directives and feature substitution rules that may appear within curly braces. For example, G'MIC replaces `{n}`, the image name feature substitution rule, with the name of the last image on the list, if it has one, or its file of origination, if there is one, or the special `[unamed]` indicator otherwise. G'MIC substitutes `${ <pipeline> }` with the return status of a pipeline of commands.  Consult [Substitution Rules](https://gmic.eu/reference/substitution_rules.html#top) for the full set of directives.
 | 2.  |G'MIC interprets `=`, as an _assignment operator_. This operator establishes a lefthand side _variable_ as representing a (typically extensive) right hand side value: a _nan_, scalar or a list of values. The right hand side may be an explicit value or value list, or a directive within curly braces that G'MIC follows. With the right hand side evaluated, `=` assigns the outcome to the left hand side. From this point in the pipeline forward, a dollar sign `$` prepended to the variable prompts G'MIC to substitute it for the assigned right hand value.
-|      a.  |G'MIC recognizes assignments according to particular _visibility scopes_, more simply "scopes". Depending on the presence, and number of, prepended underscores to a variable name, G'MIC limits recognition of assignments to _local_, _global_ or '_cross-thread_' visibility scopes.
+|      a.  |G'MIC recognizes assignments according to particular _visibility scopes_, more simply "scopes". Depending on the presence, and number of, prepended underscores to a variable name, G'MIC limits recognition of assignments to _local_, _global_ or _cross-thread_ visibility scopes.
 |            i.  |Without prepended underscores, the visibility of an assignment is limited to the "local scope", that of processing of the current pipeline. Should G'MIC discover that a pipeline item references a custom command, it _enters a new scope_ — that of the custom command — and effectively "forgets" the assignments made during what is now the "parent context" or "parent scope." These parent-based assignments remain masked until G'MIC completes the pipeline defined by custom command and returns from it to the parent context, where the hitherto masked assignments become visible again. By extension, when G'MIC completes the current pipeline and exits from it — perhaps to its parent context, perhaps to the operating system shell — all the local variable assignments are deleted.
-|           ii.  |With one prepended underscore, the variable becomes visible in all scope contexts that appear in a run of a G'MIC interpreter in one CPU thread. A global variable defined in one custom command is visible to all other custom commands. To the uninitiated, this seems a boon. In `… _foo=4 … echo "The value of Foo is: "$_foo` can retrieve the value assigned to `$_foo` almost no matter where the reference occurs. We can cease worrying about scope! Alas! the practice replaces one set of bothers with another, even worse set. The uninitiated soon discover that initialization protocols need to be worked out; apart from programmer's memory, there is no enforcement or control over the order that commands may be invoked, and what happens when one such command is invoked before shared global variables have been assigned initial values. There are limited cases where shared state outweighs the bother of shared state; none rank high in the list of best practices.
+|           ii.  |With one prepended underscore, the variable becomes visible in all scope contexts that appear in a run of a G'MIC interpreter in one CPU thread. A global variable defined in one custom command is visible to all other custom commands. To the uninitiated, this seems a boon. In `… _foo=4 … echo "The value of Foo is: "$_foo …` the value assigned to `$_foo` can be retrieved no matter where the reference occurs. We can cease worrying about scope! Alas! The practice replaces one set of bothers with another, even worse set. The uninitiated soon discover that initialization protocols need to be worked out; apart from a programmer's memory, there is no enforcement or control over the order that commands may be invoked, and it is never clear what happens when one such command is invoked before shared global variables have all been assigned their initial values. There are limited cases where having shared state among a set of commands outweighs the bother of maintaining shared state; none rank high in the list of best practices.
 |          iii.  |With two prepended underscores, the variable becomes visible in all scope contexts that appear in a run of the G'MIC interpreter across all CPU threads created by the interpretor. To the perils of globally visible variables, the programmer is given those of thread synchronization and locking. There are only very limited circumstances where such are worth the management trouble.
 |      b.  |Locally scoped variables are the safest, least problematic and most common form of command line variables. That they disappear when they fall out of scope is a feature, not a bug. In a well-designed command, the locally scoped variables, few in number, serve the script-writer's immediate and transitory needs. He need not focus on anything else. On leaving a scope, G'MIC deletes the locals, a kind of garbage collection that keeps the interpreter lean.
 | 3.  |When G'MIC enters a scope, either the initial command line or a custom command, it is tasked to interpret a new pipeline. This goes through two phases:
 |      a.  |The interpreter first itemizes, or _decomposes_ the text, roughly splitting on whitespaces, obtaining an itemized list.
-|      b.  |The interpreter then enters a new scope and processes the items one at a time. On each iteration, G'MIC attempts to classify the current item as one of (i) A variable assignment: G'MIC processes the right hand side. (ii) A command: G'MIC consults an internally maintained lookup table to attempt to match the item to a known command or a shortcut version of the command, or (iii) a comma-separated argument list. G'MIC consults the classification of the previous pipeline item. If it is a command, G'MIC associates the argument list with that command. If the previous item is not a command, G'MIC infers the presence of an implied ''-input'' command and associates the argument with that. In each case, G'MIC may encounter curly braces delimiting a directive or a variable prepended with a dollar sign; G'MIC expands these substitutions first before undertaking to classify the current pipeline item. If a mathematical expression embeds substitutable elements, G'MIC expands these first, then invokes the mathematical expression parser. That parser never "sees" substitutable elements _per se_, only the results of their expansions.  
+|      b.  |The interpreter then enters a new scope and processes the items one at a time. On each iteration, G'MIC attempts to classify the current item as one of (i) A variable assignment: G'MIC processes the right hand side. (ii) A command: G'MIC consults an internally maintained lookup table to attempt to match the item to a known command or a shortcut version of the command, or (iii) a comma-separated argument list. G'MIC consults the classification of the previous pipeline item. If it is a command, G'MIC associates the argument list with that command. If the previous item is not a command, G'MIC infers the presence of an implied ''-input'' command and associates the argument with that. In each case, G'MIC may encounter curly braces delimiting a directive or a variable prepended with a dollar sign; G'MIC expands these substitutions first before undertaking to classify the current pipeline item. If a mathematical expression embeds substitutable elements, G'MIC expands these first, then invokes the mathematical expression parser. That parser never "sees" substitutable elements _per se_, only the results of their expansions.
+
+???
+
+Thu Feb  12 2023 16:12 UTC commit 9c538e9dfe244011be861763e098aa3445ebf16f

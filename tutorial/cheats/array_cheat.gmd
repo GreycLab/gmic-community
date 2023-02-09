@@ -1,81 +1,165 @@
 %% x "mkdir -p img" rm %%
-|+ [Cheat Home](cheatsheet.html) | [Custom Cheat](custom_cheat.html) | [Display Cheat](display_cheat.html) | [Debug Cheat](debug_cheat.html) |**Array Cheat**|                    
+|+ [Cheat Home](cheatsheet.html) | [Custom Cheat](custom_cheat.html) | [Display Cheat](display_cheat.html) | [Debug Cheat](debug_cheat.html) |**Array Cheat**| [Substitution Cheat](subs_cheat.html)
 |                    |                    |                    |                    |                    |                    
-### Cheat #5: Pixel and Array Assessors
-__TL;DR:__ Vectors live in math expressons; the square bracket assessor returns subvectors from a given starting index, subvector width and stride size. Image pixels also have a suare bracket accessor, but the pixel accessor takes an offset and a boundary policy flag. It is easy to confuse the two, what with square brackets cuing different kinds of accessors.
-
-??? Substitution Rules
-### Substitutions
-|- 1.  |G'MIC's [Substitution Rules](https://gmic.eu/reference/substitution_rules.html#top) define a set of `{ <string> }` directives. The string directs G'MIC to follow one of a number of rules that can produce nothing ("Not-a-Number," or _nan_), one alphanumeric value or a series of such, the last separated by commas.
-|      a.  |For example, a common directive is a feature substitution rule that pairs an optional image index with a [Mathematical Expression](https://gmic.eu/reference/mathematical_expressions.html#top). In the absence of an image index, the last image on the list, `[-1]`, is assumed. G'MIC executes the mathematical expression in the context of the given image; the last statement of the mathematical expression may produce _nan_, a scalar or a mathematical vector. G'MIC replaces such curly-brace bracketed constructs with the results of the directive, without the curly braces, transcribing mathematical vectors into lists of comma separated values.
-|      b.  |While (a.) has placed an emphasis on the mathematical expression feature substitution rule, there are other kinds of directives and feature substitution rules that may appear within curly braces. For example, G'MIC replaces `{n}`, the image name feature substitution rule, with the name of the last image on the list, if it has one, or its file of origination, if there is one, or the special `[unamed]` indicator otherwise. G'MIC substitutes `{ <pipeline> }` with the return status of a pipeline of commands. Consult [Substitution Rules](https://gmic.eu/reference/substitution_rules.html#top) for the full set of directives.
-| 2.  |G'MIC interprets `=`, as an _assignment operator_. This operator establishes a lefthand side _variable_ as representing a (typically extensive) right hand side value: a _nan_, scalar or a list of values. The right hand side may be an explicit value or value list, or a directive within curly braces that G'MIC follows. With the right hand side evaluated, `=` assigns the outcome to the left hand side. From this point in the pipeline forward, a dollar sign `$` prepended to the variable prompts G'MIC to substitute it for the assigned right hand value.
-|      a.  |G'MIC recognizes assignments according to particular _visibility scopes_, more simply "scopes". Depending on the presence, and number of, prepended underscores to a variable name, G'MIC limits recognition of assignments to _local_, _global_ or '_cross-thread_' visibility scopes.
-|            i.  |Without prepended underscores, the visibility of an assignment is limited to the "local scope", that of processing of the current pipeline. Should G'MIC discover that a pipeline item references a custom command, it _enters a new scope_ — that of the custom command — and effectively "forgets" the assignments made during what is now the "parent context" or "parent scope." These parent-based assignments remain masked until G'MIC completes the pipeline defined by custom command and returns from it to the parent context, where the hitherto masked assignments become visible again. By extension, when G'MIC completes the current pipeline and exits from it — perhaps to its parent context, perhaps to the operating system shell — all the local variable assignments are deleted.
-|           ii.  |With one prepended underscore, the variable becomes visible in all scope contexts that appear in a run of a G'MIC interpreter in one CPU thread. A global variable defined in one custom command is visible to all other custom commands. To the uninitiated, this seems a boon. In `… _foo=4 … echo "The value of Foo is: "$_foo` can retrieve the value assigned to `$_foo` almost no matter where the reference occurs. We can cease worrying about scope! Alas! the practice replaces one set of bothers with another, even worse set. The uninitiated soon discover that initialization protocols need to be worked out; apart from programmer's memory, there is no enforcement or control over the order that commands may be invoked, and what happens when one such command is invoked before shared global variables have been assigned initial values. There are limited cases where shared state outweighs the bother of shared state; none rank high in the list of best practices.
-|          iii.  ||With two prepended underscores, the variable becomes visible in all scope contexts that appear in a run of the G'MIC interpreter across all CPU threads created by the interpretor. To the perils of globally visible variables, the programmer is given those of thread synchronization and locking. There are only very limited circumstances where such are worth the management trouble.
-|      b.  |Locally scoped variables are the safest, least problematic and most common form of command line variables. That they disappear when they fall out of scope is a feature, not a bug. In a well-designed command, the locally scoped variables, few in number, serve the script-writer's immediate and transitory needs. He need not focus on anything else. On leaving a scope, G'MIC deletes the locals, a kind of garbage collection that keeps the interpreter lean.
-| 3.  |When G'MIC enters a scope, either the initial command line or a custom command, it is tasked to interpret a new pipeline. This goes through two phases:
-|      a.  |The interpreter first itemizes, or _decomposes_ the text, roughly splitting on whitespaces, obtaining an itemized list.
-|      b.  |The interpreter then enters a new scope and processes the items one at a time. On each iteration, G'MIC attempts to classify the current item as one of (i) A variable assignment: G'MIC processes the right hand side. (ii) A command: G'MIC consults an internally maintained lookup table to attempt to match the item to a known command or a shortcut version of the command, or (iii) a comma-separated argument list. G'MIC consults the classification of the previous pipeline item. If it is a command, G'MIC associates the argument list with that command. If the previous item is not a command, G'MIC infers the presence of an implied ''-input'' command and associates the argument with that. In each case, G'MIC may encounter curly braces delimiting a directive or a variable prepended with a dollar sign; G'MIC expands these substitutions first before undertaking to classify the current pipeline item. If a mathematical expression embeds substitutable elements, G'MIC expands these first, then invokes the mathematical expression parser. That parser never "sees" substitutable elements _per se_, only the results of their expansions.  
+### Cheat #5: Vector and Pixel Access Operators
+%% ofs=1.07858,3.319513 i images/e_letter.png r. 25%,25%,100%,100%,5 f. ">OFS=get('ofs',2,0);V=I-J(OFS[0],OFS[1],0,2,3);V[s-1]=2^16-1;V" sh. 0,{s-2} n. 0,{2^16-1} rm. o. img/fuzze.png rm %%
+#### Vector Access Operator
+#### TL;DR
+|-![FuzzE](img/fuzze.png)\n[Fuzzed E](#fuzzede)|In [Mathematical Expressions](https://gmic.eu/reference/mathematical_expressions.html#top), right hand square brackets — `V[p,q,s]` — invoke a _vector access operator_. It returns a subvector copied from `V`; `V` is unchanged. Parameters `p`, `q` and `s` govern what elements copy to the subvector. Copy single elements, blocks, or elements separated by a constant _stride_.\n\n1.    `p` sets the starting index and is required. By itself only the element indexed by `p` copies.\n2.    `q` specifies how many elements in a block are copied. It is optional and defaults to one.\n3.    `s` specifies a stride. Strides select disjoint elements separated by constant intervals. Optional and defaulting to one; the default copies contiguous elements when `q > 1`.
+= vecexamples
 #### Examples:
-| 1.  |Create a substitution|… `twelvesquared=144` …|… `evens={V=vector256(0);fill(V,i,i*2);V}` …
-| 2.  |Use a substitution|… `echo $twelvesquared` …|… `16,16,1,1,$evens` …
-
-===
+Copy the fourth element of `V` into scalar `SV`.
 ~~~
-$ gmic twelvesquared=144 echo $twelvesquared
+$ gmic a={V=expr('x',16);SV=V[3];print(V);print(SV)}
 [gmic]-0./ Start G'MIC interpreter.
-[gmic]-0./ Set local variable 'twelvesquared=144'.
-[gmic]-0./ 144
-[gmic]-0./ End G'MIC interpreter.
-
-$ gmic evens={V=vector256(0);fill(V,i,i*2);V} 16,16,1,1,$evens name. Ramp
-[gmic]-0./ Start G'MIC interpreter.
-[gmic]-0./ Set local variable 'evens=0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,4(...).
-[gmic]-0./ Input image at position 0, with values '0,2,4,6,8,10,12,14,16,18,20,22,2(...)94,496,498,500,502,504,506,508,510' (1 image 16x16x1x1).
-[gmic]-1./ Set name of image [0] to 'Ramp'.
-[gmic]-1./ Display image [0] = 'Ramp'.
-[0] = 'Ramp':
-  size = (16,16,1,1) [1024 b of float32].
-  data = (0,2,4,6,8,10,12,14,16,18,20,22,(...),488,490,492,494,496,498,500,502,504,506,508,510).
-  min = 0, max = 510, mean = 255, std = 148.09, coords_min = (0,0,0,0), coords_max = (15,15,0,0).
-~~~
-%% evens={V=vector256(0);fill(V,i,i*2);V} 16,16,1,1,$evens =>. Ramp n[Ramp] 0,255 r2dx[Ramp] {w*16},1 %%
-*Ramp*
-===
-???
-
-G'MIC's pipeline variables are essentially labels for underlying things or lists of things. These can be created with assignment (`=`) operators and, later in the pipeline, recalled with a dereference (`$`) operator. Labels represent lists of alphanumerics, comma-separated, where the list can be one thing.
-
-|- Creation | Use
-|`somenumber=4| echo "Some_Number: "$somenumber"."
-| gausscurve='{V=vector16(0);fill(V,k,gauss((k/7.5)-1,0.25,1));V}'|echo "Curve Plots: "$gausscurve|echo "Gaussian plots: "$gausscurve
-
-===
-~~~
-[gmic]-0./ Start G'MIC interpreter.
-[gmic]-0./ Set local variable 'somenumber=4'.
-[gmic]-0./ Some_Number: 4.
-[gmic]-0./ End G'MIC interpreter.
-
-[gmic]-0./ Start G'MIC interpreter.
-[gmic]-0./ Set local variable 'gausscurve=0.00053532090305954147,0.0039205118451014877,0.0216042247247774(...).
-[gmic]-0./ Gaussian plots: 0.00053532090305954147,0.0039205118451014877,0.021604224724777483,0.089578121179371598,0.27946830428366071,0.6560402987039744,1.1587662110459314,1.5400274983840558,1.5400274983840558,1.1587662110459314,0.65604029870397484,0.27946830428366093,0.089578121179371528,0.021604224724777483,0.0039205118451014877,0.00053532090305954147
+[gmic_math_parser] V = (uninitialized) (mem[37]: vector16)
+[gmic_math_parser] SV = (uninitialized) (mem[54]: scalar)
+[gmic_math_parser] V = [ 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 ] (size: 16)
+[gmic_math_parser] SV = 3
+[gmic]-0./ Set local variable 'a=3'.
 [gmic]-0./ End G'MIC interpreter.
 ~~~
+|- 1.  |Mathematical expression vectors are zero-indexed. With `V[3]`, `p` is at the fourth element, counting from zero; the length of the subvector, `q`,  defaults to one, and the stride, `s` defaults to one element.
+| 2.  |Unlike image lists, vector indices are non-negative. `V[-1]` does not select the last element of a vector `V` but throws an out-of-bounds exception.
+| 3.  |In single-element access, G'MIC produces scalars. To explicitly obtain single-element vectors, wrap the access function in square brackets, `SV=[V[3]]`, which creates a one element vector from the return scalar value of `V[3]`.
+
+Copy a 3 element subvector from `V` starting at index=5.
+~~~
+$ gmic a={V=[0,1,2,3,4,5,6,7,8,9];SV=V[5,3];print(SV)}
+[gmic]-0./ Start G'MIC interpreter.
+[gmic_math_parser] SV = (uninitialized) (mem[45]: vector3)
+[gmic_math_parser] SV = [ 5,6,7 ] (size: 3)
+[gmic]-0./ Set local variable 'a=5,6,7'.
+[gmic]-0./ End G'MIC interpreter.
+~~~
+|- 1.  |The length of the subvector is set to three elements. `q=3`.
+| 2.  |The subvector receives consecutive elements starting from index=5. This stems from the default stride: `s=1`.
+
+Copy a four element subvector from every fourth element in `V` starting at index=0.
+~~~
+$ gmic a={V=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];SV=V[0,4,4];print(SV)}
+[gmic]-0./ Start G'MIC interpreter.
+[gmic_math_parser] SV = (uninitialized) (mem[56]: vector4)
+[gmic_math_parser] SV = [ 0,4,8,12 ] (size: 4)
+[gmic]-0./ Set local variable 'a=0,4,8,12'.
+[gmic]-0./ End G'MIC interpreter.
+~~~
+|- 1.  |The length of the subvector is set to four elements. `q=4`.
+| 2.  |The _stride_ of the operation, `s=4`, copies disjoint elements separated from each other by `s-1` intervening elements.
+
+Join six elements from `V` situated at even indices, starting at index=0, with five disjoint elements, also from `V`, starting at index=3 and separated by two intervening elements.
+~~~
+$ gmic a='{V=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];[V[0,6,2],V[3,5,3]]}'
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Set local variable 'a=0,2,4,6,8,10,3,6,9,12,15'.
+[gmic]-0./ End G'MIC interpreter.
+~~~
+|- 1.  |Square brackets not otherwise decorating existing vectors create new ones.  Encompassing a list with square brackets creates a vector with a length equal to the length of the list. List elements themselves may be vectors, as seen here. The operation concatenates the vectors in the order that they appear.
+= setelement
+#### Setting Elements
+When on the left hand side of an assignment, a vector accessor operator permits only one element assignment. Attempting to set multiple elements of a left hand vector with `q>1` or `s>1` raises an exception.
+~~~
+$ gmic a={V=expr('x',20);V[0,5,5]=320;print(V)}
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ *** Error *** Item substitution '{V=expr('x',20);V[0,5,5]=3;print(V)}': Unrecognized item '0,5,5' in expression 'V[0,5,5]=3'.
+~~~
+
+However, with `q==1` and `s==1`, the defaults, the single element addressed by `p` can be altered through assignment.
+~~~
+ $ gmic a={V=expr('x',20);V[5]=320;print(V)}
+[gmic]-0./ Start G'MIC interpreter.
+[gmic_math_parser] V = (uninitialized) (mem[37]: vector20)
+[gmic_math_parser] V = [ 0,1,2,3,4,320,6,7,8,9,10,11,12,13,14,15,16,17,18,19 ] (size: 20)
+[gmic]-0./ Set local variable 'a=0,1,2,3,4,320,6,7,8,9,10,11,12,13,14,15,16,17,18,19'.
+[gmic]-0./ End G'MIC interpreter.
+~~~
+= pixelaccess
+#### Pixel Access Operators
+#### TL;DR
+|-     |Pixel Access Operators obtain __p__ ixel __el__ ements, _pels_, or pixels — a column vector of pels, and are the core "setters" and "getters" for _pel_ and _pixel_ _processors_, which are the math expressions serving as kernels for iterations mediated by ''-fill'', ''-eval'' or ''-input''.\n\nIn their simplest configurations, _sans_ arguments, pixel access operators can set or get the current pel or pixel, operating on both sides of an assignment. More detailed schemes arise from writing operators with specific styles of argument brackets, identifying letters and letter cases. A [tabulation](#pixelaccess) of such styles follows.
+= pixelexamples
+#### Examples:
 ===
+%% images/dne_face.png r2dx. 25% o. img/dne_face.png rm %% %% images/dne_face.png -fill. ip=sum(I)/s;vectors(ip) r2dx. 25% n. 0,255 o. img/dne_face_ave.png rm %%
+|-![dne_face](img/dne_face.png) | ![dne_face_ave](img/dne_face_ave.png)
+| *face* | * average face *
+===
+Replace every pixel by the average of its channel values.
+~~~
+$gmic images/dne_face.png -fill. ip=sum(I)/s;vectors(ip)
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Input file 'images/dne_face.png' at position 0 (1 image 1024x1024x1x3).
+[gmic]-1./ Fill image [0] with expression 'ip=sum(I)/s;vectors(ip)'.
+[gmic]-1./ Display image [0] = 'dne_face.png'.
+[0] = 'images/dne_face.png':
+  size = (1024,1024,1,3) [12 Mio of float32].
+  data = (186.667,190,193,195.667,197,197,195.667,195,195,195,196.667,195.667,(...),189.333,189.667,190.667,189.667,190.667,191.333,191.333,191.333,191.333,191.333,190.333,186).
+  min = 13.3333, max = 225, mean = 162.022, std = 49.5293, coords_min = (581,136,0,0), coords_max = (460,0,0,0).
+~~~
+|- 1.  |The pixel access operator appears here in a vector form: `I`. In the absence of explicit arguments, the immediate value of `I` varies as the current location changes under iterations mediated by ''-fill'', ''-input'' or ''-eval''. "Vector form" means that `I` provides the entire pixel at the current location as column vector of length `s`, the depth of the current image.
+| 2.  |The aim of writing `vectors(ip)`, and not an unadorned `ip`, is to obtain a _pixel processor_; these iterate over images a pixel-at-a-time and are called into play by fashioning processors with vector return values. The unadorned `ip` is scalar, the return type of `sum()`. Unaltered, this scalar return value would have fashioned a _pel processor_. These iterate over images a pel at-a-time, the finer granularity requiring traversal over individual image planes — three times as many steps with an `RGB` image. This finer-grained traversal happens to achieve the same result but at unnecessary cost.
+| 3.  |Terse notation bears careful reading. At first glance, `vectors(ip)` suggests a plural form of `vector()`. But recall that this constructor has a compound form: "vector" plus "number" — or what can resolve to a number. So `vector8(0)` returns an eight element vector populated with zeros; `vectors(3.5)` returns a vector whose length equals the depth of the current image (`s`) and with all elements set to `3.5`.
+===
+%% images/dne_face.png -fill. norm2(i-j(-3,-3,0,-1,0,2)) r2dx. 25% n. 0,255 o. img/dne_face_diff.png rm %%
 
-There are few array management resources available to the G'MIC interpreter; lists of alphanumerics are array-like, but not arrays. Array access is not the interpreter's long suite. That lies with the Mathematics E  
+|-![dne_face](img/dne_face.png) | ![dne_face_diff](img/dne_face_diff.png)
+| *face* | * diff face *
+===
+Take the L2 norm of every delta between a pel and a neighbor offset in position by `[-3,-3,0,-1]`.
+~~~
+$ gmic -input images/dne_face.png -fill. 'norm2(i-j(-3,-3,0,-1,0,2))'
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Input file 'images/dne_face.png' at position 0 (1 image 1024x1024x1x3).
+[gmic]-1./ Fill image [0] with expression 'norm2(i-j(-3,-3,0,-1,0,2))'.
+[gmic]-1./ Display image [0] = 'dne_face.png'.
+[0] = 'images/dne_face.png':
+  size = (1024,1024,1,3) [12 Mio of float32].
+  data = (1,5,10,3,4,4,2,2,1,0,2,0,(...),11,9,8,11,11,10,10,10,9,8,9,13).
+  min = 0, max = 168, mean = 16.2062, std = 17.0729, coords_min = (9,0,0,0), coords_max = (298,0,0,1).
+[gmic]-1./ End G'MIC interpreter.
+~~~
+|- 1.  |The pixel access operator appears in two scalar forms: `i`, and `j(-3,-3,0,-1,0,2)`. In pel processors `i`, _sans_ arguments, references the channel value at the current location; it varies with changing location throughout the iteration, taking on the pel value of the current position. `j(-3,-3,0,-1,0,2)` accesses the pel offset from the current location in the direction `[-3,-3,0,-1]`. The L2 norm of their difference measures a color space distance. A large color space distance — from red to cyan, say — signals an edge in the image space direction (-3, -3, 0, -1).
+| 2.  |The fifth and sixth arguments to `j(…0,2)` set _interpolation_ and [boundary](https://gmic.eu/tutorial/images_have_edges_now_what.html) policies. Interpolation puts forward the idea that image pixels are sample points and it is reasonable to access values between them. In such cases, the fifth parameter, an `interpolation` flag `1`, provides for linear interpolation, while `2` provides for cubic interpolation. `0`, used here, establishes discrete sampling. There are no "in-between" values; sampling assumes the value of the nearest pel or pixel.
+| 3.  |In the matter of returning results, mathematical expressions given to pel and pixel processors as arguments to ''-input'' and ''-fill'' behave differently  from ''-eval''. In the first two, the value of the last statement in the expression sets the pel or pixel value at the current location; an implied assignment. ''-input'' and ''-fill'' processors "paint" the image. ''-eval'' leaves the pel or pixel unchanged — no implicit assignment. It "evaluates" the image without (necessarily) changing it, though indirect changes might stem from other statements in the processor.
 
+= pixelaccess
+#### A Pixel Access Operator Menagerie
+The foregoing examples illustrate the diverse notation exhibited by pixel access operators. Select behavior through choice of (1) operator names (2) argument brackets, or (3) letter case.
 
-|  **67** | __Vector Accessor Function:__ `CPX[0,3,1]` is an example of a _vector accessor function_, which extracts subvectors from source vectors. The present example copies _+r_, _±θ_ and _±2πf_ from `CPX` to the ''-fill'' return vector.\n\nThe accessor function's three arguments, `[0,3,1]`, correspond to `[ <starting index>, <subvector length>, <step> ]`. The first argument marks the index in the source vector where the subvector starts. It is the only required argument and, used in isolation, simply extracts a single item from the source vector. The second argument, if present, sets the subvector's length. Thus `V=[0,1,2,3,4,5,6,7,8,9]`; `SV=V[5,3]` sets `SV` to `[5,6,7]`, the three item subvector beginning at index = `5`. The third argument, if present, sets the _step_, and defaults to increments of one item. Thus `V=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];V[0,4,4]` retrieves the subvector `[0,4,8,12]`, the four item subvector starting at index `0` in the source vector and consisting of every fourth item thereafter until a length of four items is obtained.\n\nA vector accessor function can only read vectors; it cannot write them. This precludes its use on the left hand side of an assignment. For that, consider `copy()`, which can transcribe a subvector from a source to a destination vector, or sequencing a new vector's content within a pair of square brackets, as done in line **67**.
+|+`i/j` v. `I/J`|Pel\Pixel|Lower-case operator names, `i` and `j`, return scalar pels. Necessarily, fully addressing specific pels requires coordinates in width, `x`, height, `y`, depth, `z` and channel size `c.` Upper-case operator names, `I` and `J` return vector pixels. This coaser-grained addressing scheme dispenses with channel addressing, as the pixel slices through all channels.
+|`i/I` v. `j/J`|Origin\current location|With operator names `i` or `I`, Coordinate arguments `x`, `y`, `z` and `c` measure from the image origin. With `j` or `J` operator names, measures are relative to the current location.
+|`[]` v. `()`|Vector\Image|Square brackets around the arguments address image elements as if occupying a one dimensional vector and gives rise to a modified signature: `[#ind,i,boundary_conditions]`. The one index, `i`, measures from the start of this vector (`i/I`) or from the current location mapped into the vector (`j/J`), the index furnishing an offset. During iterations, the lower-case scalar form reads out memory storage: first the red channel, then green, then blue, presuming an RGB image. Upper-case `I/J` vectors stride across image channels and assemble pixels. The square bracket form does not support an `interpolation` argument, but does take a `boundary_condition` flag to handle off-image access.\n\nParenthetically bracketed arguments give rise to the image-oriented signature: `(#ind,x,y,z,c,interpolation,boundary_condition).` This signature is for lower-case pel operators, `i/j` which work with a high-resolution view of image contents, locating a specific pel by image column, `x`, image row `y`, slice, `z` and channel `c`; see [Images](https://gmic.eu/tutorial/images.html). Omitting the channel argument `c` gives rise to the upper-case pixel operators `I/J`. These work with a lower resolution view of the image contents and return entire pixels at each call: column vectors with length `s`, the _spectrum_, or channel count, of the image.\n\nWith both signatures, a numeric first argument with a preceding `#` signet is taken to be the index to an image on the list index. Operations then proceed on that image instead of the one associated with the math expression. In the absence of explicit association, it is the last image on the list. Also with both signatures, a first argument of the form `#$`_<name>_, then operations proceed on the named image.\n\nHere, a recurring theme: terse notation bears careful reading. For the (1) uninitiated, (2) sleep and/or coffee deprived, or (3) generally inattentive, the day will come when the pixel access functions `i[…]`, `I[…]`, `j[…]` or `J[…]` will confusticate with vector access right hand decorators `[]` and the afflicted coder will write `I[p,q,r]` vector access argument signatures where pixel access signatures were intended. The effect is not fatal; it will access neither pixels nor vectors but raise exceptions instead.
+= fuzzede
+#### Fuzz E
+The frontpiece image toy furnishes an extended play on differencing neighboring pixels for what may be construed as a chiseling in stone effect.
+~~~
+fuzze: -check ${1=1.5}>0" && "\
+              isnum(${1})" && "\
+              isnum(${2=45})" && "\
+              ${2}>=0" && "\
+              ${2}<=180
+     -skip ${3=8}
+     -if s<3
+        -to_rgb.
+     -fi
+     fz={0.1*$1}
+     ang={deg2rad($2)}
+     dpth=$3
+     isa={!(s%2)}
+     -fill. ">
+               OFS=cexp([$fz,$ang]);
+               V=I-J(OFS[0],OFS[1],0,2,2);
+               $isa?V[s-1]=2^$dpth-1:V;
+               V
+            "
+     -shared. 0,{s-(1+$isa)}
+     -normalize. 0,{2^$dpth-1}
+     -remove.
+~~~
+Command line:
+Note last argument to `fuzze`. `.png` and `.tiff` image formats support various bit resolutions: 8, 16 and 32 being common. ''-input'' can detect this resolution and return it in status, `${}` as a numeric: 8, 16, 32… If detection fails, the return status `${}` contains an empty string.
+~~~
+gmic fuzze.gmic -input images/e_letter.png fuzze. 12.5,72,${} -output. img/fuzze.png
+~~~
 
-
-
-
-
-
-
-|  **63** | __Pixel Accessors:__ Assigning `I` to `CPX` is not a (redundant) assignment of one vector to another, rather it is the creation of a vector from a _pixel accessor function_. The right hand side, `I`, is the pixel accessor; see [Specific Functions](https://gmic.eu/reference/mathematical_expressions.html#specific_functions), bullet points 5 – 10. There is a square-bracket form of the pixel accessor function; its signature, `I[#_ind,offset,offset,_boundary_conditions], differs from the square-bracketed form applied to vectors: `V[ <starting index>, <subvector length>, <step> ]`. The aim here is to remap the pixel to the vector, `CPX,` so as to harness vector accessor function instead. See **67** following. This particular pixel accessor, `I` unadorned, lacks an explicit argument decorator, so the default is in play: `I(#ind,x,y,z,interpolation,boundary_conditions)` where `x`, `y`, and `z` are the predefined math expression variables that, under image iteration, assume the current image column, row and depth values.\n\nBy default, pixel accessors reference the current image. An optional "hashtag-identifier" initial argument explicitly identifies an access source by an image list index or image name: `#2` identifies the third image on the list, counting from the beginning (remember: zero-indexed: 0,1,2!); `#-3` identifies the third image counting from the end of the list. `#$bluishimag` identifies the image named `bluishimag`, should one exist. If there is no image that is so named, or if any of the access identifiers reach beyond the extent of the image list, you cop yourself an access error.\n\nYou can access in-between pixels. That is, pixel coordinates `x`, `y` and `z` may be reals with fractional parts — you access the void between pixels! What happens then? An _interpolation_ takes place through one of three flavors: `0:nearest neighbor`; the interpolator reports the value of the nearest pixel along each image axis; `1:linear`; the interpolator reports the value taken from a linear ramp between the two actual neighboring pixels; `2:cubic`; the interpolator reports the value taken from a cubic spline intersecting the two actual neighboring pixels. See [Pixel Accessors: Kinds of interpolation](#interpolation).\n\nYou can access off-image pixels; perhaps you have overidden `x` with a value far exceeding the image width. What happens then? You apply boundary policy via `boundary conditions:` `0:dirichlet`, the off-pixel is black, `1:neumann`, the off-pixel is the same as the nearest edge pixel, `2:periodic`, images repeat out to infinity along all axes; the off-pixel assumes the value of wherever it is in this repeating cycle, or `3:mirror`, edges are mirror axes where images flip, and flip again out to infinity; the off-pixel assumes the value of wherever it is in this mirror repeating cycle. See [Images Have Edges: Now What?](https://gmic.eu/tutorial/images_have_edges_now_what.html) for the deep dive.\n\nSome pixel accessor functions use a square-bracket decorator, these intended to reference images as if they were one dimensional arrays: `I[_#ind,offset,_boundary_conditions]`. It is easy to confuse this notation with accessing items of a vector, also using square brackets, and, by extended confusion, taking `I` to be a vector. Don't confuse this square bracket flavored pixel accessor with  _vector accessors_, described later; see **67**.
-
+Updated: March 7 2023 12:15 UTC Commit 220bd6b91cf3556158551b6ca6d8f6e242b72850

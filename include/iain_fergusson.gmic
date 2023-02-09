@@ -1238,11 +1238,9 @@ tilew={w/64}
 tileh={h/64}
 
 split_tiles $tilew,$tileh
-apply_parallel "
-fftpolar
-append z
-k[0]
-"
+# apply_parallel "fftpolar append z k[0]"
+foreach { fftpolar a z }
+
 +blend_median # find median fft of all tiles to use as threshold
 
 mul[-1] $1 # scale median fft threshold
@@ -1267,10 +1265,9 @@ repeat $!-1
  done
 done
 rm[-1]
-apply_parallel "
-split z
-ifftpolar
-"
+# apply_parallel "split z ifftpolar"
+foreach { s z ifftpolar }
+
 
 append_tiles $tilew,$tileh
 c 0,255
@@ -1652,15 +1649,55 @@ fi
 ####################################
 #         Banding Denoise          #
 ####################################
+# 2023/03/23: Add Tiling option (David Tschumperlé).
 
-#@gui Banding Denoise: banding_denoise, banding_denoise_preview(0)
+#@gui Banding Denoise : banding_denoise_v2, banding_denoise_v2_preview(0)
 #@gui : V Cutoff = float(5,0,50)
 #@gui : H Cutoff = float(5,0,50)
 #@gui : Space = float(5,0,20)
 #@gui : Value = float(10,0,100)
-#@gui : Show Difference = bool(0)
+#@gui : Size of Tiles = choice("No Tiling","64px","128px","256px","512px","1024px","2048px")
+#@gui : Preview Difference = bool(0)
 #@gui : sep = separator()
-#@gui : note = note("<small>Author : <i>Iain Fergusson</i>.</small>")
+#@gui : Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal",
+#@gui : "Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right",
+#@gui : "Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse")
+#@gui : Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+#@gui : sep = separator()
+#@gui : note = note("<small>Authors: <i>Iain Fergusson</i> and <i>David Tschumperlé</i>
+#@gui :       Latest Update: <i>2023/02/23</i>.</small>")
+banding_denoise_v2 :
+  if !$5 _banding_denoise_v2 $*
+  else
+    ts:=arg($5,64,128,256,512,1024,2048)
+    apply_tiles "_banding_denoise_v2 $*",$ts,$ts,1,20%,20%,1,3
+  fi
+
+_banding_denoise_v2 :
+  foreach { split_opacity l[0] {
+    +bilateral $3,$4 bilateral. $3,$4 -.. .
+    fftpolar..
+    polygon... 4,0,{(h/2)+1},{50-$1}%,{(h/2)+1},{50-$1}%,{(h/2)-1},0,{(h/2)-1}
+    polygon... 4,{50+$1}%,{(h/2)+1},{w},{(h/2)+1},{w},{(h/2)-1},{50+$1}%,{(h/2)-1}
+    polygon... 4,{(w/2)+1},0,{(w/2)+1},{50-$2}%,{(w/2)-1},{50-$2}%,{(w/2)-1},0
+    polygon... 4,{(w/2)-1},{h},{(w/2)+1},{h},{(w/2)+1},{50+$2}%,{(w/2)-1},{50+$2}%
+    ifftpolar[-3,-2]
+    + c 0,255
+  } a c }
+
+banding_denoise_v2_preview :
+  if $6==0 gui_split_preview "banding_denoise_v2 $*",${-3--1}
+  else foreach { remove_opacity +banding_denoise_v2 ${1--1} - * 6 + 128 c 0,255 }
+  fi
+
+# #@gui Banding Denoise: banding_denoise, banding_denoise_preview(0)
+# #@gui : V Cutoff = float(5,0,50)
+# #@gui : H Cutoff = float(5,0,50)
+# #@gui : Space = float(5,0,20)
+# #@gui : Value = float(10,0,100)
+# #@gui : Show Difference = bool(0)
+# #@gui : sep = separator()
+# #@gui : note = note("<small>Author : <i>Iain Fergusson</i>.</small>")
 banding_denoise:
 
 repeat 2 +bilateral[-1] $3,$4 keep[0,-1] done
