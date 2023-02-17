@@ -669,6 +669,7 @@ gcd_gradient_exponent : skip ${1=0.5}
 #@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2023/02/14</i>.</small>")
 #@gui : note = note("\n<small><b><u>Notes</u></b></small>")
 #@gui : note = note("<small>Preview is fixed to lowest quality kernel.</small>")
+#@gui : note = note("<small>Kernel size zero will use randomized matching.</small>")
 #@gui : note = note("<small>Due to the algorithm some glitches are expected.</small>")
 #@gui : note = note("<small>\n<b>Warning:</b> large kernels are slow to compute.</small>")
 #@gui : note = note("<small>Image size also affects computation time significantly.</small>")
@@ -720,30 +721,34 @@ gcd_proximity_ssu2x : skip ${1=4}
   foreach {
     [0],[0],[0],2
     +r2dx[0] 50%,2
-    # calculate search offset coords
-    K:=$1*2+1
-    $K,$K,1,2,"X=[x,y]-$1;sign(X)*X*X"
-    s. c y[-2,-1] x
-    # find best matches
-    eval[0] ":
-      begin(
-        const boundary=0;
-        const interpolation=0;
-        L=crop(#-2);
-        M=crop(#-1);
-        const S=w#-1;
-      );
-      X=floor(x/2);
-      Y=floor(y/2);
-      V=X; W=Y; D=inf;
-      P=crop(x-1,y-1,3,3);
-      for(K=0,K<S,++K,
-        A=X+L[K]; B=Y+M[K];
-        Q=crop(#2,A-1,B-1,3,3);
-        N=sum(abs(P-Q));
-        if(N<D,V=A;W=B;D=N);
-      );
-      I(#1,x,y)=[V,W];"
+    if $1>0
+      # calculate search offset coords
+      K:=$1*2+1
+      $K,$K,1,2,"X=[x,y]-$1;sign(X)*X*X"
+      s. c y[-2,-1] x
+      # find best matches
+      eval[0] ":
+        begin(
+          const boundary=0;
+          const interpolation=0;
+          L=crop(#-2);
+          M=crop(#-1);
+          const S=w#-1;
+        );
+        X=floor(x/2);
+        Y=floor(y/2);
+        V=X; W=Y; D=inf;
+        P=crop(x-1,y-1,3,3);
+        for(K=0,K<S,++K,
+          A=X+L[K]; B=Y+M[K];
+          Q=crop(#2,A-1,B-1,3,3);
+          N=sum(abs(P-Q));
+          if(N<D,V=A;W=B;D=N);
+        );
+        I(#1,x,y)=[V,W];"
+    else
+      +matchpatch[0] [2],3,3,1,10,15,-2 j[1] . rm.
+    fi
     # calculate patch intensity corrections
     +boxfilter[0,2] 3 warp. [1],0 +eq. 0 +[-2,-1] /[-2,-1]
     # upscale and correct intensities
