@@ -659,6 +659,128 @@ gcd_gradient_exponent : skip ${1=0.5}
     } rm. }
   }
 
+#@gui Upscale [Recursive2x] : fx_gcd_upscale_recursive2x, fx_gcd_upscale_recursive2x_preview(0)
+#@gui : note = note("<u>Self similarity 2x upscale</u>")
+#@gui : note = note("\n<i>Quality Options</i>"), sep = separator()
+#@gui : Kernel = _int(4,0,10)
+#@gui : note = note("\n<i>Processing Options</i>"), sep = separator()
+#@gui : Sharpness = float(0.05,0,0.4)
+#@gui : Grain = float(0.01,0,0.1)
+#@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2023/02/14</i>.</small>")
+#@gui : note = note("\n<small><b><u>Notes</u></b></small>")
+#@gui : note = note("<small>Preview is fixed to lowest quality kernel.</small>")
+#@gui : note = note("<small>Kernel size zero will use randomized matching.</small>")
+#@gui : note = note("<small>Due to the algorithm some glitches are expected.</small>")
+#@gui : note = note("<small>\n<b>Warning:</b> large kernels are slow to compute.</small>")
+#@gui : note = note("<small>Image size also affects computation time significantly.</small>")
+fx_gcd_upscale_recursive2x : skip ${1=4},${2=0.05},${3=0.01}
+  foreach {
+    split_opacity
+    gcd_upscale_recursive2x[0] {[$1,1-$2,0.25,round(1/log(1+$3))]}
+    if $!>1 # 2x bilateral upscale opacity
+      (0.0625,0.125,0.0625;0.125,0.25,0.125;0.0625,0.125,0.0625)
+      r[1] 200%,200%,100%,100%,1 convolve[1] . rm. a c
+    fi
+  }
+
+fx_gcd_upscale_recursive2x_preview :
+  fx_gcd_upscale_recursive2x 1,${2--1}
+
+#@cli gcd_upscale_recursive2x : search_size>0,0<=_sharpening<=1,0<=_smoothing<=1,_noise_divisor>0
+#@cli : Double image size using processed recursive expansion.
+#@cli : Default values: 'search_size=4', 'sharpening=0.9', 'smoothing=0.25' and 'noise_divisor=100'.
+#@cli : $ image.jpg gcd_upscale_recursive2x 4
+gcd_upscale_recursive2x : skip ${1=4},${2=0.95},${3=0.25},${4=100}
+  e[^-1] "Double xy-dimensions of image$?, using Recursive2x algorithm."
+  foreach {
+    m={0,[im,iM]} =>[0] small
+    # force even dimensions
+    wh:=[w,h]*2 r {[w+w%2,h+h%2]},100%,100%,0,1
+    # pre sharpening
+    gcd_midrange_exponent $2 c $m
+    # self-similar upscale
+    +gcd_proximity_ssu2x[0] $1 => large
+    # post texture smoothing
+    gcd_box_texture[large] 2,$3
+    # error diffusion
+    +gcd_random[large] {X=iM-im;[-X,X]/$4} +[large,-1]
+    +ri[large] [small],2 sub. [small] ri. [large]
+    (0.0625,0.125,0.0625;0.125,0.25,0.125;0.0625,0.125,0.0625)
+    convolve.. . rm. sub[large,-1]
+    rm[small] c[large] $m mv[large] 0
+    # restore 2n dimensions
+    r $wh,100%,100%,0
+  }
+
+#@cli gcd_proximity_ssu2x : search_size>0
+#@cli : Double image size using self-similar upscaling.
+#@cli : Default values: 'search_size=4'.
+#@cli : $ image.jpg gcd_proximity_ssu2x 4
+gcd_proximity_ssu2x : skip ${1=4}
+  e[^-1] "Double xy-dimensions of image$?, using ssu2x algorithm."
+  foreach {
+    [0],[0],[0],2
+    +r2dx[0] 50%,2
+    if $1>0
+      # calculate search offset coords
+      K:=$1*2+1
+      $K,$K,1,2,"X=[x,y]-$1;sign(X)*X*X"
+      s. c y[-2,-1] x
+      # find best matches
+      eval[0] ":
+        begin(
+          const boundary=0;
+          const interpolation=0;
+          L=crop(#-2);
+          M=crop(#-1);
+          const S=w#-1;
+        );
+        X=floor(x/2);
+        Y=floor(y/2);
+        V=X; W=Y; D=inf;
+        P=crop(x-1,y-1,3,3);
+        for(K=0,K<S,++K,
+          A=X+L[K]; B=Y+M[K];
+          Q=crop(#2,A-1,B-1,3,3);
+          N=sum(abs(P-Q));
+          if(N<D,V=A;W=B;D=N);
+        );
+        I(#1,x,y)=[V,W];"
+    else
+      +matchpatch[0] [2],3,3,1,10,15,-2 j[1] . rm.
+    fi
+    # calculate patch intensity corrections
+    +boxfilter[0,2] 3 warp. [1],0 +eq. 0 +[-2,-1] /[-2,-1]
+    # upscale and correct intensities
+    mul[1] 2 r[1] 200%,200%,100%,100%,1 f[1] "I+[x%2,y%2]"
+    warp[0] [1],0 r. 200%,200%,100%,100%,1 mul[0,-1] k[0]
+  }
+
+#@cli gcd_midrange_exponent : exponent<=1
+#@cli : Sharpen selected images by midrange exponent method.
+#@cli : Default values: 'exponent=0.5'.
+#@cli : $ image.jpg gcd_midrange_exponent 0.8
+gcd_midrange_exponent : skip ${1=0.5}
+  e[^-1] "Sharpen image$? with midrange exponent $1."
+  foreach {
+    C,R:=H=(iM-im)/2;[H+im,H] - $C / $R
+    i (0,1,0;1,1,1;0,1,0) +dilate.. . +erode... .. rm[1]
+    -.. . /.. 2 +. .. -[0] . +eq[1] 0 +. [1] /[0,-1]
+    ^[1] $1 *[0,1] + * $R + $C
+  }
+
+#@cli gcd_box_texture : size>=0[%],0<=edge_exponent<=1
+#@cli : Edge preserving smooth.
+#@cli : Default values: 'size=3' and 'edge_exponent=0.5'.
+#@cli : $ image.jpg gcd_box_texture 3
+gcd_box_texture : skip ${1=3},${2=0.5}
+  e[^-1] "Apply box texture filter of size $1, on image$?."
+  foreach { # i = i + (A(k) - i) / stddev(k)^p
+    [0] +sqr. boxfilter[-2,-1] $1 +sqr.. -[-2,-1]
+    max. 0 +eq. 0 +[-2,-1] sqrt. ^. -$2
+    j[0] ..,0,0,0,0,1,. k[0]
+  }
+
 #@gui Upscale [Solver2x] : fx_gcd_upscale_solver2x, fx_gcd_upscale_solver2x_preview(0)
 #@gui : note = note("<u>Anisotropic 2x upscale with optional unsharpening</u>")
 #@gui : note = note("\n<i>Quality Options</i>"), sep = separator()

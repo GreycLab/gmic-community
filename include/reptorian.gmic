@@ -48,6 +48,58 @@
 #
 #-------------------------------
 
+#@cli rep_two_dimension_set_indices:
+#@cli : Return images containing indexes
+rep_two_dimension_set_indices:
+num_of_imgs:=$!
+
+repeat $num_of_imgs {
+ width:=w#$>
+ height:=h#$>
+
+ if narg(${image_dimension_${width}_${height}})
+  eval da_push(#${image_dimension_${width}_${height}},$>)
+ else
+  1 => image_dimension_${width}_${height}
+  eval da_push(#-1,$>)
+ fi
+}
+
+foreach[$num_of_imgs--1] { eval da_freeze(#-1) }
+#@cli rep_sort_images_by_order: number_a,number_b,....
+#@cli : Sort images given numbers. The number has to be equal to the number of images selected.
+rep_sort_images_by_order:
+if $#!=$! error invalid_image_count fi
+
+input_v=[{[$*]%$#}]
+sorted_v=[{sort([expr('x',$#)])}]
+
+if $input_v==$sorted_v return
+elif $input_v==reverse($sorted_v) reverse
+else
+ $#,1,1,1
+
+ $#,1,1,1,>"begin(
+   const max_index=w-1;
+   index_counter=vector(#w,0);
+   order=[$*];
+  );
+  value_index=order[x]%w;
+  if(++index_counter[value_index]>1,run('error dup_ind_inp'););
+  off_position=value_index-i(#-1,value_index);
+  polygon(#-1,2,value_index,0,max_index,0,-1,1);
+  off_position+x;
+  "
+
+ remove[-2]
+
+ repeat $# {
+  move[{i(#-1,$>)}] $>
+ }
+
+ remove[-1]
+
+fi
 #@cli rep_num2base_float_max: number
 #@cli : Create a image which represent a positive integer number in base 16777216. Used for emulating BIGINT process.
 +rep_num2base_float_max:
@@ -948,7 +1000,7 @@ eval "
  "
 
 if ${}
- rm.
+ remove.
  status 1,$pv
 else
  {prod(crop(0,0,0,1,1,h,1,1)+1)},1,1,1,"begin(
@@ -965,12 +1017,11 @@ else
   );
   m=int(x/modulo_list)%primes_freq_choices;
   result[x]=prod(primes_list^m);
-  0;
   end(
-   set('v',v2s(sort(result)));
+   set('{}',v2s(sort(result)));
   );
   "
- rm[-2,-1] status $v
+ remove[-2,-1]
 fi
 rep_gcd_multiple_numbers:
 eval >"
@@ -1208,7 +1259,7 @@ if $use_shape
    resize. $shape_dimensions_length,$shape_dimensions_length,100%,100%,5
   fi
 
-  resize $shape_size,$shape_size,100%,100%,0,0,.5,5
+  resize. $shape_size,$shape_size,100%,100%,0,0,.5,.5
 
   cut. 0,1 n. 0,1
 
@@ -12991,7 +13042,7 @@ foreach {
 
   fi
 
-  modf. ${modulo_method_$>},${maxmodnum_$>},{(${maxmodnum_$>}-${modnum_$>})/${maxmodnum_$>}}
+  modf. ${modulo_method_$>},${maxmodnum_$>},{(${maxmodnum_$>}-${modnum_$>})}
 
   if ${normalize_$>} /. {${maxmodnum_$>}/255} fi
   if ${negate_$>} f. max(iM#-1,255)-i fi
@@ -15288,219 +15339,9 @@ else
 
  +store. _bayer_threshold_map
 fi
-#@cli rep_modo_mc: eq. to 'rep_modular_operation_multiple_channels'
-rep_modo_mc: rep_modular_operation_multiple_channels $*
-#@cli rep_modular_operation_multiple_channels: operation,max_channel_value,channel_value(%)...operation_n,max_channel_value_n,channel_value_n
-#@cli : Apply modular operation for every 2 layers, and for each channels. Either by blending or applying modf function to every 2 layer per channels.
-#@cli : (eq. to 'rep_modo_mc').\n
-#@cli : If there is only one set of rep_modo variables,max_channel_value,channel_value, then the values applied here will be applied to the rest of the channels per layers.
-#@cli : If there is more than one set, then values will be applied with periodic condition.
-#@cli : If channel_value is less than 0 and greater than or equal to -1, then rep_modular_operation function will use layer blending techniques for 2 layers for every 2 layers. If channel value is less than -1, then operation is disabled on that channel (Only applicable with more than one set of rep_modo variables, and one more layer.).\n
-#@cli : Note: You can actually assign cmyk mode with this filter by typing 'u cmyk' before 'rep_modo_mc' as the filter will detect if using cmyk instead.\n
-#@cli : See 'gmic h rep_modf' for more details on variables.\n
-#@cli : Author: Reptorian.
-rep_modular_operation_multiple_channels:
-
-cmyk=0
-
-if '${}'=='cmyk' cmyk=1 fi
-
-tcr={$cmyk?4:3}
-
-total_set_of_operation={narg($*)/3}
-
-if $total_set_of_operation!=int($total_set_of_operation) error narg("$*")/3==F fi
-
-oper_cond={max(0,$total_set_of_operation-2)}
-
-if $oper_cond
- {$oper_cond+1},1,1,3,"begin(argset=[${1--1}]);argset[3*x+c];"
- s. c
-
- oper_set={crop(#-3)}
- maxchanval_set={crop(#-2)}
- perc_set={crop(#-1)}
-
- rm[-3--1]
-else
- oper_set=$1
- maxchanval_set=$2
- perc_set=$3
-fi
-
-if $total_set_of_operation>1
- nset={$total_set_of_operation-1}
-else
- nset=1
-fi
-
-if $!==1
- if s==2||s>$tcr
-
-  ss={s-1}
-  t_color_oper_set={vector$nset($oper_set)}
-  t_color_maxchanval_set={vector$nset($maxchanval_set)}
-  t_color_perc_set={vector$nset($perc_set)}
-  color_oper=[{vector$tcr($t_color_oper_set)}]
-  color_maxchanval=[{vector$tcr($t_color_maxchanval_set)}]
-  color_perc=[{vector$tcr($t_color_perc_set)}]
-
-  repeat $ss {
-   sh. $>
-
-   if ($color_perc)[$>]>=0
-    modf. {($color_oper)[$>]},{($color_maxchanval)[$>]},{abs(($color_perc)[$>])}
-   fi
-
-   rm.
-  }
-
-  if $-1>=0
-   sh. $ss
-   modf. $-3,$-2,$-1
-   rm.
-  fi
-
- else
-
-  color_oper=[{vectors($oper_set)}]
-  color_maxchanval=[{vectors($maxchanval_set)}]
-  color_perc=[{vectors($perc_set)}]
-
-  repeat s {
-   sh. $>
-
-   if ($color_perc)[$>]>=0
-    modf. {($color_oper)[$>]},{($color_maxchanval)[$>]},{abs(($color_perc)[$>])}
-   fi
-
-   rm.
-  }
-
- fi
-
-else
-
- if min($perc_set)>=0&&$-1>=0
-
-  foreach {
-
-   if s==2||s>$tcr
-    ss={s-1}
-    t_color_oper_set={vector$nset($oper_set)}
-    t_color_maxchanval_set={vector$nset($maxchanval_set)}
-    t_color_perc_set={vector$nset($perc_set)}
-    color_oper=[{vector$tcr($t_color_oper_set)}]
-    color_maxchanval=[{vector$tcr($t_color_maxchanval_set)}]
-    color_perc=[{vector$tcr($t_color_perc_set)}]
-   else
-    ss={s}
-    color_oper=[{vectors($oper_set)}]
-    color_maxchanval=[{vectors($maxchanval_set)}]
-    color_perc=[{vectors($perc_set)}]
-   fi
-
-   repeat $ss {
-    sh. $>
-
-    if ($color_perc)[$>]>=0
-     modf. {($color_oper)[$>]},{($color_maxchanval)[$>]},{abs(($color_perc)[$>])}
-    fi
-
-    rm.
-   }
-
-   if s==2||s>$tcr
-    sh. {s-1}
-    modf. ${-3--1}
-    rm.
-   fi
-
-  }
-
- else
-
-  repeat int($!/2) {
-
-   local [{$>*2},{$>*2+1}] {
-    loc_a={$>*2}
-    loc_b={$>*2+1}
-    if s#0!=s#1 error (s#0#$loc_a!=s#1#$loc_b)==F fi
-    if s==2||s>$tcr
-     ss={s-1}
-     t_color_oper_set={vector$nset($oper_set)}
-     t_color_maxchanval_set={vector$nset($maxchanval_set)}
-     t_color_perc_set={vector$nset($perc_set)}
-     color_oper=[{vector$tcr($t_color_oper_set)}]
-     color_maxchanval=[{vector$tcr($t_color_maxchanval_set)}]
-     color_perc=[{vector$tcr($t_color_perc_set)}]
-    else
-     ss={s}
-     color_oper=[{vectors($oper_set)}]
-     color_maxchanval=[{vectors($maxchanval_set)}]
-     color_perc=[{vectors($perc_set)}]
-    fi
-
-    repeat $ss {
-     if ($color_perc)[$>]>=-1
-      sh[0] $>
-      sh[1] $>
-      rep_modo[-2,-1] {($color_oper)[$>]},{($color_maxchanval)[$>]},{($color_perc)[$>]}
-      rm[-2,-1]
-     fi
-    }
-
-    if ($-1>=-1)&&(s==2||s>$tcr)
-     v + echo pass v -
-     sh[0] {s#0-1}
-     sh[1] {s#0-1}
-     rep_modo[-2,-1] ${-3--1}
-     rm[-2,-1]
-    fi
-
-   }
-
-  }
-
- fi
-
-fi
-#@cli rep_modo: eq. to 'rep_modular_operation'.
-rep_modo: rep_modular_operation $*
-#@cli rep_modular_operation: operation,max_channel_value,channel_value(%)
-#@cli : Apply modular operation to every 2 layers. Either by blending layers or applying modf function to every 2 layers.
-#@cli : (eq. to 'rep_modo').\n
-#@cli : If channel_value is less than 0, then rep_modular_operation function will use layer blending techniques for 2 layers for every 2 layers.
-#@cli : See 'gmic h rep_modf' for more details.\n
-#@cli : Author: Reptorian.
-rep_modular_operation:
-
-rv={int($!/2)}
-
-if $!>1&&$3<0
-
- repeat $rv {
-  l[{$>*2},{$>*2+1}] {
-   +modf[-1] $1,$2,[-2] modf[0] $1,$2,[1]
-   rm..
-  }
- }
-
-else
-
- if $!%2
-  if $!>2
-   modf[^-1] $1,$2,$3
-  else
-   modf $1,$2,$3
-  fi
- else
-  modf $1,$2,$3
- fi
-
-fi
 #@cli modf: eq. to 'modular_formula'.
 modf:
+skip ${2=255},${3=100%}
 max_img_ind={$!-1}
 modf_arg2,modf_arg3=${2-3}
 
@@ -15518,7 +15359,7 @@ fi
 
 modular_formula[0-$max_img_ind] $1,$modf_arg2,$modf_arg3
 keep[0-$max_img_ind]
-#@cli modular_formula : operation,max_channel_value={ float_value | [image] },channel_values={ float_value(%) | [image] }
+#@cli modular_formula : operation,max_channel_value={ float_value | [image] },_channel_values={ float_value(%) | [image] }
 #@cli : Apply modular formulas into selected images. 'channel_value' can be values outside the channel ranges of image.
 #@cli : When using a image argument to max_channel_value, the dimension should be equal to the spectrum of target images.
 #@cli : When using a image argument to channel_value, it can be single spectrum or equal to the spectrum of target images.
@@ -15526,7 +15367,9 @@ keep[0-$max_img_ind]
 #@cli : operation can be { 0=modulo | 1=modulo_continuous | 2=divisive | 3=divisive_continuous | 4=additive | 5=additive_continuous}
 #@cli : In addition, the operation variable can be the corresponding string as argument.
 #@cli : Author: Reptorian.
+#@cli : Default value: '_channel_value=100%'
 modular_formula:
+skip ${2=255},${3=100%}
 if isint($1)
  modular_mode={int($1)%6}
 else
@@ -18166,7 +18009,7 @@ foreach
 done
 #@gui _<b>Testing</b>
 #@gui <i>Reptorian</i>
-#@gui Modulos Operation:fx_rep_modo,fx_rep_modo_preview
+##@gui Modulos Operation:fx_rep_modo,fx_rep_modo_preview
 #@gui:_=note("<b>Initial</b>")
 #@gui:Colour Space=choice(0,"RGB","sRGB","RYB","CMY","CMYK","HCY","HSI","HSL","HSV","LAB","LCH","YIQ","YUV","YCbCr","YCbCrGLIC","XYZ","YES","Kodak 1","Ohta")
 #@gui:Edit Multiple Channels at once?=bool(0)
@@ -25841,6 +25684,7 @@ tau={2*pi}
 ow={w}
 oh={h}
 mode={$14?2:1}
+ti=$!
 
 local [0] {
  rep_three_coupled_oscillators $1,{$tau*$2%},{$tau*$3%},-$4,$5,{($6-50)/50},{($7-50)/-50},$8
@@ -25852,7 +25696,7 @@ local [0] {
    if $-1>1
     n 0,{255*$-1}
     if $-2!=0 + {$-2*255} fi
-    modf {$-4?3:2},255,1
+    modf {$-4?3:2},255,100%
    else
     n 0,{255*$-1}
    fi
@@ -25863,7 +25707,7 @@ local [0] {
 
   if $-2!=0&&(!($-1>1))
    + {$-2*255}
-   modf {$-4?3:2},255,1
+   modf {$-4?3:2},255,100%
   fi
 
   if $-3 negate fi
@@ -25919,10 +25763,9 @@ if $9==2
 
 else
 
- ti={$!}
+ k.
  if $ti>1
-  rm[^0]
-  repeat $ti-1 . done
+  [-1]x{$ti-1} done
  fi
 
 fi
