@@ -17161,17 +17161,13 @@ fi
 #@cli : -- end of form_id --
 #@cli :
 #@cli : Note: _shape_option_1 can be empty. n refers to corresponding shape option.
-#@cli : Default value: '_form_ratio=1','_ang=0','_reflect_dir=0','_sublevel=.5','_interpolation=2','tile_boundary=0','_image_boundary=2','_fit_tile=1','_kodl=0'\n
 #@cli :
 #@cli : Author: Reptorian.
 #@cli : $ sp landscape rep_form_pixel star,20,,90%,45,0,1,1,2,75%,0,5,2,0,0
 rep_form_pixel:
-skip ${2=},${3=},${4=},${5=},${6=},${7=},${8=},${9=},${10=},${11=},${12=},${13=},${14=},${15=}
+skip ${2=},${3=},${4=1},${5=0},${6=0},${7=1},${8=0},${9=1},${10=100%},${11=0},${12=5},${13=0},${14=1},${15=0}
 
-if narg($2)  form_quad_lx=$2 else form_quad_lx=$3 fi
-if narg($3)  form_quad_ly=$3 else form_quad_ly=$2 fi
-
-form_ratio,ang,mirror,sub,tile_boundary,image_boundary,z_convolve,z_convolve_boundary,interpolation,cs_mode,fit_tile,var_kodl={narg($4)?abs($4):1},{narg($5)?$5:0},{narg($6)?abs($6)%3:0},{narg($7)?abs($7)+1:2},{narg($8)?abs($8)%4:0},{narg($9)?abs($9)+1:2},{narg($10)?abs($10):.5},{narg($11)?abs($11)%2+1:1},{narg($12)?abs($12)+1:5},{narg($13)?abs($13)%9:7},{narg($14)?abs($14):1},{narg($15)?abs($15)%4:0}
+form_ratio,ang,mirror,sub,tile_boundary,image_boundary,z_convolve,z_convolve_boundary,interpolation,cs_mode,fit_tile,var_kodl={[cut(abs($4),0,1),$5,int(abs($6))%3,abs($7)+1,int(abs($8))%4,int(abs($9))+1,abs($10),abs($11)%2+1,int(abs($12))+1,int(abs($13))%9,$14&1,int(abs($15))%4]}
 
 convert_colors_fwd=${arg\ 1+$cs_mode,none,rgb2ryb,cs_error,rgb2hcy,rgb2hsi,rgb2hsl,rgb2hsv,rgb2lab,rgb2lch}
 convert_colors_bwd=${arg\ 1+$cs_mode,none,ryb2rgb,cs_error,hcy2rgb,hsi2rgb,hsl2rgb,hsv2rgb,lab2rgb,lch2rgb}
@@ -17184,25 +17180,19 @@ if $cs_mode>2
 fi
 
 if $z_convolve
- offpixel={$z_convolve*-1}
- onpixel={($z_convolve)*2+1}
+ offpixel,onpixel={z_convolve=$z_convolve;[z_convolve*-1,z_convolve*2+1]}
  ($offpixel/$onpixel/$offpixel)
  store. zmap
 fi
 
-tile_w={abs($form_quad_lx)}
-tile_h={abs($form_quad_ly)}
-if $tile_w&&$tile_w<4 __$tw=4 fi
-if $tile_h&&$tile_h<4 __$th=4 fi
+tile_w,tile_h={round(abs([$2,$3]))}
+if $tile_w?$tile_w<4 tile_w=4 fi
+if $tile_h?$tile_h<4 tile_h=4 fi
 if !($tile_w||$tile_h) error "\$tile_w||\$tile_h==F"  fi
 tile_w={!$tile_w?$tile_h:$tile_w}
 tile_h={!$tile_h?$tile_w:$tile_h}
 tile_wh={$tile_w*$tile_h}
-
-mw=${-max_w}
-mh=${-max_h}
-nw={ceil($mw/$tile_w)*$tile_w}
-nh={ceil($mh/$tile_h)*$tile_h}
+tile_dim=[$tile_w,$tile_h]
 
 if ${is_image_arg\ $1}
 
@@ -17222,7 +17212,7 @@ if ${is_image_arg\ $1}
 
 else
 
- sid="$1"
+ sid=$1
 
  if isnum($1) if isint($1)
   sid=${"-arg "1+$sid"","australia,barbedwire,circle,crosshair,cupid,diamond,dragon,dragonfly,fern,flip,gear,gumleaf,heart,information,kookaburra,mail,mapleleaf,paint_splat,paw,phone,polygon,rooster,shopping_cart,snowflake,star"}
@@ -17232,7 +17222,7 @@ else
  else shape_$sid {max($tile_w,$tile_h)*$sub}
  fi
 
- r. {ceil(w/$tile_w)*$tile_w},{ceil(h/$tile_h)*$tile_h},100%,100%,0,0,.5,.5
+ resize. {ceil(w/$tile_w)*$tile_w},{ceil(h/$tile_h)*$tile_h},100%,100%,0,0,.5,.5
 
 fi
 
@@ -17254,22 +17244,17 @@ resize. $tile_w,$tile_h,100%,100%,0,0,.5,.5
 
 cut. 0,1 n. 0,1
 
-avgc={avg(crop(#-1))}
+avgc={ia#-1}
 
 repeat $!-1 {
 
  local[$<,-1] {
 
-  ntw={ceil(w#0/$tile_w)}
-  nth={ceil(h#0/$tile_h)}
-  rw={$ntw*$tile_w}
-  rh={$nth*$tile_h}
-  ss={s#0}
+  ntw,nth,rw,rh,ss={tile_dim=$tile_dim;new_tile=ceil([w#0,h#0]/tile_dim);[new_tile,new_tile*tile_dim,s#0]}
 
   if $var_kodl>1
    if $var_kodl==3 +store[0] kodl_image fi
-   ow={w#0}
-   oh={h#0}
+   ow,oh={[w#0,h#0]}
    resize[0] $rw,$rh,100%,100%,0,$image_boundary,.5,.5
   elif $var_kodl==1
    resize[0] $rw,$rh,100%,100%,0,$image_boundary,.5,.5
@@ -17283,12 +17268,17 @@ repeat $!-1 {
     $convert_colors_fwd[0]
    else
     if s#$<==3 rgb2cmyk[0]
-    else local[0] { s c,-3 rgb2cmyk.. a c }
+    else 
+     local[0] { 
+      split c,-3 
+      rgb2cmyk.. 
+      append c 
+     }
     fi
    fi
   fi
 
-  $ntw,$nth,2,{s#0},:"begin(
+  $ntw,$nth,2,$ss,:"begin(
    const avg_c=$avgc;
    const tw=$tile_w;
    const th=$tile_h;
@@ -17375,7 +17365,7 @@ repeat $!-1 {
   if $z_convolve
    $zmap
    convolve.. .,$z_convolve_boundary
-   remove.
+   rm.
   fi
 
   if $cs_mode>=2&&(s#-1>=3)
