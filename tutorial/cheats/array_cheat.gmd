@@ -1,84 +1,165 @@
 %% x "mkdir -p img" rm %%
-|+ [Cheat Home](cheatsheet.html) | [Custom Cheat](custom_cheat.html) | [Display Cheat](display_cheat.html) | [Debug Cheat](debug_cheat.html) |**Array Cheat**|                    
+|+ [Cheat Home](cheatsheet.html) | [Custom Cheat](custom_cheat.html) | [Display Cheat](display_cheat.html) | [Debug Cheat](debug_cheat.html) |**Array Cheat**| [Substitution Cheat](subs_cheat.html)
 |                    |                    |                    |                    |                    |                    
-### Cheat #5: Arrays: Command line and Math Expressions
-__TL;DR:__ Notation to address ordered sequences of things on the command line and in the Math Expression parser, and moving between the two.
-= expressrefresh
-### Brief Refresher on Substitutions
-Command line variables stem from G'MIC's [Substitution Rules](https://gmic.eu/reference/substitution_rules.html#top). Brief refresher:
-| 1.  |Create a substitution|… 'twelvesquared=144' …
-| 2.  |Use a substitution|… 'echo $twelvesquared' …
+### Cheat #5: Vector and Pixel Access Operators
+%% ofs=1.07858,3.319513 i images/e_letter.png r. 25%,25%,100%,100%,5 f. ">OFS=get('ofs',2,0);V=I-J(OFS[0],OFS[1],0,2,3);V[s-1]=2^16-1;V" sh. 0,{s-2} n. 0,{2^16-1} rm. o. img/fuzze.png rm %%
+#### Vector Access Operator
+#### TL;DR
+|-![FuzzE](img/fuzze.png)\n[Fuzzed E](#fuzzede)|In [Mathematical Expressions](https://gmic.eu/reference/mathematical_expressions.html#top), right hand square brackets — `V[p,q,s]` — invoke a _vector access operator_. It returns a subvector copied from `V`; `V` is unchanged. Parameters `p`, `q` and `s` govern what elements copy to the subvector. Copy single elements, blocks, or elements separated by a constant _stride_.\n\n1.    `p` sets the starting index and is required. By itself only the element indexed by `p` copies.\n2.    `q` specifies how many elements in a block are copied. It is optional and defaults to one.\n3.    `s` specifies a stride. Strides select disjoint elements separated by constant intervals. Optional and defaulting to one; the default copies contiguous elements when `q > 1`.
+= vecexamples
+#### Examples:
+Copy the fourth element of `V` into scalar `SV`.
 ~~~
-$ gmic twelvesquared=144 echo $twelvesquared
+$ gmic a={V=expr('x',16);SV=V[3];print(V);print(SV)}
 [gmic]-0./ Start G'MIC interpreter.
-[gmic]-0./ Set local variable 'twelvesquared=144'.
-[gmic]-0./ 144
+[gmic_math_parser] V = (uninitialized) (mem[37]: vector16)
+[gmic_math_parser] SV = (uninitialized) (mem[54]: scalar)
+[gmic_math_parser] V = [ 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 ] (size: 16)
+[gmic_math_parser] SV = 3
+[gmic]-0./ Set local variable 'a=3'.
 [gmic]-0./ End G'MIC interpreter.
 ~~~
-* Equating a lefthand string with a righthand item through a `=` operator sets up a _substitution_.
-* From such a declaration forward, G'MIC substitutes occurences of '$ _<lefthand_item>_' with '_<righthand_item>_.'
-* Such substitutions underlie G'MIC _command line variables_. These may have _global_ or _local_ visiblity. A _scope_ constitutes the current, in-progress G'MIC pipeline, along with the substitutions which the command line processor can act upon (i.e., are 'visible') while operating on the current pipeline. See [Debuggery](https://gmic.eu/tutorial/debug_cheat.html#debuggery) for further remarks on how G'MIC _enters_ and _exits_ various _scopes_. 
-* _Global_: prepend the lefthand string with an underscore character: '_visibleeverywhere=42'. Even when subsequently entering the scopes custom commands, no matter how deep they may be from the declaration, G'MIC will substitute occurences of '$_visibleeverywhere' with '42'.
-* _Local_: 'visibleincurrentscopeonly=26', the default scope when omitting a prepended underscore. Note line two of the shell log. When subsequently entering scopes of custom commands, the definition of '$visibleincurrentscopeonly' disappears from the deeper scope. Similarly, the definition of '$visibleincurrentscopeonly' disappears when G'MIC exits the scope of its declaration. While it may seem contrary to common sense, the self-effacing nature of local variables is a feature, not a bug. Practically, most variables are meaningful only in the immediate scope of their use and have no business in deeper or shallower ones: that means you may reuse meaningful local variable names in other scopes without undue ambiguity. In contrast, global variables are forever and trip up scripters after their declarations are forgotten, giving rise to subtle, hard-to-detect bugs. Best practice: use global variables only when you really, _really_ have to.
-= mathexpjit
-### Substitutions with the Math Expression JIT processor
-G'MIC performs substitutions very early in the process of analyzing command line items. This has consequence in scripts where math expressions live. 
+|- 1.  |Mathematical expression vectors are zero-indexed. With `V[3]`, `p` is at the fourth element, counting from zero; the length of the subvector, `q`,  defaults to one, and the stride, `s` defaults to one element.
+| 2.  |Unlike image lists, vector indices are non-negative. `V[-1]` does not select the last element of a vector `V` but throws an out-of-bounds exception.
+| 3.  |In single-element access, G'MIC produces scalars. To explicitly obtain single-element vectors, wrap the access function in square brackets, `SV=[V[3]]`, which creates a one element vector from the return scalar value of `V[3]`.
+
+Copy a 3 element subvector from `V` starting at index=5.
 ~~~
-$ gmic constantfive=5 count={V=vector$constantfive(0);fill(V,k,V[k]=k)} echo $count
+$ gmic a={V=[0,1,2,3,4,5,6,7,8,9];SV=V[5,3];print(SV)}
 [gmic]-0./ Start G'MIC interpreter.
-[gmic]-0./ Set local variable 'constantfive=5'.
-[gmic]-0./ Set local variable 'count=0,1,2,3,4'.
-[gmic]-0./ 0,1,2,3,4
+[gmic_math_parser] SV = (uninitialized) (mem[45]: vector3)
+[gmic_math_parser] SV = [ 5,6,7 ] (size: 3)
+[gmic]-0./ Set local variable 'a=5,6,7'.
 [gmic]-0./ End G'MIC interpreter.
 ~~~
-Awful lot going on here. Let's unpack this.
-| 1.  |We are declaring _two_ substitutions, one for '$constantfive', the second for '$count'.
-| 2.  |First item: The declaration for '$constantfive' is easy to digest. _Immediately_ after this declaration, wherever G'MIC "sees" '$constantfive', it substitutes it with '5'. Mark our word: _Immediately_. The first substitution, item one of the pipeline, is for '$constantfive'; it is ready for use by the time G'MIC takes up the second item on the pipeline, the declaration for the substitution 'count'
-| 3.  |In the declaration of 'count', what's going on with the right hand side? Hint: G'MIC already knows how to substitute occurences of '$constantfive' with '5':
-|   a.   |Brackets '{}' signal G'MIC to summon the 'Just In Time' (JIT) math processor to process the intervening string, presumably a properly composed [math expression](https://gmic.eu/reference/mathematical_expressions.html#top) and, barring JIT errors,  to substitute the bracketed string with the results of JIT math processing. That results becomes the right hand side in the declaration for 'count'. 
-|   b.   |Before invoking the math processor, G'MIC scans the math expression for possible substitutions, finds '$constantfive' and replaces it with '5'.
-|   c.   |When G'MIC invokes the math processor, that facility "sees" not 'vector$constantfive' but 'vector5', the math function which creates five element vectors. The math processor is _wholly unaware_ of the substitution. In fact, the math processor is wholly unaware of G'MIC. It leads an uncomplicated life; it just processes the strings it is given, just as they are given to it.
-|   d.   |In conducting its uncomplicated life, the math processor observes the ';' statement separator operator: the math expression consists of two statements. The first statement assigns symbol 'V' a five element vector, all elements '0'. The second statement fills that vector with the ascending sequence '0,1,2,3,4'. See [Specific functions](https://gmic.eu/reference/mathematical_expressions.html#specific_functions) and [New useful features in math parser, planned in 2.9.8](https://discuss.pixls.us/t/new-useful-features-in-math-parser-planned-in-2-9-8/24910)for the care and feeding of 'fill()' and other math processing functions.
-|   e.   |The second math processor statement seems to have forgotten to assign anything to anything. It is the way of the math processor to pass whatever the results of the last statement may be to the parent context: the G'MIC command line processor, to wit, a swan song: "I am done. That string you gave me is a valid math expression and the last statement in that expression reduces to a vector '[0,1,2,3,4]' Do with it what you will. I am cleaning up now, deallocating resources, and I am ceasing to exist."
-| 4.  |G'MIC does what it will. Having no innate notion of a vector, G'MIC sees it as a comma separated list of five items, '0,1,2,3,4' This is a right hand side that it can understand; it assigns the list to the left hand name for the substitution. Thereafter, '$count' resolves to '0,1,2,3,4' wherever the former may be seen.
-| 5.  |Recall that substitutions are _immediate_. The follow-on command, 'echo' "sees" not '$count', but '0,1,2,3,4', which it duly echos to the G'MIC shell log.
-= constmath
-### Substitution and 'const' math expressions 
-'3b' GMIC preprossessing of math expressions, looking for possible substitutions within such and replacing them with their declared values, is more useful than it first seems.
+|- 1.  |The length of the subvector is set to three elements. `q=3`.
+| 2.  |The subvector receives consecutive elements starting from index=5. This stems from the default stride: `s=1`.
 
-The math expression processor embodies the the notion of a 'const' symbol:
+Copy a four element subvector from every fourth element in `V` starting at index=0.
 ~~~
-const fivemetercircumference=5*pi;
-~~~
-So long as the right hand side reduces to a fixed numeric quantity during JIT compilation — a _known value_ at compilation time — then the JIT compiler can readily replace all occurences of symbol 'fivemetercircumference' with the numeric 15.70796 or thereabouts, as the product of five and π, are both known fixed quantities at compilation time. If the math processor establishes that a symbol can be associated with a known numeric that _never changes_ throughout a math expression lifetime, the math processor then essentially replaces the symbol with the numeric, which can simplify and speed up math expression processing.
-
-Well, that is all well and good — until one wants to cheat:
-~~~
-gmic                                                                  \
-   eval "                                                             \
-          for(                                                        \
-               k=2,                                                   \
-               k<7,                                                   \
-               k=k+1,                                                 \
-               V=vector(#k,0);                                        \
-               fill(V,j,V[j]=2*j+3);                                  \
-               … # Do various things with our very own flexi-vector V \
-             )                                                        \
-        "                                                             \
+$ gmic a={V=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];SV=V[0,4,4];print(SV)}
 [gmic]-0./ Start G'MIC interpreter.
-[gmic]-0./ Evaluate expression '(...)' and assign it to status.
-[gmic]-0./ *** Error *** Command 'eval': Function 'vector()': First argument (of type 'scalar') is not a constant, in expression 'for(
+[gmic_math_parser] SV = (uninitialized) (mem[56]: vector4)
+[gmic_math_parser] SV = [ 0,4,8,12 ] (size: 4)
+[gmic]-0./ Set local variable 'a=0,4,8,12'.
+[gmic]-0./ End G'MIC interpreter.
 ~~~
-G'MIC big, red letter message is its gentle way of observing that the iterator variable, 'k' can't possibly be a known constant value at compile time; assuredly, the variable changes during iteration in the run-time phase. But the creation function 'vector(# _<size>_,…)' most assuredly _does_ require a constant first argument because, in its current implementation, the math processor needs to establish all of its storage requirements up front, during compile time. So one cannot do dynamic vectors in this way. For that, consider [Dynamic arrays](https://gmic.eu/reference/mathematical_expressions.html#dynamic_arrays) where the math expression parser hijacks an image to furnish backing store for arrays that seem to adjust their sizes as elements are added or removed.
+|- 1.  |The length of the subvector is set to four elements. `q=4`.
+| 2.  |The _stride_ of the operation, `s=4`, copies disjoint elements separated from each other by `s-1` intervening elements.
 
-Dynamic arrays aside, one may salvage the broken approach with this:
+Join six elements from `V` situated at even indices, starting at index=0, with five disjoint elements, also from `V`, starting at index=3 and separated by two intervening elements.
 ~~~
- gmic                            \
-   -repeat 5,k                   \
-   kay={\$k+1}                   \
-   -eval  "const kayiter = $kay; \
-          V=vector(#kayiter,0);  \
-          fill(V,j,V[j]=2*j+3);  \
-         "                       \
-   -done
+$ gmic a='{V=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];[V[0,6,2],V[3,5,3]]}'
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Set local variable 'a=0,2,4,6,8,10,3,6,9,12,15'.
+[gmic]-0./ End G'MIC interpreter.
 ~~~
+|- 1.  |Square brackets not otherwise decorating existing vectors create new ones.  Encompassing a list with square brackets creates a vector with a length equal to the length of the list. List elements themselves may be vectors, as seen here. The operation concatenates the vectors in the order that they appear.
+= setelement
+#### Setting Elements
+When on the left hand side of an assignment, a vector accessor operator permits only one element assignment. Attempting to set multiple elements of a left hand vector with `q>1` or `s>1` raises an exception.
+~~~
+$ gmic a={V=expr('x',20);V[0,5,5]=320;print(V)}
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ *** Error *** Item substitution '{V=expr('x',20);V[0,5,5]=3;print(V)}': Unrecognized item '0,5,5' in expression 'V[0,5,5]=3'.
+~~~
+
+However, with `q==1` and `s==1`, the defaults, the single element addressed by `p` can be altered through assignment.
+~~~
+ $ gmic a={V=expr('x',20);V[5]=320;print(V)}
+[gmic]-0./ Start G'MIC interpreter.
+[gmic_math_parser] V = (uninitialized) (mem[37]: vector20)
+[gmic_math_parser] V = [ 0,1,2,3,4,320,6,7,8,9,10,11,12,13,14,15,16,17,18,19 ] (size: 20)
+[gmic]-0./ Set local variable 'a=0,1,2,3,4,320,6,7,8,9,10,11,12,13,14,15,16,17,18,19'.
+[gmic]-0./ End G'MIC interpreter.
+~~~
+= pixelaccess
+#### Pixel Access Operators
+#### TL;DR
+|-     |Pixel Access Operators obtain __p__ ixel __el__ ements, _pels_, or pixels — a column vector of pels, and are the core "setters" and "getters" for _pel_ and _pixel_ _processors_, which are the math expressions serving as kernels for iterations mediated by ''-fill'', ''-eval'' or ''-input''.\n\nIn their simplest configurations, _sans_ arguments, pixel access operators can set or get the current pel or pixel, operating on both sides of an assignment. More detailed schemes arise from writing operators with specific styles of argument brackets, identifying letters and letter cases. A [tabulation](#pixelaccess) of such styles follows.
+= pixelexamples
+#### Examples:
+===
+%% images/dne_face.png r2dx. 25% o. img/dne_face.png rm %% %% images/dne_face.png -fill. ip=sum(I)/s;vectors(ip) r2dx. 25% n. 0,255 o. img/dne_face_ave.png rm %%
+|-![dne_face](img/dne_face.png) | ![dne_face_ave](img/dne_face_ave.png)
+| *face* | * average face *
+===
+Replace every pixel by the average of its channel values.
+~~~
+$gmic images/dne_face.png -fill. ip=sum(I)/s;vectors(ip)
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Input file 'images/dne_face.png' at position 0 (1 image 1024x1024x1x3).
+[gmic]-1./ Fill image [0] with expression 'ip=sum(I)/s;vectors(ip)'.
+[gmic]-1./ Display image [0] = 'dne_face.png'.
+[0] = 'images/dne_face.png':
+  size = (1024,1024,1,3) [12 Mio of float32].
+  data = (186.667,190,193,195.667,197,197,195.667,195,195,195,196.667,195.667,(...),189.333,189.667,190.667,189.667,190.667,191.333,191.333,191.333,191.333,191.333,190.333,186).
+  min = 13.3333, max = 225, mean = 162.022, std = 49.5293, coords_min = (581,136,0,0), coords_max = (460,0,0,0).
+~~~
+|- 1.  |The pixel access operator appears here in a vector form: `I`. In the absence of explicit arguments, the immediate value of `I` varies as the current location changes under iterations mediated by ''-fill'', ''-input'' or ''-eval''. "Vector form" means that `I` provides the entire pixel at the current location as column vector of length `s`, the depth of the current image.
+| 2.  |The aim of writing `vectors(ip)`, and not an unadorned `ip`, is to obtain a _pixel processor_; these iterate over images a pixel-at-a-time and are called into play by fashioning processors with vector return values. The unadorned `ip` is scalar, the return type of `sum()`. Unaltered, this scalar return value would have fashioned a _pel processor_. These iterate over images a pel at-a-time, the finer granularity requiring traversal over individual image planes — three times as many steps with an `RGB` image. This finer-grained traversal happens to achieve the same result but at unnecessary cost.
+| 3.  |Terse notation bears careful reading. At first glance, `vectors(ip)` suggests a plural form of `vector()`. But recall that this constructor has a compound form: "vector" plus "number" — or what can resolve to a number. So `vector8(0)` returns an eight element vector populated with zeros; `vectors(3.5)` returns a vector whose length equals the depth of the current image (`s`) and with all elements set to `3.5`.
+===
+%% images/dne_face.png -fill. norm2(i-j(-3,-3,0,-1,0,2)) r2dx. 25% n. 0,255 o. img/dne_face_diff.png rm %%
+
+|-![dne_face](img/dne_face.png) | ![dne_face_diff](img/dne_face_diff.png)
+| *face* | * diff face *
+===
+Take the L2 norm of every delta between a pel and a neighbor offset in position by `[-3,-3,0,-1]`.
+~~~
+$ gmic -input images/dne_face.png -fill. 'norm2(i-j(-3,-3,0,-1,0,2))'
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Input file 'images/dne_face.png' at position 0 (1 image 1024x1024x1x3).
+[gmic]-1./ Fill image [0] with expression 'norm2(i-j(-3,-3,0,-1,0,2))'.
+[gmic]-1./ Display image [0] = 'dne_face.png'.
+[0] = 'images/dne_face.png':
+  size = (1024,1024,1,3) [12 Mio of float32].
+  data = (1,5,10,3,4,4,2,2,1,0,2,0,(...),11,9,8,11,11,10,10,10,9,8,9,13).
+  min = 0, max = 168, mean = 16.2062, std = 17.0729, coords_min = (9,0,0,0), coords_max = (298,0,0,1).
+[gmic]-1./ End G'MIC interpreter.
+~~~
+|- 1.  |The pixel access operator appears in two scalar forms: `i`, and `j(-3,-3,0,-1,0,2)`. In pel processors `i`, _sans_ arguments, references the channel value at the current location; it varies with changing location throughout the iteration, taking on the pel value of the current position. `j(-3,-3,0,-1,0,2)` accesses the pel offset from the current location in the direction `[-3,-3,0,-1]`. The L2 norm of their difference measures a color space distance. A large color space distance — from red to cyan, say — signals an edge in the image space direction (-3, -3, 0, -1).
+| 2.  |The fifth and sixth arguments to `j(…0,2)` set _interpolation_ and [boundary](https://gmic.eu/tutorial/images_have_edges_now_what.html) policies. Interpolation puts forward the idea that image pixels are sample points and it is reasonable to access values between them. In such cases, the fifth parameter, an `interpolation` flag `1`, provides for linear interpolation, while `2` provides for cubic interpolation. `0`, used here, establishes discrete sampling. There are no "in-between" values; sampling assumes the value of the nearest pel or pixel.
+| 3.  |In the matter of returning results, mathematical expressions given to pel and pixel processors as arguments to ''-input'' and ''-fill'' behave differently  from ''-eval''. In the first two, the value of the last statement in the expression sets the pel or pixel value at the current location; an implied assignment. ''-input'' and ''-fill'' processors "paint" the image. ''-eval'' leaves the pel or pixel unchanged — no implicit assignment. It "evaluates" the image without (necessarily) changing it, though indirect changes might stem from other statements in the processor.
+
+= pixelaccess
+#### A Pixel Access Operator Menagerie
+The foregoing examples illustrate the diverse notation exhibited by pixel access operators. Select behavior through choice of (1) operator names (2) argument brackets, or (3) letter case.
+
+|+`i/j` v. `I/J`|Pel\Pixel|Lower-case operator names, `i` and `j`, return scalar pels. Necessarily, fully addressing specific pels requires coordinates in width, `x`, height, `y`, depth, `z` and channel size `c.` Upper-case operator names, `I` and `J` return vector pixels. This coaser-grained addressing scheme dispenses with channel addressing, as the pixel slices through all channels.
+|`i/I` v. `j/J`|Origin\current location|With operator names `i` or `I`, Coordinate arguments `x`, `y`, `z` and `c` measure from the image origin. With `j` or `J` operator names, measures are relative to the current location.
+|`[]` v. `()`|Vector\Image|Square brackets around the arguments address image elements as if occupying a one dimensional vector and gives rise to a modified signature: `[#ind,i,boundary_conditions]`. The one index, `i`, measures from the start of this vector (`i/I`) or from the current location mapped into the vector (`j/J`), the index furnishing an offset. During iterations, the lower-case scalar form reads out memory storage: first the red channel, then green, then blue, presuming an RGB image. Upper-case `I/J` vectors stride across image channels and assemble pixels. The square bracket form does not support an `interpolation` argument, but does take a `boundary_condition` flag to handle off-image access.\n\nParenthetically bracketed arguments give rise to the image-oriented signature: `(#ind,x,y,z,c,interpolation,boundary_condition).` This signature is for lower-case pel operators, `i/j` which work with a high-resolution view of image contents, locating a specific pel by image column, `x`, image row `y`, slice, `z` and channel `c`; see [Images](https://gmic.eu/tutorial/images.html). Omitting the channel argument `c` gives rise to the upper-case pixel operators `I/J`. These work with a lower resolution view of the image contents and return entire pixels at each call: column vectors with length `s`, the _spectrum_, or channel count, of the image.\n\nWith both signatures, a numeric first argument with a preceding `#` signet is taken to be the index to an image on the list index. Operations then proceed on that image instead of the one associated with the math expression. In the absence of explicit association, it is the last image on the list. Also with both signatures, a first argument of the form `#$`_<name>_, then operations proceed on the named image.\n\nHere, a recurring theme: terse notation bears careful reading. For the (1) uninitiated, (2) sleep and/or coffee deprived, or (3) generally inattentive, the day will come when the pixel access functions `i[…]`, `I[…]`, `j[…]` or `J[…]` will confusticate with vector access right hand decorators `[]` and the afflicted coder will write `I[p,q,r]` vector access argument signatures where pixel access signatures were intended. The effect is not fatal; it will access neither pixels nor vectors but raise exceptions instead.
+= fuzzede
+#### Fuzz E
+The frontpiece image toy furnishes an extended play on differencing neighboring pixels for what may be construed as a chiseling in stone effect.
+~~~
+fuzze: -check ${1=1.5}>0" && "\
+              isnum(${1})" && "\
+              isnum(${2=45})" && "\
+              ${2}>=0" && "\
+              ${2}<=180
+     -skip ${3=8}
+     -if s<3
+        -to_rgb.
+     -fi
+     fz={0.1*$1}
+     ang={deg2rad($2)}
+     dpth=$3
+     isa={!(s%2)}
+     -fill. ">
+               OFS=cexp([$fz,$ang]);
+               V=I-J(OFS[0],OFS[1],0,2,2);
+               $isa?V[s-1]=2^$dpth-1:V;
+               V
+            "
+     -shared. 0,{s-(1+$isa)}
+     -normalize. 0,{2^$dpth-1}
+     -remove.
+~~~
+Command line:
+Note last argument to `fuzze`. `.png` and `.tiff` image formats support various bit resolutions: 8, 16 and 32 being common. ''-input'' can detect this resolution and return it in status, `${}` as a numeric: 8, 16, 32… If detection fails, the return status `${}` contains an empty string.
+~~~
+gmic fuzze.gmic -input images/e_letter.png fuzze. 12.5,72,${} -output. img/fuzze.png
+~~~
+
+Updated: March 7 2023 12:15 UTC Commit 220bd6b91cf3556158551b6ca6d8f6e242b72850
