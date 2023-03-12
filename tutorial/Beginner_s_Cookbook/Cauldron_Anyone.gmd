@@ -12,14 +12,32 @@ The key idea in this Cookbook piece is this: ''-bandpass'', like many G'MIC comm
 
 Here is a pipeline that produces a kind of a cauldron effect. The nice thing about clips produced by this pipeline is that they can be seamlessly looped without a 'pop' crossing from the end to the beginning of the loop. Details follow.
 ~~~
-gmic srand 100                            \
-   -input 360,240,200,3                   \
-   -noise[-1] 0.2,2                       \
-   -bandpass 2%,3%                        \
-   -normalize 0,255                       \
-   -display                               \
-   -split z                               \
-   -output /path/to/your/animation.mp4,24
+cauldron:
+   -input 360,240,200,3
+   -noise[-1] 0.2,2
+   -bandpass 2%,3%
+   -normalize 0,255
+   -display
+   -split z
+   -output cauldron.mp4,24,h264
+
+ $ gmic cauldron.gmic -verbose + -cauldron -verbose -
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Input custom command file 'cauldron.gmic' (1 new, total: 4552).
+[gmic]-0./ Increment verbosity level (set to 2).
+[gmic]-0./cauldron/ Input black image at position 0 (1 image 360x240x200x3).
+[gmic]-1./cauldron/ Add salt&pepper noise to image [0], with standard deviation 0.2.
+[gmic]-1./cauldron/ Apply bandpass filter [2%,3%] to image [0].
+[gmic]-1./cauldron/ Normalize image [0] in range [0,255], with constant-case ratio 0.
+[gmic]-1./cauldron/ Display image [0] = '[unnamed]', from point (180,120,100).
+[0] = '[unnamed]':
+  size = (360,240,200,3) [197 Mio of float32].
+  data = (128.162,131.093,133.638,135.768,137.465,138.717,139.523,139.89,139.832,139.374,138.546,137.386,(...),127.24,126.957,126.86,126.962,127.271,127.793,128.532,129.489,130.661,132.043,133.626,135.401).
+  min = 0, max = 255, mean = 129.187, std = 28.3084, coords_min = (344,103,28,0), coords_max = (38,157,34,0).
+[gmic]-1./cauldron/ Split image [0] along the 'z'-axis.
+[gmic]-200./cauldron/ Output images [0,1,2,(...),197,198,199] as mp4 file 'cauldron.mp4', with 24 fps and h264 codec.
+[gmic]-200./ Decrement verbosity level (set to 1).
+[gmic]-200./ End G'MIC interpreter.
 ~~~
 |1. |First, we [conjure from the aether](https://gmic.eu/tutorial/conjuring_images_out_of_the_aether_and_other_generators.html) a contiguous volume 320 pixels wide, 240 pixels high and two hundred slices deep, sufficient for an eight second video clip playing at 24 frames per second. Into this conjured image, we salt-and-pepper a fairly sparse pattern of pixels. If you scrub through the image volume at this point in the pipeline (insert ''-display'' after ''-noise''), the animation would have the appearance of dirty film. To this sparse noise we apply a low-pass spectral filter, using the ''-bandpass'' command. The lower relative cutoff frequency is 2%, the upper relative cutoff frequency is 3%. That is, of 100% of the original image spectra, we toss all frequencies but a one percent wide band between the 2%-3% markers.
 
@@ -61,25 +79,29 @@ To distort this title, as if it being affected by the cauldron, we will harness 
 ===
 
 ~~~
-gmic                                \
-   -input img/cauldron.mp4          \
-   -blur 1                          \
-   -input images/cauldron_title.png \ Step 0
-   -repeat $!-1                     \
-      -local [$>,-1]                \ Step 1
-         +channels[0] 0,1           \
-         -normalize. -15,15         \ Step 2
-         +warp[1] [-1],1            \
-         -remove..                  \ Step 3
-         -shared. 100%              \
-         -normalize. 0,255          \ Step 4
-         -remove.                   \
-         -blend[0,-1] alpha         \ Step 5
-      -done                         \
-   -done                            \
-   -remove.                         \ Step 6
-   -output img/cauldron2.mp4,24
+cauldron_over:
+   -input cauldron.mp4
+   -blur 1
+   -input cauldron_title.png
+   -repeat $!-1
+      -local[$>,-1]
+         +channels[0] 0,1
+         -normalize. -15,15
+         +warp[1] [-1],1
+         -remove..
+         -shared. 100%
+         -normalize. 0,255
+         -remove.
+         -blend[0,-1] alpha
+      -done
+   -done
+   -remove.
+   -output cauldron2.mp4,24,h264
 
+$ gmic cauldron_over.gmic -cauldron_over
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Input custom command file 'cauldron_over.gmic' (1 new, total: 4552).
+[gmic]-200./ End G'MIC interpreter.
 ~~~
 
 ## Distorted Title Walkthrough
