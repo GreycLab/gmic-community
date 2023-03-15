@@ -51,14 +51,17 @@
 #@cli rep_color_region: _threshold[%]>0
 #@cli : For use in images with large color blobs, this simplifies a image.
 rep_color_region:
-skip ${1=25%}
-threshold={cut($1,0,1)}
-foreach { 
- round 
- +colormap 0,,0 
+skip ${1=25%},${2=2%}
+
+check "inrange($1,0,1,0,1)&&inrange($2,0,1,1,1)"
+area_threshold,stray_threshold=${1-2}
+
+foreach {
+ +round 
+ +colormap. 0,,0 
  +index[-2] [-1],0,0 
  +area. 0,0 
- gt. {ia*$threshold} 
+ ge. {ia*$area_threshold}
  *.. . 
  negate. 
  -.. . 
@@ -68,7 +71,80 @@ foreach {
  map. .. 
  rm.. 
  index.. .,0,1 
- rm.
+ rm. rv
+ 
+ if $2
+
+  100%,100%,100%,1
+ 
+  1,1,1,2
+ 
+  eval[0] >"
+   begin(
+    off_place=[-1,1];
+   );
+
+   pixel_in_place=0;
+
+   repeat(4,position,
+    xp=off_place[position&1];
+    yp=off_place[position>>1];
+    pixel_in_place=(I==J(xp,0,0,0,1))&&(I==J(0,yp,0,0,1));
+    if(pixel_in_place,break(););
+   );
+
+   if(!pixel_in_place,
+    pixel_position=[x,y];
+    i(#-2,pixel_position)=1;
+    da_push(#-1,pixel_position);
+   );
+
+   I;"
+ 
+  area_fg.. 0,0
+  inrange.. 0,{iM*$stray_threshold},0,1
+ 
+  eval "
+   size_da=da_size(#-1);
+   point=size_da-1;
+   repeat(size_da,
+    if(!i(#-2,I[#-1,point]),da_remove(#-1,point););
+    --point;
+   );
+   da_freeze(#-1);
+   "
+
+  eval. :"begin(
+    a_coordinates=[-1,0,1,-1,1,-1,0,1];
+    b_coordinates=[-1,-1,-1,0,0,1,1,1];
+   );
+
+   number_of_valid_pixels=0;
+   difference_vector=vector(#8,inf);
+
+   repeat(8,position,
+    offset_a=a_coordinates[position];
+    offset_b=b_coordinates[position];
+    offset=[offset_a,offset_b];
+    test_pixel_position=I+offset;
+    if(!i(#3,test_pixel_position,0,0),
+     difference_vector[position]=norm(I(#0,I),I(#1,test_pixel_position));
+     ++number_of_valid_pixels;
+    );
+   );
+
+   if(number_of_valid_pixels,
+    position=argmin(difference_vector);
+    offset_a=a_coordinates[position];
+    offset_b=b_coordinates[position];
+    offset=[offset_a,offset_b];
+    pixel_position=I+offset;
+    I(#0,I)=I(#0,pixel_position);
+   );"
+
+ fi
+ 
+ keep[0]
 }
 #@cli rep_two_dimension_set_indices:
 #@cli : Return images containing indexes
@@ -28636,13 +28712,14 @@ u "{"$mode_K_a"}_"{$allow_mode_switch*2}\
 "{"$allow_mode_switch"}"\
 "{1}"
 #@gui Color Region:fx_rep_color_region,fx_rep_color_region_preview(0)*
-#@gui:Threshold (%)=float(5,1,100)
+#@gui:Area Threshold (%)=float(5,1,100)
+#@gui:Stray Threshold (%)=float(5,0,100)
 #@gui:_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"),Preview Split=point(50,50,0,0,200,200,200,0,10)_0
 #@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2023/3/13</i>.</small>")
 fx_rep_color_region:
-rep_color_region $1%
+rep_color_region $1%,$2%
 fx_rep_color_region_preview:
-gui_split_preview "fx_rep_color_region $1",${-3--1}
+gui_split_preview "fx_rep_color_region ${1-2}",${-3--1}
 ######################
 
 # Local Variables:
