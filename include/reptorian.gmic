@@ -3149,7 +3149,7 @@ skip ${2=2}
 
 pass$1 0
 
-ts,length={[s#-1,whd#-1]}
+length={whd}
 
 if isint($2) mode={int($2)%3}
 else
@@ -3159,9 +3159,12 @@ fi
 
 repeat $!-1 {
 
- if (s#$>)>1 continue fi
+ if !s#$> continue fi
+ 
+ reference_spectrum_size={s#$>}
 
- {w#$>},{h#$>},{d#$>},$ts,:"begin(
+ {w#$>},{h#$>},{d#$>},{s*$reference_spectrum_size},:"begin(
+   const reference_spectrum_size=$reference_spectrum_size;
    const img_pos=$>;
    const length=$length;
    const mi=length-1;
@@ -3207,16 +3210,39 @@ repeat $!-1 {
    ):(
     calc_ps()=[pref-1,pref,pref+1,pref+2];
    );
+   reference_spectrum_size>1?(
+    const pal_spectrum_size=s#-1;
+    const new_spectrum_size=pal_spectrum_size*reference_spectrum_size;
+    output()=(
+     color_output=vector(#new_spectrum_size,0);
+     repeat(reference_spectrum_size,channel_position,
+      vp=i(#img_pos,x,y,z,channel_position);
+      pref=floor(vp);
+      interp=vp-pref;
+      ps=calc_ps();
+      p_s=ps[0]; #Start Point
+      p_0=ps[1];
+      p_1=ps[2];
+      p_e=ps[3]; #End Point  
+      copy(color_output[channel_position*pal_spectrum_size],calc(),s);
+     );
+     color_output;
+    );
+   ):(
+    output()=(
+     vp=i(#img_pos,x,y,z,0);
+     pref=floor(vp);
+     interp=vp-pref;
+     ps=calc_ps();
+     p_s=ps[0]; #Start Point
+     p_0=ps[1];
+     p_1=ps[2];
+     p_e=ps[3]; #End Point
+     calc();
+    );
+   );
   );
-  vp=i(#img_pos,x,y,z,0);
-  pref=floor(vp);
-  interp=vp-pref;
-  ps=calc_ps();
-  p_s=ps[0]; #Start Point
-  p_0=ps[1];
-  p_1=ps[2];
-  p_e=ps[3]; #End Point
-  calc();"
+  output();"
 
   reverse[$>,-1]
   remove[-1]
