@@ -1,0 +1,66 @@
+svgtoimg: -check ${1=10}>0" && "isbool(${2=1})" && "isfile(['$3'])
+    dens=$1
+    norm=$2
+    ifile=$3
+
+    # Normalize plot points?
+    -if $norm
+       nflg='--normalize'
+    -else
+       nflg=''
+    -fi
+ 
+    # Get name of a temporary file that
+    # will live in the /tmp diretory.
+    -filename_rand
+    fn=${}
+
+    # Command to execute:
+    cmd="python scripts/svghelper.py --density "$dens" "$nflg" --output "$fn" "$ifile
+
+    # Invoke script
+    -exec 1,$cmd
+    stdo=${}
+
+    # Did the subprocess create an output?
+    -if isfile(['$fn'])
+        -input_csv $fn,0
+	-exec 0,"rm "$fn
+	-name. svgplots
+    -else
+        echo "stdout dump: "$stdo
+        error "Could not find: "$fn
+    -fi
+
+imgplot: -check ${is_image_arg\ $1}  
+       -pass$1 1
+       foreach[^-1] {
+          -name. canvas
+	  -pass[-1] 0
+          -name. svgplots
+          -permute[svgplots] cyzx
+          -fill[svgplots] "
+                             begin(
+                                    sw=min(w#$canvas,h#$canvas)/2;
+                                    id=eye(3);
+                                    id[0]=sw/0.5625;
+                                    id[2]=sw;
+                                    id[4]=-sw/0.5625;
+                                    id[5]=sw
+                                  );
+                             (id*[I(x,y),1])[0,2]
+                          "
+          -permute[svgplots] cyzx
+          -eval "
+                  PV=crop(#$svgplots);
+                  polygon(#$canvas,
+                          -int(size(PV)/2),
+                          PV,
+                          1,
+                          0xffffffff,
+                          255
+                         )
+                "
+          -remove[svgplots]
+       }
+       -remove.

@@ -1,0 +1,109 @@
+%% x "mkdir -p img" rm %%
+%% scripts/svgtoimg.gmic svgtoimg 8,1,images/ampersand_circ.svg 300,300,1,1 imgplot. [-2] dilate_circ. 3 label. -f. 'i%3' map. flag o. img/amp.png rm %%
+|+ [Cheat Home](cheatsheet.html) | [Custom Cheat](custom_cheat.html) | [Display Cheat](display_cheat.html) | [Debug Cheat](debug_cheat.html) |[Array Cheat](array_cheat.html) | [Substitution Cheat](subs_cheat.html)
+|**Execute Cheat**|                    |                    |                    |                    |                    
+### Cheat #7: Execute a Subprocess from G'MIC
+#### TL;DR
+|-![amp](img/amp.png)\n            [French Flag Ampersand](#svgexample)|You want to run a script or program outside of your G'MIC script and harvest its output.\n\nFor that use the ''-exec'' command; shortcut: ''x''.
+~~~
+  exec _is_verbose={ 0 | 1 },"command"
+~~~
+|- 1.  |The first argument, `is_verbose` defaults to `1`, useful if you plan to harvest whatever the command writes to its standard output (`stdout`). But perhaps the command writes its meaningful results to a file. Then set `is_verbose` explicitly to zero and save the overhead of fetching standard output strings you won't use.
+| 2.  |The second argument invokes the script or program you wish to run outside of G'MIC. Furnish the command and its arguments as if you would when writing the command and arguments at a shell prompt.
+
+Following examples use this Python script:
+===
+~~~
+ $ svghelper.py -h
+usage: svghelper.py [-h] [-d DENSITY] [-o OUTPUT] [-n] fname
+
+Plot points from SVG Path.
+
+positional arguments:
+  fname                 Strutured Vector Graphics (SVG) file
+
+options:
+  -h, --help            show this help message and exit
+  -d DENSITY, --density DENSITY
+                        Plot point quantity as powers of two;
+                        4 → 2⁴ → 16. Larger → denser.
+                        Defaults to 10 (1024)
+  -o OUTPUT, --output OUTPUT
+                        Text file for output plots.
+  -n, --normalize       Normalize plots.
+                        (1) Center of gravity maps to origin.
+                        (2) Scaling of largest distance to 1,
+                        (3) Preserves aspect ratio.
+~~~
+( [Download svghelper.py](scripts/svghelper.py) )
+===
+The python script harnesses Mathandy's [svgpathtools](https://github.com/mathandy/svgpathtools#svgpathtools) to parse Structured Vector Graphics files and digitize the first path found in such. While it serves our limited purposes, it hardly illustrates what `svgpathtools` can do, including — say — choosing paths based on labels attached to SVG objects. To use `svghelper.py`, create an SVG document with just _one_ path object.  
+
+= svgexample
+===
+%% images/digitizedpath.jpg r2dx 50% %%
+===
+#### Example:
+~~~
+svgtoimg: -check ${1=10}>0" && "isbool(${2=1})" && "isfile(['$3'])
+    dens=$1
+    norm=$2
+    ifile=$3
+
+    # Normalize plot points?
+    -if $norm
+       nflg='--normalize'
+    -else
+       nflg=''
+    -fi
+ 
+    # Get name of a temporary file that
+    # will live in the /tmp diretory.
+    -filename_rand
+    fn=${}
+
+    # Command to execute:
+    cmd="python scripts/svghelper.py --density "$dens" "$nflg" --output "$fn" "$ifile
+
+    # Invoke script
+    -exec 1,$cmd
+    stdo=${}
+
+    # Did the subprocess create an output?
+    -if isfile(['$fn'])
+        -input_csv $fn,0
+        -exec 0,"rm "$fn
+        -name. svgplots
+    -else
+        echo "stdout dump: "$stdo
+        error "Could not find: "$fn
+    -fi
+—————
+$ gmic scripts/svgtoimg.gmic -v + -svgtoimg 4,1,images/ampersand_circ.svg -v -
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Input custom command file 'scripts/svgtoimg.gmic' (2 new, total: 4564).
+[gmic]-0./ Increment verbosity level (set to 2).
+[gmic]-0./svgtoimg/ Set local variable 'dens=4'.
+[gmic]-0./svgtoimg/ Set local variable 'norm=1'.
+[gmic]-0./svgtoimg/ Set local variable 'ifile=images/ampersand_circ.svg'.
+[gmic]-0./svgtoimg/*if/ Set local variable 'nflg='--normalize''.
+[gmic]-0./svgtoimg/ Set local variable 'fn=/tmp/gmic3910554165'.
+[gmic]-0./svgtoimg/ Set local variable 'cmd=python scripts/svghelper.py --density 4 '--normalize' --output /tmp/gm(...).
+[gmic]-0./svgtoimg/ Execute external command 'python scripts/svghelper.py --densit(...)c3910554165 images/ampersand_circ.svg' in verbose mode.
+
+[gmic]-0./svgtoimg/ Set local variable 'stdo=0'.
+[gmic]-0./svgtoimg/*if/ Input number array from file '/tmp/gmic3910554165'.
+[gmic]-1./svgtoimg/*if/ Execute external command 'rm /tmp/gmic3910554165' .
+[gmic]-1./svgtoimg/*if/ Set name of image [0] to 'svgplots'.
+[gmic]-1./ Decrement verbosity level (set to 1).
+[gmic]-1./ Display image [0] = 'svgplots'.
+[0] = 'svgplots':
+  size = (2,16,1,1) [128 b of float32].
+  data = (-0.306328,0.0860442;-0.0848769,0.363683;-0.29221,0.177343;-0.127902,0.00188423;-0.200789,0.0523709;-0.144242,-0.305296;(...),0.349561,0.345194;0.389299,0.368731;0.31905,0.00283116;0.156633,-0.349672;-0.276443,-0.332615;-0.306328,0.0860442).
+  min = -0.349672, max = 0.389299, mean = -1.2551e-09, std = 0.241429, coords_min = (1,13,0,0), coords_max = (0,11,0,0).
+~~~
+|- 1.  |Text
+| 2.  |Text
+| 3.  |Text
+
+Updated: March 27 2023 12:15 UTC Commit 220bd6b91cf3556158551b6ca6d8f6e242b72850
