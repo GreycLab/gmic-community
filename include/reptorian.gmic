@@ -67,11 +67,18 @@ foreach {
  -.. .
  rm.
  colormap. 0,,1
- crop. 1,100%
+ 
+ if xM discard. -1
+ else crop. 1,100%
+ fi
+ 
  map. ..
 
  if $color_distance_threshold
-  100%,1,1,1,">begin(
+  if h>1 dimensions=1,100%
+  else 100%,1
+  fi
+  $dimensions,1,1,">begin(
     const color_distance_threshold=$color_distance_threshold;
     position=0;
     test_color=vector(#s#-1,-inf);
@@ -2401,7 +2408,7 @@ repeat $ncol {
 
 if $ncol>1 u_string.=] fi
 
-{arg($axis+1,[$1,1,1],[1,$1,1],[1,1,$1])},$ncol
+{arg($axis+1,[$1,1,1],[1,$1,1],[1,1,$1])},1
 
 s. $dir_axis,$2
 
@@ -3149,7 +3156,7 @@ skip ${2=2}
 
 pass$1 0
 
-ts,length={[s#-1,whd#-1]}
+length={whd}
 
 if isint($2) mode={int($2)%3}
 else
@@ -3159,9 +3166,12 @@ fi
 
 repeat $!-1 {
 
- if (s#$>)>1 continue fi
+ if !s#$> continue fi
+ 
+ reference_spectrum_size={s#$>}
 
- {w#$>},{h#$>},{d#$>},$ts,:"begin(
+ {w#$>},{h#$>},{d#$>},{s*$reference_spectrum_size},:"begin(
+   const reference_spectrum_size=$reference_spectrum_size;
    const img_pos=$>;
    const length=$length;
    const mi=length-1;
@@ -3207,16 +3217,39 @@ repeat $!-1 {
    ):(
     calc_ps()=[pref-1,pref,pref+1,pref+2];
    );
+   reference_spectrum_size>1?(
+    const pal_spectrum_size=s#-1;
+    const new_spectrum_size=pal_spectrum_size*reference_spectrum_size;
+    output()=(
+     color_output=vector(#new_spectrum_size,0);
+     repeat(reference_spectrum_size,channel_position,
+      vp=i(#img_pos,x,y,z,channel_position);
+      pref=floor(vp);
+      interp=vp-pref;
+      ps=calc_ps();
+      p_s=ps[0]; #Start Point
+      p_0=ps[1];
+      p_1=ps[2];
+      p_e=ps[3]; #End Point  
+      copy(color_output[channel_position*pal_spectrum_size],calc(),s);
+     );
+     color_output;
+    );
+   ):(
+    output()=(
+     vp=i(#img_pos,x,y,z,0);
+     pref=floor(vp);
+     interp=vp-pref;
+     ps=calc_ps();
+     p_s=ps[0]; #Start Point
+     p_0=ps[1];
+     p_1=ps[2];
+     p_e=ps[3]; #End Point
+     calc();
+    );
+   );
   );
-  vp=i(#img_pos,x,y,z,0);
-  pref=floor(vp);
-  interp=vp-pref;
-  ps=calc_ps();
-  p_s=ps[0]; #Start Point
-  p_0=ps[1];
-  p_1=ps[2];
-  p_e=ps[3]; #End Point
-  calc();"
+  output();"
 
   reverse[$>,-1]
   remove[-1]
@@ -26606,7 +26639,7 @@ if $17==4
 
    f begin(length=(w-1)/$36;);x/length
 
-   $36,1,1,3
+   $36,1,1,1
 
    repeat $split_count {
     f. begin(srand($seed_b+$>););$col
@@ -27780,7 +27813,7 @@ u "{"$str_inform"}"\
 #@gui:_=note{"\n<b>Basic Description:</b>\n\nGenerates a image based on the count of binary number found in string of binary. Initial array contains value count-sorted by count of binary number within binary representation of integers.\n\n<b>Step:</b>\n\n1) Create an array of integer that matches index with size of 2^n.\n2) Create another array which is the count of 'bin_a' in binary representation of the previous array.\n3) Count sort the array of integer with the count of binary number array.\n4) Delete all other array other than the sorted array.\n5) Generate a surface with row and column the same size as the primary array, and use formula which takes values from the sorted value, and then find the count of 'bin_b' in binary representation of the found value.\n\n<b>Source Code: </b>\n\nAuthor: Lavander in discord/generative AKA weightt_an in discuss.pixls.us"}
 #@gui:Python Source Code=_text{1,"def m_show(m, size = 4, cmap = 'afmhot'):\n    import matplotlib.pyplot as plt\n    from numpy import array\n    cmaps =  ['binary', 'gist_yarg', 'gist_gray', 'gray', 'bone',\n                'pink', 'spring', 'summer', 'autumn', 'winter', 'cool',\n                'Wistia', 'hot', 'afmhot', 'gist_heat', 'copper']\n    plt.figure(num = None, figsize=(size, size), dpi=300)\n    plt.axis('off')\n    plot = plt.imshow(array(m), cmap = cmap) #, interpolation='bicubic' )\n    plt.show()\n    plt.close()\n\nfrom tqdm import tqdm\n\ndef get_matrix_bin(s):\n    n = len(s)\n    mat =  [[0]*n for i in range(n)]\n    for x in tqdm(range(0, n)):\n        for y in range(0, n):\n            f = format((s[x] ^ s[y]), 'b').count('10')\n            mat[x][y] = f\n            #mat[y][x] = f\n    return mat\n\nbig_n = 11\n\npows = [i for i in range(0, 2**big_n)]\npows = sorted(pows, key = lambda k: format(k, 'b').count('01'))\nadj_m = get_matrix_bin(pows)\n\nm_show(adj_m)"}
 #@gui:Stored Text=_text{1,"def m_show(m, size = 4, cmap = 'afmhot'):\n    import matplotlib.pyplot as plt\n    from numpy import array\n    cmaps =  ['binary', 'gist_yarg', 'gist_gray', 'gray', 'bone',\n                'pink', 'spring', 'summer', 'autumn', 'winter', 'cool',\n                'Wistia', 'hot', 'afmhot', 'gist_heat', 'copper']\n    plt.figure(num = None, figsize=(size, size), dpi=300)\n    plt.axis('off')\n    plot = plt.imshow(array(m), cmap = cmap) #, interpolation='bicubic' )\n    plt.show()\n    plt.close()\n\nfrom tqdm import tqdm\n\ndef get_matrix_bin(s):\n    n = len(s)\n    mat =  [[0]*n for i in range(n)]\n    for x in tqdm(range(0, n)):\n        for y in range(0, n):\n            f = format((s[x] ^ s[y]), 'b').count('10')\n            mat[x][y] = f\n            #mat[y][x] = f\n    return mat\n\nbig_n = 11\n\npows = [i for i in range(0, 2**big_n)]\npows = sorted(pows, key = lambda k: format(k, 'b').count('01'))\nadj_m = get_matrix_bin(pows)\n\nm_show(adj_m)"}_0
-#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2022/08/30</i>.</small>")
+#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2023/03/21</i>.</small>")
 #@gui:Started?=bool(0)_0
 #@gui:Size of Array=choice(0,"Auto","User-Defined")_0
 #@gui:Formula=choice(2,"AND-Simple","OR-Simple","XOR-Simple","AND","OR","XOR","User-Defined")_0
@@ -28264,14 +28297,14 @@ if $color_mode_change
   fx_rep_lavander_binary_map_create_palette => ref_col
 
   if $_num_of_colors==5
-   3,1,1,3
-   4,1,1,3
+   3,1,1,1
+   4,1,1,1
   elif $_num_of_colors==4
-   3,1,1,3
-   5,1,1,3
+   3,1,1,1
+   5,1,1,1
   elif $_num_of_colors==3
-   4,1,1,3
-   5,1,1,3
+   4,1,1,1
+   5,1,1,1
   fi
 
   if !$act_rand_map permute[-3] yzcx fi
@@ -28279,7 +28312,7 @@ if $color_mode_change
   rep_cubic_map[-2--1] [-3]
   sort_list[-3--1] +,w
 
-  $size_val_arr_base_map,1,1,3,lerp(0,$mi,x/(w-1))
+  $size_val_arr_base_map,1,1,1,lerp(0,$mi,x/(w-1))
   rep_cubic_map[-1] [ref_col]
 
   +map[base_map] [-1] rm.. => output
