@@ -12,13 +12,13 @@
 #@gui <b>Testing</b>
 #@gui <i>Marcos Capelini</i>
 
-#@gui Film Grain: mc_film_grain_grain,mc_film_grain_grain_preview(0)*
+#@gui Film Grain: mc_film_grain,mc_film_grain_preview(0)*
 #@gui : _=note("<u><b>Grain pattern</b></u>")
-#@gui : Grain pattern file: =file()
-#@gui : Texture generator: =choice("Syntexturize", "Patch matching")
+#@gui : Grain Pattern File: =file()
+#@gui : Texture Generator: =choice("Syntexturize", "Patch matching")
 #@gui : _=separator()
 #@gui : _=note("<u><b>Blend</b></u>")
-#@gui : Blend mode: =choice(1,"Grain Only","Grain Merge","Overlay","Soft Light","Hard Light","Alpha")
+#@gui : Blend Mode: =choice(1,"Grain Only","Grain Merge","Overlay","Soft Light","Hard Light","Alpha")
 #@gui : Opacity (%): =float(20,0,100)
 #@gui : _=separator()
 #@gui : _=note("<u><b>Grain appearance</b></u>")
@@ -28,12 +28,12 @@
 #@gui : Gamma: = int(0,-50,50)
 #@gui :_=separator()
 #@gui : _=note("<u><b>Normalisation:</u></b>")
-#@gui : Lowest value: = int(0,0,127)
-#@gui : Highest value: = int(255,128,255)
+#@gui : Lowest Value: = int(0,0,127)
+#@gui : Highest Value: = int(255,128,255)
 #@gui : _=separator()
 ##@gui : _=note("<u><b>Preview</b></u>")
 ##@gui :Content =choice("Filter Output","Grain Only")
-#@gui :Preview grain only: =bool(false)
+#@gui :Preview Grain Only: =bool(false)
 #@gui :_=separator()
 #@gui :_=note("<small>This filter applies a film grain pattern over an image. A grain pattern file must be provided by the user and is assumed to be a patch of digitised 35mm film grain at 24MP, meaning 6000x4000 px.</small>")
 #@gui :_=note("<small>The filter will internally up or down scale the grain pattern based on the actual resolution of the current image. A full-image-sized grain texture is then generated using the selected pattern generating algorithm.</small>")
@@ -42,30 +42,30 @@
 #@gui :_=note("<small>Author: <i>Marcos Capelini</i>.</small>")
 #@gui :_=note("<small>Based on the \"Add Grain\" filter by: <i><a href="http://bit.ly/2CmhX65">David Tschumperlé</a></i>.</small>")
 
-mc_film_grain_grain :
-  __mc_film_grain_grain 0,{w},$*
+mc_film_grain :
+  __mc_film_grain_grain 0,{max(w,h)},$"*"
 
-mc_film_grain_grain_preview :
-  full_width:=w
+mc_film_grain_preview :
+  max_dimension={max(w,h)}
   gui_crop_resize_preview  # Extract preview thumbnail from full image
-  __mc_film_grain_grain 1,$full_width,$*
+  __mc_film_grain_grain 1,$max_dimension,$"*"
 
 #
 # Internal command for the "Film Grain" filter
 #
 __mc_film_grain_grain :
 
-  # For easier maintenace and code docummentation, define named variables for each positional command argument
+  # For easier maintenance and code docummentation, define named variables for each positional command argument
 
   is_preview,\
-  full_width,\
+  max_img_dimension,\
   grain_file_path,texture_type,\
   blend_mode_opt,blend_opacity,\
   scale_pct,\
   gr_sharpness,\
   gr_contrast,gr_gamma,\
   gr_norm_low,gr_norm_high,\
-  preview_grain=$*
+  preview_grain=$"*"
 
   # Blend modes: must follow the same order declared in the "Blend Mode" filter argument
 
@@ -83,11 +83,24 @@ __mc_film_grain_grain :
       msg.="A grain pattern file must be a valid image file containing a patch of scanned\n"
       msg.="or simulated film grain, typically as a square at least 500x500 px.\n\n"
       msg.="For best results, grain patterns are assumed to be crops of 35mm full-frame\n"
-      msg.="images at 24Mp."
+      msg.="images at 24Mp, meaning 6000x4000 px, so the grain is properly scaled based\n"
+      msg.="on the current image width.\n\n"
+      msg.="If the grain pattern file is 6MP or greater, it will be cropped to 1000x1000\n"
+      msg.="and its width will be used instead as a reference for scaling the grain."
       gui_print_preview "Warning:",,$msg
     fi
     return
   }
+
+  # Original grain scan width assumed to be 6000px (35mm frame at 24MP=6000x4000px)
+  ref_frame_size=6000
+
+  # If grain pattern image is large enough (at least 6MP), assume it's a full-frame scan
+  # => set reference width for scaling, and crop image so the remaing of the code runs unchanged
+  if "max(w,h) > 3000 && min(w,h) > 2000"
+    ref_frame_size={max(w,h)}
+    crop. 0,0,1000,1000
+  fi
 
   foreach[^-1] {
     split_opacity
@@ -104,8 +117,8 @@ __mc_film_grain_grain :
     # Adjust contrast and gamma to taste
     adjust_colors. 0,$gr_contrast,$gr_gamma,0,0 c. 0,255
 
-    # Resize pattern, assuming it is a crop of a normalised full-frame 35mm image @ 24MP (6000px wide)
-    resize2dx. {w*$full_width/6000}
+    # Resize pattern for proper grain size
+    resize2dx. {w*$max_img_dimension/$ref_frame_size}
 
     # Generate grain texture image
     if $texture_type==0
@@ -133,6 +146,7 @@ __mc_film_grain_grain :
     # text_outline {w}" x "{h}", full-width: "$full_width,2,2,23,2,1,255
 
     append[^-1] c
+    remove.
   }
   remove.
 
