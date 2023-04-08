@@ -619,6 +619,54 @@ gcd_unstereo_preview :
 #@gui _<b>Testing</b>
 #@gui <i>Garagecoder</i>
 
+#@gui Simple Dehaze : gcd_simple_dehaze, gcd_simple_dehaze(1)
+#@gui : note = note("<i>Simple sRGB dehaze</i>"), sep = separator()
+#@gui : Haze = float(0.75,0,1)
+#@gui : Exposure = float(1,0,2)
+#@gui : Scale = float(0.75,0,25)
+#@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2023/04/08</i>.</small>")
+gcd_simple_dehaze : skip ${1=0.75},${2=1},${3=0.75}
+  foreach {
+    split_opacity
+    l[0] {
+      srgb2rgb div 255
+      +gcd_erode_vw $3% compose_channels. min => msk
+      #X = n(Y - hT) / (1 - nT)
+      +mul[msk] $1 sub[0,-1] max[0] 0 mul[0] $2 # (Y - hT)
+      mul[msk] -$2 add[msk] 1 max[msk] 0 # (1 - T)
+      +eq[msk] 0 add[msk,-1]
+      +compose_channels[0] max
+      max[msk,-1] div[0,msk] # divide
+      mul 255 rgb2srgb
+    }
+  }
+
+#@cli gcd_erode_vw : size>=0[%],_tolerance>=0
+#@cli : Filter selected images by variance weighted erosion of specified size.
+#@cli : Default values: 'size=3' and 'tolerance=1e-6'.
+#@cli : $ image.jpg gcd_erode_vw 5
+gcd_erode_vw : skip ${1=3},${2=1e-6}
+  foreach {
+    C,R:=H=iM-im;[H/2+im,H] - $C / $R
+    +sqr boxfilter $1 +sqr.. -[-2,-1]
+    ++. $2 sqrt. -[0,-1] r. 100%,100%,100%,1,2
+    max. $2 ^. -1 *[0] . boxfilter $1 +eq. 0 +[-2,-1] /
+    c -0.5,0.5 * $R + $C
+  }
+
+#@cli gcd_dilate_vw : size>=0[%],_tolerance>=0
+#@cli : Filter selected images by variance weighted dilation of specified size.
+#@cli : Default values: 'size=3' and 'tolerance=1e-6'.
+#@cli : $ image.jpg gcd_dilate_vw 5
+gcd_dilate_vw : skip ${1=3},${2=1e-6}
+  foreach {
+    C,R:=H=iM-im;[H/2+im,H] - $C / $R
+    +sqr boxfilter $1 +sqr.. -[-2,-1]
+    ++. $2 sqrt. +[0,-1] r. 100%,100%,100%,1,2
+    max. $2 ^. -1 *[0] . boxfilter $1 +eq. 0 +[-2,-1] /
+    c -0.5,0.5 * $R + $C
+  }
+
 #@gui Colored signum : fx_gcd_signum_color, fx_gcd_signum_color(1)
 #@gui : sep = separator()
 #@gui : Sigma1 = float(0.1,0,1)
