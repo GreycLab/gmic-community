@@ -3158,9 +3158,9 @@ pass$1 0
 
 length={whd}
 
-if isint($2) mode={int($2)%3}
+if isint($2) mode={int($2)%4}
 else
- neumann,periodic,continuous=0,1,2
+ neumann,periodic,periodic_smooth,continuous=0,1,2,3
  mode=$$2 if !narg($mode) error invalid_arg fi
 fi
 
@@ -3183,47 +3183,52 @@ repeat $!-1 {
     +(-.5*p0+.5*p2)*v
     +p1
    );
+   cubic_map()=cubic_interpolation(
+    I[#-1,p_s],
+    I[#-1,p_0],
+    I[#-1,p_1],
+    I[#-1,p_e],
+    interp
+   );
    mode?(
-    calc()=cubic_interpolation(
-     I[#-1,p_s],
-     I[#-1,p_0],
-     I[#-1,p_1],
-     I[#-1,p_e],
-     interp
-    );
+    calc()=cubic_map();
    ):(
     calc()=(
      inrange(pref,0,smi,1,1)?(
-      cubic_interpolation(
-       I[#-1,p_s],
-       I[#-1,p_0],
-       I[#-1,p_1],
-       I[#-1,p_e],
-       interp
-      );
+      cubic_map();
      ):(
       pref>0?I[#-1,mi]:I[#-1,0];
      );
     );
    );
-   mode==2?(
-    calc_ps()=[pref-1,pref,pref+1,pref+2]%length;
-   ):
-   mode==1?(
+   mode==3?(
+    const double_length=mi*2;
     calc_ps()=(
-     npref=pref%length;
-     [max(0,npref-1),npref,min(mi,npref+1),min(npref+2,mi)];
+     a=[pref-1,pref,pref+1,pref+2]%double_length;
+     mi-abs(mi-a);
     );
+   ):
+   mode>1?(
+    calc_ps()=[pref-1,pref,pref+1,pref+2]%length;
    ):(
     calc_ps()=[pref-1,pref,pref+1,pref+2];
    );
    reference_spectrum_size>1?(
     const pal_spectrum_size=s#-1;
     const new_spectrum_size=pal_spectrum_size*reference_spectrum_size;
+    mode==1?(
+     calc_vp()=(
+      v=i(#img_pos,x,y,z,channel_position);
+      mv=v%mi;
+      vp=!mv?v>0?mi:mv;
+     );
+    ):(
+     calc_vp()=i(#img_pos,x,y,z,channel_position);
+    );
     output()=(
      color_output=vector(#new_spectrum_size,0);
      repeat(reference_spectrum_size,channel_position,
-      vp=i(#img_pos,x,y,z,channel_position);
+      vp=calc_vp();
       pref=floor(vp);
       interp=vp-pref;
       ps=calc_ps();
@@ -3236,8 +3241,17 @@ repeat $!-1 {
      color_output;
     );
    ):(
+    mode==1?(
+     calc_vp()=(
+      v=i(#img_pos,x,y,z,0);
+      mv=v%mi;
+      vp=!mv?v>0?mi:mv;
+     );
+    ):(
+     calc_vp()=i(#img_pos,x,y,z,0);
+    );
     output()=(
-     vp=i(#img_pos,x,y,z,0);
+     vp=calc_vp();
      pref=floor(vp);
      interp=vp-pref;
      ps=calc_ps();
