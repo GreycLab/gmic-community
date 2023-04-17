@@ -1,0 +1,63 @@
+# Mathematical Expressions
+Mathematical expressions provide means to three broad ends:
+| 1.  |Furnishing logical indicators after general, perhaps extensive, queries of zero, one or more images. See [Example One](#examone)
+| 2.  |Iterating over images to initialize, change or examine raster content. See [Example Two](#examtwo)
+| 3.  |Constructing image feature substitution expressions for values derived from the states of zero, one or more images; these initialize pipeline variables or furnish arguments to commands. See [Example Three](#examthree)
+Outside these settings, one may not invoke the mathematical expression parser, but once invoked, it proceeds as an interpreter for a complete programming language, operating in an environment where rasters of any number of images may be directly iterated over, queried or set, or processing independent of any image may be undertaken.
+
+= examone
+__Example One:__
+You want to produce an output conditioned on an image feature:
+
+|-%% 256,256,1,3 noise. 32,0 n. 0,255 do b. 1,1 while iv>4  %%|`reducevariance: -skip ${1=256},${2=5},${3=5}`\n   `sz,nlevel,cutoff=${1-3}`\n   `-input $sz,$sz,1,3`\n   `-name noisy`\n   `-noise[noisy] $nlevel,0`\n   `-normalize[noisy] 0,255`\n   `-do`\n      `-blur[noisy] 1,1`\n   `-while iv>$cutoff`\n   `-echo "Image\ Variance:\ "{iv}`
+|    |*Mostly invariant variance*
+
+A [Mathematical Expression](https://gmic.eu/index.html) asserts a ''-do'' … ''-while'' exit condition; iterative image blurring ceases when image variance, `iv`, falls beneath a supplied `cutoff` level.
+
+= examtwo
+__Example Two:__
+You want to produce an image reflecting the averaged, absolute differences of luminance values between pixels and their immediate neighbors along the x-axis.
+~~~
+xdiff: 
+    -luminance
+    -fill. (abs((j(-1,0)-i))+abs(i-j(1,0)))/2
+    -normalize. 0,255
+~~~
+———
+~~~
+$ gmic xdiff.gmic -input forest.png +xdiff. -output. differed_forest.png
+~~~
+===
+|%% images/forestflowers.png r. 45%,45%,100%,100% %% | %% images/forestflowers.png r. 45%,45%,100%,100% -luminance. -f. (abs((j(-1,0)-i))+abs(i-j(1,0)))/2 n. 0,255 %%
+| *Forest* | *Differed Forest*
+===
+Commands ''-input'', ''-fill'' and ''-eval'' each may take [pel or pixel processors](https://gmic.eu/tutorial/fill.html#math_expressions) to define images procedurally. These processors:
+
+|- 1.  |Define pels or pixels at image locations, when operating as the fifth component of an ''-input'' image definition, to wit: `w,h,d,s,procedure`
+| 2.  |Change pels or pixels at image locations, when operating as a math expression argument to the ''-fill'' command
+| 3.  |Read pels or pixels at image locations, when operating as a math expression evaluator argument to the ''-eval'' command.
+
+= examthree
+__Example Three:__
+You want to compute a value to initialize a pipeline variable and command arguments, these based on certain characteristics of the default image. For that, use mathematical expression image features: [Substitution Expressions](https://gmic.eu/tutorial/subs_cheat.html#subexpressions).
+~~~
+vdiffmedian:
+   +median. 20,{0,ia}
+   vdiff={iv#0-iv#1}
+   -echo 'Median Variation Difference: '$vdiff
+~~~
+———
+~~~
+$ gmic vdiff.gmic input forest.png r2dx. 45%  -vdiffmedian.
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Input custom command file 'vdiff.gmic' (1 new, total: 4581).
+[gmic]-0./ Input file 'forest.png' at position 0 (1 image 768x768x1x3).
+[gmic]-1./ Resize 2D image [0] to 45% pixels along the x-axis, while preserving 2D ratio.
+[gmic]-2vdiffmedian/ 'Median Variation Difference: '634.59960887090256
+…
+~~~
+===
+| %% images/forestflowers.png r2dx. 45% %% | %% images/forestflowers.png r2dx. 45% median. 20,{0,ia} %%
+| *Forest* | *Semi-median Forest*
+===
+Substitution expressions, directives bracketed in curly braces, induces G'MIC's pipeline interpreter to examine the bracketed string, which determines the substitution taking place; G'MIC replaces the substitution expression with a value, this according to the directive. See [Of the possible substitution expressions, those pertaining to _image features_ specifically return information about images. These substitution expressions take the form `{` _image index_, _<feature>_ `}`, the _<feature>_ is a one-letter directive requesting a specific image feature. The first argument identifies the specific image being queried. For example, 
