@@ -26,15 +26,20 @@
 #@gui : Scale (%): =int(100,20,300)
 #@gui : _=separator()
 #@gui : _=note("<u><b>Grain Appearance</b></u>")
-#@gui : Sharpness (radius) = float(0,-5,20)
+#@gui : Sharpness: = float(0,-10,10)
 #@gui : Contrast: = int(0,-100,100)
 #@gui : Gamma: = int(0,-50,50)
 #@gui :_=separator()
-#@gui : _=note("<u><b>Grain Normalise/Cut:</u></b>")
+#@gui : _=note("<u><b>Grain Normalise/Cut</u></b>")
 #@gui : Mode: =choice(1,"None","Normalise","Cut")
 #@gui : Lowest Value: = int(0,0,127)
 #@gui : Highest Value: = int(255,128,255)
 #@gui : _=separator()
+#@gui : _=note("<u><b>Image Adustments</u></b>")
+#@gui : Sharpness: = float(0,-10,10)
+#@gui : Contrast: = int(0,-50,50)
+#@gui : Gamma: = int(0,-50,50)
+#@gui :_=separator()
 ##@gui : _=note("<u><b>Preview</b></u>")
 ##@gui :Content =choice("Filter Output","Grain Only")
 #@gui :Preview Grain Only: =bool(false)
@@ -71,6 +76,8 @@ __mc_film_grain :
   gr_sharpness,\
   gr_contrast,gr_gamma,\
   gr_norm_opt,gr_norm_low,gr_norm_high,\
+  img_sharpness,\
+  img_contrast,img_gamma,\
   preview_grain=$"*"
 
   # Blend modes: must follow the same order declared in the "Blend Mode" filter argument
@@ -137,12 +144,12 @@ __mc_film_grain :
     split_opacity
     pass. 0
 
-    # We use the same variable to sharpen (positive radius) or blur (negative radius)
+    # We use the same variable to sharpen (positive) or blur (negative)
     # as there's not much point in having sharpen & blur active simultaneously
     if $gr_sharpness>0
-      unsharp. 100,$gr_sharpness n. 0,255
-    elif $gr_sharpness<00
-      blur. {-1*$gr_sharpness}      
+      unsharp. 100,$gr_sharpness 
+    elif $gr_sharpness<0
+      blur. {-1*$gr_sharpness/4}      
     fi
 
     # Adjust contrast and gamma to taste
@@ -168,12 +175,24 @@ __mc_film_grain :
     
     # Resize grain pattern to image size before blending
     resize {0,w},{0,h},1,100%,5 c. 0,255
-    
+   
     # Show only the grain layer, or apply filter result     
     if "$preview_grain && $is_preview"        
       keep[0,-1] 
       reverse
     else 
+      # Adjust image sharpness/blur before blending
+      if $img_sharpness>0
+        sharpen[0] {$img_sharpness} 
+      elif $img_sharpness<0
+        blur[0] {-1*$img_sharpness/4}      
+      fi     
+       
+      # Adjust image contrast and gamma before blending
+      if "$img_contrast || $img_gamma"
+        adjust_colors[0] 0,$img_contrast,$img_gamma,0,0
+      fi
+      
       blend[0,-1] ${arg\ {$blend_mode_opt+1},$blend_modes},{if($blend_mode_opt>0,$blend_opacity/100,1)}
     fi
     
