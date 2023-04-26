@@ -37,17 +37,15 @@
 #@gui : _=separator()
 #@gui : _=note("<u><b>Image Adustments</u></b>")
 #@gui : Blur/Sharpen: = float(0,-10,10)
+#@gui : Highlight Compression: = float(0,0,10)
 #@gui :_=separator()
 ##@gui : _=note("<u><b>Preview</b></u>")
-##@gui :Content =choice("Filter Output","Grain Only")
-#@gui :Preview Grain Only: =bool(false)
+#@gui: Preview: =choice("Filter Output","Grain Only","Filter Output + Debug Info", "Grain Only + Debug Info")
 #@gui :_=separator()
-#@gui :_=note("<small>This filter applies a film grain pattern over an image. A grain pattern file must be provided by the user. If smaller than 6MP,it is assumed to be a crop of digitised 35mm film grain at 24MP. If 6MP or more, its is treated as a full 35mm frame of digitised grain.</small>") 
-#@gui :_=note("<small>The filter will internally up or down scale the grain pattern based on the actual resolution of the current image, and the selected output Film Format. A full-image-sized grain texture is then generated using the selected pattern generating algorithm.</small>")
-#@gui :_=note("<small>Several properties can be changed to taste to achieve the desired grain appearance. The resulting grain pattern can be further normalised, which affects the end result depending on the selected blend mode.</small>")
-#@gui :_=separator()
-#@gui :_=note("<small>Author: <i>Marcos Capelini</i>. Latest Update: 2023/04/11</small>")
+#@gui :_=note("<small>Author: <i>Marcos Capelini</i>. Latest Update: 2023/04/25</small>")
 #@gui :_=note("<small>Based on the \"Add Grain\" filter by: <i><a href="http://bit.ly/2CmhX65">David Tschumperlé</a></i>.</small>")
+#@gui :_=note("\n")
+#@gui : Show Usage Tips =button(2)
 
 mc_film_grain :
   __mc_film_grain 0,{max(w,h)},{min(w,h)},$"*"
@@ -58,7 +56,40 @@ mc_film_grain_preview :
   #gui_crop_resize_preview
   gui_crop_preview
   __mc_film_grain 1,$long_side,$short_side,$"*"
-      
+
+__mc_film_grain_usage :  
+
+  msg="This filter requires a grain pattern file as input. Sample grain files are not\n"
+  msg.="included, and must be provided by the user.A grain pattern file must be\n"
+  msg.="a valid image file containing digitised or simulated film grain, recommended\n"
+  msg.="to be a square 1000x1000 px.\n\n"
+  
+  msg.="Grain pattern patches are assumed to be crops of 35mm full-frame images at\n"
+  msg.="24Mp, meaning 6000x4000 px, so the grain is properly scaled based on the\n"
+  msg.="the current image size and the \"Film Format\" parameter.\n\n"            
+
+  msg.="If the grain pattern image is at least 6Mp, it is assumed to be a full 35mm\n"
+  msg.="film frame instead of a patch of grain, and its actual dimensions are used to\n"
+  msg.="calculate the final grain scaling.\n\n"
+ 
+  msg.="In either case, the filter will generate a synthesised grain image to cover\n"
+  msg.="the whole area of the input image.\n\n"
+
+  msg.="The grain appearance cay be tweaked to taste by altering its size, sharpness\n"
+  msg.="contrast and gamma. If grain normalisation is enabled, the grain values will\n"
+  msg.="be normalised to be between a range of high/low values. This can affect the\n"
+  msg.="filter output depending on the selected blend mode.\n\n"    
+
+  msg.="The input image can be adjusted for a better overall effect. A slighly blurred\n"
+  msg.="image may sometimes look better if the grain pattern has to be scaled up.\n"
+  msg.="Also, a little more grain in the highlights may sometimes result in a more\n"
+  msg.="pleasing effect, which is achievable by increasing the \"Highlight Compression\".\n\n"  
+ 
+  
+  msg.="$1"
+  
+  gui_print_preview "Usage:",,$msg 
+  
 #      
 # Internal command for the "Film Grain" filter
 #
@@ -75,8 +106,13 @@ __mc_film_grain :
   gr_sharpness,\
   gr_contrast,gr_gamma,\
   gr_norm_opt,gr_norm_low,gr_norm_high,\
-  img_sharpness,\
-  preview_grain=$"*"
+  img_sharpness,img_highl_compress,\  
+  #print_debug,preview_grain,\  
+  preview_opt,\
+  show_usage=$"*"
+  
+  print_debug={$preview_opt>1}
+  preview_grain={{$preview_opt==1}||{$preview_opt==3}}
 
   # Blend modes: must follow the same order declared in the "Blend Mode" filter argument
   
@@ -89,19 +125,21 @@ __mc_film_grain :
     normalize. 0,255         
   onfail
     if $is_preview
-      msg="This filter requires a grain pattern file as input. Sample grain files are\n"
-      msg.="not included with this filter, and must be provided by the user.\n\n"    
-      msg.="A grain pattern file must be a valid image file containing a patch of scanned\n"
-      msg.="or simulated film grain, recommended to be a square 1000x1000 px.\n\n"
-      msg.="For best results, grain patterns are assumed to be crops of 35mm full-frame\n"
-      msg.="images at 24Mp, meaning 6000x4000 px, so the grain is properly scaled based\n"
-      msg.="on the current image width.\n\n"            
-      msg.="If the grain pattern file is 6MP or greater, it will be cropped to 1000x1000\n"
-      msg.="and its width will be used instead as a reference for scaling the grain."
-      gui_print_preview "Warning:",,$msg
+      __mc_film_grain_usage "(Error loading grain pattern file)"
     fi
     return    
   }
+
+  # Show usage tips 
+  if "$is_preview && $show_usage"
+    __mc_film_grain_usage "(Click anywhere to dismiss usage tips...)"
+    return
+  fi 
+     
+  debug_msg.="Image size: "{$img_long_side}"x"{$img_short_side}"\n"
+  debug_msg.="Preview size: "{$_preview_width}"x"{$_preview_height}"\n"    
+  debug_msg.="Grain sample file: "$grain_file_path"\n"
+   
     
   # Adjust scale factor based on desired output film format choice
   # notes: 
@@ -135,13 +173,19 @@ __mc_film_grain :
   if "max(w,h) > 3000 && min(w,h) > 2000"
     ref_frame_long={max(w,h)}
     ref_frame_short={min(w,h)}
-    crop. {w/2-500},{h/2-500},{w/2+500},{h/2+500}   # take crop from centre
+    debug_msg.="Grain file as: Full-Frame\n"
+    crop. {w/2-500},{h/2-500},{w/2+499},{h/2+499}   # take crop from centre
+  else
+    debug_msg.="Grain file as: Crop\n"
   fi
+  debug_msg.="Grain scan image size: "{$ref_frame_long}"x"{$ref_frame_short}" ("{_$ref_frame_long*$ref_frame_short/1000000}"MP)\n"  
+  debug_msg.="Grain crop size: "{-1,w}"x"{-1,h}"\n"
+  debug_msg.="Actual grain scaling: "{_$scale_pct}"%\n"
        
   foreach[^-1] {
     split_opacity
     pass. 0
-
+    
     # Resize pattern for proper grain size  
     resize2dx. {w*$img_short_side/$ref_frame_short}
 
@@ -155,7 +199,6 @@ __mc_film_grain :
     # We use the same variable to sharpen (positive) or blur (negative)
     # as there's not much point in having sharpen & blur active simultaneously
     if $gr_sharpness>0
-      #unsharp. 100,$gr_sharpness 
       sharpen. {$gr_sharpness*10},1 
     elif $gr_sharpness<0
       blur. {-1*$gr_sharpness/4}      
@@ -179,7 +222,7 @@ __mc_film_grain :
     if "$preview_grain && $is_preview"        
       keep[0,-1] 
       reverse
-    else 
+    else
       # Adjust image sharpness/blur before blending
       # note: 
       #   the idea is to just fine-tune the overall image sharpness,
@@ -190,12 +233,27 @@ __mc_film_grain :
       elif $img_sharpness<0
         blur[0] {-1*$img_sharpness/5}      
       fi     
+
+      # A little highlighting compression before blending can help if more grain 
+      # is desired in the highlights, so we apply a gentle curve at the shoulder
+      if $img_highl_compress
+        apply_curve[0] 0.4,0,0,192,{192-3*$img_highl_compress/4},255,{255-3*$img_highl_compress}
+      fi
        
       blend[0,-1] ${arg\ {$blend_mode_opt+1},$blend_modes},{if($blend_mode_opt>0,$blend_opacity/100,1)}
+      
+      # We really only want to get a little more grain visible in the highlights, not
+      # change the original image that much, so we "un-apply" most of the curve effect
+      # after blending the grain into the image.
+      if $img_highl_compress
+        apply_curve[0] 0.4,0,0,192,{192+2*$img_highl_compress/4},255,{255+2*$img_highl_compress}
+      fi      
     fi
     
     # debug
-    # text_outline {w}" x "{h}", full-width: "$full_width,2,2,23,2,1,255              
+    if "$is_preview && $print_debug" 
+      text_outline $debug_msg,2,2,20,2,1,255,255,0        
+    fi
     
     append[^-1] c 
     remove.
