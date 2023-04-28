@@ -24,6 +24,7 @@
 #@gui : _=note("<u><b>Grain Size</b></u>")
 #@gui : Film Format: =choice(0,"135 &#40;35mm&#41;","135 Half-frame &#40;Olympus PEN&#41;","110 &#40;Pocket Instamatic&#41;","120 &#40;Medium Format&#41;","APS &#40;H&#44;C&#44;P auto-detect&#41;" )
 #@gui : Scale (%): =int(100,20,300)
+#@gui : Micrograin: =float(0,0,10)
 #@gui : _=separator()
 #@gui : _=note("<u><b>Grain Appearance</b></u>")
 #@gui : Blur/Sharpen: = float(0,-10,10)
@@ -59,32 +60,37 @@ mc_film_grain_preview :
 
 __mc_film_grain_usage :  
 
-  msg="This filter requires a grain pattern file as input. Sample grain files are not\n"
-  msg.="included, and must be provided by the user.A grain pattern file must be\n"
-  msg.="a valid image file containing digitised or simulated film grain, recommended\n"
-  msg.="to be a square 1000x1000 px.\n\n"
-  
-  msg.="Grain pattern patches are assumed to be crops of 35mm full-frame images at\n"
-  msg.="24Mp, meaning 6000x4000 px, so the grain is properly scaled based on the\n"
-  msg.="the current image size and the \"Film Format\" parameter.\n\n"            
-
-  msg.="If the grain pattern image is at least 6Mp, it is assumed to be a full 35mm\n"
-  msg.="film frame instead of a patch of grain, and its actual dimensions are used to\n"
-  msg.="calculate the final grain scaling.\n\n"
- 
-  msg.="In either case, the filter will generate a synthesised grain image to cover\n"
-  msg.="the whole area of the input image.\n\n"
-
-  msg.="The grain appearance cay be tweaked to taste by altering its size, sharpness\n"
-  msg.="contrast and gamma. If grain normalisation is enabled, the grain values will\n"
-  msg.="be normalised to be between a range of high/low values. This can affect the\n"
-  msg.="filter output depending on the selected blend mode.\n\n"    
-
-  msg.="The input image can be adjusted for a better overall effect. A slighly blurred\n"
-  msg.="image may sometimes look better if the grain pattern has to be scaled up.\n"
-  msg.="Also, a little more grain in the highlights may sometimes result in a more\n"
-  msg.="pleasing effect, which is achievable by increasing the \"Highlight Compression\".\n\n"  
- 
+  msg.="1.Load a grain pattern file with sample grain to be added to an image\n"
+#  msg.="\n"  
+  msg.="2.A grain file can be either a crop (usually 1000x1000 px) of a digitised 24Mp\n"
+  msg.="   35mm film frame, or the whole full 35mm frame digitised at any resolution\n"
+  msg.="   if the file is at least 6Mp (3000x2000 px).\n"  
+#  msg.="\n"  
+  msg.="3.Select desired blend options (tip: grain merge usually gives better results).\n"
+#  msg.="\n"  
+  msg.="4.Select grain size options:\n"
+  msg.="- \"Film Format\" may shrink or enlarge the grain to better emulate the look of\n"  
+  msg.="   film grain at the chosen format\n"
+  msg.="- \"Scale\" allows further tuning of grain size on top of the selected Film Format.\n"
+  msg.="- \"Micrograin\" attempts to add a little bit of small-sized grain to the mix for\n"
+  msg.="   better-looking texture at larger grain sizes.\n"  
+#  msg.="\n"
+  msg.="5.Change grain appearance to taste by altering the grain sharpness, contrast \n"  
+  msg.="   and gamma.\n" 
+#  msg.="\n"  
+  msg.="6.Normalisation will fit the grain pixel values between a range of low and high\n"
+  msg.="   values. This affects the grain blending result, and can be used to bring more\n"
+  msg.="   grain into the highlights, change the overal blending effect, etc.\n"
+#  msg.="\n"  
+  msg.="7.Adjust a couple of properties of the input image:\n"  
+  msg.="- \"Blur/Sharpen\" can affect the interplay of image details and the applied grain.\n"
+  msg.="   Film grain may sometimes look more natural when applied to a softer image.\n"        
+  msg.="- \"Highlight Compression\" will bring down the highlights, including blown-out\n"  
+  msg.="   areas, making some more grain visible in the highlights.\n"
+#  msg.="\n"
+  msg.="8.You can enable the preview of the grain alone to better assess the effect of\n"
+  msg.="   the above filter parameters on the grain.\n"      
+  msg.="\n"    
   
   msg.="$1"
   
@@ -103,11 +109,11 @@ __mc_film_grain :
   blend_mode_opt,blend_opacity,\
   film_fmt_opt,\  
   scale_pct,\
+  micrograin,\
   gr_sharpness,\
   gr_contrast,gr_gamma,\
   gr_norm_opt,gr_norm_low,gr_norm_high,\
   img_sharpness,img_highl_compress,\  
-  #print_debug,preview_grain,\  
   preview_opt,\
   show_usage=$"*"
   
@@ -136,7 +142,7 @@ __mc_film_grain :
     return
   fi 
      
-  debug_msg.="Image size: "{$img_long_side}"x"{$img_short_side}"\n"
+  debug_msg.="Image size: "{$img_long_side}"x"{$img_short_side}" ("{f2ui($img_long_side*$img_short_side/1000000)}"Mp)\n" 
   debug_msg.="Preview size: "{$_preview_width}"x"{$_preview_height}"\n"    
   debug_msg.="Grain sample file: "$grain_file_path"\n"
    
@@ -178,24 +184,34 @@ __mc_film_grain :
   else
     debug_msg.="Grain file as: Crop\n"
   fi
-  debug_msg.="Grain scan image size: "{$ref_frame_long}"x"{$ref_frame_short}" ("{_$ref_frame_long*$ref_frame_short/1000000}"MP)\n"  
-  debug_msg.="Grain crop size: "{-1,w}"x"{-1,h}"\n"
-  debug_msg.="Actual grain scaling: "{_$scale_pct}"%\n"
+  debug_msg.="Grain full-frame size: "{$ref_frame_long}"x"{$ref_frame_short}" ("{f2ui($ref_frame_long*$ref_frame_short/1000000)}"Mp)\n"  
+  debug_msg.="Grain patch size: "{-1,w}"x"{-1,h}"\n"
        
   foreach[^-1] {
     split_opacity
     pass. 0
     
     # Resize pattern for proper grain size  
-    resize2dx. {w*$img_short_side/$ref_frame_short}
+    total_scale_pct={_$scale_pct*$img_short_side/$ref_frame_short}
+    resize2dx. {w*$total_scale_pct/100.0},5
+    debug_msg.="Total grain scaling: "{f2ui($total_scale_pct)}"%\n"    
+    debug_msg.="Scaled grain patch size: "{-1,w}"x"{-1,h}"\n"
 
+    # If possible/desirable, add some micrograin to improve texture 
+    if "$total_scale_pct>66 && $micrograin"
+      debug_msg.="Micrograin: enabled (intensity="{$micrograin}")"
+      +resize2dx. {w/3},5
+      syntexturize. {-2,w},{-2,h}
+      blend[-1,-2] overlay,{0.2+0.8*$micrograin/10}
+    fi
+    
     # Generate grain texture image
     if $texture_type==0
-      +syntexturize. {0,max(10,100*w/$scale_pct)},{0,max(10,100*h/$scale_pct)}
+      +syntexturize. {0,max(10,w)},{0,max(10,h)}
     else
-      +syntexturize_matchpatch. {0,max(10,100*w/$scale_pct)},{0,max(10,100*h/$scale_pct)}      
+      +syntexturize_matchpatch. {0,max(10,w)},{0,max(10,h)}
     fi     
-
+    
     # We use the same variable to sharpen (positive) or blur (negative)
     # as there's not much point in having sharpen & blur active simultaneously
     if $gr_sharpness>0
