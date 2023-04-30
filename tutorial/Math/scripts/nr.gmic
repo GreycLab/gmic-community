@@ -1,0 +1,109 @@
+#@cli nraphson : [roots],_center_x,center_y,_mag,_maxiter
+#@cli :
+#@cli : Draw on the selected images the basins of attraction of the polynomial
+#@cli : roots given in the argument image using Newton-Raphson root
+#@cli : polishing. Argument image is N,1,1,2 - an N vector for N, complex,
+#@cli : number of roots.  Channel zero contains real, and channel one
+#@cli : imaginary components. Default values: 'center_x = 0', 'center_y = 0',
+#@cli : 'magnification = 1', 'maximum_iterations = 100'
+nraphson : -check ${-is_image_arg\ $1} -skip ${2=0},${3=0},${4=1},${5=100}
+   -verbose +
+   -echo[^-1] "Newton-Raphson root polishing on selected images associated with the roots given by $1."
+   -verbose -
+   ppu=255.5
+   ox,oy,mag,lim=${2-5}
+   cx={$ox-w/(2*$ppu*$mag)}
+   cy={$oy+h/(2*$ppu*$mag)}
+   err=1e-10
+   -pass$1 1
+   -name. roots
+   -foreach[^roots] {
+      -pass[-1] 1
+      -fill[canvas] "
+                begin(Q = vectorw#$roots(0));
+                ic = 0;
+                zz = [$cx+x/($ppu*$mag),$cy-y/($ppu*$mag)];
+                do(
+                    acc = [0,0];
+                    for(
+                          k=0, k < w#$roots, k++,
+                          Q[k] = cabs(zz-I(#$roots,k,0));
+                          acc += [1,0]//(zz-I(#$roots,k,0))
+                       );
+                    dif  = [1,0]//acc;ic+=1;
+                    zz   = zz - dif,
+                    cabs(dif) > $err && ic < $lim
+                  );
+               if(
+                   ic < $lim,
+                   [argmin(Q),ic],
+                   [w#$roots,$lim]
+                 )"
+      }
+   -rm.
+
+nrcolor:  -check ${-is_image_arg\ $1}
+   -pass$1 0
+   -foreach[^-1] {
+      -pass[-1] 0
+      -name.. canvas
+      -name. palette
+      -rgb2hsv[palette]
+      -resize[canvas] {w#$canvas},{h#$canvas},{d#$canvas},{s#$canvas+1},0,0
+      -apply_channels[canvas] "-log",rgb_g
+      -fill[canvas] ">
+                       PX=I(x,y);
+		       K=I(#$palette,PX[0],0);
+		       [K[0],K[1],PX[1]*K[2]]
+		    "
+      -hsv2rgb[canvas]
+      -normalize[canvas] 0,255
+   }
+   -remove[^canvas]
+
+nrframe: -check ${-is_image_arg\ $1} -skip ${2=45},${3=1},${4=0.125},${5=50},${6=10}
+   rad0=1
+   ang,rad1,ofx,itr,scale=${2-6}
+   -pass$1 2
+   -name. palette
+   -foreach[^palette] {
+      -name. canvas
+      -pass[-1] 2
+      -input (-$rad0,0^{$rad0*cexp([0.0,$ang°])}^{$rad1*cexp([0.0,-$ang°])})
+      -permute. cyzx
+      -name. roots
+      -nraphson[canvas] [roots],$ofx,0,$scale,$itr
+      -nrcolor[canvas] [palette]
+   }
+   -remove[^canvas]
+
+nranim: -skip ${1=300},${2=45},${3=0.5},${4=1},${5=0.01},${6=0.125}
+   fc=$1
+   rad0=1
+   abase=$2
+   adel=$3
+   rbase=$4
+   rdel=$5
+   ofx=$6
+   itr=200
+   -repeat {$fc}
+      -local[]
+         u={$>/($fc-1)}
+         ang={lerp($abase-($adel/2),$abase+($adel/2),$u)}
+         rad1={lerp($rbase-($rdel/2),$rbase+($rdel/2),$u)}
+         -input (-$rad0,0^{$rad0*cexp([0.0,$ang°])}^{$rad1*cexp([0.0,-$ang°])})
+         -permute. cyzx
+         -name. roots
+         -input 512,512,1,2
+         -name. canvas
+         -nraphson[canvas] [roots],{$ofx},0,10,$itr
+         -input (255,150,70^200,85,255^85,140,255^200,220,240)
+         -permute. cyzx
+         -name. palette
+         -nrcolor[canvas] [-1]
+         -remove[^canvas]
+	 -text_outline "A\ "{_$ang},8,8,15,1,1
+	 -text_outline "R1\ "{_$rad1},8,19,15,1,1
+	 -text_outline "X\ of\ "{_$ofx},8,30,15,1,1
+      -done
+   -done
