@@ -1,11 +1,11 @@
 # Mathematical Expressions
 %% m scripts/nr.gmic x "mkdir -p img" ({u([255,255,255])}^{u([255,255,255])}^{u([255,255,255])}^200,220,240) -permute cyzx 1200,1200,1,2 nrframe[-1] [-2],{25.3027+u(-0.005,0.005)},{0.998034+u(-0.0005,0.0005)},0.27,200,20 -rm.. r. 25%,25%,100%,100%,5 n. 0,255 o. img/nrfront.png rm %%
-|![newtonrhapson](img/nrfront.png)|G'MIC pipeline commands function on the "image indivisible." Consider ''-blur'': it operates on its selected images; soft-edged, lower-variance versions appear in their steads. During its course ''-blur'' admits no interventions. How it goes about blurring is beyond the scripter's ken, save through adjusting command line arguments.\n\nMost times, such opacity is welcome; people have concerns other than with the devils in details. But should the details matter, then there are G'MIC's [Mathematical Expressions](https://gmic.eu/reference/mathematical_expressions.html#top), which operate from _within_ images — on the very bitmaps comprising those images. They cannot be invoked except within certain pipeline settings, yet when invoked they put forward a complete programming language that operates in an environment where rasters of any number of images may be directly accessed along with aspects of the environment itself.\n\n( [Download Newton-Raphson Generator](scripts/nr.gmic) )
+|![newtonrhapson](img/nrfront.png)|G'MIC pipeline commands function on the "image indivisible." Consider ''-blur'': it operates on its selected images; soft-edged, lower-variance versions appear in their steads. During its course ''-blur'' admits no interventions. How it goes about blurring is beyond the scripter's ken, save through adjusting command line arguments.\n\nMost times, such opacity is welcome; people have concerns other than with devils in details. But should the details matter, then there are G'MIC's [Mathematical Expressions](https://gmic.eu/reference/mathematical_expressions.html#top), which operate from _within_ images — on the very bitmaps comprising those images. They cannot be invoked except within certain pipeline settings, yet when invoked they put forward a complete programming language that operates in an environment where rasters of any number of images may be directly accessed along with aspects of the environment itself.\n\n( [Download Newton-Raphson Generator](scripts/nr.gmic) )
 
 There are three pipeline settings in which mathematical expressions can appear:
 
 | 1.  |__Logic Flags:__ Mathematical expressions furnish logical flags for flow control commands. The return value is taken to be a boolean. See [Example One](#examone).
-| 2.  |__Raster Processing:__ Mathematial expressions implement [pel or pixel processors](https://gmic.eu/tutorial/fill.html#math_expressions). The return value is taken to be a per-pel scalar or per-pixel vector; specifics depend on the last statement's composition. Vector return values imply pixel processors; scalar return values imply pel processors. Return values update pels or pixels as iterations proceed. See [Example Two](#examtwo).
+| 2.  |__Raster Processing:__ Mathematical expressions implement [pel or pixel processors](https://gmic.eu/tutorial/fill.html#math_expressions). The return value is taken to be a per-pel scalar or per-pixel vector; What the last statement returns establishes the processor type. Vector return values establish pixel processors; scalar return values establish pel processors. In any case, return values set the pel or pixel at the current location of the iteration. See [Example Two](#examtwo).
 | 3.  |__Image Feature Substitutions:__ As the bodies of _image feature substitution expressions_, mathematical expressions initialize pipeline variables or set command arguments. The return value completes a pipeline variable key-value pair or furnishes a value for an argument. See [Example Three](#examthree).
 
 Within these settings, mathematical expressions are built up from sequences of _statements_ separated by semicolons; the trailing semi-colon may be omitted; the aggregate constitutes the expression. The last statement connects the mathematical expression with its pipeline setting. The computed value of that last statement becomes the expression's return value. A non-computing final statement returns a _<nan>_ ("not-a-number"), a floating point library metavalue. The subsequent fate of such returns follows from the math expression's pipeline processing setting.
@@ -13,17 +13,36 @@ Within these settings, mathematical expressions are built up from sequences of _
 Except in a few corner cases, such as an empty image stack, mathematical expressions operate with respect to _reference images_. These establish much of the environment in which mathematical expressions operate, including a host of predefined variables conveying image metrics such as `iv` (variance) or `ia` (median value).
 | 1.  |The last item on the image list is the reference for logical expressions.
 | 2.  |The currently processing image is the reference for raster processors.
-| 3.  |In image feature substitutions, `{` _<index>,<expression>_ `}`, A prefix integer, comma-separated from the math expression, selects the reference image via its list index. Without a prefix, the reference image defaults to the last image on the list. [Name](https://gmic.eu/tutorial/name.html) labels may appear instead of image indices, but the allied named collection should contain only one image: a multi-image collection raises errors, as it is not clear which in the collection is the reference.
-
+| 3.  |In image feature substitutions, `{` _<index>,<expression>_ `}`, A prefix integer, comma-separated from the math expression, selects the reference image via its list index. Without a prefix, the reference image defaults to the last image on the list. [Name](https://gmic.eu/tutorial/name.html) labels may appear instead of image indices, but the allied named collection should contain only one image: a multi-image collection raises errors, as it is not clear which image in the collection is the reference.
 = examone
 __Example One:__
 You want to produce an output conditioned on an image feature:
-
-|-%% 256,256,1,3 noise. 32,0 n. 0,255 do b. 1,1 while iv>4  %%|`reducevariance: -skip ${1=256},${2=5},${3=5}`\n   `sz,nlevel,cutoff=${1-3}`\n   `-input $sz,$sz,1,3`\n   `-name noisy`\n   `-noise[noisy] $nlevel,0`\n   `-normalize[noisy] 0,255`\n   `-do`\n      `-blur[noisy] 1,1`\n   `-while iv>$cutoff`\n   `-echo "Image\ Variance:\ "{iv}`
-|    |*Mostly invariant variance*
-
+%% 300,300,1,3 noise. 1%,2 dilate_circ 3,2 n. -1000,1000 iiv={iv} +n. 0,255 to. "Variance: "{_$iiv},8,8,15,1,1 o. img/var0.png rm. do b. 1,1 while iv>20 oiv={iv} n. 0,255 to. "Variance: "{_$oiv},8,8,15,1,1 o. img/var1.png rm %%
+~~~
+reducevariance:
+   -skip ${1=5},${2=5},${3=1000},${4=1}
+   nlevel,cutoff,range,bstp=${1-4}
+   -noise. $nlevel%,2
+   -dilate_circ 3,2
+   -normalize. -$range,$range
+   -do
+      -blur. $bstp,1
+   -while iv>$cutoff
+~~~
+——————
+~~~
+$ gmic                                 \
+   reducevariance.gmic                 \
+   -input 300,300,1,3                  \
+   -name. canvas                       \
+   -reducevariance[canvas] 1,20,1000,1 
+~~~
+===
+|-![var0](img/var0.png)|![var1](img/var1.png)
+| *Variance* | *Mostly invariant variance*
+===
 | 1.  |A mathematical expression, `iv>$cutoff`, operating as a logical flag, asserts a ''-do'' … ''-while'' exit condition. Iterative blurring ceases when the current image's variance, the predefined math expression variable `iv`, is no longer greater than a supplied `$cutoff` level.
-| 2.  |G'MIC's pipeline interpreter dereferences such keys as `$cutoff` before pre-processing mathematical expressions. Here, the pipeline iterpreter first dereferences the key `$cutoff` and substitutes its value within the math expression, then turns the expression over to the mathematical expression parser. That parser does not "see" the string `iv>$cutoff`, but instead `iv>0.8125`, presuming a user-supplied third argument of `0.8125.` G'MIC always dereferences pipeline variables, substituting keys for values, before evaluating math expressions. By this, one may write pipeline variables in math expressions; after key-value substitutions, the mathematical expression parser consumes the value, typically as a "constant numeric", and not the key. See [Substitution Cheats](https://gmic.eu/tutorial/subs_cheat.html) for background.
+| 2.  |G'MIC's pipeline interpreter dereferences such keys as `$cutoff` before processing mathematical expressions. Here, the pipeline iterpreter first dereferences the key `$cutoff` and substitutes its value within the math expression, then turns the expression over to the mathematical expression parser. That parser does not "see" the string `iv>$cutoff`, but instead `iv>0.8125`, presuming a user-supplied third argument of `0.8125.` G'MIC always dereferences pipeline variables, substituting keys for values, before evaluating math expressions. By this, one may write pipeline variables in math expressions; after key-value substitutions, the mathematical expression parser consumes the value, typically as a "constant numeric", and not the key. See [Substitution Cheats](https://gmic.eu/tutorial/subs_cheat.html) for background.
 
 = examtwo
 __Example Two:__
@@ -34,11 +53,7 @@ xdiff:
     -fill. (abs((j(-1,0)-i))+abs(i-j(1,0)))/2
     -normalize. 0,255
 ~~~
-===
-|%% images/forestflowers.png r. 45%,45%,100%,100% %% | %% images/forestflowers.png r. 45%,45%,100%,100% -luminance. -f. (abs((j(-1,0)-i))+abs(i-j(1,0)))/2 n. 0,255 %%
-| *Forest* | *Differed Forest*
-===
-———
+——————
 ~~~
 $ gmic xdiff.gmic -input forest.png -verbose + +xdiff. -output. differed_forest.png
 [gmic]-0./ Start G'MIC interpreter.
@@ -51,18 +66,22 @@ $ gmic xdiff.gmic -input forest.png -verbose + +xdiff. -output. differed_forest.
 [gmic]-2./ Output image [1] as png file 'img/differed_forestflowers.png'.
 [gmic]-2./ End G'MIC interpreter.
 ~~~
+===
+|- %% images/forestflowers.png r. 45%,45%,100%,100% %% | %% images/forestflowers.png r. 45%,45%,100%,100% -luminance. -f. (abs((j(-1,0)-i))+abs(i-j(1,0)))/2 n. 0,255 %%
+| *Forest* | *Differed Forest*
+===
 | 1.  |Commands ''-input'', ''-fill'' and ''-eval'' each may take [pel or pixel processor](https://gmic.eu/tutorial/fill.html#math_expressions) arguments, these to define, change or evaluate images procedurally.
 |      a.  |If given, ''-input'' repeatedly applies its fifth argument — a math expression — to each pel or pixel, part-and-parcel with image initialization.
 |      b.  |Similarly, ''-fill'' alters bitmaps in accordance with its math expression argument, also applied to every pixel or pel.
 |      c.  |Like ''-fill'', ''-eval'' also takes a math expression argument and iterates over the raster, but the last statement in the expresion does not automatically alter the bitmap. Such expressions operate for their side-effects instead.
-| 2.  |The heart of `xdiff` is the ''-fill'' command and its _[pel processor](https://gmic.eu/tutorial/array_cheat.html#pixelaccess)_ argument: `(abs((j(-1,0)-i))+abs(i-j(1,0)))/2`. Those new to math expressions may be forgiven if the expression's Delphic composition seems enigmatic: Oh Pythia! What do you mean? _Are the Persians coming or not?_ (She just smiles).
-|   a.  |Pel processors iterate over the channel rasters themselves, one picture element (pel) at a time: a scalar. With the present example, the processor takes the average of the absolute values of two differences, these of center pels and their x-axis predecessors and successors. Such computations exhibits edge sensitivity.
-|   b.  |When, along the x-axis, the center pel is more-or-less equal to its predecessor and sucessor, the two differences are small; so follows the average of their absolutes. the image locality exhibits shallow gradients; the results exhibits only low luminance.
-|   c.  |On the other hand, differences vary greatly in localities of steep gradients; the results exhibit high luminance because the differences and their absolute averages are large.
+| 2.  |The heart of `xdiff` is the ''-fill'' command and its _[pel processor](https://gmic.eu/tutorial/array_cheat.html#pixelaccess)_ argument:\n\n                                                     `(abs((j(-1,0)-i))+abs(i-j(1,0)))/2`.\n\nThose new to math expressions may be forgiven if such expressions seem Delphic: Oh Pythia! What does this mean? _Are the Persians coming or not?_ (She just smiles).
+|      a.  |Pel processors iterate over the channel rasters themselves, one picture element (pel) at a time: a scalar. With the present example, the processor takes the average of the absolute values of two differences, these of center pels and their x-axis predecessors and successors. Such computations exhibits edge sensitivity.
+|      b.  |When, along the x-axis, the center pel is more-or-less equal to its predecessor and sucessor, the two differences are small; so follows the average of their absolutes. the image locality exhibits shallow gradients; the results exhibits only low luminance.
+|      c.  |On the other hand, differences vary greatly in localities of steep gradients; the results exhibit high luminance because the differences and their absolute averages are large.
 
-Even in this pel processor précis, it is worth emphasizing that the mathematical expression implementing it executes once for every channel value (a.k.a. _pel_). A 768×768 image with red, green and blue channels will induce 768×768×3=1,769,472 separate expression operations. As an aside, fashioning a vector final result is typically faster, as the return value updates all channels at each `x`, `y` pixel location; only 768×768=589,824 operations are needed.
+Even in this pel processor précis, it is worth emphasizing that the mathematical expression implementing it executes once for every channel value (a.k.a. _pel_). A 768×768 image with red, green and blue channels will induce 768×768×3=1,769,472 separate expression operations. As an aside, fashioning a vector final result is often faster, as the return value updates all channels at each `x`, `y` pixel location; only 768×768=589,824 operations are needed.
 
-In concert with the command line, common mathematical expression functions tend to terse, single-letter names. `i()` and `j()`, the so-called [pixel access operators](https://gmic.eu/tutorial/array_cheat.html#pixel_access_operators), are almost universally present in math expressions. They assume, respectively, the thirty-two bit float value of the "current center pel" in the iteration (read: `i`), or those thirty-two bit float values of the immediate ± x-axis neighbors (read: `j`). At the iteration's conclusion, the pel processor has "filled" the selected image with these computed absolute difference averages, overwriting whatever pel data may have been constituting the raster before.
+In concert with pipeline command shortcuts, common mathematical expression functions tend to terse, single-letter names. `i()` and `j()`, the [pixel access operators](https://gmic.eu/tutorial/array_cheat.html#pixel_access_operators), are almost always present in raster processors, these querying the bitmap. In this rôle, they take on the thirty-two bit float values of pels in the current iteration location ( `i(x,y)` ), or ± x-axis offsets from that location ( `j(Δx,Δy)` ). When the iteration completes, the pel processor has "filled" the selected image with a multitude of return pel or pixel values, overwriting whatever may have been in place before.
 
 = examthree
 __Example Three:__
@@ -84,9 +103,19 @@ You want to compute a value to initialize a pipeline variable and command argume
 14   -done
 15   -display[^0]
 ~~~
-%% images/forestflowers.png r2dx 22% =>. orig oave={$orig,_ia} +text_outline. "Average:\ "$oave,3%,82%,7.5%,1,1,255,240,200 o. img/med_0.jpg,65 repeat 5 trial={$>+1} mset={5*$trial} +median[orig] $mset,$oave vdiff={_iv#$orig-iv} -text_outline. "#\ "$trial"\ Med:\ "$mset,3%,82%,7.5%,1,1,255,240,200 text_outline. "dvar:\ "$vdiff,3%,90%,7.5%,1,1,255,240,200 o. img/med_{$trial}.jpg,65 done rm %%
+%% images/sheepandhills.png r2dx 36% =>. orig oave={$orig,_ia} +text_outline. "Average:\ "$oave,3%,82%,7.5%,1,1,255,240,200 o. img/med_0.jpg,65 repeat 5 trial={$>+1} mset={5*$trial} +median[orig] $mset,$oave vdiff={_iv#$orig-iv} -to. "#\ "$trial"\ Med:\ "$mset,3%,82%,7.5%,1,1,255,240,200 to. "dvar:\ "$vdiff,3%,90%,7.5%,1,1,255,240,200 o. img/med_{$trial}.jpg,65 done rm %%
 ===
 |-![med_0](img/med_0.jpg)|![med_1](img/med_1.jpg)|![med_2](img/med_2.jpg)
 |![med_3](img/med_3.jpg)|![med_4](img/med_4.jpg)|![med_5](img/med_5.jpg)
 ===
-`vdiffmedian` is one of a class of finger exercises one might write to better apprise the effect of pipeline commands and their arguments. Here, ''-median'' is on the examination table; its selective blurring can be dream-like. There are a number of image feature substitution expressions in play with this finger exercise: <todo>
+
+`vdiffmedian` is a finger exercises that one might carry out to better understand the effect of pipeline commands and their arguments. Here, ''-median'' lies on the examination table. Its first argument, `radius`, operates much like the corresponding ''-blur'' argument; it sizes the blurring kernel — the neighborhood over which the command averages pel values. Larger radii yield greater spreads of one region into another. ''-median'' 's second argument, `threshold` preserves gradients arising from local value changes that are greater than the specified argument. In this case, the average value of the original image is being harnessed to establish the threshold at which ''-median'' holds edges. The overall effect can be dream-like. `dvar`, the difference between the image variance of the original and a median-blurred copy, is being investigated as a trial "dream-like" factor; as a particular image is progressively blurred, its [variance](https://en.wikipedia.org/wiki/Variance) tends to drop.\n\nThis finger exercise strives to grasp how ''-median'' thresholding holds edges that are at least as pronounced as the average value of the original. Other benchmarks can be chosen and readers are welcome to devise such. The heart of this finger exercise is a ''-repeat'' … ''-done'' loop with a fixed number of steps. It steps the `radius` argument by increments of five. The exercise holds `threshold` steady as `radius` varies. Progressively larger radii give rise to progressively higher "dream-like" factors.    
+
+There are a number of image feature substitution expressions at play in this finger exercise:
+| 1.  |__Line 3:__ `{$original,_ia}` is an image feature substitution expression where a named collection, `original` specifies the reference image. More commonly, an explicit image list index appears here. The cited collection ( `original` ) should contain only one image, otherwise G'MIC can't determine which item in a multi-member collection is to serve as the reference. In this case, only the selected image is in the collection so there is no ambiguity.\n\nThe mathematical expression in this particular image feature is simply `_ia`. The leading underscore is a "round numeric display" operator, which truncates results to a limited number of significant digits. The mathematical expression consists of a single statement: `_ia` the overall average value of the named image `original.` Necessarily the last statement in the expression, it sets the value to be associated with the key `oave`, used down-script (Line 9) to set the threshold argument.    
+| 2.  |__Line  5:__ The image feature substitution expression here, `{0,n}`, is not the common mathematical expression; it is one of the [lesser known variants](). Instead of a mathematical expression, the single letter directive, `n`, identifies this as the image feature substitution expression that supplies the collection name in which an image is enrolled, if any. As with all image feature substitution expressions, the first argument is usually an image index; if omitted, then the last image on the list is implied. G'MIC replaces this substitution expression with the collection name, if the image is enrolled in one, or the name of the image source that supplied the image, if there is one, or the default indicator `[unnamed]` if the image was created on the pipeline and is in no collection.   
+| 3.  |__Line  7:__ `{$>+1}` is an image feature substitution expression lacking the initial index argument; its reference image defaults to the last one on the image list. This point is moot, however: the single statement entails no image-dependent feature or metric. As noted in [Example One](#examone), above, G'MIC dereferences the key `$>` substituting its value. This particular key is among those pre-defined substitutions reserved for ''-repeat''…''-done'' loop counts and substitutes for ascending loop counting. Its descending counterpart is `$<.` As noted in [Example One](#examone), above, G'MIC dereferences the key `$>` and substitutes its value before it undertakes processing the math expression. The loop count, offset by one, becomes the trial count and, from the point of view of the math expression parser, the statement is a straightforward sum of two constants, the value associated with the key `$trial`.
+| 4.  |__Line  8:__ `{5*$trial}` operates in a similar manner to the image feature substitution sequence on the previous line: `$trial` is the ones-based ascending loop count; this count, multiplied by five, becomes the current blurring radius: `$mset`. The computation embodies the only statement in the expression, defining the value keyed by `$mset`.
+| 5.  |__Line 10:__ `{_iv#$original-iv}` takes the difference between two image metrics: the variance of the original image and the reference image. The postfix qualifier `#$original` furnishes the means to reference an image metric of any other image on the list. Commonly, an explicit image list index follows the hashtag, `#` but the dereferenced name of a collection, here, `$original` may be used as well, so long as the collection contains only one image. Collections of greater size is ambiguous; G'MIC will throw an error with multi-member collections.
+
+This completes our survey of the three pipeline settings for mathematical expressions. The remaaining topics delve into the construction of 
