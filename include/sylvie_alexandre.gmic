@@ -39,7 +39,7 @@
 #@gui :_=note("<b>Nettoyage du code/Cleaning the code :</b>)
 #@gui :_=note("Thank RepTorian1125 for modernizing the source code of these filters for GMIC 3.1.0")
 #@gui :_=note("Merci Reptorian1125 pour avoir modernisé le code source de ces filtres pour GMIC 3.1.0")
-#@gui :_=note("Version 2023/05/07 GMIC 3.2.4")
+#@gui :_=note("Version 2023/05/28 GMIC 3.2.5_pre")
 
 samj_about :
  Dim=1024
@@ -3355,6 +3355,122 @@ samj_rien_atistic :
 
 #@gui _
 #@gui <b>Artistic</b>
+
+#################################################
+##                                             ##
+##          samj_ripple_houghsketchbw          ##
+##                                             ##
+#################################################
+
+#@gui samj_ripple_houghsketchbw : samj_ripple_houghsketchbw, samj_ripple_houghsketchbw_preview(0)*
+#@gui :_=separator()
+#@gui :_=note("<span foreground="orangered"><b>Blur</b></span>")
+#@gui : 1 - Blur = float(2,0.1,10)
+#@gui :_=note("<span foreground="orangered"><b>Ripple</b></span>")
+#@gui : 2 Amplitude = int(100,1,300)
+#@gui : 3 Bandwidth = float(50,1,300)
+#@gui : 4 Shape = choice(1,"Sine","Sine+")
+#@gui : 5 Angle = float(45,0,360)
+#@gui : 6 Offset = float(0,0,500)
+#@gui :_=note("<span foreground="orangered"><b>houghsketchbw</b></span>")
+#@gui : 7 Density = float(10,0,70)
+#@gui : 8 Radius = int(5,0,30)
+#@gui : 9 Threshold = float(80,0,100)
+#@gui : 10 Opacity = float(0.1,0,1)
+#@gui : 11 Votesize = float(100,10,200)
+#@gui :_=note("<span foreground="orangered"><b>Color</b></span>")
+#@gui : 12 Blend Color = bool(1)
+#@gui : 13 Mode = choice(17,"add","alpha","and","average","blue","burn","darken","difference",
+#@gui : "divide","dodge","edges","exclusion","freeze","grainextract","grainmerge","green","hardlight",
+#@gui : "hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance",
+#@gui : "multiply","negation","or","overlay","pinlight","red","reflect","saturation","seamless","seamless_mixed",
+#@gui : "screen","shapeareamax","shapeareamax0","shapeareamin","shapeareamin0","shapeaverage","shapeaverage0",
+#@gui : "shapemedian","shapemedian0","shapemin","shapemin0","shapemax","shapemax0","softburn","softdodge",
+#@gui : "softlight","stamp","subtract","value","vividlight","xor")
+#@gui : 14 Opacity = float(1,0,1)
+#@gui : 15 Reverse Layers = bool(0)
+#@gui :_=separator()
+#@gui :Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse")
+#@gui :_=separator()
+#@gui :_=note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2023/05/28</i>.</small>")
+
+samj_ripple_houghsketchbw :
+foreach {
+ autocrop
+ blur $1
+ ripple {round({w}/$2)},$3,{$4+2},$5,$6
+ if $12
+  +samj_houghsketchbw_20230528 $7,$8,$9,$10,$11% # Version du 28 mai 2023 de houghsketchbw de David Tschumperlé
+  mode=${arg\ 1+$13,add,alpha,and,average,blue,burn,darken,difference,\
+  ,divide,dodge,edges,exclusion,freeze,grainextract,grainmerge,green,hardlight,\
+  ,hardmix,hue,interpolation,lighten,lightness,linearburn,linearlight,luminance,\
+  ,multiply,negation,or,overlay,pinlight,red,reflect,saturation,seamless,seamless_mixed,\
+  ,screen,shapeareamax,shapeareamax0,shapeareamin,shapeareamin0,shapeaverage,shapeaverage0,\
+  ,shapemedian,shapemedian0,shapemin,shapemin0,shapemax,shapemax0,softburn,softdodge,\
+  ,softlight,stamp,subtract,value,vividlight,xor}
+  if $15 rv fi
+  blend $mode,$14
+ else
+  samj_houghsketchbw_20230528 $7,$8,$9,$10,$11% # Version du 28 mai 2023 de houghsketchbw de David Tschumperlé
+ fi
+ c 0,255
+}
+
+samj_ripple_houghsketchbw_preview :
+gui_split_preview "samj_ripple_houghsketchbw $*",$-1
+
+ # Version du 28 mai 2023 de houghsketchbw de David Tschumperlé
+ #@cli samj_houghsketchbw_20230528 : _density>=0,_radius>0,0<=_threshold<=100,0<=_opacity<=1,_votesize[%]>0
+ #@cli : Apply hough B&W sketch effect on selected images.
+ #@cli : Default values: 'density=100', 'radius=3', 'threshold=100', 'opacity=0.1' and 'votesize=100%'.
+ #@cli : $ image.jpg +houghsketchbw ,
+ samj_houghsketchbw_20230528 : check "${1=100}>=0 && ${2=3}>=0 && ${3=100}>=0 && $3<=100 && ${4=0.1}>=0 && $4<=1 && ${5=100%}>0"
+  e[^-1] "Apply hough B&W sketch effect on image$?, with density $1, radius $2, threshold $3, opacity $4
+          and votesize $5."
+  luminance
+  foreach {
+   nm={n}
+
+   # Compute normalized Hough transform.
+   res={round(if(${is_percent\ $5},$5*max(w,h),$5))} w={w} h={h} rhomax={sqrt(w^2+h^2)/2}
+   hough $res,$res n 0,255
+
+   # Retrieve coordinates of maximas in hough space.
+   normalize_local. $1,$2 >=. $3% pointcloud3d.
+   s3d. rm[-6--5,-3--1] r. 3,{h/3},1,1,-1 columns. 0,1
+
+   # Convert to (x0,y0)-(x1,y1) line coordinates.
+   s. x,2
+   *.. {2*pi/$res}                 # theta
+   *. {$rhomax/$res}               # rho
+   +cos.. *. .. +. {$w/2}          # x
+   +sin... *. ... +. {$h/2}        # y
+   rm...                           # Remove rho
+   i... ...
+   cos[-4] sin... *[-4,-3] 10000   # cos(t) sin(t)
+   ++.. ...                        # x + sin(t)
+   +-.. [-5]                       # y - cos(t)
+   -[-4] [-5]                      # x - sin(t)
+   +... [-6]                       # y + cos(t)
+   rm[-6,-5]
+
+   # Transform as a 3D object.
+   i... 1,{h} 1,{h} a[-6--1] x                 # Vertices
+   i.. ('CImg3d') i.. ({2*h},{h})              # Header and size.
+   1,{h},1,1,2 1,{h},1,1,2*y ++. 1 a[-3--1] x  # Primitives.
+   3,{h},1,1,0 1,{h},1,1,$4                    # Colors and opacities
+   y[-6--1] a[-6--1] y
+
+   # Render on a white image.
+   $w,$h,1,1,255 j3d. ..,0,0,0,1,1,0,0 rm.. => $nm
+  }
+
+#################################################
+##                                             ##
+##        FIN samj_ripple_houghsketchbw        ##
+##                                             ##
+#################################################
+
 #################################################
 ##                                             ##
 ##             samj_Test_Cubisme_B             ##
@@ -9231,10 +9347,10 @@ foreach {
 ##                                             ##
 #################################################
 
-#@gui samj_Selection_Spline_Rounded : samj_Selection_Spline_Rounded, samj_Selection_Spline_Rounded(1)
+#@gui samj_Selection_Spline_Rounded : samj_Selection_Spline_Rounded, samj_Selection_Spline_Rounded_preview(1)
 #@gui :_=separator()
 #@gui :_=note("<span foreground="orangered"><b>Précision du trait / Precision of the line</b></span>")
-#@gui : 1 - Précision/Precision = int(10,1,100)
+#@gui : 1 - Précision/Precision = int(20,1,200)
 #@gui :_=note("<span foreground="orangered"><b>4 Splines Ou/Or 3 Splines </b></span>")
 #@gui : 2 - Quatre/Four Splines = bool(1)
 #@gui :_=note("<span foreground="orangered"><b>Point A</b></span>")
@@ -9260,7 +9376,12 @@ foreach {
 #@gui :_=note("<span foreground="orangered"><b>Rogner selon le contenu / Crop to content</span>")
 #@gui : 21 - Autocrop = bool(0)
 #@gui :_=separator()
-#@gui :_=note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2023/05/07</i>.</small>")
+#@gui :_=note("<span foreground="orangered"><b>Aperçu Grille / Preview Grid</span>")
+#@gui : 22 - Visualiser/Preview = bool(0)
+#@gui : 23 - Divisions X Y = int(2,2,40)
+#@gui : 24 - Couleur Grille/Color Grid = int(255,0,255)
+#@gui :_=separator()
+#@gui :_=note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2023/05/15</i>.</small>")
 
 samj_Selection_Spline_Rounded :
 # barycentre modifier $19 : samj_Selection_Spline_Rounded 10,26,9,2.5,68.2,98,5,74,9,11.2,92.9,91.9,79.2,0,1,0
@@ -9317,6 +9438,21 @@ foreach {
  if $21 autocrop fi
 }
 
+samj_Selection_Spline_Rounded_preview :
+ samj_Selection_Spline_Rounded  $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21
+ if $22&&$21==0
+  line 0,0,{{w}-1},{{h}-1},1,$24,$24,$24,255
+  line 0,{{h}-1},{{w}-1},0,1,$24,$24,$24,255
+  GrX={{w}/$23}
+  GrY={{h}/$23}
+  Ind=0
+  repeat {$23-1}
+   Ind+=1
+   line {$Ind*$GrX},0,{$Ind*$GrX},{{h}-1},1,$24,$24,$24,255
+   line 0,{$Ind*$GrY},{{w}-1},{$Ind*$GrY},1,$24,$24,$24,255
+  done
+ fi
+
 #################################################
 ##                                             ##
 ##      FIN samj_Selection_Spline_Rounded      ##
@@ -9329,28 +9465,37 @@ foreach {
 ##                                             ##
 #################################################
 
-#@gui samj_Selection_Polygone : samj_Selection_Polygone, samj_Selection_Polygone(1)
+#@gui samj_Selection_Polygone : samj_Selection_Polygone, samj_Selection_Polygone_preview(1)
 #@gui :_=separator()
 #@gui :_=note("<span foreground="orangered"><b>Nombre de points/Number of points</b></span>")
-#@gui : 1 - Points = int(6,3,6)
+#@gui : 1 - Points = int(8,3,8)
 #@gui :_=note("<span foreground="orangered"><b>Point A</b></span>")
-#@gui : 2 3 - A = point(50,10,0,1,255,0,0,-128,1%)
+#@gui : 2 3 - A = point(3,3,0,1,255,0,0,-128,1%)
 #@gui :_=note("<span foreground="orangered"><b>Point B</b></span>")
-#@gui : 4 5 - B = point(80,20,0,1,0,255,0,-128,1%)
+#@gui : 4 5 - B = point(50,20,0,1,255,255,0,-128,1%)
 #@gui :_=note("<span foreground="orangered"><b>Point C</b></span>")
-#@gui : 6 7 - C = point(80,80,0,1,0,0,255,-128,1%)
+#@gui : 6 7 - C = point(97,3,0,1,0,255,0,-128,1%)
 #@gui :_=note("<span foreground="orangered"><b>Point D</b></span>")
-#@gui : 8 9 - D = point(50,90,0,1,255,255,0,-128,1%)
+#@gui : 8 9 - D = point(80,50,0,1,0,255,255,-128,1%)
 #@gui :_=note("<span foreground="orangered"><b>Point E</b></span>")
-#@gui : 10 11 - E = point(20,80,0,1,0,255,255,-128,1%)
+#@gui : 10 11 - E = point(97,97,0,1,0,0,255,-128,1%)
 #@gui :_=note("<span foreground="orangered"><b>Point F</b></span>")
-#@gui : 12 13 - F = point(20,20,0,1,255,0,255,-128,1%)
+#@gui : 12 13 - F = point(50,80,0,1,255,0,255,-128,1%)
+#@gui :_=note("<span foreground="orangered"><b>Point G</b></span>")
+#@gui : 14 15 - G = point(3,97,0,1,255,255,255,-128,1%)
+#@gui :_=note("<span foreground="orangered"><b>Point H</b></span>")
+#@gui : 16 17 - H = point(20,50,0,1,127,127,127,-128,1%)
 #@gui :_=note("<span foreground="orangered"><b>Complément/Complement</b></span>")
-#@gui : 14 - Extérieur/Outside = bool(0)
+#@gui : 18 - Extérieur/Outside = bool(0)
 #@gui :_=note("<span foreground="orangered"><b>Rogner selon le contenu / Crop to content</span>")
-#@gui : 15 - Autocrop = bool(0)
+#@gui : 19 - Autocrop = bool(0)
 #@gui :_=separator()
-#@gui :_=note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2023/05/05</i>.</small>")
+#@gui :_=note("<span foreground="orangered"><b>Aperçu Grille / Preview Grid</span>")
+#@gui : 20 - Visualiser/Preview = bool(0)
+#@gui : 21 - Divisions X Y = int(2,2,40)
+#@gui : 22 - Couleur Grille/Color Grid = int(255,0,255)
+#@gui :_=separator()
+#@gui :_=note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2023/05/15</i>.</small>")
 
 samj_Selection_Polygone :
 foreach {
@@ -9366,8 +9511,12 @@ foreach {
  point5_Y={{h}*$11/100}
  point6_X={{w}*$12/100}
  point6_Y={{h}*$13/100}
+ point7_X={{w}*$14/100}
+ point7_Y={{h}*$15/100}
+ point8_X={{w}*$16/100}
+ point8_Y={{h}*$17/100}
  to_rgba
- if $14
+ if $18
   if $1==3
    polygon 3,$point1_X,$point1_Y,$point2_X,$point2_Y,$point3_X,$point3_Y,1,0,0,0,0
   elif $1==4
@@ -9376,6 +9525,10 @@ foreach {
    polygon 5,$point1_X,$point1_Y,$point2_X,$point2_Y,$point3_X,$point3_Y,$point4_X,$point4_Y,$point5_X,$point5_Y,1,0,0,0,0
   elif $1==6
    polygon 6,$point1_X,$point1_Y,$point2_X,$point2_Y,$point3_X,$point3_Y,$point4_X,$point4_Y,$point5_X,$point5_Y,$point6_X,$point6_Y,1,0,0,0,0
+  elif $1==7
+   polygon 7,$point1_X,$point1_Y,$point2_X,$point2_Y,$point3_X,$point3_Y,$point4_X,$point4_Y,$point5_X,$point5_Y,$point6_X,$point6_Y,$point7_X,$point7_Y,1,0,0,0,0
+  elif $1==8
+   polygon 8,$point1_X,$point1_Y,$point2_X,$point2_Y,$point3_X,$point3_Y,$point4_X,$point4_Y,$point5_X,$point5_Y,$point6_X,$point6_Y,$point7_X,$point7_Y,$point8_X,$point8_Y,1,0,0,0,0
   fi
  else
   c 0,254.99
@@ -9389,6 +9542,10 @@ foreach {
    polygon. 5,$point1_X,$point1_Y,$point2_X,$point2_Y,$point3_X,$point3_Y,$point4_X,$point4_Y,$point5_X,$point5_Y,1,0,0,0,0
   elif $1==6
    polygon. 6,$point1_X,$point1_Y,$point2_X,$point2_Y,$point3_X,$point3_Y,$point4_X,$point4_Y,$point5_X,$point5_Y,$point6_X,$point6_Y,1,0,0,0,0
+  elif $1==7
+   polygon. 7,$point1_X,$point1_Y,$point2_X,$point2_Y,$point3_X,$point3_Y,$point4_X,$point4_Y,$point5_X,$point5_Y,$point6_X,$point6_Y,$point7_X,$point7_Y,1,0,0,0,0
+  elif $1==8
+   polygon. 8,$point1_X,$point1_Y,$point2_X,$point2_Y,$point3_X,$point3_Y,$point4_X,$point4_Y,$point5_X,$point5_Y,$point6_X,$point6_Y,$point7_X,$point7_Y,$point8_X,$point8_Y,1,0,0,0,0
   fi
   blend add
   c 0,255
@@ -9401,12 +9558,31 @@ foreach {
    +polygon 5,$point1_X,$point1_Y,$point2_X,$point2_Y,$point3_X,$point3_Y,$point4_X,$point4_Y,$point5_X,$point5_Y,1,255,255,255,255
   elif $1==6
    +polygon 6,$point1_X,$point1_Y,$point2_X,$point2_Y,$point3_X,$point3_Y,$point4_X,$point4_Y,$point5_X,$point5_Y,$point6_X,$point6_Y,1,255,255,255,255
+  elif $1==7
+   +polygon 7,$point1_X,$point1_Y,$point2_X,$point2_Y,$point3_X,$point3_Y,$point4_X,$point4_Y,$point5_X,$point5_Y,$point6_X,$point6_Y,$point7_X,$point7_Y,1,255,255,255,255
+  elif $1==8
+   +polygon 8,$point1_X,$point1_Y,$point2_X,$point2_Y,$point3_X,$point3_Y,$point4_X,$point4_Y,$point5_X,$point5_Y,$point6_X,$point6_Y,$point7_X,$point7_Y,$point8_X,$point8_Y,1,255,255,255,255
   fi
   rv
   blend alpha
  fi
- if $15 autocrop fi
+ if $19 autocrop fi
 }
+
+samj_Selection_Polygone_preview :
+ samj_Selection_Polygone $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
+ if $20&&$19==0
+  line 0,0,{{w}-1},{{h}-1},1,$22,$22,$22,255
+  line 0,{{h}-1},{{w}-1},0,1,$22,$22,$22,255
+  GrX={{w}/$21}
+  GrY={{h}/$21}
+  Ind=0
+  repeat {$21-1}
+   Ind+=1
+   line {$Ind*$GrX},0,{$Ind*$GrX},{{h}-1},1,$22,$22,$22,255
+   line 0,{$Ind*$GrY},{{w}-1},{$Ind*$GrY},1,$22,$22,$22,255
+  done
+ fi
 
 #################################################
 ##                                             ##
@@ -9420,7 +9596,7 @@ foreach {
 ##                                             ##
 #################################################
 
-#@gui samj_Selection_Rectangle : samj_Selection_Rectangle, samj_Selection_Rectangle(1)
+#@gui samj_Selection_Rectangle : samj_Selection_Rectangle, samj_Selection_Rectangle_preview(1)
 #@gui :_=separator()
 #@gui :_=note("<span foreground="orangered"><b>Position</b></span>")
 #@gui : 1 2 - Centre = point(50,50,0,1,255,255,0,-128,1%)
@@ -9435,6 +9611,11 @@ foreach {
 #@gui : 7 - Autocrop = bool(0)
 #@gui :_=note("<span foreground="orangered"><b>Pivoter la sélection / Rotate the selection</span>")
 #@gui : 8 - Pivoter/Rotate = choice(0,"Non/No","Angle","Angle-90","Angle+90","Angle+180")
+#@gui :_=separator()
+#@gui :_=note("<span foreground="orangered"><b>Aperçu Grille / Preview Grid</span>")
+#@gui : 9 - Visualiser/Preview = bool(0)
+#@gui : 10 - Divisions X Y = int(2,2,40)
+#@gui : 11 - Couleur Grille/Color Grid = int(255,0,255)
 #@gui :_=separator()
 #@gui :_=note("<small>samj - Derni\303\250re mise \303\240 jour : <i>2023/05/06</i>.</small>")
 
@@ -9477,6 +9658,21 @@ foreach {
  if $7 autocrop fi
 }
 
+samj_Selection_Rectangle_preview :
+ samj_Selection_Rectangle $1,$2,$3,$4,$5,$6,$7,$8
+ if $9&&$8==0&&$7==0
+  line 0,0,{{w}-1},{{h}-1},1,$11,$11,$11,255
+  line 0,{{h}-1},{{w}-1},0,1,$11,$11,$11,255
+  GrX={{w}/$10}
+  GrY={{h}/$10}
+  Ind=0
+  repeat {$10-1}
+   Ind+=1
+   line {$Ind*$GrX},0,{$Ind*$GrX},{{h}-1},1,$11,$11,$11,255
+   line 0,{$Ind*$GrY},{{w}-1},{$Ind*$GrY},1,$11,$11,$11,255
+  done
+ fi
+
 #################################################
 ##                                             ##
 ##        FIN samj_Selection_Rectangle         ##
@@ -9489,7 +9685,7 @@ foreach {
 ##                                             ##
 #################################################
 
-#@gui samj_Selection_Ellipse : samj_Selection_Ellipse, samj_Selection_Ellipse(1)
+#@gui samj_Selection_Ellipse : samj_Selection_Ellipse, samj_Selection_Ellipse_preview(1)
 #@gui :_=separator()
 #@gui :_=note("<span foreground="orangered"><b>Position</b></span>")
 #@gui : 1 2 - Centre = point(50,50,0,1,255,255,0,-128,1%)
@@ -9504,6 +9700,11 @@ foreach {
 #@gui : 7 - Autocrop = bool(0)
 #@gui :_=note("<span foreground="orangered"><b>Pivoter la sélection / Rotate the selection</span>")
 #@gui : 8 - Pivoter/Rotate = choice(0,"Non/No","Angle","Angle-90","Angle+90","Angle+180")
+#@gui :_=separator()
+#@gui :_=note("<span foreground="orangered"><b>Aperçu Grille / Preview Grid</span>")
+#@gui : 9 - Visualiser/Preview = bool(0)
+#@gui : 10 - Divisions X Y = int(2,2,40)
+#@gui : 11 - Couleur Grille/Color Grid = int(255,0,255)
 #@gui :_=separator()
 #@gui :_=separator()
 #@gui :_=note("<span>Pour ajouter un flou utiliser le filtre <i>Blur [Depth-Of-Field]</i> par David Tschumperlé.</span>")
@@ -9535,6 +9736,21 @@ foreach {
  fi
  if $7 autocrop fi
 }
+
+samj_Selection_Ellipse_preview :
+ samj_Selection_Ellipse $1,$2,$3,$4,$5,$6,$7,$8
+ if $9&&$8==0&&$7==0
+  line 0,0,{{w}-1},{{h}-1},1,$11,$11,$11,255
+  line 0,{{h}-1},{{w}-1},0,1,$11,$11,$11,255
+  GrX={{w}/$10}
+  GrY={{h}/$10}
+  Ind=0
+  repeat {$10-1}
+   Ind+=1
+   line {$Ind*$GrX},0,{$Ind*$GrX},{{h}-1},1,$11,$11,$11,255
+   line 0,{$Ind*$GrY},{{w}-1},{$Ind*$GrY},1,$11,$11,$11,255
+  done
+ fi
 
 #################################################
 ##                                             ##
