@@ -1,0 +1,37 @@
+# shared
+%% x "mkdir -p img" %%
+|-![sharedkid](images/sharedkid.png)\n _Extremely identical twins_ |Shared places "clones" of its selected images on the image stack. These clones, more formally called shared images, behave in almost every significant way as copies of their reference image except in one significant respect: they share the image buffer of their reference image instead of having their own copy. Any operation invoked on one image is reflected in the other. The shared copy is more like an alias of its reference image than a copy.\n\nOne can, using various addessing schemes, limit the shared image buffer region, however, in each scheme, the shared region must form a contiguous section of the image buffer. Thus, one cannot designate an arbitrarily shaped rectangle as shared, because the rectangle cleaves image rows into left, center and right portions and the left and right excluded portions intersperse with included ones, a noncontiguous state of affairs.
+
+When establishing a shared image, one designates starting and ending points in the image buffer relative to some reference point, using a particular unit measure. Each variant of the command employs a different unit measure of increasingly larger size. The command 'knows' the pertinent unit measure from counting the number of its arguments, five implying pel resolution and none implying the entire image.
+
+Here are the five variants:
+
+|- 1.  | __pel resolution:__ `x0[%],x1[%],y[%],z[%],c[%] - y, z, and c designate the particular image row, slice, and channel location to start counting pels. `x0` designates a pel count from the beginning of row `y`; `x1` indicates the location of the last pel in the buffer. `x0`–`x1`+`1` is the size of the buffer in pels.
+| 2.  | __row resolution:__ `y0[%],y1[%],z[%],c[%] - `z` and `c` designate the particular slice and channel location to start counting rows. `y0` designates a row count from the beginning of the slice `z`; `y1` indicates the location of the last row in the buffer. `y1`–`y0`+`1` is the size of the buffer in rows.
+| 3.  | __slice resolution:__ `z0[%],z1[%],c` - `c` designates the particular channel location to start counting slices. `z0` designates a slice count from the beginning of channel `c`. `z1` indicates the location of the last slice in the buffer. `z1`–`z0`+`1` is the size of the buffer in slices.
+| 4.  | __channel resolution:__ `c0[%],c1[%]` - `c0` designates a channel count from the beginning of the image buffer. `c1` indicates the location of the last channel in the buffer. `c1`–`c0`+`1` is the size of the buffer in channels.
+| 5.  | __image resolution:__ (no args) Selects the entire image buffer.
+
+Range arguments are inclusive, so the pair x,x is legitmate and indicates that the buffer begins at x (so many pels, rows, slices or channels from the reference point) and consists of one unit (`x`–`x`+`1`), nor are there limits on range arguments, which probably will get you into trouble. Thus `-shared[-1] 0,{w*h*d*s-1},0,0,0` is a rather roundabout way of sharing out the entire buffer of the preceding image on the stack; `-shared[-1]`, without arguments, achieves the same end and will more likely preserve your sanity.
+
+It is probably clear to the reader that this command operates at a very low level, bypassing most of the safe guards and checks that normally operate on command line input. The ''-shared'' command offers an extremely efficient, low-overhead access mechanism to image data but furnishes few safety nets, should one miscalculate buffer sizes or delete reference images. G'MIC sanity-checks ranges for buffer over runs, but deleting referenced images without doing the same on outstanding shares will probably trigger an operating system memory access violation, terminating G'MIC without giving it a chance to issue any illuminating _mea culpas_ (even though it probably is your fault). That said, one shouldn't avoid the command for its fearfulness, never benefiting from its usefulness. If quantities stem from established image constants and the math is correct, the ''-shared'' command furnishes the quickest means of accessing image data.
+= discreteturbexample
+## Discrete Turbulence Example
+~~~
+discreteturb: -skip ${1=32},${2=6},${3=3}
+   radius,octaves,alpha=${1-3}
+   -foreach {
+      -repeat s#-1
+         -shared. $>
+	 -turbulence. {$radius*($>+1)},$octaves,$alpha
+	 -normalize. 0,1
+	 -pow. {1/3}
+	 -normalize 0,255
+         -rm.
+      -done
+   }
+~~~
+===
+%% 256,256,1,3 rad=4 foreach { repeat s#-1 shared. $> turbulence. {$rad*($>+1)},6,3 n. 0,1 pow 0.33 n. 0,255  rm. done } %%
+*Pastel Turbulence*
+===
