@@ -1,4 +1,5 @@
 #! /usr/bin/python
+#-*- coding: utf-8 -*-
 
 import argparse
 import svgpathtools
@@ -9,8 +10,8 @@ DESC   = """
 Plot points from SVG Path.
 """
 DENHLP = """
-Plot point quantity as powers of two; 4 → 2⁴ → 16.\n
-Larger → denser. Defaults to 10 (1024)
+Plot point quantity as powers of two; 4 -> 2^4 -> 16.\n
+Larger -> denser. Defaults to 10 (1024)
 """
 OUTHLP = """
 Text file for output plots.
