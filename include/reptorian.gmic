@@ -4063,6 +4063,159 @@ if $#>1
 else
  u 0
 fi
+#@cli rep_partial_permutations: number_of_items,selected_items_count,_axis={x|y|z}
+#@cli : Generates partial combination. P(n,k)
+#@cli : Note - Code is taken from Alistairisrael pseudo-code - https://alistairisrael.wordpress.com/2009/09/22/simple-efficient-pnk-algorithm/
+#@cli : Default values: '_axis=x'
++rep_partial_permutations:
+skip ${3=x}
+
+check "($1>=$2&&$1>0&&isint($1))&&($2>0&&isint($2))&&inrange(_'$3',_'x',_'z',1,1)"
+
+if [${1-2}]==[1,1] 1 return fi
+
+num_of_combinations,axis={permut($2,$1,1)},{_'$3'-_'x'}
+
+if $axis==2   out_dim=1,1,$num_of_combinations
+elif $axis==1 out_dim=1,$num_of_combinations,1
+else          out_dim=$num_of_combinations,1,1
+fi
+
+if $2==1 $out_dim,1,${arg\ $axis+1,x,y,z} return fi
+
+$out_dim,$2,>"begin(
+  const edge=s-1;
+  const n=$1;
+  const dec_n=n-1;
+  const axis=$axis;
+
+  axis==2?(
+   axis()=z;
+  ):
+  axis==1?(
+   axis()=y;
+  ):(
+   axis()=x;
+  );
+
+  output=expr('x',n);
+
+  reverse_array_starting_from(a)=(
+   start=a;
+   end=dec_n;
+   while(start<end,
+    swap(output[start++],output[end--]);
+   );
+  );
+
+ );
+
+ if(axis(),
+  j=s;
+  while(j<n && (output[edge]>=output[j]),++j;);
+
+  j<n?(
+   swap(output[edge],output[j]);
+  ):(
+   reverse_array_starting_from(s);
+
+   i=edge-1;
+   while(i>=0 && output[i]>=output[i+1],--i;);
+
+   j=dec_n;
+   while(j>i && (output[i]>=output[j]),--j;);
+
+   swap(output[i],output[j]);
+
+   reverse_array_starting_from(i+1);
+  );
+ );
+
+ (output)[0,s];
+ "
+#@cli rep_extract_partial_permutation_order: number_of_item,selected_items_count,permutation_number
+#@cli : Return permutation order at index permutation_number.
+rep_extract_partial_permutation_order:
+
+check "$2<=$1&&$1>0&&$2>0"
+
+if $1==1 status 0
+elif $2==1 status {$3%$1}
+else
+
+ permutation_number={$3%permut($2,$1,1)}
+
+ 1,{$1+1},1,1,y
+
+ {1+($1==$2?$1-2:min($1-1,$2-1))},1,1,1,>"begin(
+   const m=($1==$2?1:$1-$2)+1;
+   v=m;
+  );
+  x>1?v=v*(m+x-1):(x?v:1);"
+
+ eval "
+  new_arr=vector(#$2,0);
+  divisor_position=w#-1-1;
+  permutation_number=$permutation_number;
+
+  repeat(w#-1,iter,
+   division_number=i[#-1,divisor_position];
+   pos=int(permutation_number/division_number);
+   new_arr_num=i[#-2,pos];
+   new_arr[iter]=new_arr_num;
+   da_remove(#-2,pos);
+   permutation_number%=division_number;
+   --divisor_position;
+  );
+
+  new_arr[iter]=i[#-2,0];
+  new_arr;
+  "
+
+ remove[-2--1]
+fi
+#@cli rep_find_partial_permutation_lexicographic_index: number_of_items,number_list
+#@cli : Return the lexicographic index in which this permutation is found within a list of all possible permutations.
+#@cli :
+#@cli : number_list must be in the form of 0,1,2,3.... , but can be in any order. However, the size of it must be less than or equal to number_of_items. That means you can exclude some numbers.
+rep_find_partial_permutation_lexicographic_index:
+check "($#-1)<=$1"
+n_items,n_list_size={[$1>1,$#-1]}
+if $#==2&&$n_items status {$2%#1}
+elif $#>2&&$n_items
+ (${2--1})
+ if iM>=$1||im<0 error value_ranges fi
+ +fill[-1] isint(i)
+ if !im error non_int fi
+ remove[-1]
+ +colormap[-1] 0
+ if w#-2!=w#-1 error dup_values fi
+ remove[-2,-1]
+
+ {1+($1==$n_list_size?$1-2:min($1-1,$n_list_size-1))},1,1,1,>"begin(
+   const m=($1==$n_list_size?1:$1-$n_list_size)+1;
+   v=m;
+  );
+  x>1?v=v*(m+x-1):(x?v:1);"
+
+ eval "
+   const n_list_size=min($n_list_size,$1-1);
+   iv=[${2--1}];
+   p=0;
+   repeat(n_list_size,k,
+    v=iv[k];
+    repeat(k,m,
+     if(iv[m]<iv[k],--v);
+    );
+    p+=v*i[#-1,(n_list_size-k-1)];
+   );
+   p;
+  "
+
+ rm.
+
+else status 0
+fi
 #@cli rep_inverse_permutation: number_list
 #@cli : Return the inverse permutation.
 #@cli :
@@ -5103,7 +5256,7 @@ rep_compb: rep_complexion_burst $*
 #@cli : Complex-Plane adaptation of the Pickover Popcorn Fractal. Discovered By Reptorian.\n
 #@cli : _points defines the maximum number of points to be added on image based on pixel location.
 #@cli : _density defines the frequency of points to be added along row and height of image. A value of one implies n points to be added per pixel.
-#@cli : _H is the function multiplier used to subtract from the new found values from each iteration. Use "[H_A,H_B]" and replace 
+#@cli : _H is the function multiplier used to subtract from the new found values from each iteration. Use "[H_A,H_B]" and replace
 #@cli : _K is the inner multiplier for the inside function. Use "[K_A,K_B]" and replace each K_ with a number. See popcorn_x(a,b), and popcorn_y(a,b) embedded within the code of rep_popcorn_fractal for more information.
 #@cli : _zoom defines the magnification of image. A negative value will "shrink" the structure of generated fractal.
 #@cli : _rotation_angle defines the function angle of fractal.
