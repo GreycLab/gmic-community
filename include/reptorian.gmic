@@ -3664,305 +3664,165 @@ eval "
  );
 
  idx;"
-#@cli rep_variable_combinations: number_of_items_a,number_of_items_b,...,_axis{x,y,z}
-#@cli : Generates variable combinations. Zero items count as a item.
-#@cli : Default values: '_axis=x'
-rep_variable_combinations:
-check "[${1--2}]==int([${1--2}])"
+#@cli rep_r_permutations: number_of_items, repetition,_axis={ x|y|z} : -number_of_items>0, occurance_per_items,_axis={ x|y|z}
+#@cli : Create image representing permutations with repeating numbers.
+rep_r_permutations:
+skip ${3=x}
 
-if find(abs([${1--2}]),0,0,1)+1 error inv_num fi
+check "($1&&isint($1))&&isint($2)>0&&inrange(_'$3',_'x',_'z',1,1)"
 
-if narg($-1)
- if v='$-1';a=size(v)==1;b=inrange((v)[0],_'x',_'z',1,1);!(a&&b)
-  error inv_axis_inp
- fi
- axis={_'$-1'-_'x'}
-else
- axis=1
-fi
+mode,ss,num_of_permutations,axis={pm=$1>0;[pm,pm?[$2,$1^$2]:[abs($1),$2^abs($1)],_'$3'-_'x']}
 
-num_of_combinations={v=abs([${1--2}]);prod(v)}
+if $num_of_permutations>(768*$_cpus) p_mode=: fi
 
-if $num_of_combinations==1 {$#-1} return fi
+out_dim={v=[1,1,1];v[$axis]=$num_of_permutations;v;}
 
-if $num_of_combinations>16777216 error excess_combina fi
-
-if $num_of_combinations>3125 mode=:
-else mode=>
-fi
-
-outdim={v=vector(#3,1);v[$axis]=$num_of_combinations;v;}
-
-$outdim,{$#-1},$mode"begin(
+$out_dim,$ss,$p_mode"
+ begin(
   const axis=$axis;
-  const d_s=s-1;
-  items_list=abs([${1--2}]);
-  div_list=vector(#s,0);
-  div_list[0]=tv=1;
-  repeat(d_s,p,
-   div_list[p+1]=tv*=items_list[d_s-p];
+  const mode=$mode;
+  mode?(
+   const mod_factor=$1;
+   div_list=reverse(expr('$1^x',$2));
+  ):(
+   const mod_factor=$2;
+   div_list=reverse(expr('$2^x',abs($1)));
   );
-  div_list=reverse(div_list);
   axis==2?(index()=z;):
   axis==1?(index()=y;):
            index()=x;
  );
- int(index()/div_list)%items_list;
- "
-#@cli rep_extract_variable_combination: index,number_of_items_a,number_of_items_b,...
-#@cli : Return the combination at index for specified variable combination.
-rep_extract_variable_combination:
+ int(index()/div_list)%mod_factor;"
+ 
+#@cli rep_r_permutations_index2list: number_of_items, repetition, position : -number_of_items, occurance_per_items, position
+#@cli : Return the list of numbers which correspond to the index provided based on permutations with repetition.
+rep_r_permutations_index2list:
+check "v=[$*];size(v)==$#&&sum(isint(v))==3&&min((v)[0,2])&&$2>0;"
 
 eval "
- items_list=int(abs([${2--1}]));
-
- if(find(items_list,0,0,1)+1,run('error zero_num_err'););
-
- index=$1%prod(items_list);
- const group_count=size(items_list);
- const dec_group_count=group_count-1;
-
- div_list=vector(#group_count,0);
- div_list[0]=tv=1;
-
- repeat(dec_group_count,p,
-  div_list[p+1]=tv*=items_list[dec_group_count-p];
+ const mode=$1>0;
+ mode?(
+  const mod_factor=$1;
+  const size_of_list=$1^$2;
+  div_list=reverse(expr('$1^x',$2));
+ ):(
+  const mod_factor=$2;
+  const size_of_list=$2^abs($1);
+  div_list=reverse(expr('$2^x',abs($1)));
  );
+ const position=$3%size_of_list;
+ int(position/div_list)%mod_factor;"
+ 
+#@cli rep_r_permutations_list2index:
+#@cli : Return the lexicographic index in which the list of numbers corresponds to the lexicographically-ordered list of permutations with repetitions.
+rep_r_permutations_list2index:
+check "(sum([${2--1}]>=0)==($#-1))&&(sum(isint([${1--1}]))==$#)"
 
- div_list=reverse(div_list);
+eval "
+ const mode=$1>0;
+ mode?(
+  const mod_factor=$1;
+  mul_list=reverse(expr('$1^x',$2));
+ ):(
+  const mod_factor=$2;
+  mul_list=reverse(expr('$2^x',abs($1)));
+ );
+ sum(mul_list*([${3--1}]%mod_factor));"
 
- int(index/div_list)%items_list;
- "
-#@cli rep_find_variable_combination_lexicographic_index: number_of_items_a,...,combination_a,...
-#@cli : Return the lexicographic index in which this combination is found within a list of all combinations possible.
-#@cli :
-#@cli : Note: There must be equal amount of number_of_items, and combination_number.
-rep_find_variable_combination_lexicographic_index:
+#@cli rep_cartesian_product: number_of_items_a,number_of_items_b,...,_axis : -number_of_items,occurance_per_items,_axis  : number_of_items,_axis 
+#@cli : Output image representing cartesian product based on input.
+#@cli : Default values: '_axis=x'
++rep_cartesian_product:
+skip ${2=x}
+
+if isnum($-1)&&isint($-1)
+ axis,user_xyz=0
+elif inrange(_'$-1',_'x',_'z',1,1)
+ axis,user_xyz={_'$-1'-_'x'},1
+else 
+ error invalid_char
+fi
+
+vars2chk={$#-$user_xyz}
+v_list={abs(([$*])[0,$vars2chk])}
+n_vars_isint,all_valid={v=[$v_list];[sum(isint(v)),min(v)]}
+
+if !$all_valid error var_0_error fi
+if $n_vars_isint!=$vars2chk invalid_var_inp fi
+
+dims,s_size={v=[$v_list];[prod(v),size(v)];}
+
+if $dims>33554432 error dims_lim_exc fi
+if $dims>(768*$_cpus) p_mode=: fi
+
+dims={v=vector(#3,1);v[$axis]=$dims;v;}
+
+if max($v_list)==1 1,1,1,$s_size return 
+elif $s_size==1 $dims,1,${arg\ $axis+1,x,y,z} return
+fi
+
+$dims,$s_size,$p_mode"
+ begin(
+  const axis=$axis;
+  const mode=$mode;
+  const d_s=s-1;
+  const dec_d_s=d_s-1;
+  items_list=["$v_list"];
+  div_list=vector(#s,1);
+  tv=1; 
+  repeat(d_s,p,
+   div_list[dec_d_s-p]=tv*=items_list[d_s-p];
+  );
+  axis==2?(index()=z;):
+  axis==1?(index()=y;):
+           index()=x;
+ );
+ int(index()/div_list)%items_list;"
+ 
+#@cli rep_cartesian_product_index2list: number_of_items_a,number_of_items_b,...,index
+#@cli : Return the list of numbers which correspond to the index provided. Every arguments must be a integer.
+rep_cartesian_product_index2list:
+check "sum(isint([$*]))==$#"
+
+max_int={max(abs([${1--2}]))}
+
+if $max_int==1
+ status {vector(#($#-1),0)} return
+elif !$max_int 
+ error var_0_error
+fi
+
+eval "
+ const size_of_array=$#-1;
+ const d_s=size_of_array-1;
+ const dec_d_s=d_s-1;
+ items_list=abs([${1--2}]);
+ position=$-1%prod(items_list);
+ div_list=vector(#size_of_array,1);
+ tv=1; 
+ repeat(d_s,p,
+  div_list[dec_d_s-p]=tv*=items_list[d_s-p];
+ );
+ int(position/div_list)%items_list;"
+ 
+#@cli rep_cartesian_product_list2index: number_of_items_a,number_of_items_b,...,coordinate_a,coordinate_b,...
+#@cli : Return the index in which the coordinates is seen in a box of size number_of_items_a*number_of_items_b....
+rep_cartesian_product_list2index:
 if $#&1 error inv_args_count fi
 
 eval "
  const half_list_size=$#>>1;
  const dec_half_list_size=half_list_size-1;
  mul_items=int(abs(([${1--1}])[0,half_list_size]));
- combinations=int(abs(([${1--1}])[half_list_size,half_list_size]));
- combinations%=mul_items;
+ position=int(abs(([${1--1}])[half_list_size,half_list_size]));
+ position%=mul_items;
  mul_items=shift(mul_items,-1,0);
  ++mul_items[dec_half_list_size];
  tv=1;
  repeat(half_list_size,p,
   tv=mul_items[dec_half_list_size-p]*=tv;
  );
- mul_items;
- sum(mul_items*combinations);
- "
-#@cli rep_full_combinations: 0<=number_of_items<9,_axis={x|y|z}
-#@cli : Generates all combinations that are equal to size of input in number of items and occurances.
-#@cli : Default values:'_axis=x'
-+rep_full_combinations:
-skip ${2=x}
-
-check "inrange($1,0,8,1,1)&&$1==int($1)&&inrange(_'$2',_'x',_'z',1,1)"
-
-if !$1||$1==1 1 return fi
-
-if $1>5 mode=:
-else mode=>
-fi
-
-num_of_combinations,axis={$1^$1},{_'$2'-_'x'}
-
-if $axis==2   out_dim=1,1,$num_of_combinations
-elif $axis==1 out_dim=1,$num_of_combinations,1
-else          out_dim=$num_of_combinations,1,1
-fi
-
-$out_dim,$1,$mode"
- begin(
-  const arr_size=$1;
-  const sub_arr_size=arr_size-1;
-  const axis=$axis;
-  axis==2?(
-   first_pos()=z%arr_size;
-   consec_pos()=int(z/dividier);
-  ):
-  axis==1?(
-   first_pos()=y%arr_size;
-   consec_pos()=int(y/dividier);
-  ):(
-   first_pos()=x%arr_size;
-   consec_pos()=int(x/dividier);
-  );
- );
- dividier=arr_size;
- combination=vector(#arr_size,0);
- combination[0]=first_pos();
- repeat(sub_arr_size,p,
-  ip=p+1;
-  combination[ip]=consec_pos()%arr_size;
-  dividier*=arr_size;
- );
- combination;"
-
-mirror. c
-#@cli rep_extract_full_combination_order: number_of_item,combination_number
-#@cli : Return full combination order at index full_combination_number.
-rep_extract_full_combination_order:
-check "$1>=0&&isint($1)"
-
-if !$1||$1==1 u 0 return fi
-
-num_of_combinations={$1^$1}
-combination_number={$2%$num_of_combinations}
-
-eval "
- const arr_size=$1;
- const sub_arr_size=arr_size-1;
- const combination_number=$combination_number
-
- dividier=arr_size;
- combination=vector(#arr_size,0);
- combination[0]=combination_number%arr_size;
-
- repeat(sub_arr_size,p,
-  ip=p+1;
-  combination[ip]=int(combination_number/dividier)%arr_size;
-  dividier*=arr_size;
- );
-
- reverse(combination);"
-#@cli rep_find_full_combination_lexicographic_index: number_list
-#@cli : Return the lexicographic index in which this combination is found within a list of all combinations that is the size of the list itself.
-rep_find_full_combination_lexicographic_index:
-if $#>1
- if inrange([$*],0,$#,1,0)==vector(#$#,1)
-  eval "
-   v=0;
-   const arr_size=$#;
-   arr=reverse([$*]);
-   multiplier=arr_size;
-   repeat(arr_size,p,
-    p?(
-     v+=arr[p]*multiplier;
-     multiplier*=arr_size;
-    ):(
-     v+=arr[p];
-    );
-   );
-   v;"
- else
-  error inv_args
- fi
-else
- u 0
-fi
-#@cli rep_combinations: 0<=number_of_items,occurance>0,_axis={x|y|z}
-#@cli : Generates combinations of items with specified occurance for all items.
-#@cli : Note: Null occurance counts as a occurance.
-#@cli : Default values: '_axis=x'
-+rep_combinations:
-skip ${3=x}
-
-check "($1>0&&isint($1))&&($2>0&&isint($2))&&inrange(_'$3',_'x',_'z',1,1)"
-
-if !$2 $1 return fi
-
-num_of_combinations,axis={$2^$1},{_'$3'-_'x'}
-
-if $num_of_combinations>3125 mode=:
-else mode=>
-fi
-
-if $axis==2   out_dim=1,1,$num_of_combinations
-elif $axis==1 out_dim=1,$num_of_combinations,1
-else          out_dim=$num_of_combinations,1,1
-fi
-
-$out_dim,$1,$mode"
- begin(
-  const occurance=$2;
-  const sub_occurance=occurance-1;
-  const log_occurance=log(occurance);
-  const axis=$axis;
-  axis==2?(
-   index()=z;
-   first_pos()=z%occurance;
-   consec_pos()=int(z/dividier);
-  ):
-  axis==1?(
-   index()=y;
-   first_pos()=y%occurance;
-   consec_pos()=int(y/dividier);
-  ):(
-   index()=x;
-   first_pos()=x%occurance;
-   consec_pos()=int(x/dividier);
-  );
- );
- dividier=occurance;
- combination=vector(#$1,0);
- combination[0]=first_pos();
- repeat(int(log(index())/log_occurance),p,
-  ip=p+1;
-  combination[ip]=consec_pos()%occurance;
-  dividier*=occurance;
- );
- combination;
- "
-
-mirror. c
-#@cli rep_extract_combination_order: number_of_items>0,occurance>0,combination
-#@cli : Return combination order assuming number of items and their max occurance at index.
-#@cli : Note: Null occurance counts as a occurance.
-rep_extract_combination_order:
-check "($1>0&&isint($1))&&($2>0&&isint($2))&&isint($3)"
-
-num_of_combinations={$2^$1}
-combination_number={$3%$num_of_combinations}
-
-eval "
-  const occurance=$2;
-  const sub_occurance=occurance-1;
-  const log_occurance=log(occurance);
-  const combination_number=$combination_number;
-  consec_pos()=int(combination_number/dividier);
-
-  dividier=occurance;
-  combination=vector(#$1,0);
-  combination[0]=$combination_number%occurance;
-
-  repeat(int(log(combination_number)/log_occurance),p,
-   ip=p+1;
-   combination[ip]=consec_pos()%occurance;
-   dividier*=occurance;
-  );
-
-  reverse(combination)"
-#@cli rep_find_combination_lexicographic_index: occurance,number_list
-#@cli : Return the lexicographic index in which this combination is found.
-#@cli : Note: Null occurance counts as a occurance.
-rep_find_combination_lexicographic_index:
-check "$1>1&&(sum(isint([$*]))==$#)&&(max([${2--1}])<$1)"
-
-num_of_items={$#-1}
-
-eval "
- const num_of_items=$num_of_items;
- const occurance=$1;
-
- arr=reverse([${2--1}]);
-
- v=0;d=1;
-
- repeat(num_of_items,p,
-  p?(
-   v+=arr[p]*(d*=occurance);
-  ):(
-   v+=arr[p];
-  );
- );
-
- v;
- "
+ sum(mul_items*position);"
 #@cli rep_permutations: init_num,_axis={x,y,z}
 #@cli : Return all the permutations of set of numbers as a image.
 #@cli :
@@ -3998,34 +3858,26 @@ $out_dim,$1,$mode"
     swap(permutation[start++],permutation[end--]);
    );
   );
-  started=m=0;
-  fn=max_index;
-  init_array_size=s;
-  init_permutation=expr('x',s);
-  permutation=init_permutation;
+  started=0;
+  permutation=expr('x',s);
  );
 
  started?(
-  fn=max_index;
-
-  while(permutation[fn-1]>=permutation[fn],
-   --fn;
-   if(!fn,m=1;break(););
-  );
-
-  if(!m,
-   b=max_index;
-   while(b>fn&&permutation[b]<=permutation[fn-1],--b;);
-   swap(permutation[fn-1],permutation[b]);
-   reverse_array_starting_from(fn);
-  ,permutation=reverse(permutation);m;
-  );
-
+  fn=b=max_index;
+  while(permutation[fn-1]>=permutation[fn],--fn;if(!fn,break();););
+  while(b>fn&&permutation[b]<=permutation[fn-1],--b;);
+  swap(permutation[fn-1],permutation[b]);
+  reverse_array_starting_from(fn);
  ):(
 
   index=index();
 
   if(index,
+
+   fn=max_index;
+   init_array_size=s;
+   init_permutation=permutation;
+
    repeat(fn,iter,
     division_number=fact(fn);
     pos=int(index/division_number);
@@ -4337,7 +4189,7 @@ if !${} error inv_dims fi
 
 a z
 
-+rep_full_combinations $timg,z
++rep_r_permutations $timg,$timg,z
 permute. cyzx
 
 {w#0*d#0},{h#0},{d#-1},{s#0}
@@ -28371,7 +28223,7 @@ if $28||$29||$30||$31
   else
    index=${arg\ $num_of_rand_bin_a_digits,${16-19}}
    binary_string_a_ind_{$num_of_rand_bin_a_digits-1},temp={a=int(u(0,2^$num_of_rand_bin_a_digits,1,0));a==$index?(a+1)%(2^$num_of_rand_bin_a_digits):a;}
-   (${rep_extract_combination_order\ $num_of_rand_bin_a_digits,2,$temp})
+   (${rep_r_permutations_index2list\ 2,$num_of_rand_bin_a_digits,$temp})
    +. 48
    bin_a={t}
    rm.
@@ -28386,7 +28238,7 @@ if $28||$29||$30||$31
   else
    index=${arg\ $num_of_rand_bin_b_digits,${20-23}}
    binary_string_b_ind_{$num_of_rand_bin_b_digits-1},temp={b=int(u(0,2^$num_of_rand_bin_b_digits,1,0));b==$index?(b+1)%(2^$num_of_rand_bin_b_digits):b;}
-   (${rep_extract_combination_order\ $num_of_rand_bin_b_digits,2,$temp})
+   (${rep_r_permutations_index2list\ 2,$num_of_rand_bin_b_digits,$temp})
    +. 48
    bin_b={t}
    rm.
@@ -28401,7 +28253,7 @@ if $28||$29||$30||$31
   else
    index=${arg\ $num_of_rand_bin_c_digits,${24-27}}
    binary_string_c_ind_{$num_of_rand_bin_c_digits-1},temp={c=int(u(0,2^$num_of_rand_bin_c_digits,1,0));c==$index?(c+1)%(2^$num_of_rand_bin_c_digits):c;}
-   (${rep_extract_combination_order\ $num_of_rand_bin_c_digits,2,$temp})
+   (${rep_r_permutations_index2list\ 2,$num_of_rand_bin_c_digits,$temp})
    +. 48
    bin_c={t}
    rm.
@@ -28415,17 +28267,17 @@ elif $neq_bin
 
  if $neq_bin_a
   num_of_rand_bin_a_digits=$bin_a_size
-  binary_string_a_ind_{$num_of_rand_bin_a_digits-1}=${rep_find_combination_lexicographic_index\ 2,{['$4']-48}}
+  binary_string_a_ind_{$num_of_rand_bin_a_digits-1}=${rep_r_permutations_list2index\ 2,$num_of_rand_bin_a_digits,{['$4']-48}}
  fi
 
  if $neq_bin_b
   num_of_rand_bin_b_digits=$bin_b_size
-  binary_string_b_ind_{$num_of_rand_bin_b_digits-1}=${rep_find_combination_lexicographic_index\ 2,{['$5']-48}}
+  binary_string_b_ind_{$num_of_rand_bin_b_digits-1}=${rep_r_permutations_list2index\ 2,$num_of_rand_bin_b_digits,{['$5']-48}}
  fi
 
  if $neq_bin_c
   num_of_rand_bin_c_digits=$bin_c_size
-  binary_string_c_ind_{$num_of_rand_bin_c_digits-1}=${rep_find_combination_lexicographic_index\ 2,{['$6']-48}}
+  binary_string_c_ind_{$num_of_rand_bin_c_digits-1}=${rep_r_permutations_list2index\ 2,$num_of_rand_bin_c_digits,{['$6']-48}}
  fi
 
 else
@@ -28458,7 +28310,7 @@ else
     else
 
      if $left_arg!=$right_arg
-      (${rep_extract_combination_order\ $num_of_digits,2,$left_arg})
+      (${rep_r_permutations_index2list\ 2,$num_of_digits,$left_arg})
       +. 48
       bin_$a_b={t}
       num_of_rand_bin_$a_b"_digits"=$num_of_digits
@@ -28480,7 +28332,7 @@ else
     num_of_digits={$>+1}
 
     if $left_arg!=$right_arg
-     (${rep_extract_combination_order\ $num_of_digits,2,$left_arg})
+     (${rep_r_permutations_index2list\ 2,$num_of_digits,$left_arg})
      +. 48
      bin_c={t}
      num_of_rand_bin_c_digits=$num_of_digits
@@ -28496,13 +28348,13 @@ else
  elif !$started
 
   num_of_rand_bin_a_digits=$bin_a_size
-  binary_string_a_ind_{$num_of_rand_bin_a_digits-1}=${rep_find_combination_lexicographic_index\ 2,{['$4']-48}}
+  binary_string_a_ind_{$num_of_rand_bin_a_digits-1}=${rep_r_permutations_list2index\ 2,$num_of_rand_bin_a_digits,{['$4']-48}}
 
   num_of_rand_bin_b_digits=$bin_b_size
-  binary_string_b_ind_{$num_of_rand_bin_b_digits-1}=${rep_find_combination_lexicographic_index\ 2,{['$5']-48}}
+  binary_string_b_ind_{$num_of_rand_bin_b_digits-1}=${rep_r_permutations_list2index\ 2,$num_of_rand_bin_b_digits,{['$5']-48}}
 
   num_of_rand_bin_c_digits=$bin_c_size
-  binary_string_c_ind_{$num_of_rand_bin_c_digits-1}=${rep_find_combination_lexicographic_index\ 2,{['$6']-48}}
+  binary_string_c_ind_{$num_of_rand_bin_c_digits-1}=${rep_r_permutations_list2index\ 2,$num_of_rand_bin_c_digits,{['$6']-48}}
 
  fi
 
