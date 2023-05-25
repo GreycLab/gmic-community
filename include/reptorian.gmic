@@ -3664,6 +3664,133 @@ eval "
  );
 
  idx;"
+#@cli rep_r_combinations: number_of_items>0,choices>0,_axis={x,y,z}
+rep_r_combinations:
+skip ${3=x}
+
+check "($1>0&&$2>0)&&(isint($1)&&isint($2))&&inrange(_'$3',_'x',_'z',1,1)"
+
+n_items,choices=$1,$2
+num_combs,axis={permut($choices,$n_items+$choices-1,0)},{_'$3'-_'x'}
+
+if $axis==2   out_dim=1,1,$num_combs
+elif $axis==1 out_dim=1,$num_combs,1
+else          out_dim=$num_combs,1,1
+fi
+
+$out_dim,$choices,"
+ begin(
+  const n_items=$n_items;
+  const max_ind=s-1;
+  const axis=$axis;
+  axis==2?(index()=z;):
+  axis==1?(index()=y;):
+           index()=x;
+  comb=vector(#s,0);
+  cur_ind=max_ind-1;
+ );
+ if(index(),
+  val=++comb[max_ind];
+  if(val==n_items,
+   val=++comb[cur_ind];
+   val==n_items?(
+    --cur_ind;
+    while(++comb[cur_ind]==n_items,
+     --cur_ind;
+    );
+    val=comb[cur_ind];
+   );
+   copy(comb[cur_ind+1],val,max_ind-cur_ind,1,0); 
+   cur_ind=max_ind-1;
+  ); 
+ );
+ comb;"
+#@cli rep_r_combination_index2list: n,k,index
+#@cli : Return the list of numbers which correspond to the index provided based on a list of all possible combinations with repetition.
+#@cli : Author : Reptorian.
+rep_r_combination_index2list:
+check "sum(isint([${1-2}]))==2&&$1>0&&$2>0&&$#==3"
+
+eval "
+ const n=$1;
+ const k=$2;
+ const d_k=k-1;
+ const num_of_combs=permut($2,$1+$2-1,0);
+ index=$3%$num_of_combs;
+ Tc=n-1;
+ calc_approximate_n(v,r)=ceil((v*fact(r)-r)^(1/r));
+ 
+ output_list=vector(#k,0);
+ !index?(
+  output_list;
+ ):
+ index==(num_of_combs-1)?(
+  output_list=vector(#k,n-1);
+ ):(
+  loop_count=0;
+  
+  index<n?(
+   output_list[d_k]=index;
+   output_list;
+  ):(
+   while(index&&Tc,
+    
+    FTn=Tn=calc_approximate_n(index,Tc)-Tc;
+    last_n=permut(Tc,Tc+Tn,0);
+    ncr_val=0;
+    
+    while(ncr_val<=index&&Tc,
+     ncr_val=permut(Tc,Tc+Tn,0);
+     if(ncr_val<=index,
+      last_n=ncr_val;
+      ++FTn;
+     );
+     ++Tn;
+    );
+    
+    index-=last_n;
+    --Tc;
+    copy(output_list[d_k],1,FTn,-1,0,-1);
+   );
+   
+   output_list;
+  );
+ );"
+#@cli rep_r_combination_list2index: number_of_items,index_a,index_b,...
+#@cli : Return the index which correspond to the list of numbers provided based on a list of all possible combinations with repetition.
+#@cli : Note: All numbers must be in range [0,number_of_items). They must be in integer only.
+#@cli : Author : Reptorian.
+rep_r_combination_list2index:
+check "const v=$#;sum(isint([$*]))==v&&$1>-1&&(sum(inrange([${2--1}],0,$1,1,0))==v-1)"
+
+if !$1
+ status nan return
+elif $#-1==1
+ status {$2%$1} return
+elif !sum(${2--1})
+ status 0 return
+fi
+
+eval "
+ const n_items=$1;
+ const max_ind=n_items-1;
+ const kv=$#-1;
+ series_of_indexes=sort([${2--1}]);
+ Tc=kv;
+ index=0;
+ a=permut(kv,n_items+kv-1,0); 
+ repeat(kv-1,p,
+  v_ind_p=series_of_indexes[p];
+  diff=kv-v_ind_p;
+  sum_nd=n_items+diff-p;
+  b=permut(Tc,sum_nd-1,0);
+  index+=a-b;
+  if(v_ind_p==max_ind,break(););
+  a=b-permut(Tc,sum_nd-2,0);  
+  --Tc;
+ );
+ index+=series_of_indexes[kv-1]-series_of_indexes[kv-2];
+ index;"
 #@cli rep_r_permutations: number_of_items, repetition,_axis={ x|y|z} : -number_of_items>0, occurance_per_items,_axis={ x|y|z}
 #@cli : Create image representing permutations with repeating numbers.
 rep_r_permutations:
