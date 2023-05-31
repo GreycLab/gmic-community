@@ -1,195 +1,176 @@
-﻿# G’MIC 3.2.5 : 15 ans de développement pour du traitement d’images libre et reproductible
+﻿# G’MIC 3.2.5 : 15 years of development for open and reproducible image processing
 
-À l’occasion de la sortie de la version **3.2.5** de [_G’MIC_](https://gmic.eu) (_GREYC’s Magic for Image Computing_), [cadriciel](https://fr.wikipedia.org/wiki/Framework) libre pour [le traitement des images](https://fr.wikipedia.org/wiki/Traitement_d%27images), nous vous proposons un récapitulatif des nouvelles fonctionnalités implémentées depuis notre [précédente dépêche](https://linuxfr.org/news/sortie-de-g-mic-3-0-une-troisieme-dose-pour-un-traitement-efficace-de-vos-images) (publiée en décembre 2021). C’est aussi pour nous l’opportunité de célébrer les **15 ans** d’existence du projet !
+To celebrate the release of version **3.2.5** of [_G’MIC_](https://gmic.eu) (_GREYC’s Magic for Image Computing_), an open [framework](https://en.wikipedia.org/wiki/Software_framework) for [digital image processing](https://en.wikipedia.org/wiki/Digital_image_processing), we present you with a summary of the new features implemented since our [previous report](https://linuxfr.org/news/sortie-de-g-mic-3-0-une-troisieme-dose-pour-un-traitement-efficace-de-vos-images) (published during December of 2021). It is also the opportunity for us to celebrate the project's **15 years** of existence!
 
-_G’MIC_ est développé à [Caen](https://fr.wikipedia.org/wiki/Caen), en France, dans l’équipe [_IMAGE_](https://www.greyc.fr/image) du [_GREYC_](https://www.greyc.fr), un laboratoire public de recherche en Sciences et Technologies de l’Information et de la Communication (Unité Mixte de Recherche [_CNRS_](https://www.cnrs.fr/) / [_ENSICAEN_](https://www.ensicaen.fr/) / [Université de Caen](https://www.unicaen.fr/)). Il est distribué sous licence libre [_CeCILL_](http://www.cecill.info/licences/Licence_CeCILL_V2.1-fr.html).
+_G’MIC_ is being developed in [Caen](https://en.wikipedia.org/wiki/Caen), in France, by the [_IMAGE_](https://www.greyc.fr/image) team  of [_GREYC_](https://www.greyc.fr), a public research lab in Information and Communication Sciences and Technologies (Joint Research Unit [_CNRS_](https://www.cnrs.fr/) / [_ENSICAEN_](https://www.ensicaen.fr/) / [Université de Caen](https://www.unicaen.fr/)). It is distributed under the free [_CeCILL_](http://www.cecill.info/licences/Licence_CeCILL_V2.1-en.html) licence.
 
 [![gmic_teaser](https://gmic.eu/gmic325/thumbs/greyc.png)](https://gmic.eu/gmic325/img/greyc.jpg)
 
-Dans cette dépêche, nous détaillerons quelques-unes des fonctionnalités récemment ajoutées, et nous les illustrerons par des exemples de traitement et de synthèse d’images 2D et 3D.
+In this report, we will explain in detail a few of the recently added features, and illustrate them with examples of 2D and 3D image processing and synthesis.
 
-_N. D. A. : Cliquez sur les images pour en obtenir une version en pleine résolution, ou un lien vers la vidéo, pour Les images contenant l’icône ![play_video](https://gmic.eu/gmic325/thumbs/icon_play_video.png)_
+_A. N. : Click on images to see a full resolution version, or a link to the video for images showing the icon ![play_video](https://gmic.eu/gmic325/thumbs/icon_play_video.png)_
 
 ----
 
-* [Le projet G’MIC](https://gmic.eu)
-* [Fil Mastodon des nouvelles du projet](https://piaille.fr/@gmic)
+* [The G’MIC project](https://gmic.eu)
+* [The Project's Mastodon news feed](https://piaille.fr/@gmic)
 * [Série d’articles G’MIC sur LinuxFr.org](https://linuxfr.org/tags/gmic/public)
 
 ----
 
-# 1. Qu’est ce que _G’MIC_ ?
+# 1. What is _G’MIC_ ?
 
 
-[_G’MIC_](https://gmic.eu) est un cadriciel (_framework_) libre pour la manipulation et le traitement des [images numériques](https://fr.wikipedia.org/wiki/Image_num%C3%A9rique). Il propose des interfaces utilisateur variées pour la manipulation algorithmique d’images et de signaux. Le cœur de ce projet repose sur l’implémentation d’un langage de script (le [_« langage G’MIC »_](https://gmic.eu/reference/overall_context.html)), élaboré spécifiquement pour faciliter le prototypage et l’implémentation de nouveaux algorithmes et opérateurs de traitement d’images. Les utilisateurs peuvent appliquer des opérateurs parmi plusieurs centaines déjà implémentées, mais ont également la possibilité d’écrire leurs propres pipelines de traitement et de les rendre accessibles dans les différentes interfaces utilisateur du projet. C’est donc, par essence, un cadriciel ouvert, extensible et en évolution constante.
+[_G’MIC_](https://gmic.eu) is an open [digital image](https://en.wikipedia.org/wiki/Digital_image) manipulation and processing framework. It provides various user interfaces allowing algorithmic manipulation of images and signals. The heart of this project is based on the implementation of a scripting language (the [_« G’MIC language »_](https://gmic.eu/reference/overall_context.html)),
+specifically designed to ease the prototyping and implementation of new image processing algorithms and operators. Users can apply operators among several hundreds already available, but they also have the capability of writing their own processing pipelines and making them available through the various user interfaces of the project. It is therefore, in essence, an open, expandable and constantly evolving framework.
+
+_G’MIC_'s most accomplished user interfaces are : [`gmic`](https://gmic.eu/reference/), the command line interface (useful addition to [_ImageMagick_](https://www.imagemagick.org/) or [_GraphicsMagick_](http://www.graphicsmagick.org) for people who like to use the terminal), the Web service [_G’MIC Online_](https://gmicol.greyc.fr/), and above all, the plug-in [_G’MIC-Qt_](https://github.com/c-koi/gmic-qt), which can be used in numerous popular image editing software such as [_GIMP_](https://www.gimp.org), [_Krita_](https://www.krita.org), [_DigiKam_](https://www.digikam.org), [_Paint.net_](https://www.getpaint.net), [_Adobe Photoshop_](https://en.wikipedia.org/wiki/Adobe_Photoshop), [_Affinity Photo_](https://en.wikipedia.org/wiki/Affinity_Photo)…
+This plug-in is very easy to use and now provides more than **580 processing filters** to augment these image manipulation software.
+
+[![Greffon G’MIC-Qt](https://gmic.eu/gmic325/thumbs/gmic_qt_325.png)](https://gmic.eu/gmic325/img/gmic_qt_325.jpg) _Fig. 1.1. Preview of the G’MIC-Qt plug-in, in version **3.2.5**, here launched from GIMP 2.10._
 
 
-Les interfaces utilisateurs de _G’MIC_ les plus abouties sont : [`gmic`](https://gmic.eu/reference/), l’interface en ligne de commande (complément utile à [_ImageMagick_](https://www.imagemagick.org/) ou [_GraphicsMagick_](http://www.graphicsmagick.org) pour ceux qui aiment utiliser le terminal), le service Web [_G’MIC Online_](https://gmicol.greyc.fr/), et surtout, le greffon [_G’MIC-Qt_](https://github.com/c-koi/gmic-qt), utilisable dans de nombreux logiciels populaires d’édition d’images numériques tels que [_GIMP_](https://www.gimp.org), [_Krita_](https://www.krita.org), [_DigiKam_](https://www.digikam.org), [_Paint.net_](https://www.getpaint.net), [_Adobe Photoshop_](https://fr.wikipedia.org/wiki/Adobe_Photoshop), [_Affinity Photo_](https://fr.wikipedia.org/wiki/Affinity_Photo)… Ce greffon, très facile à utiliser, propose aujourd’hui plus de **580 filtres** de traitement pour enrichir ces logiciels de manipulation d’images.
+Thanks to its dedicated scripting language, new filters and effects are regularly added to _G’MIC_.
 
 
-[![Greffon G’MIC-Qt](https://gmic.eu/gmic325/thumbs/gmic_qt_325.png)](https://gmic.eu/gmic325/img/gmic_qt_325.jpg) _Fig. 1.1. Aperçu du greffon G’MIC-Qt, en version **3.2.5**, ici lancé depuis GIMP 2.10._
+In this article, we will describe a few of these new filter effects and give some news about the project. We will also show some examples for the `gmic` command line tool, which is by far the most powerful interface provided by the project.
 
 
-Grâce à son langage de script dédié, de nouveaux filtres et effets pour le traitement d’images sont régulièrement ajoutés à _G’MIC_.
+# 2. New abstraction, _Glitch Art_ and pattern generation filters
 
 
-Dans cette dépêche, nous détaillerons quelques-uns de ces nouveaux traitements et donneront quelques nouvelles du projet. Nous donnerons également des exemples d’utilisation de l’outil en ligne de commande `gmic`, qui est de loin l’interface la plus puissante offerte par le projet.
+- To begin this new features report, let's mention the existence of a new transformation filter which converts images to [Line Art](https://en.wikipedia.org/wiki/Line_art) drawings. This filter, appropriately named **Artistic / Line Art** was conceived by [Claude Lion](https://github.com/cl4cnam), an external contributor who is already the author of multiple filters (such as the very appreciated **Artistic / Comic Book**, [already mentioned EN LINK?](https://linuxfr.org/news/sortie-de-g-mic-3-0-une-troisieme-dose-pour-un-traitement-efficace-de-vos-images#toc-21-effets-artistiques) in our previous article.
 
-# 2. Nouveaux filtres pour l’abstraction, le _Glitch Art_ et la génération de motifs
-
-
-- Pour commencer cette revue des nouveautés, mentionnons l’existence d’un nouveau filtre de transformation d’images sous la forme de dessins au trait (« [Line Art](https://en.wikipedia.org/wiki/Line_art) » en anglais). Ce filtre, opportunément nommé **Artistic / Line Art** a été élaboré par [Claude Lion](https://github.com/cl4cnam), contributeur extérieur déjà auteur de plusieurs filtres (dont le très apprécié **Artistic / Comic Book** dont nous [avions déjà parlé](https://linuxfr.org/news/sortie-de-g-mic-3-0-une-troisieme-dose-pour-un-traitement-efficace-de-vos-images#toc-21-effets-artistiques) dans notre dépêche précédente).
-
-Ce filtre analyse la géométrie des structures principales dans les images et décide si ces structures doivent apparaître dans une image redessinée sur fond blanc, soit sous forme de traits noirs, soit sous forme d’applats gris ou noirs. Il fonctionne particulièrement bien avec des portraits, puisque les contrastes sont assez marqués dans ce type d’images.
+This filter anlyses the geometry of the main structures in images and decides if these structures should appear in a picture redrawn on a white background, either as black lines or as gray or black filled regions. It is particularly effective on portraits, since the contrasts are rather well marked marked in this type of images.
 
 
-[![filter_lineart](https://gmic.eu/gmic325/thumbs/filter_lineart.png)](https://gmic.eu/gmic325/img/filter_lineart.jpg) _Fig. 2.1. Le filtre **Artistic / Line Art**, tel qu’il apparaît dans le greffon G’MIC-Qt._
+[![filter_lineart](https://gmic.eu/gmic325/thumbs/filter_lineart.png)](https://gmic.eu/gmic325/img/filter_lineart.jpg) _Fig. 2.1. The **Artistic / Line Art** filter, as seen in the G’MIC-Qt plug-in._
 
 
-La visualisation interactive du greffon _G’MIC-Qt_ facilite le réglage de l’ensemble des paramètres du filtre, pour personnaliser le type de rendu souhaité. L’appui sur les boutons « _Apply_ » ou « _OK_ » applique le filtre sur l’image. Notons qu’une fois ces paramètres choisis, l’appui sur le bouton _« Copy to Clipboard »_ de l’interface du greffon va copier la commande _G’MIC_ correspondante dans le presse-papier.
+The interactive preview of the _G’MIC-Qt_ plug-in alleviates the adjustment of all the filter's settings to personalize the expected results. Pressing either the « _Apply_ » or « _OK_ » button applies the filter to the picture. Note that once these settings are selected, pressing the _« Copy to Clipboard »_ button in the plug-in's interface will copy the corresponding _G’MIC_ command to the clipboard.
 
 
-[![filter_lineart_zoom](https://gmic.eu/gmic325/thumbs/filter_lineart_zoom.png)](https://gmic.eu/gmic325/img/filter_lineart_zoom.jpg) _Fig. 2.2. Le bouton « Copy to Clipboard » copie dans le presse-papier la commande G’MIC correspondant à l’action du filtre._
+[![filter_lineart_zoom](https://gmic.eu/gmic325/thumbs/filter_lineart_zoom.png)](https://gmic.eu/gmic325/img/filter_lineart_zoom.jpg) _Fig. 2.2. The « Copy to Clipboard » button adds the G'MIC command corresponding to the filter's action to the clipboard._
 
 
-Pour appliquer ensuite le filtre avec les même paramètres sur d’autres images (par exemple pour du traitement par lot), il suffit de lancer `gmic` dans son terminal, en y ajoutant le nom du fichier image à traiter et la commande copiée préalablement dans le presse-papier, ce qui donnera par exemple :
+Then, to apply the effect with the same parameters on different images (for batch processing), all you need is to launch `gmic` in a terminal, add the filename of the image to process, followed by the command previously copied to the clipboard, which will give something like this:
 
 ```sh
 $ gmic autre_portrait.jpg cl_lineart 0,0,2,1,15,15,1,0,6,2,2,0,0,0,50,50 output lineart.png
 ```
 
 
+This method is useful when one wants to use certain _G’MIC_ effects inside personalized scripts (this obviously works with all the filters available in the plug-in).
 
 
-
-Cette astuce est utile quand on souhaite utiliser certains effets _G’MIC_ simplement dans des scripts personnalisés (cela fonctionne évidemment avec tous les filtres disponibles dans le greffon).
-
-
-[![lineart](https://gmic.eu/gmic325/thumbs/lineart.png)](https://gmic.eu/gmic325/img/lineart.jpg) _Fig. 2.3. Le filtre « Line Art », appliqué sur une autre image de portrait, avec les mêmes paramètres, depuis le terminal._
+[![lineart](https://gmic.eu/gmic325/thumbs/lineart.png)](https://gmic.eu/gmic325/img/lineart.jpg) _Fig. 2.3. The « Line Art » filter, applied on another portrait image, with the same settings, from the terminal._
 
 
-[![lineart](https://gmic.eu/gmic325/thumbs/lineart2.png)](https://gmic.eu/gmic325/img/lineart2.jpg) _Fig. 2.4. Le filtre « Line Art », appliqué sur d’autres images d’exemples._
+[![lineart](https://gmic.eu/gmic325/thumbs/lineart2.png)](https://gmic.eu/gmic325/img/lineart2.jpg) _Fig. 2.4. The « Line Art » filter, applied on a few other example images._
 
 
-- Passons maintenant au filtre **Degradations / Huffman Glitches**, un moyen amusant de générer du [_Glitch Art_](https://fr.wikipedia.org/wiki/Glitch_art). Plus précisément, on va simuler ici des artéfacts de décompression d’images via l’ajout volontaire d’erreurs (inversions de bits) dans les [codes d’Huffman](https://fr.wikipedia.org/wiki/Codage_de_Huffman) qui auraient été utilisés pour la compression sans perte des données de l’image d’entrée. Cela produit des distorsions numériques visibles sur l’image lors de la décompression des données bruitées, distorsions qui sont justement des effets recherchés par les amateurs de _Glitch Art_ !
+- Now, let's take a look at the **Degradations / Huffman Glitches** filter, a fun way to generate [_Glitch Art_](https://en.wikipedia.org/wiki/Glitch_art). More precisely, here we will simulate image decompression artifacts with the deliberate addition of errors (bits inversion) in the [Huffman codes](https://en.wikipedia.org/wiki/Huffman_coding) which would have been used for the lossless compression of the input picture's data. This produces visible digital distortions on the picture when the altered data is decompressed, distortions which actually are the effects sought by the _Glitch Art_ aficionados!
 
-[![huffman_glitches](https://gmic.eu/gmic325/thumbs/huffman_glitches.png)](https://gmic.eu/gmic325/img/huffman_glitches.jpg) _Fig. 2.5. Le filtre **Degradations / Huffman Glitches**, tel qu’il apparaît dans le greffon G’MIC-Qt._
-
-
-Ce filtre permet la génération d’artéfacts de compression avec des variations : bloc par bloc, ligne par ligne, colonne par colonne, ou sur des données image encodées dans des espaces couleur différents de _RGB_. Au final, la variété des anomalies qu’il est possible de produire est assez importante, comme illustré par la figure suivante :
+[![huffman_glitches](https://gmic.eu/gmic325/thumbs/huffman_glitches.png)](https://gmic.eu/gmic325/img/huffman_glitches.jpg) _Fig. 2.5. The **Degradations / Huffman Glitches** filter, as seen in the G’MIC-Qt plug-in._
 
 
-[![huffman_glitches2](https://gmic.eu/gmic325/thumbs/huffman_glitches2.png)](https://gmic.eu/gmic325/img/huffman_glitches2.jpg) _Fig. 2.6. Quelques variations des paramètres du filtre **Degradations / Huffman Glitches**._
+This filter allows the generation of compression artifacts with variations : block by block, line by line, column by column, or on image data encoded in color spaces other than _RGB_. Ce filtre permet la génération d’artéfacts de compression avec des variations : bloc par bloc, ligne par ligne, colonne par colonne, ou sur des données image encodées dans des espaces couleur différents de _RGB_. In the end, the diversity of anomalies it is possible to produce is quite large, as depicted on the following figure:
 
 
-Là encore, il est facile de récupérer la commande _G’MIC_ correspondant à l’application du filtre, pour l’utiliser dans un script, par exemple pour l’application de cet effet sur toutes les _frames_ d’une vidéo (cliquez sur l’image ci-dessous pour visualiser la vidéo) :
+[![huffman_glitches2](https://gmic.eu/gmic325/thumbs/huffman_glitches2.png)](https://gmic.eu/gmic325/img/huffman_glitches2.jpg) _Fig. 2.6. A few variations of the **Degradations / Huffman Glitches** filter settings._
 
 
-[![v_huffman_glitches](https://gmic.eu/gmic325/thumbs/v_huffman_glitches.png)](https://gmic.eu/gmic325/img/v_huffman_glitches.mp4) _Fig. 2.7. Le filtre **Degradations / Huffman Glitches** appliqué sur la vidéo [_Tears of Steel_](https://fr.wikipedia.org/wiki/Tears_of_Steel) de la fondation Blender._
+Here again, it is easy to retrieve the _G’MIC_ command corresponding to the filter's operation, use it in a script, and, for example, apply this effect on all the _frames_ of a video (click on the picture below to view the video) :
 
 
-Il flotte comme un doux parfum de télé analogique… ☺
+[![v_huffman_glitches](https://gmic.eu/gmic325/thumbs/v_huffman_glitches.png)](https://gmic.eu/gmic325/img/v_huffman_glitches.mp4) _Fig. 2.7. The **Degradations / Huffman Glitches** filter applied on the [_Tears of Steel_](https://en.wikipedia.org/wiki/Tears_of_Steel) video by the [Blender foundation](https://en.wikipedia.org/wiki/Blender_Foundation)._
+
+There floats like the sweet scent of an analog TV set in the air...☺
+
+- Let's also mention the appearance of a new filter, named **Patterns / Pack Ellipses**, which may not be entirely pleasing to our [trypophobic](https://en.wikipedia.org/wiki/Trypophobia) readers (not at all related to the phobia of eating "tripes à la mode de Caen" )! The goal of this filter is to redraw an image by fitting together colored ellipses, yet preventing them to touch each other. Ellipses are oriented parallel or orthogonal to the local structures, to make the most visible edges of images stick out. This is not the first filter of this kind in _G’MIC_, but here we have a new [sphere packing]https://en.wikipedia.org/wiki/Sphere_packing) algorithm, which executes quickly and produces interesting pictures.
+
+[![pack_ellipses](https://gmic.eu/gmic325/thumbs/pack_ellipses.png)](https://gmic.eu/gmic325/img/pack_ellipses.jpg) _Fig. 2.8. The **Patterns / Pack Ellipses** filter, as seen in the G’MIC-Qt plug-in._
 
 
-- Mentionnons également l’apparition d’un nouveau filtre, nommé **Patterns / Pack Ellipses**, qui risque de ne pas plaire à nos lecteurs [trypophobes](https://fr.wikipedia.org/wiki/Trypophobie) (aucun lien avec la peur de manger des tripes à la mode de Caen) ! Ce filtre a pour tâche de redessiner une image en emboîtant des ellipses colorées, sans les faire se toucher. Les ellipses sont orientées parallèlement ou orthogonalement aux structures locales, pour faire ressortir au mieux les contours les plus saillants des images. Ce n’est pas le premier filtre de ce type dans _G’MIC_, mais on a ici un nouvel algorithme d’[empilement compact](https://fr.wikipedia.org/wiki/Empilement_compact), relativement rapide à exécuter, et qui produit des images intéressantes.
-
-[![pack_ellipses](https://gmic.eu/gmic325/thumbs/pack_ellipses.png)](https://gmic.eu/gmic325/img/pack_ellipses.jpg) _Fig. 2.8. Le filtre **Patterns / Pack Ellipses**, tel qu’il apparaît dans le greffon G’MIC-Qt._
+[![pack_ellipses2](https://gmic.eu/gmic325/thumbs/ellipses.png)](https://gmic.eu/gmic325/img/ellipses.jpg) _Fig. 2.9. Application of the **Patterns / Pack Ellipses** filter on different portrait images._
 
 
-[![pack_ellipses2](https://gmic.eu/gmic325/thumbs/ellipses.png)](https://gmic.eu/gmic325/img/ellipses.jpg) _Fig. 2.9. Application du filtre **Patterns / Pack Ellipses** sur différentes images de portrait._
+The video below is a step by step illustration of the algorithm's behaviour while fitting colored circles to reconstruct a portrait image :
 
 
-La vidéo ci-dessous illustre le comportement pas à pas de l’algorithme pour l’emboîtement de cercles colorés, afin de reconstituer l’image d’un portrait :
+[![v_circle_packing](https://gmic.eu/gmic325/thumbs/v_circle_packing.png)](https://gmic.eu/gmic325/img/v_circle_packing.mp4) _Fig. 2.10. A video breakdown of the different steps of the **Patterns / Pack Ellipses** filter._
 
 
-[![v_circle_packing](https://gmic.eu/gmic325/thumbs/v_circle_packing.png)](https://gmic.eu/gmic325/img/v_circle_packing.mp4) _Fig. 2.10. Les différentes étapes du filtre **Patterns / Pack Ellipses** décomposées en vidéo._
+- Still among the textures and patterns generation effects, let's point out the appearance of a new [_Halftoning_](https://en.wikipedia.org/wiki/Halftone) filter, named **Patterns / Halftone [Generic]**. Here again, the idea is to reconstruct an input image by stacking small colored patterns of any shape, such as small circles for instance :
+
+[![halftone_generic](https://gmic.eu/gmic325/thumbs/halftone_generic.png)](https://gmic.eu/gmic325/img/halftone_generic.jpg) _Fig. 2.11. The **Patterns / Halftone [Generic]** filter, as seen in the  G’MIC-Qt plug-in._
 
 
-- Toujours dans les effets de génération de textures et de motifs, signalons l’apparition d’un nouveau filtre de [_Halftoning_](https://fr.wikipedia.org/wiki/Halftoning), nommé **Patterns / Halftone [Generic]**. Là encore, l’idée est de reconstituer une image d’entrée en empilant des motifs colorés de géométrie quelconque, par exemple de petits cercles :
-
-[![halftone_generic](https://gmic.eu/gmic325/thumbs/halftone_generic.png)](https://gmic.eu/gmic325/img/halftone_generic.jpg) _Fig. 2.11. Le filtre **Patterns / Halftone [Generic]**, tel qu’il apparaît dans le greffon G’MIC-Qt._
+Or a spiral :
 
 
-Ou encore, une spirale :
+[![halftone_generic2](https://gmic.eu/gmic325/thumbs/halftone_generic2.png)](https://gmic.eu/gmic325/img/halftone_generic2.jpg) _Fig. 2.12. The **Patterns / Halftone [Generic]** filter with a spiral pattern._
 
 
-[![halftone_generic2](https://gmic.eu/gmic325/thumbs/halftone_generic2.png)](https://gmic.eu/gmic325/img/halftone_generic2.jpg) _Fig. 2.12. Filtre **Patterns / Halftone [Generic]** avec un motif en spirale._
+The filter even provides a special mode so that the user can provide his own personalized _Halftoning_ pattern design on a separate layer :
 
 
-Le filtre propose même un mode spécial pour que l’utilisateur puisse fournir son motif de _Halftoning_ personnalisé, dans un calque séparé :
+[![halftone_generic3](https://gmic.eu/gmic325/thumbs/halftone_generic3.png)](https://gmic.eu/gmic325/img/halftone_generic3.jpg) _Fig. 2.13. The **Patterns / Halftone [Generic]** filter with a personalized pattern design._
 
 
-[![halftone_generic3](https://gmic.eu/gmic325/thumbs/halftone_generic3.png)](https://gmic.eu/gmic325/img/halftone_generic3.jpg) _Fig. 2.13. Filtre **Patterns / Halftone [Generic]** avec un motif personnalisé._
+From an algorithmic point of view, the idea is to locally erode or dilate the pattern passed as a filter parameter to best encode the grayscale value of each pixel of the input image.
 
 
-D’un point de vue algorithmique, l’idée est d’éroder ou dilater localement le motif donné en paramètre du filtre, pour encoder au mieux le niveau de gris de chacun des pixels de l’image d’entrée.
+- The following filter has an amusing story : subscribed to the _Twitter_ account of the artist [Memo Akten](https://www.memo.tv/), one day I stumbled upon [this tweet](https://twitter.com/memotv/status/1556619064491102209) describing a generative art algorithm that Memo imagined (but did not implement). It was a good opportunity to try to implement it in the _G’MIC_ language, just for the fun of experimenting!  Once it was done, creating a filter usable from the _G’MIC-Qt_ plug-in was self-evident. The result is the **Rendering / Algorithm A** filter, which creates « [Mondrian-like](https://en.wikipedia.org/wiki/Piet_Mondrian) » abstract illustrations.
 
+[![algorithmA](https://gmic.eu/gmic325/thumbs/algorithmA.png)](https://gmic.eu/gmic325/img/algorithmA.jpg) _Fig. 2.14. The filter **Patterns / Algorithm A**, as seen in the G’MIC-Qt plug-in._
 
-- Le filtre suivant a une histoire amusante : étant abonné au compte _Twitter_ de l’artiste [Memo Akten](https://www.memo.tv/), je suis tombé un jour sur [ce tweet](https://twitter.com/memotv/status/1556619064491102209) qui décrit un algorithme d’art génératif que Memo a imaginé (mais pas implémenté). Ce fut une bonne occasion d’essayer de l’implémenter en langage _G’MIC_, juste pour le plaisir d’expérimenter ! Une fois cela réalisé, créer un filtre utilisable dans le greffon _G’MIC-Qt_ allait de soi. Il en résulte le filtre **Rendering / Algorithm A**, qui crée des illustrations abstraites dans un esprit très « [Mondrianesque](https://fr.wikipedia.org/wiki/Piet_Mondrian) ».
-
-[![algorithmA](https://gmic.eu/gmic325/thumbs/algorithmA.png)](https://gmic.eu/gmic325/img/algorithmA.jpg) _Fig. 2.14. Le filtre **Patterns / Algorithm A**, tel qu’il apparaît dans le greffon G’MIC-Qt._
-
-
-La génération des images repose largement sur le tirage de nombres aléatoires. D’une simple ligne de commande, on peut donc facilement produire plusieurs œuvres différentes à la suite :
-
+Image generation is largely based on drawing random numbers.
+La génération des images repose largement sur le tirage de nombres aléatoires. From a simple command line, one can easily produce many different artworks in one go :
 
 ```sh
 $ gmic repeat 6 { 500,500,1,3 fx_memoakten_algorithm_a[-1] '$>',20,30,30,2,50,10,50,40,3,60,1,0,0,0,255,255,255,255,0,0,255,128,0,255,255,0,0,0,0 } frame 1,1,0 frame 5,5,255 append_tiles 3 output output.png
 ```
 
+which synthesizes the following image :
 
 
+[![algorithmA2](https://gmic.eu/gmic325/thumbs/algorithmA2.png)](https://gmic.eu/gmic325/img/algorithmA2.jpg) _Fig. 2.15. An « artworks » Patchwork produced by the **Patterns / Algorithm A** filter._
 
 
-ce qui synthétise l’image suivante :
+- Still in order to produce bizarre and abstract pictures, let's talk about the **Arrays & Tiles / Shuffle Patches** filter, which will break down an input image into a thumbnail array (« _patches_ »), then shuffle these _patches_ spatially before joining them to produce the resulting image. Different options are offered, allowing a random rotation of the _patches_, or reassembling overlapping _patches_.
+
+[![shuffle_patches](https://gmic.eu/gmic325/thumbs/shuffle_patches.png)](https://gmic.eu/gmic325/img/shuffle_patches.jpg) _Fig. 2.16. The **Arrays & Tiles / Shuffle Patches** filter, as seen in the G’MIC-Qt plug-in._
+
+The result is an image resembling a patchwork of different parts of the original picture, with overall similar colors, but where the natural order of structures is lost.
 
 
-[![algorithmA2](https://gmic.eu/gmic325/thumbs/algorithmA2.png)](https://gmic.eu/gmic325/img/algorithmA2.jpg) _Fig. 2.15. Patchwork d’« œuvres d’art », produites par le filtre **Patterns / Algorithm A**._
+[![shuffle_patches2](https://gmic.eu/gmic325/thumbs/shuffle_patches2.png)](https://gmic.eu/gmic325/img/shuffle_patches2.jpg) _Fig. 2.17. Result of the **Arrays & Tiles / Shuffle Patches** filter applied to a landscape picture._
 
 
-- Toujours afin de produire des images bizarres et abstraites, évoquons l’apparition du filtre **Arrays & Tiles / Shuffle Patches**, qui va décomposer une image d’entrée sous la forme d’un tableau d’imagettes (« _patchs_ »), et mélanger spatialement ces _patchs_ avant de les recoller pour produire l’image résultat. Différentes options sont proposées, permettant la rotation aléatoire des _patchs_, ou le recollage de _patchs_ qui se superposent.
-
-[![shuffle_patches](https://gmic.eu/gmic325/thumbs/shuffle_patches.png)](https://gmic.eu/gmic325/img/shuffle_patches.jpg) _Fig. 2.16. Le filtre **Arrays & Tiles / Shuffle Patches**, tel qu’il apparaît dans le greffon G’MIC-Qt._
+And again, we can apply this filter to all the _frames_ of a video, as illustrated in the example below (of course you will have recognized the short movie [_Big Buck Bunny_](https://en.wikipedia.org/wiki/Big_Buck_Bunny) by the [Blender_foundation](https://en.wikipedia.org/wiki/Blender_Foundation)).
 
 
-On obtient ainsi une image qui ressemble à un collage de différentes parties de l’image d’origine, avec des couleurs globalement similaires, mais où l’on perd l’ordre naturel des structures.
+[![shuffle_patches2](https://gmic.eu/gmic325/thumbs/v_shuffle_patches.png)](https://gmic.eu/gmic325/img/v_shuffle_patches.mp4) _Fig. 2.18. The **Arrays & Tiles / Shuffle Patches** filter applied to the [_Big Buck Bunny_](https://en.wikipedia.org/wiki/Big_Buck_Bunny) video by the [Blender_foundation](https://en.wikipedia.org/wiki/Blender_Foundation))._
 
 
-[![shuffle_patches2](https://gmic.eu/gmic325/thumbs/shuffle_patches2.png)](https://gmic.eu/gmic325/img/shuffle_patches2.jpg) _Fig. 2.17. Effet du filtre **Arrays & Tiles / Shuffle Patches** sur une image de paysage._
+- And to close this section about image abstraction, _Glitch Art_ and pattern generation, here is the **Patterns / Pills** filter, which creates a periodic (repeating) texture resembling a stack of « pills » rotated 90° to each other.
 
+[![pills](https://gmic.eu/gmic325/thumbs/pills.png)](https://gmic.eu/gmic325/img/pills.jpg) _Fig. 2.19. The **Patterns / Pills**, as seen in the G’MIC-Qt plug-in._
 
-Ici encore, nous pouvons appliquer ce filtre sur toutes les _frames_ d’une vidéo, illustré avec l’exemple ci-dessous (vous aurez bien sûr reconnu le court-métrage [_Big Buck Bunny_](https://fr.wikipedia.org/wiki/Big_Buck_Bunny) de la [fondation _Blender_](https://fr.wikipedia.org/wiki/Fondation_Blender)).
-
-
-[![shuffle_patches2](https://gmic.eu/gmic325/thumbs/v_shuffle_patches.png)](https://gmic.eu/gmic325/img/v_shuffle_patches.mp4) _Fig. 2.18. Le filtre **Arrays & Tiles / Shuffle Patches** appliqué sur la vidéo [_Big Buck Bunny_](https://fr.wikipedia.org/wiki/Big_Buck_Bunny) de la fondation Blender._
-
-
-- Et pour clôre cette section sur les effets d’abstraction d’images, de _Glitch Art_ et de génération de motifs, voici le filtre **Patterns / Pills**, qui crée une texture périodique ressemblant à un empilement de « pilules » tournées de 90° les unes par rapport aux autres.
-
-[![pills](https://gmic.eu/gmic325/thumbs/pills.png)](https://gmic.eu/gmic325/img/pills.jpg) _Fig. 2.19. Le filtre **Patterns / Pills**, tel qu’il apparaît dans le greffon G’MIC-Qt._
-
-
-Rien de très compliqué : ce filtre est une implémentation directe de la formule mathématique
-
+Nothing too complicated : this filter is a straight implementation of the folowwing mathematical formula :
 
 [![pills_formula](https://gmic.eu/gmic325/thumbs/pills_formula.png)](https://gmic.eu/gmic325/img/pills_formula.jpg)
 
+This nice formula was imagined by [Miloslav Číž](https://en.wikipedia.org/wiki/User:Drummyfish), and described on [this page](https://commons.wikimedia.org/wiki/File:2D_function_pills.png). It was tempting to create a new filter available to everyone!
 
-Cette jolie formule a été imaginée par [Miloslav Číž](https://en.wikipedia.org/wiki/User:Drummyfish), et décrite sur [cette page](https://commons.wikimedia.org/wiki/File:2D_function_pills.png). Il était tentant d’en faire un nouveau filtre accessible à tout le monde !
-
-
-Notons que nous pouvons produire cette même image de base, directement à partir de la formule initiale, en lançant encore une fois `gmic` en ligne de commande :
-
+Note that we can produce the same base image, directly from the original formula, once again by executing the `gmic` command line :
 
 ```sh
 $ gmic 600,600,1,1,"X = x*30/w; Y = y*30/h; sqrt(abs(sin(X + cos(Y + sin(X + cos(Y)))) * sin(Y + cos(X + sin(Y + cos(X))))))" normalize 0,255
 ```
 
-
-
-
-
-Le filtre **Patterns / Pills** dans le greffon _G’MIC-Qt_ autorise néanmoins quelques variations additionnelles, comme la possibilité de spécifier un angle de rotation ou de créer ces motifs indépendamment pour chacun des canaux _RGB_ de l’image de sortie.
+Nevertheless, the **Patterns / Pills** found in the _G’MIC-Qt_ plug-in allows some additional variations, like the possibility of specifying a rotation angle or independently creating these patterns for each _RGB_ channel of the output image.
 
 
 # 3. Nouveautés concernant le traitement des couleurs
