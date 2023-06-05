@@ -176,7 +176,7 @@ And again, we can apply this filter to all the _frames_ of a video, as illustrat
 _Fig. 2.19. The ***Patterns / Pills***, as seen in the G’MIC-Qt plug-in._
 ===
 
-Nothing too complicated: this filter is a straight implementation of the folowwing mathematical formula:
+Nothing too complicated: this filter is a straight implementation of the following mathematical formula:
 
 ===
 [![pills_formula](https://gmic.eu/gmic325/thumbs/pills_formula.png)](https://gmic.eu/gmic325/img/pills_formula.jpg)
