@@ -70,7 +70,7 @@ _Fig. 2.4. The « Line Art » filter, applied on a few other example images._
 [![huffman glitches](https://gmic.eu/gmic325/thumbs/huffman_glitches.png)](https://gmic.eu/gmic325/img/huffman_glitches.jpg)
 _Fig. 2.5. The ***Degradations / Huffman Glitches*** filter, as seen in the G’MIC-Qt plug-in._
 ===
-https://gmic.eu/gmic325/img/v_huffman_glitches.mp4
+
 This filter allows the generation of compression artifacts with variations: block by block, line by line, column by column, or on image data encoded in color spaces other than _RGB_. In the end, the diversity of anomalies it is possible to produce is quite large, as depicted on the following figure:
 
 ===
