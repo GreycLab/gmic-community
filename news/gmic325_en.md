@@ -1,7 +1,5 @@
 ﻿# G’MIC 3.2.5: 15 years of development for open and reproducible image processing
-===
 _by [David Tschumperlé](https://tschumperle.users.greyc.fr/), [Prawnshushi](http://prawnsushi.free.fr/) and [Garry Osgood](https://discuss.pixls.us/u/grosgood/)_
-===
 
 To celebrate the release of version **3.2.5** of [_G’MIC_](https://gmic.eu) (_GREYC’s Magic for Image Computing_), an open [framework](https://en.wikipedia.org/wiki/Software_framework) for [digital image processing](https://en.wikipedia.org/wiki/Digital_image_processing), we present you with a summary of the new features implemented since our [previous report](https://gmic.eu/gmic300/) (published during December of 2021). It is also the opportunity for us to celebrate the project's **15 years** of existence!
 
