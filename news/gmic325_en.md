@@ -1,4 +1,4 @@
-﻿# G’MIC 3.2.5: 15 years of development for open and reproducible image processing
+﻿# G’MIC 3.2.5: 15 Years of Development for Open and Reproducible Image Processing
 _By [David Tschumperlé](https://tschumperle.users.greyc.fr/)._
 _Translation: [Prawnsushi](https://discuss.pixls.us/t/trying-to-make-my-1st-pipeline-filter)._
 _Copyeditor: [Garry Osgood](https://discuss.pixls.us/u/grosgood/)._
@@ -28,7 +28,7 @@ Thanks to its dedicated scripting language, new filters and effects are regularl
 
 In this article, we will describe a few of these new filter effects and give some news about the project. We will also show some examples for the `gmic` command line tool, which is by far the most powerful interface provided by the project.
 
-# 2. New abstraction, _Glitch Art_ and pattern generation filters
+# 2. New Abstraction, _Glitch Art_ and Pattern Generation Filters
 
 - To begin this new features report, let's mention the existence of a new transformation filter which converts images to [Line Art](https://en.wikipedia.org/wiki/Line_art) drawings. This filter, appropriately named **Artistic / Line Art** was conceived by [Claude Lion](https://github.com/cl4cnam), an external contributor who is already the author of multiple filters (such as the very appreciated **Artistic / Comic Book**, [already mentioned](https://gmic.eu/gmic300/#_2_1_artistic_effects) in our previous article.
 
@@ -192,9 +192,9 @@ $ gmic 600,600,1,1,"X = x*30/w; Y = y*30/h; sqrt(abs(sin(X + cos(Y + sin(X + cos
 
 Nevertheless, the **Patterns / Pills** found in the _G’MIC-Qt_ plug-in allows some additional variations, like the possibility of specifying a rotation angle or independently creating these patterns for each _RGB_ channel of the output image.
 
-# 3. Some news regarding color processing
+# 3. Some News Regarding Color Processing
 
-## 3.1. _LUTs_ 3D features
+## 3.1. _LUTs_ 3D Features
 
 _G’MIC_ is an image processing software natively integrating a lot of different [3D color_LUTs](https://en.wikipedia.org/wiki/3D_lookup_table), thanks, in particular, to an efficient _LUTs_ compression algorithm resulting from our research work (described [in a previous report](https://pixls.us/blog/2019/09/g-mic-2-7-process-your-images-with-style#4-ever-more-colorimetric-transformations)). These 3D color _LUTs_ define transformation functions of an image's colors, often to give it a specific ambiance. New commands to facilitate the visualization and creation of 3D color _LUTs_ were recently added to _G’MIC_:
 
@@ -223,7 +223,7 @@ will synthesize an image like the one below:
 _Fig. 3.1.2. Multiple randomized 3D color ***LUTs*** obtained via the `random_clut` command, and applied to a color image._
 ===
 
-## 3.2. New color filters for the _G'MIC-QT_ plug-in.
+## 3.2. New Color Filters for the _G'MIC-QT_ Plug-in.
 
 - Quite logically, the `random_clut` command is the basis for the implementation of the new **Colors / Random Color Transformation** filter, which was added to the _G’MIC-Qt_ plug-in and applies a random colorimetric transformation on an input image.
 
@@ -262,7 +262,7 @@ So here is a filter that avoids storing _sets_ of 3D color _LUTs_ of several meg
 _Fig. 3.2.4. The ***Colors / Vibrance*** filter, as seen in the G’MIC-Qt plug-in._
 ===
 
-## 3.3. The `color2name` and `name2color` commands
+## 3.3. The `color2name` and `name2color` Commands
 
 One last new feature concerning colors: the [`color2name`](https://gmic.eu/reference/color2name) and [`name2color`](https://gmic.eu/reference/name2color) command duo, which convert an _RGB_ color code to a color name, and vice versa. One example of use would be:
 
@@ -284,11 +284,11 @@ The relation between the 881 color names recognized by these commands and their 
 _Fig. 3.3.2. The whole set of named colors known to the `color2name` command._
 ===
 
-# 4. 3D mesh and voxel structures
+# 4. 3D Mesh and Voxel Structures
 
 Did you know? Not only can _G'MIC_ manage regular images, but it is also able to manipulate [3D mesh objects](https://en.wikipedia.org/wiki/Polygon_mesh)? And even if 3D visualization and manipulation are not central objectives to the project, several interesting additions were implemented in this area.
 
-## 4.1. Importing objects in the _Wavefront_ file format
+## 4.1. Importing Objects in the _Wavefront_ File Format
 First of all, _G’MIC_ can now import 3D objects stored in [_Wavefront_](https://en.wikipedia.org/wiki/Wavefront_.obj_file) `.obj` files, whereas previously only exporting was possible in this format (export which was also improved). Not all the characteristics of the `.obj` format are taken into account, but importing object geometry, colors and textures commonly works. Thus, the command:
 
 ~~~
@@ -312,7 +312,7 @@ _Fig. 4.1.2 The ***Rendering / 3D Mesh*** filter in action, in the G’MIC-Qt pl
 
 It will be typically used to import a 3D object one wants to draw, orient it in space, and use it as a tracing « guide », either by redrawing it completely on a new layer placed above, or by using one of the many _G’MIC_ filters, to render it as a _cartoon_ drawing or a painting for example.
 
-## 4.2. 3D meshes modification tools.
+## 4.2. 3D Mesh Modification Tools.
 
 What else is there to do once the 3D mesh is loaded in memory/RAM? _G’MIC_ has the following features:
 
@@ -373,7 +373,7 @@ This feature will be useful, for example, to people studying the field of discre
 _Fig. 4.2.7. Visualization video of a complex 3D mesh voxelized by the `voxelize3d` command._
 ===
 
-## 4.3. 3D mesh generation tools
+## 4.3. 3D Mesh Generation Tools
 
 To conclude this section about 3D meshes in _G’MIC_, let's mention, in no particular order, the appearance of a few recent commands dédicated to 3D mesh procedural generation:
 
@@ -417,11 +417,11 @@ In practice, all these new 3D mesh generation commands can be inserted into more
 _Fig. 4.3.6. Procedural generation of an object with G’MIC, then imported into Blender._
 ===
 
-# 5. Other news
+# 5. Other News
 
 This last section gives some new informations related to the project, in no particular order.
 
-## 5.1. Various improvements of the G'MIC-Qt plug-in
+## 5.1. Various Improvements of the G'MIC-Qt Plug-in
 
 A lot of work has been done on the _G’MIC-Qt_ plug-in's code, even if not's not really visible at first. Let's mention in particular :
 
@@ -448,7 +448,7 @@ A [detailed/provided documentation](https://docs.digikam.org/en/image_editor/enh
 _Fig. 5.1.2. The G’MIC-Qt plug-in is directly available inside Digikam, an open source photo management software._
 ===
 
-## 5.2. Improvement of the `stdgmic` standard library
+## 5.2. Improvement of the `stdgmic` Standard Library
 
 _G’MIC's_ standard library ([`stdgmic`](https://raw.githubusercontent.com/GreycLab/gmic/develop/src/gmic_stdlib.gmic)) contains the whole set of non native commands, directly written in the _G'MIC_ language, and by default provided with the framework. In practice, the vast majority of existing commands fall within this scheme. In addition to the new commands already described above, let's take note of the following inclusions and improvements in `stdgmic`:
 
@@ -517,7 +517,7 @@ _Fig. 5.2.7. Comparing traced line segments, between Brensenham's regular method
 
 - As a conclusion to this section about _G’MIC's_ standard library, let's talk about the arrival of the [ssim](https://gmic.eu/reference/ssim) (computation of the « _[Structural Similarity](https://en.wikipedia.org/wiki/Structural_Similarity)_ » between two images), [opening](https://gmic.eu/reference/opening), [opening_circ](https://gmic.eu/reference/opening_circ), [closing](https://gmic.eu/reference/closing), [closing_circ](https://gmic.eu/reference/closing_circ) (morphological opening and closing with a square of circular structural element), [betti](https://gmic.eu/reference/betti) (calculation of the [Betti_numbers](https://en.wikipedia.org/wiki/Betti_number), topological invariants of discretized shapes in 2D or 3D) and a new layer blending mode for the [blend](https://gmic.eu/reference/blend) command: `shapeprevalent`. As you can see, there is always new things to delve into ☺!
 
-## 5.3. Various information related to the project
+## 5.3. Various Information Related to the Project
 
 To conclude this long report, here is some general information on the _G’MIC_ project.
 
@@ -641,7 +641,7 @@ _Fig. 5.3.15. The « Linux Format » magazine offer a series of articles on us
 
 Here, this concludes our roundup of the _G’MIC_ project's latest developments and information.
 
-# 6. Conclusions & outlook
+# 6. Conclusions & Outlook
 
 After **15 years** of developing _G’MIC_ and **24 years** of developing [_CImg_](http://cimg.eu), the _C++_ library which serves as its foundation, we now have a free and open source digital image manipulation framework, which is mature and has proven its usefulness in solving various image processing problems. Downloads keep on rising since writing the first lines of code (in 2008), proving that it is a dynamic project which attracts a wide range of users.
 
