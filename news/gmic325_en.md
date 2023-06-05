@@ -1,6 +1,9 @@
 ﻿# G’MIC 3.2.5: 15 years of development for open and reproducible image processing
+===
+_by [David Tschumperlé](https://tschumperle.users.greyc.fr/), [Prawnshushi](http://prawnsushi.free.fr/) and [Garry Osgood](https://discuss.pixls.us/u/grosgood/)_
+===
 
-To celebrate the release of version **3.2.5** of [_G’MIC_](https://gmic.eu) (_GREYC’s Magic for Image Computing_), an open [framework](https://en.wikipedia.org/wiki/Software_framework) for [digital image processing](https://en.wikipedia.org/wiki/Digital_image_processing), we present you with a summary of the new features implemented since our [previous report](https://linuxfr.org/news/sortie-de-g-mic-3-0-une-troisieme-dose-pour-un-traitement-efficace-de-vos-images) (published during December of 2021). It is also the opportunity for us to celebrate the project's **15 years** of existence!
+To celebrate the release of version **3.2.5** of [_G’MIC_](https://gmic.eu) (_GREYC’s Magic for Image Computing_), an open [framework](https://en.wikipedia.org/wiki/Software_framework) for [digital image processing](https://en.wikipedia.org/wiki/Digital_image_processing), we present you with a summary of the new features implemented since our [previous report](https://gmic.eu/gmic300/) (published during December of 2021). It is also the opportunity for us to celebrate the project's **15 years** of existence!
 
 _G’MIC_ is being developed in [Caen](https://en.wikipedia.org/wiki/Caen), in France, by the [_IMAGE_](https://www.greyc.fr/image) team  of [_GREYC_](https://www.greyc.fr), a public research lab in Information and Communication Sciences and Technologies (Joint Research Unit [_CNRS_](https://www.cnrs.fr/) / [_ENSICAEN_](https://www.ensicaen.fr/) / [Université de Caen](https://www.unicaen.fr/)). It is distributed under the free [_CeCILL_](http://www.cecill.info/licences/Licence_CeCILL_V2.1-en.html) licence.
 
@@ -8,18 +11,7 @@ _G’MIC_ is being developed in [Caen](https://en.wikipedia.org/wiki/Caen), in F
 
 In this report, we will explain in detail a few of the recently added features, and illustrate them with examples of 2D and 3D image processing and synthesis.
 
-_A. N. : Click on images to see a full resolution version, or a link to the video for images showing the icon_ 
-
-===
-![play video](https://gmic.eu/gmic325/thumbs/icon_play_video.png)
-===
----
-
-* [The G’MIC project](https://gmic.eu)
-* [The Project's Mastodon news feed](https://piaille.fr/@gmic)
-* [Série d’articles G’MIC sur LinuxFr.org](https://linuxfr.org/tags/gmic/public)
-
----
+_A. N. : Click on images to see a full resolution version, or a link to the video for images showing the icon ![play video](https://gmic.eu/gmic325/thumbs/icon_play_video.png)_
 
 # 1. What is _G’MIC_ ?
 
@@ -204,7 +196,7 @@ Nevertheless, the **Patterns / Pills** found in the _G’MIC-Qt_ plug-in allows 
 
 ## 3.1. _LUTs_ 3D features
 
-_G’MIC_ is an image processing software natively integrating a lot of different [3D color_LUTs](https://en.wikipedia.org/wiki/3D_lookup_table), thanks, in particular, to an efficient _LUTs_ compression algorithm resulting from our research work (described [in a previous report](https://linuxfr.org/news/g-mic-2-7-0-une-rentree-pleine-de-style-pour-le-traitement-d-images#toc-4-toujours-plus-de-transformations-colorim%C3%A9triques)). These 3D color _LUTs_ define transformation functions of an image's colors, often to give it a specific ambiance. New commands to facilitate the visualization and creation of 3D color _LUTs_ were recently added to _G’MIC_:
+_G’MIC_ is an image processing software natively integrating a lot of different [3D color_LUTs](https://en.wikipedia.org/wiki/3D_lookup_table), thanks, in particular, to an efficient _LUTs_ compression algorithm resulting from our research work (described [in a previous report](https://pixls.us/blog/2019/09/g-mic-2-7-process-your-images-with-style#4-ever-more-colorimetric-transformations)). These 3D color _LUTs_ define transformation functions of an image's colors, often to give it a specific ambiance. New commands to facilitate the visualization and creation of 3D color _LUTs_ were recently added to _G’MIC_:
 
 - The [`display_clut`](https://gmic.eu/reference/display_clut) command renders a color _LUT_ in 3D, which allows to visualize the _RGB → RGB_ transformation it represents.
 
@@ -440,7 +432,7 @@ A lot of work has been done on the _G’MIC-Qt_ plug-in's code, even if not's no
 - A new **external filter sources** management system: it becomes easy for a developper to share his personalized _G’MIC_ filters with a user, by giving him a file or an URL pointing to their implementation (in the same way a _[PPA](https://doc.ubuntu-fr.org/ppa)_ works for package managers in _Ubuntu_ ).
 
 ===
-[![filter_sources](https://gmic.eu/gmic325/thumbs/filter_sources.png)](https://gmic.eu/gmic325/img/filter_sources.jpg) 
+[![filter_sources](https://gmic.eu/gmic325/thumbs/filter_sources.png)](https://gmic.eu/gmic325/img/filter_sources.jpg)
 _Fig. 5.1.1. The new external filter sources management system in the G’MIC-Qt plug-in._
 ===
 
@@ -477,7 +469,7 @@ _Fig. 5.2.2. Learning iterations sequence of the neural network for the training
 We also have working examples of the `nn_lib` to automaticaly classify simple images (from the [_MNIST_](http://yann.lecun.com/exdb/mnist/) and [_Fashion MNIST_](https://github.com/zalandoresearch/fashion-mnist) data sets, among others). _G’MIC_ is then potentially able to detect the content of some images, like illustrated below with the classification of handwritten digits (we have in store a smiliar method for detecting human faces).
 
 ===
-[![mnist](https://gmic.eu/gmic325/thumbs/mnist.png)](https://gmic.eu/gmic325/img/mnist.jpg) 
+[![mnist](https://gmic.eu/gmic325/thumbs/mnist.png)](https://gmic.eu/gmic325/img/mnist.jpg)
 _Fig. 5.2.3. Automatic classification of pictures of handwritten digits (MNIST database) by a neural network, using G'MIC's `nn_lib` library._
 ===
 
@@ -582,7 +574,7 @@ _Fig. 5.3.7. Example of raytracing rendering, implemented in G'MIC language (und
 - For those who want to know more about _G’MIC's_ language operation, we suggest reading the [amazing tutorial pages](https://gmic.eu/tutorial/) written by [Garry Osgood](https://discuss.pixls.us/u/grosgood), who contributes to the _G’MIC_ project documentation since several years. Notably, he wrote [a series of articles on the creation of arabesques](https://gmic.eu/tutorial/wheelies.html) that we can only recommend!
 
 ===
-[![arabesque](https://gmic.eu/gmic325/thumbs/v_arabesque.png)](https://gmic.eu/gmic325/img/v_arabesque.mp4) 
+[![arabesque](https://gmic.eu/gmic325/thumbs/v_arabesque.png)](https://gmic.eu/gmic325/img/v_arabesque.mp4)
 _Fig. 5.3.8. Example of silhouette tracing using the arabesque method described in Garry Osgood tutorial._
 ===
 
@@ -640,7 +632,7 @@ _Fig. 5.3.14. Using G'MIC to process astronomical images._
 
 You can find these _posts_ [here](https://twitter.com/navaneeth_ank/status/1620110820272410624), [there](https://twitter.com/SpaceGeck/status/1594213385377574913), [there](https://twitter.com/stim3on/status/1594292010000814080), and [also there](https://twitter.com/navaneeth_ank/status/1659381911255654400). This user feedback is obviously rewarding for us. If you are a (happy ☺) _G’MIC_ user yourself, do no hesitate to share your creations or your feedback. It's always a pleasure!
 
-- Finally, let's mention the fact that _G’MIC_ was the subject of articles written by [Karsten Gunther](https://linuxformat.com/archives?author_find=217) in issues number _301_ and _302_ of the [LinuxFormat](https://www.linuxformat.com/) magazine (published in may and june 2023). They present the different photo editing capabilities provided by the _G’MIC-Qt_ plugin in a very educational way (just like we try to do in our reports on [_Linuxfr_](https://linuxfr.org/tags/gmic/public)!).
+- Finally, let's mention the fact that _G’MIC_ was the subject of articles written by [Karsten Gunther](https://linuxformat.com/archives?author_find=217) in issues number _301_ and _302_ of the [LinuxFormat](https://www.linuxformat.com/) magazine (published in may and june 2023). They present the different photo editing capabilities provided by the _G’MIC-Qt_ plugin in a very educational way (just like we tried to do in this report!).
 
 ===
 [![linux_format](https://gmic.eu/gmic325/thumbs/linux_format.png)](https://gmic.eu/gmic325/img/linux_format.jpg)
@@ -662,7 +654,7 @@ On the short term, we are looking for contributors:
 
 - To push forward the development of _G’MIC's_ [Python](https://www.python.org/) [binding](https://pypi.org/project/gmic/). It needs to be updated and devoted enough time to thoroughly test it, to make _G’MIC_ usable directly from a _Python_ program, without _bugs_. Existing _binding_ is functional and is already a good working basis.
 - To succeed in _packaging G’MIC_ for [macOS](https://en.wikipedia.org/wiki/MacOS). We indeed receive a lot of requests from _Mac_ users who don't know how to build and install the _G’MIC-Qt_ plug-in for _GIMP_.
-  
+
 If you think you can contribute on one of these two subjects, [do not hesitate to contact us!](https://discuss.pixls.us/c/software/gmic)
 
 Finally, the revolution induced by the use of neural network in the field of digital image processing is fundamental. On this point, _G’MIC_ has some catching up to do. Until now, we mainly have focused on « standard » algorithmic image processing. Our `nn_lib` library should be developped faster to be able to deploy larger neural networks (a few dozens/hundreds of millions of parameters would already be satisfying!), to allow image processing or synthesis using more advanced statistical learning.
