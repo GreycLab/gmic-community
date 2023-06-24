@@ -5,13 +5,13 @@
 
 -----------------------
 
-**G'MIC** is a full-featured open-source framework for **[image processing](https://en.wikipedia.org/wiki/Image_processing)**, distributed under the
+**G'MIC** is a full-featured open-source framework for **[digital image processing](https://en.wikipedia.org/wiki/Image_processing)**, distributed under the
 **[CeCILL](http://cecill.info/index.en.html)** free software licenses (LGPL-like and/or GPL-compatible).
 It provides several different **[user interfaces](https://en.wikipedia.org/wiki/User_interface)** to convert/manipulate/filter/visualize **generic image datasets**,
 ranging from _1d scalar signals_ to _3d+t sequences of multi-spectral volumetric images_, hence including _2d color images_.
 These user interfaces are:
 
-- **1** - **[gmic](https://gmic.eu/tutorial/basics.html)**, a command-line interface , to use the **G'MIC** image processing features from a shell.
+- **1** - **[gmic](https://gmic.eu/reference/)**, a command-line interface , to use the **G'MIC** image processing features from a shell.
 In this setting, **G'MIC** may be seen as a friendly companion to the [ImageMagick](http://www.imagemagick.org) or [GraphicsMagick](http://www.graphicsmagick.org)
 software suites.
 
@@ -22,7 +22,7 @@ software suites.
 
 <a href="https://gmic.eu/img/gmic_libgmic.jpg">![interface_libgmic](https://gmic.eu/img/gmic_libgmic_thumb.jpg)</a>
 
-- **3** - **[G'MIC-Qt](https://github.com/c-koi/gmic-qt)**, a plug-in to bring **G'MIC** capabilities to the image retouching software [GIMP](http://www.gimp.org), [Krita](https://www.krita.org) and [Paint.NET](https://www.getpaint.net/). More than **500 filters** are already available, sorted by category (_Artistic, Black &amp; white, Colors, Contours, Deformations, Degradations, Details, Film emulation, Frames, Layers,
+- **3** - **[G'MIC-Qt](https://github.com/c-koi/gmic-qt)**, a plug-in to bring **G'MIC** capabilities to the image retouching software [GIMP](http://www.gimp.org), [Krita](https://www.krita.org), [Photoshop](https://en.wikipedia.org/wiki/Adobe_Photoshop) and [Paint.NET](https://www.getpaint.net/). More than **500 filters** are already available, sorted by category (_Artistic, Black &amp; white, Colors, Contours, Deformations, Degradations, Details, Film emulation, Frames, Layers,
 Light &amp; shadows, Patterns, Rendering, Repair, Sequences_, etc.).
 
 <a href="https://gmic.eu/img/gmic_gimp.jpg">![gimp_interface](https://gmic.eu/img/gmic_gimp_thumb.jpg)</a>
@@ -43,6 +43,19 @@ Other open-source projects are known to use some of the <b><font color="#000066"
 - **[Flowblade](https://github.com/jliljebl/flowblade)**, a multitrack non-linear video editor for Linux released under GPL 3 license.
 - **[Photoflow](http://aferrero2707.github.io/PhotoFlow/)**, a fully non-destructive photo retouching program.
 - **[Veejay](http://veejayhq.net/)**, a visual instrument and realtime video sampler.
+
+-----------------------
+
+## Packaging Status
+
+[![Packaging status](https://repology.org/badge/tiny-repos/gmic.svg)](https://repology.org/project/gmic/versions)
+[![latest packaged version(s)](https://repology.org/badge/latest-versions/gmic.svg)](https://repology.org/project/gmic/versions)
+<details>
+  <summary>Expand to see the packaging status of G'MIC...</summary>
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/gmic.svg?header=gmic)](https://repology.org/project/gmic/versions)
+
+</details>
 
 -----------------------
 
