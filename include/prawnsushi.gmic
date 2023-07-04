@@ -41,12 +41,14 @@
 #@gui _<b>Degradations</b>
 #-------------------------
 
-#@gui Sloppy Mess : fx_sloppymess, fx_sloppymess_preview(0)*
+#@gui Sloppy Mess : fx_sloppymess, fx_sloppymess_preview(0)
 #@gui : note = note("<span color="#EE5500"><small><b>Slices:</b></small></span>")
 #@gui : Angle = int(0,0,360)
 #@gui : Width (px) = int(1,1,5000)
 #@gui : Axis = choice("X-Axis","Y-Axis")
 #@gui : Mirror Axis = choice("X-Axis","Y-Axis")
+#@gui : Mirror Selection Interval (0:Off, -1:Random) = int(-1,-1,50)
+#@gui : Invert Mirror Selection = bool(0,0,1)
 #@gui : sep = separator()
 #@gui : note = note("<span color="#EE5500"><small><b>Rotation:</b></small></span>")
 #@gui : Range Clockwise = int(35,0,90)
@@ -58,19 +60,21 @@
 #@gui : Deform = int(3,0,20)
 #@gui : sep = separator()
 #@gui : Iterations = int(1,1,20)
-#@gui : Blending =  choice(3,"add","alpha","and","average","blue","burn","darken","difference","divide","dodge",\
-# "edges","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation",\
-# "lchlightness","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay",\
-# "pinlight","red","reflect","saturation","screen","seamless","seamless_mixed","shapeareamax","shapeareamax0",\
-# "shapeareamin","shapeareamin0","shapeaverage","shapeaverage0","shapemedian","shapemedian0","shapemin","shapemin0",\
-# "shapemax","shapemax0","shapeprevalent","softburn","softdodge","softlight","stamp","subtract","value","vividlight",\
-# "xor")
+#@gui : Blending =  choice(3,"Add","Alpha","And","Average","Blue","Burn","Darken","Difference","Divide","Dodge",\
+# "Edges","Exclusion","Freeze","Grainextract","Grainmerge","Green","Hardlight","Hardmix","Hue","Interpolation",\
+# "Lchlightness","Lighten","Lightness","Linearburn","Linearlight","Luminance","Multiply","Negation","Or","Overlay",\
+# "Pinlight","Red","Reflect","Saturation","Screen","Seamless","Seamless_mixed","Shapeareamax","Shapeareamax0",\
+# "Shapeareamin","Shapeareamin0","Shapeaverage","Shapeaverage0","Shapemedian","Shapemedian0","Shapemin","Shapemin0",\
+# "Shapemax","Shapemax0","Shapeprevalent","Softburn","Softdodge","Softlight","Stamp","Subtract","Value","Vividlight",\
+# "Xor")
 #@gui : Strength = float(100,0,100)
 #@gui : sep = separator()
 #@gui : note = note("<small>Author: <i><a href="http://prawnsushi.free.fr">Prawnsushi</i></a>.      \
-# Latest Update: <i>2023/14/06</i>.</small>")
-fx_sloppymess : skip "${1=0},${2=1},${3=0},${4=0},${5=35},${6=-35},${7=2},${8=0},${9=0},${10=3},${11=1},${12=3},${13=100}"
-arg0 $12,\
+# Latest Update: <i>2023/28/06</i>.</small>")
+fx_sloppymess : skip "${1=0},${2=1},${3=0},${4=0},${5=-1},${6=0},${7=35},${8=-35},${9=2},${10=0},${11=0},${12=3},${13=1},${14=3},${15=100}"
+
+ang,wid,ax,__mir,inter,inv,rang_f,rang_b,bound,cx,cy,def,it,bl,str=$*
+arg0 $bl,\
        "add","alpha","and","average","blue","burn","darken","difference","divide","dodge","edges","exclusion","freeze",\
        "grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lchlightness","lighten",\
        "lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red",\
@@ -79,45 +83,48 @@ arg0 $12,\
        "shapemax0","shapeprevalent","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor"
   blending_mode=${}
   n 0,255
+
   foreach {
-
     wi,he:=w,h
-    if $1>0&&$1!=360 rotate $1,0,3 fi
-
-    repeat $11
-      if $3==0 spins,dir,sli={w/$2},x,y else spins,dir,sli={h/$2},y,x fi
-      if $4==0 mir=x else mir=y fi
-
+    if $ang>0&&$ang!=360 rotate $ang,0,3 fi
+    if $ax==0 spins,dir,sli={w/$wid},x,y else spins,dir,sli={h/$wid},y,x fi
+    if $__mir==0 __mir=x else __mir=y fi
+    repeat $it
       +s. $dir,$spins
-      repeat $spins {
-        l[{$>+1}] {
-          if $5||$6 rotate {u($5,$6)},0,$7,$8%,$9% fi
-          p={($>+1)%2}
-          if $p==0 mirror $mir fi
-        }
+      if $rang_f||$rang_b
+        repeat $spins { rotate[{$>+1}] {u($rang_f,$rang_b)},0,$bound,$cx%,$cy% }
+      fi
+      l[1--1] {
+        if $inv==1 flip=^ fi
+        if $inter>1
+          ap[${flip}0--1:$inter] "mirror $__mir"
+        elif $inter==-1
+          repeat 2 {
+            ap[${flip}0--1:{floor(u(1,20))}] "mirror $__mir"
+          }
+        fi
       }
-
       a[^0] $dir
       +gradient_norm.
       negate.
-      deform[^0] $10
-      blend[^0] edges,1
-      equalize.
-      blend $blending_mode,$13%
+      deform[^0] $def
+      blend[^0] edges,0.6
+      blend $blending_mode,$str%
     done
   }
-  if $1>0&&$1!=360
-    rotate. -$1,0,3
+  if $ang>0&&$ang!=360
+    rotate. -$ang,0,3
     vx,vy={floor((w-$wi)/2)},{floor((h-$he)/2)}
     vxb,vyb={$vx+$wi-1},{$vy+$he-1}
     crop. $vx,$vy,$vxb,$vyb
   fi
   equalize
+  n 0,255
 
 fx_sloppymess_preview :
   fx_sloppymess $*
 
-#-------------------------
+
 #@gui _<b>Testing</b>
 #@gui <i>Prawnsushi</i>
 #-------------------------
@@ -434,9 +441,11 @@ u "{"$com"}""{"$origres"}""{"$procres"}""{"$dccires"}""{"$preset"}""{"$bst"}""{"
 "{"$bri"}""{"$con"}""{"$gam"}""{"$hue"}""{"$sat"}""{"$preset"}"
 
 
-#@gui Slice Stretch/Squeeze : fx_streeze, fx_streeze_preview(0)*
+#@gui Slice Stretch-Squeeze : fx_streeze, fx_streeze_preview(1)+
 #@gui : Iterations = int(10,1,100)
+#@gui : note = note("<small>Do not set this higher than the smallest side of the image:</small>")
 #@gui : Slices = int(100,5,1000)
+#@gui : sep = separator()
 #@gui : note = note("<span color="#EE5500"><small><b>Resizing:</b></small></span>")
 #@gui : Outer Range A (Starting @0%) = int(20,0,100)
 #@gui : Outer Range B (Ending @100%) = int(80,0,100)
@@ -471,6 +480,64 @@ fx_streeze: skip "${1=10},${2=20},${3=20},${4=80},${5=80},${6=20},${7=80},${8=12
 
 fx_streeze_preview:
   fx_streeze $*
+
+
+#@gui Line Spam : fx_linespam, fx_linespam_preview(1)*
+#@gui : Iterations = int(30,1,100)
+#@gui : Line Base Thickness = float(3,0.01,50)
+#@gui : Thickness Scaling = float(1.02,0.01,1.2)
+#@gui : Line Opacity = float(0.8,0,1)
+#@gui : Start X = float(-1,-100,100)
+#@gui : Start Y = float(10,-100,100)
+#@gui : End X = float(101,0,200)
+#@gui : End Y = float(100,0,200)
+#@gui : Deform = float(0,0,20)
+#@gui : Style = choice(0,"A","B","C","D")
+#@gui : Base Color = color(255,85,0,255)
+#@gui : Color Variation = float(0,-10,10)
+#@gui : Randomize Colors = bool(0,0,1)
+#@gui : sep = separator()
+#@gui : Antialiasing = bool(0,0,1)
+#@gui : Amplitude = int(5,0,100)
+#@gui : Edge Threshold (%) = int(10,0,100)
+#@gui : Smoothness = float(0.8,0,5)
+#@gui : sep = separator()
+#@gui : Spam! = int(1,1,10)
+#@gui : note = note("<small>Author: <i><a href="http://prawnsushi.free.fr">Prawnsushi</i></a>.\
+# Latest Update: <i>2023/04/07</i>.</small>")
+
+fx_linespam: skip "${1=30},${2=3},${3=1.02},${4=0.8},${5=-1},${6=10},${7=101},${8=100},${9=0},${10=0},${11=255,85,0,255},${12=0},${13=0},${14=0},${15=5},${16=10},${17=0.8},${18=1}"
+  to_rgba
+  fc 0,0,0,0
+  bthick=$2
+  repeat 4 {
+    repeat $-1 {
+      iter,thick,tscale,opac,sx,sy,ex,ey,def,style,colr,colg,colb,cola,cvar,rcol,aa,amp,edg,smoo,spam=$*
+      c={$>+1}
+      repeat $iter {
+        if $rcol==1
+          col={floor(u($colr-50,$colr+50))},{floor(u($colg-50,$colg+50))},{floor(u($colb-50,$colb+50))},255
+        else
+          col=$colr,$colg,$colb,255
+        fi
+        if $style==0 A,B={$>},{$<} elif $style==1 A,B={$<},{$>} elif $style==2 A,B={$<} else A,B={$>/2} fi
+        thickline. {$sx*$c+$bthick}%,{$A*$sy}%,{$B+$ex}%,{$ey-$A*$B}%,$thick,$opac,$col
+        thick*=$tscale
+        if {$colr+$cvar}<255&&{$colr+$cvar}>0 colr+=$cvar fi
+        if {$colg+$cvar}<255&&{$colg+$cvar}>0 colg+=$cvar fi
+        if {$colb+$cvar}<255&&{$colb+$cvar}>0 colb+=$cvar fi
+      }
+    }
+    if $def deform $def fi
+    rotate. 90,0,0
+  }
+  if $aa fx_smooth_antialias $amp,$edg,$smoo fi
+  n 0,255
+
+  fx_linespam_preview:
+  fx_linespam $*
+
+
 
 # Local Variables:
 # mode: sh
