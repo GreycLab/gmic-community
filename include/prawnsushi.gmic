@@ -198,7 +198,7 @@ fx_sloppymess_preview :
 #@gui : - Old Presets = _choice(0,"Default","1 - From Scratch","2 -Soft","3 - Cracked","4 - Black","5 - Faded Black","6 - Nuudlz for blank page")_0
 #@gui : sep = separator()
 #@gui : note = note("<small>Author: <i><a href="http://prawnsushi.free.fr">Prawnsushi</i></a>.      \
-# Latest Update: <i>2023/16/06</i>.</small>")
+# Latest Update: <i>2023/21/07</i>.</small>")
 
 uglify :
 
@@ -360,29 +360,8 @@ foreach {
   fi
 
   if $dccires repeat $dccires { r 200%,200%,100%,100%,6 } fi
-
   if $noistr fx_noise $noistr,0,11,1,0,50,50 fi
-
-  if $cnvs
-    +fc 255,255,255 noise. 50,2 to_gray. . .
-    if $cvmod
-      __wat=water.
-      __watb=water..
-      __watv=$cvmod,1,45
-    else
-      __wat=b.
-      __watb=b..
-      __watv=0
-    fi
-    parallel " blur_x. 30  $__wat $__watv  sharpen. 50  spread. 1.7 "," blur_y.. 30  $__watb $__watv sharpen.. 50 spread.. 1.7  "
-    *. .. keep[0,-1] n. 0,255 +gradient. xy,1 -a[-2,-1] c *. {$cnvs/100} warp[REND] .,3,1,1,1
-  fi
-
-  +fc[REND] $cvr,$cvg,$cvb,$cva
-  move[-1] 0
-  blend[0,REND] alpha
-  nm[0] REND
-  keep[REND]
+  if $cnvs fx_prawn_canvas[REND] $cnvs,$cvmod,1,$cvr,$cvg,$cvb,$cva fi
 
   if $post
     if $emboss fx_emboss_relief 5,0,0.5,$emboss,1,0,1 fi
@@ -524,9 +503,7 @@ fx_linespam: skip "${1=30},${2=3},${3=1.02},${4=0.8},${5=-1},${6=10},${7=101},${
               else
                 col=$colr,$colg,$colb,255
               fi
-              if $style==0 A,B={$>},{$<} elif $style==1 A,B={$<},{$>} elif $style==2 A,B={$<} else A,B={$>/2} fi
-              # spline. {$sx*$c+$bthick}%,{$A*$sy}%,{$A*100},{$B*100},{$B+$ex}%,{$ey-$A*$B}%,{$B*100},{$A*100},$opac,$col
-              # dilate {$thick/2}
+              if $style==0 A,B=$>,$< elif $style==1 A,B={$<*2},{$>/2} elif $style==2 A,B=$< else A,B={$>/2} fi
               thickline. {$sx*$c+$bthick}%,{$A*$sy}%,{$B+$ex}%,{$ey-$A*$B}%,$thick,$opac,$col
               thick*=$tscale
               if {$colr+$cvar}<255&&{$colr+$cvar}>0 colr+=$cvar fi
@@ -546,31 +523,174 @@ fx_linespam: skip "${1=30},${2=3},${3=1.02},${4=0.8},${5=-1},${6=10},${7=101},${
   fx_linespam_preview:
   fx_linespam $*
 
-#@gui Beams : fx_beams, fx_beams_preview(0)*
-#@gui : Relaunch = button(0,0,1)
-#@gui : Iterations = int(10,1,30)
-#@gui : Shift = int(50,1,99)
-#@gui : Fisheye = int(0,0,100)
+
+
+#@gui Channel Shuffle : fx_chanshuff, fx_chanshuff_preview(1)*
+#@gui : Slices (0:Random) = int(100,0,1000)
 #@gui : Angle = int(0,0,360)
-#@gui : Boundary Conditions = int(3,0,3)
-#@gui : Warp A = int(50,0,100)
-#@gui : Warp B = int(50,0,100)
-#@gui : Warp C = int(50,0,100)
-#@gui : Warp D = int(50,0,100)
-#@gui : Warp E = int(50,0,100)
-#@gui : Warp F = int(50,0,100)
-#@gui : Warp G = int(50,0,100)
-#@gui : Warp H = int(50,0,100)
-#@gui : Warp I = int(50,0,100)
-#@gui : Warp J = int(50,0,100)
-#@gui : Warp K = int(50,0,100)
-#@gui : Warp L = int(50,0,100)
-#@gui : Deform = float(0.9,0,20)
-#@gui : Lunminosity fade = int(5,0,20)
-#@gui : Transparency fade = float(0.99,0,1)
+#@gui : Axis = choice(0,"X","Y")
+#@gui : Sorting = choice(1,"Reverse","Shuffle","Minimum Value X","Minimum Value Y",\
+#"Minimum Value Z","Minimum Value C","Maximum Value X","Maximum Value Y",\
+#"Maximum Value Z","Maximum Value C","Red","Green","Blue","Alpha",\
+#"Minimum Deviation","Maximum Deviation","Average Deviation","Variance Deviation",\
+#"Standard Deviation","Sum Value","Product Value","Median Value",\
+#"L2-Norm","Width","Height","Depth")
+#@gui : Ordering = choice(0,"Positive","Negative")
+#@gui : note = note("<small>Author: <i><a href="http://prawnsushi.free.fr">Prawnsushi</a>, <a href="https://tschumperle.users.greyc.fr/">David Tschumperlé</a></i>.\
+# Latest Update: <i>2023/07/07</i>.</small>")
+
+fx_chanshuff: skip "${1=100},${2=0},${3=0},${4=1},${5=0},${6=10},${7=101},${8=100},${9=0},${10=0}"
+  foreach {
+    arg0 $3,"x","y" axis=${}
+    arg0 $4,\
+        "rv","u","xm","ym","zm","cm","xM","yM","zM","cM","R","G","B","A",\
+        "im","iM","ia","iv","id","is","ip","ic","in","w","h","z"
+    sort=${}
+    arg0 $5,"+","-" order=${}
+    wi,he:=w,h
+    if $3 sli={0,floor(h/$1)} else sli={0,floor(w/$1)} fi
+    if $2>0&&$2!=360 rotate $2,0,0 fi
+    +s c
+    cc={$!-1}
+    if $1
+      s[^0] $axis,$sli
+    if $4>0 sort_list[^0] $order,$sort else rv[^0] fi
+      repeat $cc { a[{$>+1}-{$sli+$>}] $axis }
+    else
+      N={floor(u(10,50))}
+      repeat $cc { l[{$>+1}] {
+      fx_rnd_split $N,$3
+        if $4>0 sort_list[^0] $order,$sort else rv[^0] fi
+        a $axis
+        }
+      }
+    fi
+    a[^0] c keep.
+    if $2>0&&$2!=360
+      rotate. -$2,0,0
+      vx,vy={floor((w-$wi)/2)},{floor((h-$he)/2)}
+      vxb,vyb={$vx+$wi-1},{$vy+$he-1}
+      crop. $vx,$vy,$vxb,$vyb
+    fi
+  }
+
+  fx_chanshuff_preview:
+  fx_chanshuff $*
+
+fx_rnd_split: skip "${1=10},${2=0}"
+  # By David Tschumperlé
+  foreach {
+    N=$1
+    l. {
+     if $2 D=h  else D=w fi
+      {$N+1},1,1,1,>u+j(-1) n. 0,{-2,$D} round. discard.
+      repeat h-1 {
+        param=1,[i[$>],i[$>+1]-1]
+        if $2 +rows[0] {$param} else +columns[0] {$param} fi
+      }
+      rm[0,1]
+    }
+  }
+
+#@gui Prawn Canvas : fx_prawn_canvas, fx_prawn_canvas_preview(0)
+#@gui : Strength = float(0.3,0,1)
+#@gui : Details = float(0,0,30)
+#@gui : Colored = bool(0,0,1)
+#@gui : Color = color(255,255,255,255)
+#@gui : note = note("<small>Author: <i><a href="http://prawnsushi.free.fr">Prawnsushi</i></a>.\
+# Latest Update: <i>2023/21/07</i>.</small>")
+fx_prawn_canvas : skip "${1=1},${2=0.5},${3=0},${4=255},${5=255},${6=255},${7=255}"
+  foreach {
+    nm REND
+    to_a
+    +fc 255,255,255 noise. 50,2 to_gray. . .
+    if $2
+      __wat=water.
+      __watb=water..
+      __watv=$2,1,45
+    else
+      __wat=b.
+      __watb=b..
+      __watv=0
+    fi
+    parallel " blur_x. 30  $__wat $__watv  sharpen. 50  spread. 1.7 "," blur_y.. 30  $__watb $__watv sharpen.. 50 spread.. 1.7  "
+    *. .. keep[0,-1] +n. 0,255 +gradient. xy,1 -a[-2,-1] c *. {$1/100} warp[REND] .,3,1,1,1
+    if $3 +fc[REND] $4,$5,$6,$7 move[-1] 0 blend[0,REND] alpha nm[0] REND  fi
+    keep[REND]
+  }
+
+fx_prawn_canvas_preview:
+  fx_prawn_canvas $*
+
+
+#@gui Paper Cuts : fx_papercuts, fx_papercuts_preview(0)
+#@gui : Simplification = float(3,0,32)
+#@gui : Local Normalization = float(0,0,6)
+#@gui : Colors ( RAM hungry! ) = int(8,2,40)
+#@gui : Color mode = choice(1,"Original","Monochrome","Random")
+#@gui : Monochrome Color = color(240,240,240)
+#@gui : Monochrome Variation = int(0,0,100)
+#@gui : Sorting = choice(22,"Reverse","Shuffle","Minimum Value X","Minimum Value Y",\
+#"Minimum Value Z","Minimum Value C","Maximum Value X","Maximum Value Y",\
+#"Maximum Value Z","Maximum Value C","Red","Green","Blue","Alpha",\
+#"Minimum Deviation","Maximum Deviation","Average Deviation","Variance Deviation",\
+#"Standard Deviation","Sum Value","Product Value","Median Value",\
+#"L2-Norm","Width","Height","Depth")
+#@gui : Ordering = choice(0,"Positive","Negative")
+#@gui : sep = separator()
+#@gui : note = note("<span color="#EE5500"><small><b>Shadows:</b></small></span>")
+#@gui : Size = float(2,0,6)
+#@gui : Shifting X = float(0,-10,10)
+#@gui : Shifting Y = float(0,-10,10)
+#@gui : sep = separator()
+#@gui : Output to Multiple Layers = bool(1,0,1)
+#@gui : note = note("<span color="#EE5500"><small><b>Imperfections:</b></small></span>")
+#@gui : Deformation = float(3,0,40)
+#@gui : Downscaling 50% (Uses less RAM)= bool(1,0,1)
 #@gui : sep = separator()
 #@gui : note = note("<small>Author: <i><a href="http://prawnsushi.free.fr">Prawnsushi</i></a>.\
-# Latest Update: <i>2023/20/06</i>.</small>")
+# Latest Update: <i>2023/20/07</i>.</small>")
+fx_papercuts :
+  foreach {
+    simp,ln,lay,col,cr,cg,cb,cvar,sort,order,shb,sx,sy,mulay,def,down=$*
+    arg0 $9,\
+      "rv","u","xm","ym","zm","cm","xM","yM","zM","cM","R","G","B","A",\
+      "im","iM","ia","iv","id","is","ip","ic","in","w","h","z"
+    sort=${}
+    arg0 $10,"+","-" order=${}
+    wi,he:=w,h
+    if $down r 50%,50%,100%,100%,6 simp,ln,shb,def*=0.5 fi
+    to_rgb n 0,255
+    if $ln normalize_local $ln,$ln fi
+    if $simp
+    b $simp
+    repeat {$simp/4} { bilateral $simp,$simp,$simp,$simp sharpen 50 }
+    fi
+    quantize $lay,1,0 b 0.2 split_colors ,$lay,32 np=$!
+    sh 3 b[$np--1] 0.5 rm[$np--1]
+    sh 0,2
+      if $col==1 ap[$np--1] "fc {u({$5-$8},{$5+$8})},{u({$6-$8},{$6+$8})},{u({$7-$8},{$7+$8})},255" fi
+      if $col==2 ap[$np--1] "fc ${-rgb},255" fi
+    rm[$np--1]
+    if $9>0 sort_list $order,$sort else rv fi
+    n 0,255 sharpen 30
+    repeat $np {
+      +dilate[$<] {$shb*2}
+      if $sx||$sy shift. {$sx+$<},{$sy+$<} fi
+      sh. 0,2  fc. 50,50,50  rm.
+      shrink_xy. {$>/2} b. $shb spread. {$shb/2} mv. $<
+      blend[$<,{$<+1}] alpha
+    }
+    if $def deform $def fi
+    if $down r 200%,200%,100%,100%,6 fi
+    $wi,$he,1,3 fc. 255,255,255
+    repeat $! { fx_prawn_canvas[{$<}] {u(0.1,0.5)},{u(0,0.2)},0 } to_rgb.
+    mv. 0  if $mulay  +blend alpha rv else blend alpha fi
+    n 0,255
+  }
+
+fx_papercuts_preview:
+  fx_papercuts $*
 
 
 # Local Variables:
