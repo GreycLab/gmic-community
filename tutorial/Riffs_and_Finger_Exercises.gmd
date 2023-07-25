@@ -1,0 +1,216 @@
+# Riffs and Finger Exercises
+%% x "mkdir -p img" %%
+
+|-![shellfight](images/leonardravenhill.jpg)\n*                 [Leonard Raven-Hill](https://en.wikipedia.org/wiki/Leonard_Raven-Hill): 'For Auld Lang Syne'* | Riffs and finger exercises — how do you do them?\n\nTwo ways:\n\n 1.  Use the ''-run'' command.\n 2.  Write a [custom command](https://gmic.eu/reference/adding_custom_commands.html#top).\n\nG'MIC _cognoscenti_ may recognize that these two ways are one and the same. The first is a consolidated version of the second. The `run` command creates a temporary custom command out of its argument, but you can roll your own custom command and have more control over its operations.\n\nBoth methods hide G'MIC commands from _[shell interpretation](https://en.wikipedia.org/wiki/Command-line%5finterface)_. ''-help'' aside, there is little ground for running G'MIC commands directly within shells. Command line interpreters compete with G'MIC over syntactically significant characters. Dueling interpreters — each fighting over the same command line — create no end of confusion.
+
+So:
+~~~
+$ gmic -input 128,128,1,1,255*x/(w-1)
+bash: syntax error near unexpected token `('
+~~~
+
+leaves one wondering: _what's going on?_
+
+The command line interpreter — [Bash](https://en.wikipedia.org/wiki/Bash%5f%28Unix_shell%29) here, yours may differ — is in charge and gets first dibs on on the command line. It won't start the G'MIC interpreter before it understands that it is being told to start the G'MIC interpreter. Until then, it has to work its way through the command line. Working its way through, it discovers an open parenthetical character and decides that it is in the wrong place. While the parentheses may have been _intended_ for G'MIC, the `bash` interpreter is playing by its own rules and doesn't get that.
+
+There is nothing we can do about pecking orders. But we can leverage command line rules to our advantage. Nearly every command line interpreter takes single quotes ( ' ) as delimiters for items that are to be passed — _as-is_ — to the command itself. G'MIC's ''-run'' command takes advantage of this protocol:
+~~~
+ $ gmic verbose + -run '-input 150,150,1,1,255*x/(w-1)'
+[gmic]-0./ Start G'MIC interpreter.
+[gmic]-0./ Increment verbosity level (set to 2).
+[gmic]-0./run/ Import custom commands from expression '__run : -input 150,150,1,1,255*x/(w-1)' (1 new, total: 4620).
+[gmic]-0./run/ Set local variable 'v=1'.
+[gmic]-0./run/ Set verbosity level to 3.
+[gmic]-0./run/__run/ Input image at position 0, with values '255*x/(w-1)' (1 image 150x150x1x1).
+[gmic]-1./run/ Set verbosity level to 1.
+[gmic]-1./run/ Discard definition of custom command '__run' (1 found, 4619 commands left).
+[gmic]-1./ Display image [0] = '[255*x/(w-1)]'.
+[0] = '[255*x/(w-1)]':
+  size = (150,150,1,1) [87 Kio of float32].
+  data = (0,1.71141,3.42282,5.13423,6.84564,8.55705,10.2685,11.9799,13.6913,15.4027,17.1141,18.8255,(...),236.174,237.886,239.597,241.309,243.02,244.732,246.443,248.154,249.866,251.577,253.289,255).
+  min = 0, max = 255, mean = 127.5, std = 74.1062, coords_min = (0,0,0,0), coords_max = (149,0,0,0).
+[gmic]-1./ End G'MIC interpreter.
+~~~
+===
+|- %% 150,150,1,1,255*x/(w-1)  =>. "left-to-right ramp" _parse_cli_images r2dx. 50% %%
+| *A left-to-right, black-to-white, ramp*
+===
+Here, ''-run'' slips a [ramp generator](https://gmic.eu/oldtutorial/ramps.shtml) past the bash interpreter. We also use the ''-verbose'' comand to make plain this sleigh of hand. The bash interpreter invokes G'MIC with four items: the ''-verbose'' command with its `+` argument, to better see the turning of the trick, then the ''-run'' command with its pipeline argument — to us. But it is just a ( ' ) delimited string to the command line interpreter, something that it is not supposed to touch. With those four items in play, the bash interpreter invokes the command "gmic" and retires from play.
+
+Once invoked, G'MIC takes ownership of its argument list. It finds the ''-run'' command and the string argument comprising the pipeline. The ''-run'' command converts that argument into a temporary G'MIC custom command and runs it — now safe from command line interpretation.
+
+Yes — a more roundabout game now. That's OK. We're not doing performance coding here but finger exercises; we want to study the G'MIC interpreter without all those other damn interpreters butting in.
+
+## Riffs
+With dueling interpreters behind us, let's riff — the G'MIC equivalent to improvisational jazz.
+
+Here's the play. G'MIC has something like over nine hundred commands — with community contributions thrown in, maybe over a thousand. You, starting out, know what? Could be a dozen? Can't be blamed for not knowing where to begin.
+
+Begin with riffs.
+
+Riffs embody full-on play. As in, being four years old and in a sandbox. Nobody tells you what to do. Nor do you do much strategic planning. You just do whatever floats into your head, and the notions and whimsies and bits of caprice that do float in interconnect with the bits already there, concocting a cognitive brew. Reading tutorials — as you are doing now — can help, insofar as tutorials point out possibilities, here and there. But if you are going to slay dragons, then at some point you are going to have to put that book down about slaying dragons, go out, and slay dragons. Good luck with that. At least with G'MIC there are no complications arising from forgetting your mace.
+
+So. Let's riff. To the *left-to-right* ramp, we apply a Hue, Saturation and Value (hsv) ''-map''. Why? Why not? Some tutorial said stuff-and-feathers about taking luminosity scalars to RGB vectors. Huh. So what's that really?
+
+===
+|-%% 150,150,1,1,255*x/(w-1) map hsv n. 0,255 =>. "The ramp colorized" _parse_cli_images r2dx. 50% %%
+| *The ramp colorized*
+
+~~~
+$  gmic -run '150,150,1,1,255*x/(w-1) map hsv'
+~~~
+===
+So that's what happens with ramps — but who says we're stuck with ramps? Lets riff off of the ''-apply_curve'' command. Tutorials say it changes the luminosity transfer function. What the H-E-Double Tooth Picks is a luminosity transfer function? Well, it takes X-Y pairs, points for the new function, and a "smoothing parameter" — here, "one". OK. So, let's give it points for the new function and a smoothing parameter of one and see what's what.
+
+===
+|-%% d=0,64,200,64,0 150,150,1,1,255*x/(w-1) =>. linear i ($d) display_graph. 300,300,2,4,0,255,0,255 =>. transfer r2dx[transfer] 50% +apply_curve[linear] 1,0,0,63,64,127,200,191,64,255,0 =>. bellcurve to_rgb[linear,transfer,bellcurve] _parse_cli_images append x r2dx. 50% %%
+| *The ramp is now not-a-ramp (aka — a bellcurve)*
+
+~~~
+$ gmic -run '150,150,1,1,255*x/(w-1) -apply_curve. 1,0,0,63,64,127,200,191,64,255,0
+~~~
+===
+So — the-what-used-to-be values — those on the horizontal axis — transfer to the as-they-are-now values on the vertical. Hm. Or is it the other way around? One fine day we'll read the documentation. Maybe. Or do a tutorial.
+
+But — what about all those _other_ maps? They look like what? Let's find out:
+
+===
+|-%% 150,150,1,1,255*x/(w-1) -apply_curve. 1,0,0,63,64,127,200,191,64,255,0 -name. bellcurve +map[bellcurve] balance -name. balance +map[bellcurve] aurora -name. aurora +map[bellcurve] jet -name. jet _parse_cli_images a x r2dx. 50% %%
+|-%% 150,150,1,1,255*x/(w-1) -apply_curve. 1,0,0,63,64,127,200,191,64,255,0 -name. bellcurve +map[bellcurve] curl -name. curl +map[bellcurve] hocuspocus -name. hocuspocus +map[bellcurve] rain -name. rain +map[bellcurve] matter -name. matter rm[bellcurve] _parse_cli_images a x r2dx. 50% %%
+| *Multitudes of Mappings*
+
+~~~
+$ gmic -run '150,150,1,1,255*x/(w-1) -apply_curve. 1,0,0,63,64,127,200,191,64,255,0 -name. bellcurve +map[bellcurve] balance -name. balance +map[bellcurve] aurora -name. aurora +map[bellcurve] jet -name. jet +map[bellcurve] curl -name. curl +map[bellcurve] hocuspocus -name. hocuspocus +map[bellcurve] rain -name. rain +map[bellcurve] matter -name. matter'
+~~~
+===
+
+Now from that last riff, here's a takeaway: ''-name''. Kind of a way to bookmark images. Label one image with "bellcurve", then refer to it in lots of elsewheres. We don't have to worry about how images are numbered even as things shift around.
+
+What else might we do? _Yes!_ Exclusive OR's!
+
+===
+|-%% 150,150,1,1,255*x/(w-1) =>. linear +apply_curve[linear] 1,0,0,63,64,127,200,191,64,255,0 =>. bellcurve +map[bellcurve] balance =>. balance  +rotate[linear] 90 =>. delta apply_curve[delta] 1,0,0,63,200,127,127,191,10,255,200 map. delta 100%,100%,1,3,"c==0?xor(i(#$balance,x,y,0,0),i(#$delta,x,y,0,0)):c==1?xor(i(#$balance,x,y,0,1),i(#$delta,x,y,0,1)):xor(i(#$balance,x,y,0,2),i(#$delta,x,y,0,2))" =>. magic_carpet to_rgb[linear,bellcurve] _parse_cli_images a x r2dx. 50% %%
+| *XORed Channels*
+
+~~~
+$ gmic -run '-input 150,150,1,1,255*x/(w-1) -name. linear +apply_curve[linear] 1,0,0,63,64,127,200,191,64,255,0 -name. bellcurve +map[bellcurve] balance -name. balance +rotate[linear] 90 -name. delta apply_curve[delta] 1,0,0,63,200,127,127,191,10,255,200 -map. delta -input 100%,100%,1,3,"c==0?xor(i(#$balance,x,y,0,0),i(#$delta,x,y,0,0)):c==1?xor(i(#$balance,x,y,0,1),i(#$delta,x,y,0,1)):xor(i(#$balance,x,y,0,2),i(#$delta,x,y,0,2))" -name. magic_carpet'
+~~~
+===
+
+And that's how riffs go. It's all improv. On-the-fly surprise and discovery. Who would have thought that XORing channels would have given rise to such fantastic patterns as *magic_carpet*?
+
+Yet — riffs. Easy do they come for those with a vocabulary. Incoming bits of caprice, as they say. Otherwise — nothing. One hesitates, doubts, and doubt is where riffs go to die.
+
+That's the pit to get out of. Paradoxically, though, the vocabulary for doing riffs comes from doing riffs. From first attempts comes a little knowledge. A little knowledge draws in more knowledge. In any case, it is better not to work in isolation but to seek out what others are doing:
+
+| 1.  |Look at other peoples' scripts. Go to G'MIC gathering spots like [discuss.pixls.us](https://discuss.pixls.us/c/software/gmic).
+| 2.  |Page through the [Technical Reference Command List](https://gmic.eu/reference/list_of_commands.html). Most command descriptions include a bare-bones riff.
+| 3.  |Clone the [gmic-community repository](https://github.com/GreycLab/gmic-community). Look in the [include](https://github.com/GreycLab/gmic-community/tree/master/include) directory. These are where the works of community contributors reside; many of these `.gmic` files define the filters that appear in the gmic-qt plug-in.
+| 4.  |When you are feeling more robust, clone the [gmic repository](https://github.com/GreycLab/gmic) and crack open `src/gmic_stdlib.gmic` — this file defines the core G'MIC custom commands and furnishes help text for all G'MIC commands.
+|    a.  |On first read, `src/gmic_stdlib.gmic` is very nearly incomprehensible. That's OK. Use it as a gauge for your mastery of G'MIC.
+|    b.  |As you build vocabulary, you acquire an ambient sense of how the language goes together. `gmic_stdlib.gmic` progressively becomes _less_ incomprehensible.
+|    c.  |After awhile, with your sense of G'MIC solidifying, `gmic_stdlib.gmic` begins to look — _sensible!_
+|    d.  |When it starts to look _really_ sensible, you've reached an important level of maturity. Now you can judiciously steal from it. Supporting the very language that defines it, `gmic_stdlib.gmic` is an impeccable source of mature code. Since it runs in _every_ G'MIC session, `gmic_stdlib.gmic` is heavily field-tested.
+| 5.  |At the end of the day, find some commands to play with, and just — play! It is key to actually _play with_, and not just _read_ G'MIC commands. Plain, clear-cut, experiments better fix commands in one's mind than superficial reads. That's how G'MIC vocabularies build. As you acquire vocabulary, the permutations and combinations among new-found commands increase dramatically and you can better use what you know to discover what you need to know: a boot-strapping of skills.
+
+## Finger exercises
+
+Riffs grow very long very quickly, acquiring structureless appearances that belie what they do. Quickly now — how does *magic_carpet* make its mark? That long string trailing the `run` command hides its purport in a crowd of characters. For this, [elementary custom commands](https://gmic.eu/tutorial/custom_cheat.html#usecustomcommandstobypasstheshell) can be harnessed to extract signal from noise:
+
+===
+~~~
+magic_carpet:
+   # First ramp:
+   -input 150,150,1,1,255*x/(w-1)
+   -apply_curve. 1,0,0,63,64,127,200,191,64,255,0
+   -map. balance
+
+   # Second ramp:
+   -input 150,150,1,1,255*(h-y-1)/(h-1)
+   -apply_curve. 1,0,0,63,200,127,127,191,10,255,200
+   -map. delta
+
+   # XOR to make rug pattern
+   -input 100%,100%,1,3,">c==0?
+                           xor(
+                                i(#-3,x,y,0,0),
+                                i(#-2,x,y,0,0)
+                              ):
+                         c==1?
+                           xor(
+                                i(#-3,x,y,0,1),
+                                i(#-2,x,y,0,1)
+                              ):
+                           xor(
+                                i(#-3,x,y,0,2),
+                                i(#-2,x,y,0,2)
+                              )"
+~~~
+*A magic_carpet pretty-print listing*
+===
+This listing is largely the *magic_carpet* `run` command, but formatted in a way to bring its unruly argument to heel. Yet there is an additional stroke at work here: the first line declares an equivalence between a _custom command_, here "magic_carpet," to the left of the `:` colon character, and its follow-on pipeline implementation. The colon character bears a syncopated likeness to an equal sign and fulfills a similar rôle. It goes to the heart of G'MIC's extension mechanism, binding keywords to pipelines. Henceforth, wherever the custom command _magic_carpet_ appears in a pipeline, G'MIC expands it into its pipeline implementation and "enters it" as a new _execution scope_. 
+
+There are substantial details about this extension mechanism that are being put to one side here, but can be found in the [Custom Command cheat sheet](https://gmic.eu/tutorial/custom_cheat.html). Key to our purposes is how experimental custom command definitions provide a suitable setting for doing _finger exercises_. At the outset, we can crystalize the best of impromptu riffs within an experimental custom command, then commence a considered investigation through purposeful and clear-cut modifications. This is less like patty-cake play in a sandbox and more like scientific experimentation: we are growing up.
+
+To begin, save the *magic_carpet* listing in a _command definition file_ — say, `magic_carpet.gmic`, and put it in the current working directory. Now:
+
+~~~
+$ gmic -command magic_carpet.gmic -magic_carpet
+~~~
+
+reads in the command definition, `magic_carpet`, then invokes it.
+
+===
+|-%% m scripts/magic_carpet.gmic i 150,150,1,1,255*x/(w-1) -apply_curve. 1,0,0,63,64,127,200,191,64,255,0 map. balance =>. balance 150,150,1,1,255*(h-y-1)/(h-1) -apply_curve. 1,0,0,63,200,127,127,191,10,255,200 map. delta =>. delta magic_carpet[balance] [delta],0% rm[delta] _parse_cli_images a x r2dx. 50% %%
+| *magic_carpet*
+===
+First, some good things:
+
+| 1.  |White space and judicious commenting has transformed the final riff from a barely comprehensible `run` command to a fairly readable custom command. So long as we have _some_ G'MIC savvy, It should be fairly clear that we create two ramps and that we modify each with particular ''-apply_curve'' and ''-map'' commands. It also should be clear from the comments that we generate the carpet pattern by filling a new image with a mathematical expression, one that performs various `xor` operations on the ramp image channels.
+| 2.  |Comments, introduced by the hash character, ( # ), make plain-English statements about what the code is doing. This, with white space, makes the progression of pipeline operations quite clear.
+| 3.  |Introduced by G'MIC's custom command creator, ''-command'', we can subsequently use `magic_carpet` as we might any other G'MIC command, placing it anywhere in the pipeline where we might want a "magic carpet" image. Until G'MIC exits, or until we insert an `-uncommand magic_carpet` sequence somewhere in the pipeline, `magic_carpet` remains available for reuse. We can even cite it in other custom command definitions, so long as we remember to execute `-command magic_carpet.gmic` before `magic_carpet's` first use.
+
+Next, some less-than-good things:
+
+| 1.  |As commands go, `magic_carpet` is pretty rigid. There is nothing we can do to alter its behavior. We get the two antecedent ramps and magic carpet images at fixed sizes and with fixed appearances, an arrangement that is probably less than exactly what we want.
+| 2.  |`gmic -help blur` provides guidance on how to use the ''-blur'' command. `gmic -command magic_carpet.gmic -help magic_carpet` provides no help whatsoever (`No help available for command 'magic_carpet'`). At the very least, we'd like a few hints on how to use the command.
+| 3.  |We'd like to use `magic_carpet` generally, without needing to introduce it with ''-command'' and the follow-on requirement of finding it, when maybe we can't quite remember where it went.
+
+### First Finger Exercise
+
+Finger exercises are akin to engineering exercises. Like riffs, finger exercises are iterative: change the code, review the result, design the next iteration. Unlike riffs, finger exercises are more purposeful. For people new to G'MIC, it is not surprising that finger exercises involve just very small changes. As one's grasp of the language grows, finger exercises begin to incorporate more changes per step.
+
+This may be a good time to get [git](https://git-scm.com/book/en/v2). Really? A _version control system?_ Why?
+
+To snapshot your work as you go along. If you make a mess, you can backup to the last snapshot that worked. Every commit makes a snapshot. Commit often. With finger exercises, you will be trying different things and screwing up from time to time. Under `git` version control, it is a trivial matter to back out to the last good commit. Also, `git` branches allow you to explore alternate approaches; you can make branches at any one of your commit points. Keep branches forever if you want: variations on a theme. Git repositories aren’t just for large projects. They work for tiny projects too. Here’s how to get started, assuming that `git` has been installed and you are in the directory containing `magic_carpet.gmic`:
+
+===
+~~~
+$ git init
+Initialized empty Git repository in /home/myusername/magic_carpet/.git/
+$ git branch -m main
+$ git add magic_carpet.gmic
+$ git commit -m "Initializing the repository."
+[main (root-commit) 7341d6f] Init.
+ 1 file changed, 29 insertions(+)
+ create mode 100644 magic_carpet.gmic
+~~~
+===
+These actions create the repository, adds `magic_carpet.gmic` and makes the first commit, taking a commit comment as an argument to parameter `-m` ("message"). You have your first snapshot. To each finger eexercise iteration, add the commands:
+
+===
+~~~
+$ git add magic_carpet.gmic
+$ git commit -m "<briefly: what changed>"
+~~~
+===
+### Automatically loading commands
+The file named `.gmic`, no base name, just an extension, goes in your  $HOME/ folder (UNIX, Linux, MacOS)or %USERPROFILE%/user.gmic on Windows). It will be read each time the plug-in is launched, or when the Refresh button (under the central pane) is pressed. It must be a regular text file, containing the declarations and implementations of the filters (written in the G'MIC language) that will be added to the list of available ones.
+
+
+===
+|-![magic_carpet](img/magic.mp4)
+| *Magic Carpet Animation*
+===
+
+Updated: 24-July-2023 21:00 UTC Commit: 5450b0e8c5d636c7940f89892cf5d2ed66aae9a1
