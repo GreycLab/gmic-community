@@ -629,8 +629,8 @@ fx_prawn_canvas_preview:
 #@gui : Colors ( RAM hungry! ) = int(8,2,40)
 #@gui : Color mode = choice(1,"Original","Monochrome","Random")
 #@gui : Monochrome Color = color(240,240,240)
-#@gui : Monochrome Variation = int(0,0,100)
-#@gui : Sorting = choice(22,"Reverse","Shuffle","Minimum Value X","Minimum Value Y",\
+#@gui : Color Variation (Off if Random) = int(0,0,100)
+#@gui : Sorting = choice(0,"None","Reverse","Shuffle","Minimum Value X","Minimum Value Y",\
 #"Minimum Value Z","Minimum Value C","Maximum Value X","Maximum Value Y",\
 #"Maximum Value Z","Maximum Value C","Red","Green","Blue","Alpha",\
 #"Minimum Deviation","Maximum Deviation","Average Deviation","Variance Deviation",\
@@ -640,53 +640,60 @@ fx_prawn_canvas_preview:
 #@gui : sep = separator()
 #@gui : note = note("<span color="#EE5500"><small><b>Shadows:</b></small></span>")
 #@gui : Size = float(2,0,6)
-#@gui : Shifting X = float(0,-10,10)
-#@gui : Shifting Y = float(0,-10,10)
+#@gui : Opacity = float(0.8,0,1)
+#@gui : Shifting X = float(4,-10,10)
+#@gui : Shifting Y = float(4,-10,10)
 #@gui : sep = separator()
 #@gui : Output to Multiple Layers = bool(1,0,1)
+#@gui : note = note("<small><b>First layer will contain all other layers, merged</b></small>")
+#@gui : sep = separator()
 #@gui : note = note("<span color="#EE5500"><small><b>Imperfections:</b></small></span>")
 #@gui : Deformation = float(3,0,40)
 #@gui : Downscaling 50% (Uses less RAM)= bool(1,0,1)
 #@gui : sep = separator()
 #@gui : note = note("<small>Author: <i><a href="http://prawnsushi.free.fr">Prawnsushi</i></a>.\
-# Latest Update: <i>2023/20/07</i>.</small>")
+# Latest Update: <i>2023/25/07</i>.</small>")
 fx_papercuts :
   foreach {
-    simp,ln,lay,col,cr,cg,cb,cvar,sort,order,shb,sx,sy,mulay,def,down=$*
+    simp,ln,lay,col,cr,cg,cb,cvar,sort,order,shb,sho,sx,sy,mulay,def,down=$*
     arg0 $9,\
-      "rv","u","xm","ym","zm","cm","xM","yM","zM","cM","R","G","B","A",\
+      "none","rv","u","xm","ym","zm","cm","xM","yM","zM","cM","R","G","B","A",\
       "im","iM","ia","iv","id","is","ip","ic","in","w","h","z"
     sort=${}
     arg0 $10,"+","-" order=${}
     wi,he:=w,h
-    if $down r 50%,50%,100%,100%,6 simp,ln,shb,def*=0.5 fi
+    if $down r 50%,50%,100%,100%,6 coeff=0.5 simp,ln,shb,def*=$coeff else coeff=1 fi
     to_rgb n 0,255
     if $ln normalize_local $ln,$ln fi
     if $simp
-    b $simp
-    repeat {$simp/4} { bilateral $simp,$simp,$simp,$simp sharpen 50 }
+      b $simp
+      repeat 1 {  sharpen 50 bilateral $simp,$simp,0,0 }
     fi
-    quantize $lay,1,0 b 0.2 split_colors ,$lay,32 np=$!
-    sh 3 b[$np--1] 0.5 rm[$np--1]
-    sh 0,2
-      if $col==1 ap[$np--1] "fc {u({$5-$8},{$5+$8})},{u({$6-$8},{$6+$8})},{u({$7-$8},{$7+$8})},255" fi
-      if $col==2 ap[$np--1] "fc ${-rgb},255" fi
-    rm[$np--1]
-    if $9>0 sort_list $order,$sort else rv fi
+    quantize $lay,1,-1  split_colors 20,$lay,32 np=$!
+    sh 3 b[$np--1] {1.5*$coeff} rm[$np--1]
+      sh 0,2
+        if $col==0&&$cvar ap[$np--1] "adjust_colors {u(-$8,$8)},{u(-$8,$8)},{u(-$8,$8)},{u(-$8,$8)},{u(-$8,$8)}" fi
+        if $col==1 ap[$np--1] "fc {u({$5-$8},{$5+$8})},{u({$6-$8},{$6+$8})},{u({$7-$8},{$7+$8})},100" fi
+        if $col==2 ap[$np--1] "fc ${-rgb},255" fi
+      rm[$np--1]
+    if $9>1 sort_list $order,$sort fi
+    if $9==1 rv fi
     n 0,255 sharpen 30
-    repeat $np {
-      +dilate[$<] {$shb*2}
-      if $sx||$sy shift. {$sx+$<},{$sy+$<} fi
-      sh. 0,2  fc. 50,50,50  rm.
-      shrink_xy. {$>/2} b. $shb spread. {$shb/2} mv. $<
-      blend[$<,{$<+1}] alpha
-    }
+    if $shb&&$sho
+      repeat $np {
+        +dilate[$<] {$shb*2}
+        if $sx||$sy shift. {($coeff*$sx)+$<},{($coeff*$sy)+$<} fi
+        sh. 0,2  fc. 0,0,0 rm.
+        if $sho<1 sh. 3 *. $sho rm. fi
+        shrink_xy[$<] {$<*2} b. $shb spread. {$shb/4} mv. $<
+        blend[$<,{$<+1}] alpha
+      }
+    fi
     if $def deform $def fi
     if $down r 200%,200%,100%,100%,6 fi
     $wi,$he,1,3 fc. 255,255,255
-    repeat $! { fx_prawn_canvas[{$<}] {u(0.1,0.5)},{u(0,0.2)},0 } to_rgb.
-    mv. 0  if $mulay  +blend alpha rv else blend alpha fi
-    n 0,255
+    repeat $! { fx_prawn_canvas[{$<}] {u(0.1,0.5)},{u(0,0.9)},0 } to_rgb.
+    mv. 0  if $mulay +blend alpha rv n 0,255 else blend alpha n 0,255 fi
   }
 
 fx_papercuts_preview:
