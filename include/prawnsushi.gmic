@@ -614,7 +614,7 @@ fx_prawn_canvas : skip "${1=1},${2=0.5},${3=0},${4=255},${5=255},${6=255},${7=25
       __watv=0
     fi
     parallel " blur_x. 30  $__wat $__watv  sharpen. 50  spread. 1.7 "," blur_y.. 30  $__watb $__watv sharpen.. 50 spread.. 1.7  "
-    *. .. keep[0,-1] +n. 0,255 +gradient. xy,1 -a[-2,-1] c *. {$1/100} warp[REND] .,3,1,1,1
+    *. .. keep[0,-1] +n. 0,255 +gradient. xy,1 -a[-2,-1] c *. {$1/100} warp[REND] .,3,1,3,1
     if $3 +fc[REND] $4,$5,$6,$7 move[-1] 0 blend[0,REND] alpha nm[0] REND  fi
     keep[REND]
   }
@@ -648,7 +648,7 @@ fx_prawn_canvas_preview:
 #@gui : note = note("<small><b>First layer will contain all other layers, merged</b></small>")
 #@gui : sep = separator()
 #@gui : note = note("<span color="#EE5500"><small><b>Imperfections:</b></small></span>")
-#@gui : Deformation = float(3,0,40)
+#@gui : Deformation = float(1,0,40)
 #@gui : Downscaling 50% (Uses less RAM)= bool(1,0,1)
 #@gui : sep = separator()
 #@gui : note = note("<small>Author: <i><a href="http://prawnsushi.free.fr">Prawnsushi</i></a>.\
@@ -667,7 +667,7 @@ fx_papercuts :
     if $ln normalize_local $ln,$ln fi
     if $simp
       b $simp
-      repeat 1 {  sharpen 50 bilateral $simp,$simp,0,0 }
+      repeat 1 {  bilateral $simp,$simp,0,0 }
     fi
     quantize $lay,1,-1  split_colors 20,$lay,32 np=$!
     sh 3 b[$np--1] {1.5*$coeff} rm[$np--1]
@@ -681,18 +681,24 @@ fx_papercuts :
     n 0,255 sharpen 30
     if $shb&&$sho
       repeat $np {
-        +dilate[$<] {$shb*2}
-        if $sx||$sy shift. {($coeff*$sx)+$<},{($coeff*$sy)+$<} fi
+        [$<] mul. 1.1
+        +dilate[$<] {$shb*2}  b. $shb spread. {$shb/4}
         sh. 0,2  fc. 0,0,0 rm.
         if $sho<1 sh. 3 *. $sho rm. fi
-        shrink_xy[$<] {$<*2} b. $shb spread. {$shb/4} mv. $<
+        if $sx||$sy
+          dirx,diry={($coeff*$sx)+$<},{($coeff*$sy)+$<}
+          shift. $dirx,$diry
+          shift.. {($dirx-($dirx*2))*0.3},{($diry-($diry*2))*0.3}
+        fi
+        blend[-2,-1] alpha
+        shrink_xy[$<] {$<*2} mv. $<
         blend[$<,{$<+1}] alpha
       }
     fi
     if $def deform $def fi
     if $down r 200%,200%,100%,100%,6 fi
     $wi,$he,1,3 fc. 255,255,255
-    repeat $! { fx_prawn_canvas[{$<}] {u(0.1,0.5)},{u(0,0.9)},0 } to_rgb.
+    repeat $! { fx_prawn_canvas[{$<}] {u(0.1,0.5)},{u(0,3.9)},0 } to_rgb. negate.
     mv. 0  if $mulay +blend alpha rv n 0,255 else blend alpha n 0,255 fi
   }
 
