@@ -3574,6 +3574,443 @@ check "$8!=0"
    yp=oscil_b(yp,txp);
   );
   norm(xp,yp);"
+#@cli rep_inverse_permutation: number_list
+#@cli : Return the inverse permutation.
+#@cli :
+#@cli : number_list must be in the form of 0,1,2,3.... , but can be in any order.
+rep_inverse_permutation:
+if $#>1
+ ordered={expr('x',$#)}
+ if sort([$*])==[$ordered]
+  if [$*]==[$ordered] u $ordered
+  else
+   ($*)
+   {$#}
+   eval.. i(#-1,i)=x
+   u {crop(#-1)}
+   rm[-2,-1]
+  fi
+ else error inv_args
+ fi
+else u 0
+fi
+#@cli rep_inverse_permute_str: permutation_string
+#@cli : Return the inverse permutation_string for command permute
+#@cli : 'permutation_string' is a combination of the character set {x|y|z|c},
+#@cli : e.g. 'xycz', 'cxyz', ...
+rep_inverse_permute_str:
+check "sort('$*')=='cxyz'"
+x={'x'}
+axis_list=xyzc
+
+if '$*'=='$axis_list' return fi
+
+('$axis_list') => axis_list
+({'$*'}) => user_axis_list_permutation
+
+set[user_axis_list_permutation] {$x+3},{xm}
+-[user_axis_list_permutation] $x
+
+(${rep_inverse_permutation\ {crop(#-1)}}) => inverse_permute_map
+
+map[inverse_permute_map] [axis_list]
+
+u {t}
+rm[-3--1]
+#@cli rep_generate_all_images_combinations:[images]
+#@cli : Generates all combinations of images.
+rep_find_all_images_combinations:
+if $!==1 return
+elif !$! error no_imgs
+else timg={$!}
+fi
+
+if ${-max_d}>1 error inv_dim_d fi
+
+eval "
+ valid_dim=1;
+ refer_dim=[w#-1,h#-1];
+ repeat($timg-1,p,
+  [w#p,h#p]!=refer_dim?(valid_dim=0;break(););
+ );
+ valid_dim;"
+
+if !${} error inv_dims fi
+
+a z
+
++rep_r_permutations $timg,$timg,z
+permute. cyzx
+
+{w#0*d#0},{h#0},{d#-1},{s#0}
+
+eval.. "
+ const img_w=w#0;
+ const img_h=h#0;
+ const img_s=s#0;
+ crop_image=crop(#0,0,0,i,0,img_w,img_h,1,img_s);
+ draw(#-1,crop_image,img_w*x,0,z,0,img_w,img_h,1,img_s,1);
+ "
+
+k[-1] s z
+#@cli rep_permutations: init_num,_axis={x,y,z}
+#@cli : Return all the permutations of set of numbers as a image.
+#@cli :
+#@cli : Finding the next permutation has been adapted from this link -> https://www.techiedelight.com/find-permutations-string-cpp-java-iterative/
+#@cli : Finding the permutation at point index within this code is of the author.
+#@cli : Author : Reptorian.
+#@cli : Default values: '_axis=x'
++rep_permutations:
+skip ${2=x}
+
+check "inrange($1,0,10,1,1)&&$1==int($1)&&inrange(('$2')[0],120,122,1,1)"
+
+if $1==1 1 return fi
+
+axis,fact_size={_'$2'-_'x'},{fact($1)}
+
+out_dim={v=vector(#3,1);v[$axis]=$fact_size;v}
+
+if $fact_size>(768*$_cpus) mode=: fi
+
+$out_dim,$1,$mode"
+ begin_t(
+  const max_index=s-1;
+  const dec_max_index=max_index-1;
+  const axis=$axis;
+  axis==2?(index()=z;):
+  axis==1?(index()=y;):
+           index()=x;
+  reverse_array_starting_from(a)=(
+   start=a;
+   end=max_index;
+   while(start<end,
+    swap(permutation[start++],permutation[end--]);
+   );
+  );
+  started=0;
+  permutation=expr('x',s);
+ );
+
+ started?(
+  fn=b=max_index;
+  while(permutation[fn-1]>=permutation[fn],--fn;if(!fn,break();););
+  while(b>fn&&permutation[b]<=permutation[fn-1],--b;);
+  swap(permutation[fn-1],permutation[b]);
+  reverse_array_starting_from(fn);
+ ):(
+
+  index=index();
+
+  if(index,
+
+   fn=max_index;
+   init_array_size=s;
+   init_permutation=permutation;
+
+   repeat(fn,iter,
+    division_number=fact(fn);
+    pos=int(index/division_number);
+    permutation[iter]=init_permutation[pos];
+    copy(init_permutation[pos],init_permutation[pos+1],init_array_size-pos);
+    index=index%division_number;
+    --init_array_size;
+    --fn;
+   );
+
+   permutation[iter]=init_permutation[0];
+  );
+
+  started=1;
+
+ );
+
+ permutation;"
+#@cli rep_permutation_index2list: number_of_item,permutation_number
+#@cli : Return permutation order at index permutation_number.
+rep_permutation_index2list:
+
+num_of_items={max(1,int(abs($1)))}
+
+if $num_of_items==1 u 0
+else
+
+ permutation_number={$2%fact($num_of_items)}
+
+ 1,{$num_of_items+1},1,1,y
+
+ eval "
+  const num_of_items=$num_of_items;
+  new_arr=vector(#num_of_items,0);
+
+  fn=num_of_items-1;
+
+  permutation_position=$permutation_number;
+
+  repeat(fn,iter,
+   division_number=fact(fn);
+   pos=int(permutation_position/division_number);
+   new_arr_num=i[#-1,pos];
+   new_arr[iter]=new_arr_num;
+   da_remove(#-1,pos);
+   permutation_position%=division_number;
+   --fn;
+  );
+
+  new_arr[iter]=i[#-1,0];
+
+  new_arr;"
+
+  rm.
+
+fi
+#@cli rep_permutation_list2index: number_list
+#@cli : Return the lexicographic index in which this permutation is found within a list of all possible permutation.
+#@cli :
+#@cli : number_list must be in the form of 0,1,2,3.... , but can be in any order.
+#@cli :
+#@cli : Note: Not the derived source code, but really close to the original one and can be inferred to be operating on the same logic. Arguably the same after inspection. - https://www.geeksforgeeks.org/lexicographic-rank-of-a-string/ . Derived source code author is unknown.
+rep_permutation_list2index:
+if $#>1
+ if sort([$*])==expr('x',$#)
+  if [$*]==expr('x',$#) u 0
+  else
+   eval "
+    const fn=$#-1;
+    iv=[$*];
+    p=0;
+    repeat(fn,k,
+     v=iv[k];
+     repeat(k,m,
+      if(iv[m]<iv[k],--v);
+     );
+     p+=v*fact(fn-k);
+    );
+    p;
+    "
+  fi
+ else
+  error inv_args
+ fi
+else
+ u 0
+fi
+#@cli rep_npr_permutations: number_of_items,selected_items_count,_axis={x|y|z}
+#@cli : Generates partial combination. P(n,k)
+#@cli : Note - Code is taken from Alistairisrael pseudo-code - https://alistairisrael.wordpress.com/2009/09/22/simple-efficient-pnk-algorithm/
+#@cli : Default values: '_axis=x'
++rep_npr_permutations:
+skip ${3=x}
+
+check "($1>=$2&&$1>0&&isint($1))&&($2>0&&isint($2))&&inrange(_'$3',_'x',_'z',1,1)"
+
+if [${1-2}]==[1,1] 1 return fi
+
+num_of_combinations,axis={permut($2,$1,1)},{_'$3'-_'x'}
+
+if $axis==2   out_dim=1,1,$num_of_combinations
+elif $axis==1 out_dim=1,$num_of_combinations,1
+else          out_dim=$num_of_combinations,1,1
+fi
+
+if $2==1 $out_dim,1,${arg\ $axis+1,x,y,z} return fi
+
+$out_dim,$2,>"begin(
+  const edge=s-1;
+  const n=$1;
+  const dec_n=n-1;
+  const axis=$axis;
+
+  axis==2?(
+   axis()=z;
+  ):
+  axis==1?(
+   axis()=y;
+  ):(
+   axis()=x;
+  );
+
+  output=expr('x',n);
+
+  reverse_array_starting_from(a)=(
+   start=a;
+   end=dec_n;
+   while(start<end,
+    swap(output[start++],output[end--]);
+   );
+  );
+
+ );
+
+ if(axis(),
+  j=s;
+  while(j<n && (output[edge]>=output[j]),++j;);
+
+  j<n?(
+   swap(output[edge],output[j]);
+  ):(
+   reverse_array_starting_from(s);
+
+   i=edge-1;
+   while(i>=0 && output[i]>=output[i+1],--i;);
+
+   j=dec_n;
+   while(j>i && (output[i]>=output[j]),--j;);
+
+   swap(output[i],output[j]);
+
+   reverse_array_starting_from(i+1);
+  );
+ );
+
+ (output)[0,s];
+ "
+#@cli rep_npr_permutation_index2list: number_of_item,selected_items_count,permutation_number
+#@cli : Return permutation order at index permutation_number.
+rep_npr_permutation_index2list:
+
+check "$2<=$1&&$1>0&&$2>0"
+
+if $1==1 status 0
+elif $2==1 status {$3%$1}
+else
+
+ permutation_number={$3%permut($2,$1,1)}
+
+ 1,{$1+1},1,1,y
+
+ {1+($1==$2?$1-2:min($1-1,$2-1))},1,1,1,>"begin(
+   const m=($1==$2?1:$1-$2)+1;
+   v=m;
+  );
+  x>1?v=v*(m+x-1):(x?v:1);"
+
+ eval "
+  new_arr=vector(#$2,0);
+  divisor_position=w#-1-1;
+  permutation_number=$permutation_number;
+
+  repeat(w#-1,iter,
+   division_number=i[#-1,divisor_position];
+   pos=int(permutation_number/division_number);
+   new_arr_num=i[#-2,pos];
+   new_arr[iter]=new_arr_num;
+   da_remove(#-2,pos);
+   permutation_number%=division_number;
+   --divisor_position;
+  );
+
+  new_arr[iter]=i[#-2,0];
+  new_arr;
+  "
+
+ remove[-2--1]
+fi
+#@cli rep_npr_permutation_list2index: number_of_items,number_list
+#@cli : Return the lexicographic index in which this permutation is found within a list of all possible permutations.
+#@cli :
+#@cli : number_list must be in the form of 0,1,2,3.... , but can be in any order. However, the size of it must be less than or equal to number_of_items. That means you can exclude some numbers.
+rep_npr_permutation_list2index:
+check "$1>0&&($#-1)<=$1"
+
+n_items,n_list_size={[$1>1,$#-1]}
+
+if $#==2&&$n_items status {$2%#1}
+elif $#>2&&$n_items
+
+ eval "
+  const limit=$1-1;
+  counters=vector(#$1,0);
+  test_vector=[${2--1}];
+  repeat(size(test_vector),p,
+   v=test_vector[p];
+   if(!isint(v),run('error all_todo_ints==F'););
+   if(!inrange(v,0,limit,1,1),run('error int_lim_exc'););
+   if(++counters[v]>1,run('error dups_found'););
+  );
+  "
+
+ {1+($1==$n_list_size?$1-2:min($1-1,$n_list_size-1))},1,1,1,>"begin(
+   const m=($1==$n_list_size?1:$1-$n_list_size)+1;
+   v=m;
+  );
+  x>1?v=v*(m+x-1):(x?v:1);"
+
+ eval "
+   const n_list_size=min($n_list_size,$1-1);
+   iv=[${2--1}];
+   p=0;
+   repeat(n_list_size,k,
+    v=iv[k];
+    repeat(k,m,
+     if(iv[m]<iv[k],--v);
+    );
+    p+=v*i[#-1,(n_list_size-k-1)];
+   );
+   p;
+  "
+
+ rm.
+
+else status 0
+fi
+#@cli rep_r_permutations: number_of_items, repetition,_axis={ x|y|z} : -number_of_items>0, occurance_per_items,_axis={ x|y|z}
+#@cli : Create image representing permutations with repeating numbers.
++rep_r_permutations:
+skip ${3=x}
+
+check "($1&&isint($1))&&isint($2)>0&&inrange(_'$3',_'x',_'z',1,1)"
+
+mode,ss,num_of_permutations,axis={pm=$1>0;[pm,pm?[$2,$1^$2]:[abs($1),$2^abs($1)],_'$3'-_'x']}
+
+if $num_of_permutations>(768*$_cpus) p_mode=: fi
+
+out_dim={v=[1,1,1];v[$axis]=$num_of_permutations;v;}
+
+$out_dim,$ss,$p_mode"
+ begin(
+  const axis=$axis;
+  const mode=$mode;
+  mode?(
+   const mod_factor=$1;
+   div_list=reverse(expr('$1^x',$2));
+  ):(
+   const mod_factor=$2;
+   div_list=reverse(expr('$2^x',abs($1)));
+  );
+  axis==2?(index()=z;):
+  axis==1?(index()=y;):
+           index()=x;
+ );
+ int(index()/div_list)%mod_factor;"
+#@cli rep_r_permutation_index2list: times_items_can_repeat, repetition, position : -number_of_items, occurance_per_items, position
+#@cli : Return the list of numbers which correspond to the index provided based on permutations with repetition.
+rep_r_permutation_index2list:
+check "v=[$*];size(v)==$#&&sum(isint(v))==3&&min((v)[0,2])&&$2>0;"
+
+eval "
+ const mode=$1>0;
+ mode?(
+  const mod_factor=$1;
+  const size_of_list=$1^$2;
+  div_list=reverse(expr('$1^x',$2));
+ ):(
+  const mod_factor=$2;
+  const size_of_list=$2^abs($1);
+  div_list=reverse(expr('$2^x',abs($1)));
+ );
+ const position=$3%size_of_list;
+ int(position/div_list)%mod_factor;"
+#@cli rep_r_permutation_list2index: number_of_items/occurance, item_index_a,item_index_b
+#@cli : Return the lexicographic index in which the list of numbers corresponds to the lexicographically-ordered list of permutations with repetitions. Note that number_of_items and occurance is exchangeable.
+rep_r_permutation_list2index:
+check "sum(isint([$*]))==$#&&sum([$*]>=0)==$#"
+
+eval "
+ inp_v=[${2--1}];
+ const mod_factor=$1;
+ mul_list=reverse(expr('$1^x',size(inp_v)));
+ sum(mul_list*([${2--1}]%mod_factor));"
 #@cli rep_ncr_combinations: number_of_items>0,choices>0,_axis={x,y,z} : choices>0, number_of_items>0,_axis={x,y,z}
 #@cli : Generates all combinations that fits nCr. The algorithm used for this is based on Algorithm 515 (Buckles and Lybanon 1977) which allows index-based generation of combinations.
 #@cli :
@@ -3880,63 +4317,6 @@ eval "
  );
  index+=series_of_indexes[kv-1]-series_of_indexes[kv-2];
  index;"
-#@cli rep_r_permutations: number_of_items, repetition,_axis={ x|y|z} : -number_of_items>0, occurance_per_items,_axis={ x|y|z}
-#@cli : Create image representing permutations with repeating numbers.
-rep_r_permutations:
-skip ${3=x}
-
-check "($1&&isint($1))&&isint($2)>0&&inrange(_'$3',_'x',_'z',1,1)"
-
-mode,ss,num_of_permutations,axis={pm=$1>0;[pm,pm?[$2,$1^$2]:[abs($1),$2^abs($1)],_'$3'-_'x']}
-
-if $num_of_permutations>(768*$_cpus) p_mode=: fi
-
-out_dim={v=[1,1,1];v[$axis]=$num_of_permutations;v;}
-
-$out_dim,$ss,$p_mode"
- begin(
-  const axis=$axis;
-  const mode=$mode;
-  mode?(
-   const mod_factor=$1;
-   div_list=reverse(expr('$1^x',$2));
-  ):(
-   const mod_factor=$2;
-   div_list=reverse(expr('$2^x',abs($1)));
-  );
-  axis==2?(index()=z;):
-  axis==1?(index()=y;):
-           index()=x;
- );
- int(index()/div_list)%mod_factor;"
-#@cli rep_r_permutation_index2list: times_items_can_repeat, repetition, position : -number_of_items, occurance_per_items, position
-#@cli : Return the list of numbers which correspond to the index provided based on permutations with repetition.
-rep_r_permutation_index2list:
-check "v=[$*];size(v)==$#&&sum(isint(v))==3&&min((v)[0,2])&&$2>0;"
-
-eval "
- const mode=$1>0;
- mode?(
-  const mod_factor=$1;
-  const size_of_list=$1^$2;
-  div_list=reverse(expr('$1^x',$2));
- ):(
-  const mod_factor=$2;
-  const size_of_list=$2^abs($1);
-  div_list=reverse(expr('$2^x',abs($1)));
- );
- const position=$3%size_of_list;
- int(position/div_list)%mod_factor;"
-#@cli rep_r_permutation_list2index: number_of_items/occurance, item_index_a,item_index_b
-#@cli : Return the lexicographic index in which the list of numbers corresponds to the lexicographically-ordered list of permutations with repetitions. Note that number_of_items and occurance is exchangeable.
-rep_r_permutation_list2index:
-check "sum(isint([$*]))==$#&&sum([$*]>=0)==$#"
-
-eval "
- inp_v=[${2--1}];
- const mod_factor=$1;
- mul_list=reverse(expr('$1^x',size(inp_v)));
- sum(mul_list*([${2--1}]%mod_factor));"
 #@cli rep_cartesian_product: number_of_items_a,number_of_items_b,...,_axis : -number_of_items,occurance_per_items,_axis  : number_of_items,_axis
 #@cli : Output image representing cartesian product based on input.
 #@cli : Default values: '_axis=x'
@@ -4029,386 +4409,6 @@ eval "
   tv=mul_items[dec_half_list_size-p]*=tv;
  );
  sum(mul_items*position);"
-#@cli rep_permutations: init_num,_axis={x,y,z}
-#@cli : Return all the permutations of set of numbers as a image.
-#@cli :
-#@cli : Finding the next permutation has been adapted from this link -> https://www.techiedelight.com/find-permutations-string-cpp-java-iterative/
-#@cli : Finding the permutation at point index within this code is of the author.
-#@cli : Author : Reptorian.
-#@cli : Default values: '_axis=x'
-+rep_permutations:
-skip ${2=x}
-
-check "inrange($1,0,10,1,1)&&$1==int($1)&&inrange(('$2')[0],120,122,1,1)"
-
-if $1==1 1 return fi
-
-axis,fact_size={_'$2'-_'x'},{fact($1)}
-
-out_dim={v=vector(#3,1);v[$axis]=$fact_size;v}
-
-if $fact_size>(768*$_cpus) mode=: fi
-
-$out_dim,$1,$mode"
- begin_t(
-  const max_index=s-1;
-  const dec_max_index=max_index-1;
-  const axis=$axis;
-  axis==2?(index()=z;):
-  axis==1?(index()=y;):
-           index()=x;
-  reverse_array_starting_from(a)=(
-   start=a;
-   end=max_index;
-   while(start<end,
-    swap(permutation[start++],permutation[end--]);
-   );
-  );
-  started=0;
-  permutation=expr('x',s);
- );
-
- started?(
-  fn=b=max_index;
-  while(permutation[fn-1]>=permutation[fn],--fn;if(!fn,break();););
-  while(b>fn&&permutation[b]<=permutation[fn-1],--b;);
-  swap(permutation[fn-1],permutation[b]);
-  reverse_array_starting_from(fn);
- ):(
-
-  index=index();
-
-  if(index,
-
-   fn=max_index;
-   init_array_size=s;
-   init_permutation=permutation;
-
-   repeat(fn,iter,
-    division_number=fact(fn);
-    pos=int(index/division_number);
-    permutation[iter]=init_permutation[pos];
-    copy(init_permutation[pos],init_permutation[pos+1],init_array_size-pos);
-    index=index%division_number;
-    --init_array_size;
-    --fn;
-   );
-
-   permutation[iter]=init_permutation[0];
-  );
-
-  started=1;
-
- );
-
- permutation;"
-#@cli rep_permutation_index2list: number_of_item,permutation_number
-#@cli : Return permutation order at index permutation_number.
-rep_permutation_index2list:
-
-num_of_items={max(1,int(abs($1)))}
-
-if $num_of_items==1 u 0
-else
-
- permutation_number={$2%fact($num_of_items)}
-
- 1,{$num_of_items+1},1,1,y
-
- eval "
-  const num_of_items=$num_of_items;
-  new_arr=vector(#num_of_items,0);
-
-  fn=num_of_items-1;
-
-  permutation_position=$permutation_number;
-
-  repeat(fn,iter,
-   division_number=fact(fn);
-   pos=int(permutation_position/division_number);
-   new_arr_num=i[#-1,pos];
-   new_arr[iter]=new_arr_num;
-   da_remove(#-1,pos);
-   permutation_position%=division_number;
-   --fn;
-  );
-
-  new_arr[iter]=i[#-1,0];
-
-  new_arr;"
-
-  rm.
-
-fi
-#@cli rep_permutation_list2index: number_list
-#@cli : Return the lexicographic index in which this permutation is found within a list of all possible permutation.
-#@cli :
-#@cli : number_list must be in the form of 0,1,2,3.... , but can be in any order.
-#@cli :
-#@cli : Note: Not the derived source code, but really close to the original one and can be inferred to be operating on the same logic. Arguably the same after inspection. - https://www.geeksforgeeks.org/lexicographic-rank-of-a-string/ . Derived source code author is unknown.
-rep_permutation_list2index:
-if $#>1
- if sort([$*])==expr('x',$#)
-  if [$*]==expr('x',$#) u 0
-  else
-   eval "
-    const fn=$#-1;
-    iv=[$*];
-    p=0;
-    repeat(fn,k,
-     v=iv[k];
-     repeat(k,m,
-      if(iv[m]<iv[k],--v);
-     );
-     p+=v*fact(fn-k);
-    );
-    p;
-    "
-  fi
- else
-  error inv_args
- fi
-else
- u 0
-fi
-#@cli rep_npr_permutations: number_of_items,selected_items_count,_axis={x|y|z}
-#@cli : Generates partial combination. P(n,k)
-#@cli : Note - Code is taken from Alistairisrael pseudo-code - https://alistairisrael.wordpress.com/2009/09/22/simple-efficient-pnk-algorithm/
-#@cli : Default values: '_axis=x'
-+rep_npr_permutations:
-skip ${3=x}
-
-check "($1>=$2&&$1>0&&isint($1))&&($2>0&&isint($2))&&inrange(_'$3',_'x',_'z',1,1)"
-
-if [${1-2}]==[1,1] 1 return fi
-
-num_of_combinations,axis={permut($2,$1,1)},{_'$3'-_'x'}
-
-if $axis==2   out_dim=1,1,$num_of_combinations
-elif $axis==1 out_dim=1,$num_of_combinations,1
-else          out_dim=$num_of_combinations,1,1
-fi
-
-if $2==1 $out_dim,1,${arg\ $axis+1,x,y,z} return fi
-
-$out_dim,$2,>"begin(
-  const edge=s-1;
-  const n=$1;
-  const dec_n=n-1;
-  const axis=$axis;
-
-  axis==2?(
-   axis()=z;
-  ):
-  axis==1?(
-   axis()=y;
-  ):(
-   axis()=x;
-  );
-
-  output=expr('x',n);
-
-  reverse_array_starting_from(a)=(
-   start=a;
-   end=dec_n;
-   while(start<end,
-    swap(output[start++],output[end--]);
-   );
-  );
-
- );
-
- if(axis(),
-  j=s;
-  while(j<n && (output[edge]>=output[j]),++j;);
-
-  j<n?(
-   swap(output[edge],output[j]);
-  ):(
-   reverse_array_starting_from(s);
-
-   i=edge-1;
-   while(i>=0 && output[i]>=output[i+1],--i;);
-
-   j=dec_n;
-   while(j>i && (output[i]>=output[j]),--j;);
-
-   swap(output[i],output[j]);
-
-   reverse_array_starting_from(i+1);
-  );
- );
-
- (output)[0,s];
- "
-#@cli rep_npr_permutation_index2list: number_of_item,selected_items_count,permutation_number
-#@cli : Return permutation order at index permutation_number.
-rep_npr_permutation_index2list:
-
-check "$2<=$1&&$1>0&&$2>0"
-
-if $1==1 status 0
-elif $2==1 status {$3%$1}
-else
-
- permutation_number={$3%permut($2,$1,1)}
-
- 1,{$1+1},1,1,y
-
- {1+($1==$2?$1-2:min($1-1,$2-1))},1,1,1,>"begin(
-   const m=($1==$2?1:$1-$2)+1;
-   v=m;
-  );
-  x>1?v=v*(m+x-1):(x?v:1);"
-
- eval "
-  new_arr=vector(#$2,0);
-  divisor_position=w#-1-1;
-  permutation_number=$permutation_number;
-
-  repeat(w#-1,iter,
-   division_number=i[#-1,divisor_position];
-   pos=int(permutation_number/division_number);
-   new_arr_num=i[#-2,pos];
-   new_arr[iter]=new_arr_num;
-   da_remove(#-2,pos);
-   permutation_number%=division_number;
-   --divisor_position;
-  );
-
-  new_arr[iter]=i[#-2,0];
-  new_arr;
-  "
-
- remove[-2--1]
-fi
-#@cli rep_npr_permutation_list2index: number_of_items,number_list
-#@cli : Return the lexicographic index in which this permutation is found within a list of all possible permutations.
-#@cli :
-#@cli : number_list must be in the form of 0,1,2,3.... , but can be in any order. However, the size of it must be less than or equal to number_of_items. That means you can exclude some numbers.
-rep_npr_permutation_list2index:
-check "$1>0&&($#-1)<=$1"
-
-n_items,n_list_size={[$1>1,$#-1]}
-
-if $#==2&&$n_items status {$2%#1}
-elif $#>2&&$n_items
-
- eval "
-  const limit=$1-1;
-  counters=vector(#$1,0);
-  test_vector=[${2--1}];
-  repeat(size(test_vector),p,
-   v=test_vector[p];
-   if(!isint(v),run('error all_todo_ints==F'););
-   if(!inrange(v,0,limit,1,1),run('error int_lim_exc'););
-   if(++counters[v]>1,run('error dups_found'););
-  );
-  "
-
- {1+($1==$n_list_size?$1-2:min($1-1,$n_list_size-1))},1,1,1,>"begin(
-   const m=($1==$n_list_size?1:$1-$n_list_size)+1;
-   v=m;
-  );
-  x>1?v=v*(m+x-1):(x?v:1);"
-
- eval "
-   const n_list_size=min($n_list_size,$1-1);
-   iv=[${2--1}];
-   p=0;
-   repeat(n_list_size,k,
-    v=iv[k];
-    repeat(k,m,
-     if(iv[m]<iv[k],--v);
-    );
-    p+=v*i[#-1,(n_list_size-k-1)];
-   );
-   p;
-  "
-
- rm.
-
-else status 0
-fi
-#@cli rep_inverse_permutation: number_list
-#@cli : Return the inverse permutation.
-#@cli :
-#@cli : number_list must be in the form of 0,1,2,3.... , but can be in any order.
-rep_inverse_permutation:
-if $#>1
- ordered={expr('x',$#)}
- if sort([$*])==[$ordered]
-  if [$*]==[$ordered] u $ordered
-  else
-   ($*)
-   {$#}
-   eval.. i(#-1,i)=x
-   u {crop(#-1)}
-   rm[-2,-1]
-  fi
- else error inv_args
- fi
-else u 0
-fi
-#@cli rep_inverse_permute_str: permutation_string
-#@cli : Return the inverse permutation_string for command permute
-#@cli : 'permutation_string' is a combination of the character set {x|y|z|c},
-#@cli : e.g. 'xycz', 'cxyz', ...
-rep_inverse_permute_str:
-check "sort('$*')=='cxyz'"
-x={'x'}
-axis_list=xyzc
-
-if '$*'=='$axis_list' return fi
-
-('$axis_list') => axis_list
-({'$*'}) => user_axis_list_permutation
-
-set[user_axis_list_permutation] {$x+3},{xm}
--[user_axis_list_permutation] $x
-
-(${rep_inverse_permutation\ {crop(#-1)}}) => inverse_permute_map
-
-map[inverse_permute_map] [axis_list]
-
-u {t}
-rm[-3--1]
-#@cli rep_generate_all_images_combinations:[images]
-#@cli : Generates all combinations of images.
-rep_find_all_images_combinations:
-if $!==1 return
-elif !$! error no_imgs
-else timg={$!}
-fi
-
-if ${-max_d}>1 error inv_dim_d fi
-
-eval "
- valid_dim=1;
- refer_dim=[w#-1,h#-1];
- repeat($timg-1,p,
-  [w#p,h#p]!=refer_dim?(valid_dim=0;break(););
- );
- valid_dim;"
-
-if !${} error inv_dims fi
-
-a z
-
-+rep_r_permutations $timg,$timg,z
-permute. cyzx
-
-{w#0*d#0},{h#0},{d#-1},{s#0}
-
-eval.. "
- const img_w=w#0;
- const img_h=h#0;
- const img_s=s#0;
- crop_image=crop(#0,0,0,i,0,img_w,img_h,1,img_s);
- draw(#-1,crop_image,img_w*x,0,z,0,img_w,img_h,1,img_s,1);
- "
-
-k[-1] s z
 #@cli rep_rrd: eq. to 'rep_random_rectangular_division'
 rep_rrd: rep_random_rectangular_division $*
 #@cli rep_random_rectangular_division: split>1,_additional_thickness>=0,_max_iter>=2,_probability[%]>0,_loop_limit>1,0<=_border[%]>=100%,_seed,_normalize,border_color,palette_mode
