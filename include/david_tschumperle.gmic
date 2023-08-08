@@ -2014,6 +2014,314 @@ view_surfels3d :
   while {*}" && "!{*,ESC}
   rm
 
+
+
+
+foo :
+  v +
+  sp leno,16 sp eagle,zelda to_gray. transpose. 1,512,1,3,u sp balloons +noise. 30 palette curl sp cat
+#  sp portrait3 animate "blur","0","30",200
+
+#  $HOME/work/img/volumes/reference.inr s z
+
+  ndisplay
+
+#@cli nd : eq. to 'ndisplay'.
+nd :
+  _gmic_s0="$?" _gmic_s1=$[] v + _ndisplay
+
+#@cli ndisplay
+#@cli : Display selected images in an interactive window.
+ndisplay :
+  _gmic_s0="$?" _gmic_s1=$[] v + _ndisplay
+
+_ndisplay :
+  nb_images=$!
+  if !$nb_images e[0--4] "Display image []." return fi
+  ($_gmic_s1:y) => image_indices
+
+  # Generate window and log titles and print log message.
+  m "_$0 : u $""[]"
+  if $nb_images<=6 sel=${"_$0[^-1]"} is_ellipsized=0
+  else sel=${"_$0[0-2,-4--2]"} is_ellipsized=1
+  fi
+  um _$0
+  log_title,window_title,sep=
+  repeat narg($sel) {
+    ind={image_indices,i[$>]}
+    basename {$>,n}
+    log_title.=$sep${}
+    window_title.=$sep[$ind]" "${}
+    if $is_ellipsized" && "$>==2 sep=", (...) " else sep=", " fi
+  }
+  e[0--3] "Display image"$_gmic_s0" = '"$log_title"'."
+  p[^-1]
+
+  # Initialize display window.
+  window_previous_normalization,windows_previous_fullscreen=
+  if !{*}
+    w[] {round([min(1280,0.75*{*,u}),min(1280,0.75*{*,v})])},0,$window_title
+  else
+    window_previous_normalization,windows_previous_fullscreen={*,n,f}
+    w[] -1,-1,0,$window_title
+  fi
+  window_nonfullscreen_width,window_nonfullscreen_height={*,w,h}
+
+  # Initialize viewer variables.
+  thumb_mouseover=-1
+  thumb_selected=0
+  thumb_height=0
+  thumb_drag_absolute,thumb_drag_relative,thumb_drag=0
+
+  is_fullscreen={*,f}
+  is_clicked0,is_clicked1,is_clicked2,\
+   is_released0,is_released1,is_released2=0
+
+  image_label_alignment=0
+
+  # Enter user interaction loop.
+  for {*}" && "!{*,ESC} {
+    window_width,window_height:={*,w,h}
+
+    # Generate views for thumbnail.
+    if !narg($thumb_base)
+      rmn thumb_coords,thumb_label
+      1,$nb_images,1,2,"Mwh = max(w#y,h#y); [ max(0.5,w#y/Mwh),max(0.5,h#y/Mwh) ]"
+      thumb_height:=max(64,round($window_height/6)) *. $thumb_height round.
+      +f. ">begin(Sw = 0); res = [ Sw, round(($thumb_height - i1)/2) ]; Sw+=i0; res"
+      rv[-2,-1] a[-2,-1] c => thumb_coords
+
+      sum_w={thumb_coords,i(0,h-1,0,0)+i(0,h-1,0,2)}
+      {max($sum_w,$window_width)},$thumb_height,1,3 100%,1,1,1,-1
+      repeat $nb_images {
+        x0,y0,w,h={thumb_coords,I[$>]}
+        line. $x0,0,{$x0+$w-1},0,1,$>
+        [$>]
+        if s>3 channels. 0,2 fi
+        r. $w,$h
+        n. 0,255
+        if s==1 r. 100%,100%,1,3
+        elif s==2 r. 100%,100%,1,3,0
+        fi
+        j... .,$x0,$y0 rm.
+      }
+      => thumb_base,thumb_label
+      rmn thumb_view
+    fi
+    thumb_drag_max={thumb_coords,i[h-1]*100/w#$thumb_base}
+    thumb_drag_px={thumb_base,(cut($thumb_drag_absolute+$thumb_drag_relative,0,$thumb_drag_max))*w%}
+
+    if !narg($thumb_view)
+      +z[thumb_base] $thumb_drag_px,{$thumb_drag_px+$window_width-1}
+      x0,y0,w,h={thumb_coords,I[$thumb_selected]}
+      x0-=$thumb_drag_px
+      rectangle. $x0,$y0,{[$x0,$y0]+[$w,$h]-1},1,0xFFFFFFFF,255
+      rectangle. {[$x0,$y0]+1},{[$x0,$y0]+[$w,$h]-2},1,0xFFFFFFFF,255
+      rectangle. {[$x0,$y0]+2},{[$x0,$y0]+[$w,$h]-3},1,0xFFFFFFFF,0
+      to. "#"{image_indices,i[$thumb_selected]},{[$x0,$y0]+1},20,2
+      if $thumb_mouseover>=0
+        x0,y0,w,h={thumb_coords,I[$thumb_mouseover]}
+        x0-=$thumb_drag_px
+        rectangle. $x0,$y0,{[$x0,$y0]+[$w,$h]-1},0.25,200
+        if $thumb_mouseover!=$thumb_selected
+          rectangle. $x0,$y0,{[$x0,$y0]+[$w,$h]-1},0.75,0x33333333,0
+          rectangle. $x0,$y0,{[$x0,$y0]+[$w,$h]-1},0.75,0xCCCCCCCC,255
+          to. "#"{image_indices,i[$thumb_mouseover]},$x0,$y0,20,1,0.75
+        fi
+      fi
+
+      # Add left/right shading in thumb view.
+      if $thumb_drag_px>0
+        +z. 0,31
+        32,1,1,1,"lerp(max(0,1 - $thumb_drag_px/32),1,x/w)" *[-2,-1]
+        j.. .,0 rm.
+      fi
+      if {thumb_base,$thumb_drag_px+$window_width<w}
+        x0:=w-32
+        +z. $x0,100%
+        32,1,1,1,"lerp(1,max(0,1 - (w#$thumb_base - $window_width - $thumb_drag_px)/32),x/w)" *[-2,-1]
+        j.. .,$x0 rm.
+      fi
+
+      => thumb_view
+      rmn view
+    fi
+
+    # Generate views for image.
+    if !narg($image_base)
+      $window_width,{$window_height-$thumb_height},1,3
+      => image_base
+
+      [$thumb_selected]
+      if s>3 channels 0,2 fi
+      r2din. {image_base,[w,h]},1
+      n. 0,255
+      if s==1 r. 100%,100%,1,3
+      elif s==2 r. 100%,100%,1,3,0
+      fi
+      j[image_base] .,0.5~,0.5~ rm.
+      rmn image_label_info
+    fi
+
+    if !narg($image_label_info)
+      basename {$thumb_selected,n} basename=${}
+      0 t. "#"{image_indices,i[$thumb_selected]}": "$basename" ("{``{$thumb_selected,[w,h,d,s]}}")",\
+       0,0,{image_base,cut(round(h/16),16,32)},1,255
+      +n. 100,255 to_rgb.. a[-2,-1] c
+      => image_label_info
+      rmn image_view
+    fi
+
+    if !narg($image_view)
+      [image_base] => image_view
+      if {image_label_info,w}
+        ja[image_view] [image_label_info],1,{$image_label_alignment?1:0}~
+      fi
+      rmn view
+    fi
+
+    # Generate global view.
+    if !narg($view)
+      $window_width,$window_height,1,3 => view
+      j[view] [thumb_view]
+      j[view] [image_view],0,$thumb_height
+      w[view]
+    fi
+
+    wait
+
+    # Convert low-levels events to higher-level (buttons / drag).
+    mouse_x,mouse_y,mouse_button:={*,x,y,b}
+    mouse_area:=$mouse_y<0?0:$mouse_y<$thumb_height?1:2
+    is_button0,is_button1,is_button2:=($mouse_button&1),($mouse_button&2),($mouse_button&4)
+    repeat 3 {
+      if !${is_clicked$>}" && "${is_button$>}
+        is_clicked$>,is_released$>=$mouse_area,0
+        drag_start_x$>,drag_start_y$>,drag_end_x$>,drag_end_y$>=$mouse_x,$mouse_y,$mouse_x,$mouse_y
+      elif ${is_clicked$>}" && "!${is_button$>}
+        is_clicked$>,is_released$>=0,$mouse_area
+        drag_end_x$>,drag_end_y$>=$mouse_x,$mouse_y
+      elif ${is_clicked$>}" && "${is_button$>}
+        drag_end_x$>,drag_end_y$>=$mouse_x,$mouse_y
+      fi
+      if narg(${drag_end_x$>})
+        is_drag$>:=norm(${drag_end_x$>}-${drag_start_x$>},${drag_end_y$>}-${drag_start_y$>})>5?$mouse_area:0
+      else
+        is_drag$>=0
+      fi
+    }
+
+    # Manage events related to thumbnail view.
+    if $is_clicked0==1" && "$is_drag0
+      thumb_drag_relative={thumb_base,($drag_start_x0-$drag_end_x0)*100/w}
+      rmn thumb_view
+    elif $is_released0" && "$is_drag0
+      thumb_drag_absolute={thumb_base,$thumb_drag_px*100/w}
+      thumb_drag_relative=0
+      is_drag0,is_released0=0
+      rmn thumb_view
+    fi
+
+    if $mouse_area==1
+      prev_thumb_selected=$thumb_selected
+
+      x_ind:=$mouse_x+$thumb_drag_px
+      if {thumb_label,inrange($x_ind,0,w-1)" && "i[$x_ind]>=0}
+        ind={thumb_label,i[$x_ind]}
+        if $ind!=$thumb_mouseover
+          thumb_mouseover=$ind
+          rmn thumb_view
+        fi
+        if !$is_drag0" && "$is_released0
+          if $thumb_selected!=$ind
+            thumb_selected=$ind
+            rmn thumb_view,image_base
+          fi
+        fi
+      fi
+      if $is_released0 is_released0=0 fi
+
+      if {*,ARROWLEFT}" || "{*,ARROWRIGHT}" || "{*,ARROWUP}" || "{*,ARROWDOWN}" || "\
+         {*,PAGEUP}" || "{*,PAGEDOWN}" || "{*,HOME}" || "{*,END}
+        step:={*,ARROWLEFT}||{*,ARROWUP}?-1:\
+              {*,ARROWRIGHT}||{*,ARROWDOWN}?1:\
+              {*,PAGEUP}?-max(2,round($nb_images/16)):\
+              {*,PAGEDOWN}?max(2,round($nb_images/16)):\
+              {*,HOME}?-$thumb_selected:\
+              {*,END}?$nb_images-1-$thumb_selected:0
+        thumb_selected:=cut($thumb_selected+$step,0,$nb_images-1)
+        rmn thumb_view,image_base
+      fi
+      if {*,o}
+        step:={*,-o}*max(1,round($nb_images/32))
+        thumb_selected:=cut($thumb_selected+$step,0,$nb_images-1)
+        rmn thumb_view,image_base
+      fi
+
+      # Ensure that newly selected thumbnail is fully visible.
+      if $thumb_selected!=$prev_thumb_selected
+        x0,w={thumb_coords,[i(0,$thumb_selected,0,0),i(0,$thumb_selected,0,2)]}
+        if $x0<$thumb_drag_px
+          thumb_drag_absolute,thumb_drag_relative={thumb_base,($x0-48)*100/w},0
+        elif $x0+$w>=$thumb_drag_px+$window_width
+          thumb_drag_absolute,thumb_drag_relative={thumb_base,($x0+$w-$window_width+48)*100/w},0
+        fi
+      fi
+
+    fi
+
+    # Manage events related to image view.
+    if $mouse_area==2
+
+      if (!$image_label_alignment" && "{image_label_info,$mouse_y<$thumb_height+h})" || "\
+         ($image_label_alignment" && "{image_label_info,$mouse_y>$thumb_height+2*h})
+        image_label_alignment:=!$image_label_alignment
+        rmn image_label_info
+      fi
+
+      if $is_released0
+        is_released0=0
+      fi
+    fi
+
+    # Manage events related to window resizing.
+    if {*,r}
+      w[] -1,-1
+      rmn thumb_base,image_base
+    fi
+    is_CTRL:={*,CTRLLEFT}" || "{*,CTRLRIGHT}
+    if $is_CTRL" && "{*,C}
+      is_fullscreen=0
+      w[] {round([max(128,0.8*$window_width),max(128,0.8*$window_height)])},0,0
+      rmn thumb_base,image_base
+    fi
+    if $is_CTRL" && "{*,D}
+      is_fullscreen=0
+      w[] {round([min({*,u},1.25*$window_width),min({*,v},1.25*$window_height)])},0,0
+      rmn thumb_base,image_base
+    fi
+    if $is_CTRL" && "{*,-F}
+      if $is_fullscreen
+        is_fullscreen=0
+        w[] $window_nonfullscreen_width,$window_nonfullscreen_height,0,0
+      else
+        is_fullscreen,window_nonfullscreen_width,window_nonfullscreen_height=1,{*,d,e}
+        w[] {*,u,v},0,1
+      fi
+      rmn thumb_base,image_base
+    fi
+
+  }
+
+  # Reset image list and display window to their previous states.
+  if narg($window_previous_normalization)
+    w[] -1,-1,$window_previous_normalization,$window_previous_fullscreen
+  else
+    w[] 0
+  fi
+  k[0-{$nb_images-1}]
+  is_change 0
+
 # Local Variables:
 # mode: sh
 # End:
