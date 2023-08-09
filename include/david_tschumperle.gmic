@@ -2227,6 +2227,7 @@ _ndisplay :
     wait
 
     # Convert low-levels events to higher-level (buttons / drag).
+    is_CTRL:={*,CTRLLEFT}" || "{*,CTRLRIGHT}
     mouse_x,mouse_y,mouse_button:={*,x,y,b}
     mouse_area:=$mouse_y<0?0:$mouse_y<$thumb_height?1:2
     is_button0,is_button1,is_button2:=($mouse_button&1),($mouse_button&2),($mouse_button&4)
@@ -2248,6 +2249,8 @@ _ndisplay :
     }
 
     # Manage events related to thumbnail view.
+    prev_thumb_selected=$thumb_selected
+
     if !$thumb_is_hidden
       if $is_clicked0==1" && "$is_drag0
         thumb_drag_relative={thumb_base,($drag_start_x0-$drag_end_x0)*100/w}
@@ -2260,8 +2263,6 @@ _ndisplay :
       fi
 
       if $mouse_area==1
-        prev_thumb_selected=$thumb_selected
-
         x_ind:=$mouse_x+$thumb_drag_px
         if {thumb_label,inrange($x_ind,0,w-1)" && "i[$x_ind]>=0}
           ind={thumb_label,i[$x_ind]}
@@ -2278,34 +2279,37 @@ _ndisplay :
         fi
         if $is_released0 is_released0=0 fi
 
-        if {*,ARROWLEFT}" || "{*,ARROWRIGHT}" || "{*,ARROWUP}" || "{*,ARROWDOWN}" || "\
-           {*,PAGEUP}" || "{*,PAGEDOWN}" || "{*,HOME}" || "{*,END}
-          step:={*,ARROWLEFT}||{*,ARROWUP}?-1:\
-                {*,ARROWRIGHT}||{*,ARROWDOWN}?1:\
-                {*,PAGEUP}?-max(2,round($nb_images/16)):\
-                {*,PAGEDOWN}?max(2,round($nb_images/16)):\
-                {*,HOME}?-$thumb_selected:\
-                {*,END}?$nb_images-1-$thumb_selected:0
-          thumb_selected:=cut($thumb_selected+$step,0,$nb_images-1)
-          rmn thumb_view,image_base
-        fi
         if {*,o}
           step:={*,-o}*max(1,round($nb_images/32))
           thumb_selected:=cut($thumb_selected+$step,0,$nb_images-1)
           rmn thumb_view,image_base
         fi
 
-        # Ensure that newly selected thumbnail is fully visible.
-        if $thumb_selected!=$prev_thumb_selected
-          x0,w={thumb_coords,[i(0,$thumb_selected,0,0),i(0,$thumb_selected,0,2)]}
-          if $x0<$thumb_drag_px
-            thumb_drag_absolute,thumb_drag_relative={thumb_base,($x0-48)*100/w},0
-          elif $x0+$w>=$thumb_drag_px+$window_width
-            thumb_drag_absolute,thumb_drag_relative={thumb_base,($x0+$w-$window_width+48)*100/w},0
-          fi
-        fi
-
         if $image_label_alignment image_label_alignment=0 rmn image_view fi
+      fi
+    fi
+
+    if ($mouse_area==1" || "$is_CTRL)" && "(\
+         {*,ARROWLEFT}" || "{*,ARROWRIGHT}" || "{*,ARROWUP}" || "{*,ARROWDOWN}" || "\
+         {*,PAGEUP}" || "{*,PAGEDOWN}" || "{*,HOME}" || "{*,END}\
+       )
+      step:={*,ARROWLEFT}||{*,ARROWUP}?-1:\
+            {*,ARROWRIGHT}||{*,ARROWDOWN}?1:\
+            {*,PAGEUP}?-max(2,round($nb_images/16)):\
+            {*,PAGEDOWN}?max(2,round($nb_images/16)):\
+            {*,HOME}?-$thumb_selected:\
+            {*,END}?$nb_images-1-$thumb_selected:0
+      thumb_selected:=cut($thumb_selected+$step,0,$nb_images-1)
+      rmn thumb_view,image_base
+    fi
+
+    # Ensure that a newly selected thumbnail is fully visible.
+    if $thumb_selected!=$prev_thumb_selected
+      x0,w={thumb_coords,[i(0,$thumb_selected,0,0),i(0,$thumb_selected,0,2)]}
+      if $x0<$thumb_drag_px
+        thumb_drag_absolute,thumb_drag_relative={thumb_base,($x0-48)*100/w},0
+      elif $x0+$w>=$thumb_drag_px+$window_width
+        thumb_drag_absolute,thumb_drag_relative={thumb_base,($x0+$w-$window_width+48)*100/w},0
       fi
     fi
 
@@ -2329,7 +2333,7 @@ _ndisplay :
       w[] -1,-1
       rmn thumb_base,image_base
     fi
-    is_CTRL:={*,CTRLLEFT}" || "{*,CTRLRIGHT}
+
 
     if $is_CTRL" && "{*,C} # Decrease window size
       is_fullscreen=0
