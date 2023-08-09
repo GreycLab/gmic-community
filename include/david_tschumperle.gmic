@@ -2200,11 +2200,11 @@ _ndisplay :
 
     # Generate image view.
     if !0$image_base
-      $window_width,{$window_height-$thumb_height2},1,3 => image_base
       if $nb_images>1 rmn image_label_info fi
 
       # Viewer for 3D volumetric images.
       if {$thumb_selected,d>1}
+        $window_width,{$window_height-$thumb_height2},1,3 => image_base
         [$thumb_selected]
         if s>3 channels. 0,2 fi
         volumetric2d. 50%,50%,50%,2
@@ -2219,22 +2219,32 @@ _ndisplay :
 
       # Viewer for 2D images.
       else
+        image_width,image_height:=$window_width,$window_height-$thumb_height2
 
-        # {image_base,[w,h]},1,2,"
-        #   [ int(x*w#$thumb_selected/w), int(y*h#$thumb_selected/h) ]"
-        # +warp[$thumb_selected] .,0,0,0 rm..
+        xr,yr,sr={$thumb_selected,"
+          [ w/2, h/2, max(w/$image_width,h/$image_height) ]"}
+        x0,y0:=[$xr,$yr]-$sr*[$image_width,$image_height]/2
+        x1,y1:=[$xr,$yr]+$sr*[$image_width,$image_height]/2
 
-        [$thumb_selected]
+        $image_width,$image_height,1,3,":
+          u = int(lerp($x0,$x1,x/w));
+          v = int(lerp($y0,$y1,y/h));
+          s#$thumb_selected==1?(
+            R = i(#$thumb_selected,u,v,0,0);
+            [ R,R,R ]
+          ):s#$thumb_selected==2?(
+            R = i(#$thumb_selected,u,v,0,0);
+            G = i(#$thumb_selected,u,v,0,1);
+            [ R,G,0 ]
+          ):(
+            R = i(#$thumb_selected,u,v,0,0);
+            G = i(#$thumb_selected,u,v,0,1);
+            B = i(#$thumb_selected,u,v,0,2);
+            [ R,G,B ]
+          )" => image_base
 
-        if s>3 channels. 0,2 fi
-        r2din. {image_base,[w,h]},1
         if s=is;isinf(s)||isnan(s) replace_naninf. i>0?512:-512 fi
         n. 0,255
-        if s==1 r. 100%,100%,1,3
-        elif s==2 r. 100%,100%,1,3,0
-        fi
-
-        j[image_base] .,0.5~,0.5~ rm.
 
       fi
     fi
