@@ -2096,17 +2096,17 @@ _ndisplay :
   fi
   window_nonfullscreen_width,window_nonfullscreen_height={*,w,h}
   is_fullscreen={*,f}
+  is_clicked0,is_clicked1,is_clicked2,is_released0,is_released1,is_released2=0
 
   # Initialize other viewer variables.
   thumb_mouseover=-1
   thumb_selected=0
   thumb_drag_absolute=
   thumb_drag_relative=0
-  is_clicked0,is_clicked1,is_clicked2,\
-   is_released0,is_released1,is_released2=0
 
   canvas_label_alignment=0
   canvas_x,canvas_y,canvas_fact=0.5,0.5,1
+  canvas_pan_absolute,canvas_pan_relative=0
 
   # Enter user interaction loop.
   for {*}" && "!{*,ESC} {
@@ -2324,18 +2324,19 @@ _ndisplay :
     mouse_area:=$mouse_y<0?0:$mouse_y<$thumb_height?1:2
     is_button0,is_button1,is_button2:=($mouse_button&1),($mouse_button&2),($mouse_button&4)
     repeat 3 {
-      if !${is_clicked$>}" && "${is_button$>}" && "$mouse_x>=0
-        is_clicked$>,is_released$>=$mouse_area,0
+      if ${is_button$>}" && "$mouse_area" && "!${is_clicked$>} # Possible start of a drag
+        is_clicked$>,is_released$>,is_drag$>=$mouse_area,0,0 # At this point, cannot ensure drag has started
         drag_start_x$>,drag_start_y$>,drag_end_x$>,drag_end_y$>=$mouse_x,$mouse_y,$mouse_x,$mouse_y
-      elif ${is_clicked$>}" && "!${is_button$>}" && "$mouse_x>=0
+      elif ${is_button$>}" && "$mouse_area" && "${is_clicked$>} # Possible update of a drag
+        drag_end_x$>,drag_end_y$>=$mouse_x,$mouse_y
+        if !${is_drag$>} # Determine if that is really a drag
+          is_drag$>:=norm(${drag_end_x$>}-${drag_start_x$>},${drag_end_y$>}-${drag_start_y$>})>5?$mouse_area:0
+        fi
+      elif !${is_button$>}" && "$mouse_area" && "${is_clicked$>} # Possible end of a drag
         is_clicked$>,is_released$>=0,$mouse_area
         drag_end_x$>,drag_end_y$>=$mouse_x,$mouse_y
-      elif ${is_clicked$>}" && "${is_button$>}" && "$mouse_x>=0
-        drag_end_x$>,drag_end_y$>=$mouse_x,$mouse_y
-      fi
-      if narg(${drag_end_x$>})
-        is_drag$>:=norm(${drag_end_x$>}-${drag_start_x$>},${drag_end_y$>}-${drag_start_y$>})>5?1:0
-      else
+        # 'is_drag$>' is not reset to 0 to ease drag end detection (must be then zero-ed manually afterwards).
+      elif $mouse_area" && "!${is_clicked$>}
         is_drag$>=0
       fi
     }
@@ -2343,10 +2344,10 @@ _ndisplay :
     # Manage thumbnail navigation events.
     prev_thumb_selected=$thumb_selected
     if !$thumb_is_hidden
-      if $is_clicked0==1" && "$is_drag0
+      if $is_drag0==1" && "$is_clicked0==1
         thumb_drag_relative={thumb_base,($drag_start_x0-$drag_end_x0)/w}
         rmn thumb_view
-      elif ($is_released0" || "!$mouse_area)" && "$is_drag0
+      elif $is_drag0" && "($is_released0" || "!$mouse_area)
         thumb_drag_absolute={thumb_base,$thumb_drag_px/w}
         thumb_drag_relative=0
         is_drag0,is_released0=0
@@ -2406,6 +2407,16 @@ _ndisplay :
     fi
 
     # Manage canvas events.
+    # if $is_clicked0==2" && "$is_drag0
+    #   canvas_pan_relative=$drag_start_x0-$drag_end_x0)
+    #   rmn canvas_base
+    # elif ($is_released0" || "!$mouse_area)" && "$is_drag0
+    #   thumb_drag_absolute={thumb_base,$thumb_drag_px/w}
+    #   thumb_drag_relative=0
+    #   is_drag0,is_released0=0
+    #   rmn thumb_view
+    # fi
+
     if $mouse_area==2
 
       if $nb_images>1
