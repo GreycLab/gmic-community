@@ -2105,7 +2105,7 @@ _ndisplay :
   is_clicked0,is_clicked1,is_clicked2,\
    is_released0,is_released1,is_released2=0
 
-  image_label_alignment=0
+  canvas_label_alignment=0
 
   # Enter user interaction loop.
   for {*}" && "!{*,ESC} {
@@ -2199,34 +2199,33 @@ _ndisplay :
     fi
 
     # Generate image view.
-    if !0$image_base
-      if $nb_images>1 rmn image_label_info fi
+    if !0$canvas_base
+      if $nb_images>1 rmn canvas_label_info fi
 
       # Viewer for 3D volumetric images.
       if {$thumb_selected,d>1}
-        $window_width,{$window_height-$thumb_height2},1,3 => image_base
+        $window_width,{$window_height-$thumb_height2},1,3 => canvas_base
         [$thumb_selected]
         if s>3 channels. 0,2 fi
         volumetric2d. 50%,50%,50%,2
-        r2din. {image_base,[w,h]},1
+        r2din. {canvas_base,[w,h]},1
         if s=is;isinf(s)||isnan(s) replace_naninf. i>0?512:-512 fi
         n. 0,255
         if s==1 r. 100%,100%,1,3
         elif s==2 r. 100%,100%,1,3,0
         fi
-        j[image_base] .,0.5~,0.5~ rm.
-        to[image_base] "** Warning **\n3D viewer not implemented yet!",0.5~,0.5~,24
+        j[canvas_base] .,0.5~,0.5~ rm.
+        to[canvas_base] "** Warning **\n3D viewer not implemented yet!",0.5~,0.5~,24
 
       # Viewer for 2D images.
       else
-        image_width,image_height:=$window_width,$window_height-$thumb_height2
+        canvas_width,canvas_height:=$window_width,$window_height-$thumb_height2
+        canvas_x,canvas_y,canvas_scale={$thumb_selected,"
+          [ w/2, h/2, max(w/$canvas_width,h/$canvas_height) ]"}
 
-        xr,yr,sr={$thumb_selected,"
-          [ w/2, h/2, max(w/$image_width,h/$image_height) ]"}
-        x0,y0:=[$xr,$yr]-$sr*[$image_width,$image_height]/2
-        x1,y1:=[$xr,$yr]+$sr*[$image_width,$image_height]/2
-
-        $image_width,$image_height,1,3,":
+        x0,y0:=[$canvas_x,$canvas_y]-$canvas_scale*[$canvas_width,$canvas_height]/2
+        x1,y1:=[$canvas_x,$canvas_y]+$canvas_scale*[$canvas_width,$canvas_height]/2
+        $canvas_width,$canvas_height,1,3,":
           u = round(lerp($x0,$x1,x/w),1,-1);
           v = round(lerp($y0,$y1,y/h),1,-1);
           s#$thumb_selected==1?(
@@ -2241,7 +2240,7 @@ _ndisplay :
             G = i(#$thumb_selected,u,v,0,1);
             B = i(#$thumb_selected,u,v,0,2);
             [ R,G,B ]
-          )" => image_base
+          )" => canvas_base
 
         if s=is;isinf(s)||isnan(s) replace_naninf. i>0?512:-512 fi
         n. 0,255
@@ -2249,20 +2248,20 @@ _ndisplay :
       fi
     fi
 
-    if $nb_images>1" && "!0$image_label_info
+    if $nb_images>1" && "!0$canvas_label_info
       basename {$thumb_selected,n} basename=${}
-      font_size={image_base,cut(round(h/32),16,32)}
+      font_size={canvas_base,cut(round(h/32),16,32)}
       0 t. "["{image_indices,i[$thumb_selected]}"] '"$basename"' ("{``{$thumb_selected,[w,h,d,s]}}")",\
        4,0,$font_size,1,255
       +n. 100,255 to_rgb.. a[-2,-1] c
-      => image_label_info
-      rmn image_view
+      => canvas_label_info
+      rmn canvas_view
     fi
 
-    if !0$image_view
-      [image_base] => image_view
-      if $image_label_info
-        ja[image_view] [image_label_info],1,{$image_label_alignment?1:0}~
+    if !0$canvas_view
+      [canvas_base] => canvas_view
+      if $canvas_label_info
+        ja[canvas_view] [canvas_label_info],1,{$canvas_label_alignment?1:0}~
       fi
       rmn view
     fi
@@ -2273,7 +2272,7 @@ _ndisplay :
       if !$thumb_is_hidden
         j[view] [thumb_view]
       fi
-      j[view] [image_view],0,$thumb_height2
+      j[view] [canvas_view],0,$thumb_height2
       w[view]
     fi
 
@@ -2325,13 +2324,13 @@ _ndisplay :
           if !$is_drag0" && "$is_released0
             if $thumb_selected!=$ind
               thumb_selected=$ind
-              rmn thumb_view,image_base
+              rmn thumb_view,canvas_base
             fi
           fi
         fi
 
         if $is_released0 is_released0=0 fi
-        if $image_label_alignment image_label_alignment=0 rmn image_view fi
+        if $canvas_label_alignment canvas_label_alignment=0 rmn canvas_view fi
       fi
     fi
 
@@ -2347,12 +2346,12 @@ _ndisplay :
               {*,HOME}?-$thumb_selected:\
               {*,END}?$nb_images-1-$thumb_selected:0
         thumb_selected:=cut($thumb_selected+$step,0,$nb_images-1)
-        rmn thumb_view,image_base
+        rmn thumb_view,canvas_base
       fi
       if ($mouse_area==1" || "$is_CTRL)" && "{*,o}
         step:={*,-o}*max(1,round($nb_images/32))
         thumb_selected:=cut($thumb_selected+$step,0,$nb_images-1)
-        rmn thumb_view,image_base
+        rmn thumb_view,canvas_base
       fi
 
       # Ensure that a newly selected thumbnail is fully visible.
@@ -2370,10 +2369,10 @@ _ndisplay :
     if $mouse_area==2
 
       if $nb_images>1
-        if (!$image_label_alignment" && "{image_label_info,$mouse_y<$thumb_height2+h" && "$mouse_x<w})" || "\
-           ($image_label_alignment" && "{image_label_info,$mouse_y>$thumb_height2+2*h})
-          image_label_alignment:=!$image_label_alignment
-          rmn image_view
+        if (!$canvas_label_alignment" && "{canvas_label_info,$mouse_y<$thumb_height2+h" && "$mouse_x<w})" || "\
+           ($canvas_label_alignment" && "{canvas_label_info,$mouse_y>$thumb_height2+2*h})
+          canvas_label_alignment:=!$canvas_label_alignment
+          rmn canvas_view
         fi
       fi
     fi
@@ -2381,18 +2380,18 @@ _ndisplay :
     # Manage global window events.
     if {*,r}
       w[] -1,-1
-      rmn thumb_base,image_base
+      rmn thumb_base,canvas_base
     fi
 
     if $is_CTRL" && "{*,C} # Decrease window size
       is_fullscreen=0
       w[] {round([max(128,0.8*$window_width),max(128,0.8*$window_height)])},0,0
-      rmn thumb_base,image_base
+      rmn thumb_base,canvas_base
     fi
     if $is_CTRL" && "{*,D} # Increase window size
       is_fullscreen=0
       w[] {round([min({*,u},1.25*$window_width),min({*,v},1.25*$window_height)])},0,0
-      rmn thumb_base,image_base
+      rmn thumb_base,canvas_base
     fi
     if $is_CTRL" && "{*,-F} # Toggle fullscreen mode
       if $is_fullscreen
@@ -2402,11 +2401,11 @@ _ndisplay :
         is_fullscreen,window_nonfullscreen_width,window_nonfullscreen_height=1,{*,d,e}
         w[] {*,u,v},0,1
       fi
-      rmn thumb_base,image_base
+      rmn thumb_base,canvas_base
     fi
     if $nb_images>1" && "{*,-TAB} # Hide/show thumbnails
       thumb_is_hidden:=!$thumb_is_hidden
-      rmn image_base
+      rmn canvas_base
     fi
 
     if $is_released0 is_released0=0 fi
