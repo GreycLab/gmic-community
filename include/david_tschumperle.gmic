@@ -2231,18 +2231,31 @@ _ndisplay :
         x1,y1:=[$l_canvas_x,$l_canvas_y]+$l_canvas_fact*[$canvas_width,$canvas_height]/2
 
         if ${is_infnan$thumb_selected}
-          s_infnan="im-=dimM; iM+=dimM; replace_infnan(v) = (isinf(v)?(v = v<0?0:255):isnan(v)?(v = 0));"
+          # Determine non-infnan min and max values
+          +eval[$thumb_selected] ":begin(val_min = inf; val_max = -inf);
+            val = i;
+            !isinf(val)?(
+              val<val_min?(val_min = val):val>val_max?(val_max = val);
+            );
+            end(
+              merge(val_min,min); merge(val_max,max);
+              set('val_min',val_min);
+              set('val_max',val_max);
+              set('val_delta',val_max - val_min);
+            )"
+          s_infnan="const im = "$val_min" - "$val_delta";
+                    const iM = "$val_max" + "$val_delta";
+                    replace_infnan(v) = (isinf(v)?(v = v<0?0:255):isnan(v)?(v = 0));"
         else
-          s_infnan="replace_infnan(v) = (v);"
+          s_infnan="const im = im#$thumb_selected;
+                    const iM = iM#$thumb_selected;
+                    replace_infnan(v) = 0;"
         fi
 
         $canvas_width,$canvas_height,1,3,":
           begin(
-            im = im#$thumb_selected;
-            iM = iM#$thumb_selected;
-            dimM = iM - im;
             "$s_infnan"
-            fMm = 255/(iM - im);
+            const fMm = 255/(iM - im);
           );
           u = round(lerp($x0,$x1,x/w),1,-1);
           v = round(lerp($y0,$y1,y/h),1,-1);
