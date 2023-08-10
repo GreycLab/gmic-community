@@ -2095,7 +2095,7 @@ _ndisplay :
     w[] $window_width,$window_height,0,$window_title
   fi
   window_nonfullscreen_width,window_nonfullscreen_height={*,w,h}
-  is_fullscreen={*,f}
+  is_fullscreen,mouse_x,mouse_y={*,f,x,y}
   is_clicked0,is_clicked1,is_clicked2,is_released0,is_released1,is_released2,is_drag0,is_drag1,is_drag2=0
   window_wait_mode=0
 
@@ -2319,7 +2319,8 @@ _ndisplay :
 
     # Convert low-levels events to higher-level (buttons / drag).
     is_CTRL:={*,CTRLLEFT}" || "{*,CTRLRIGHT}
-    mouse_x,mouse_y,mouse_button:={*,x,y,b}
+    prev_mouse_x,prev_mouse_y=$mouse_x,$mouse_y
+    mouse_x,mouse_y,mouse_button={*,x,y,b}
     mouse_area:=$mouse_y<0?0:$mouse_y<$thumb_height?1:2
     is_button0,is_button1,is_button2:=($mouse_button&1),($mouse_button&2),($mouse_button&4)
     repeat 3 {
@@ -2418,14 +2419,16 @@ _ndisplay :
 
     if $mouse_area==2
       if {*,o} # Zoom in/out
-        delta={*,-o}
-        if $delta>0
-          # ncanvas_x:=lerp($canvas_x0,$canvas_x1,$mouse_x/$canvas_width)/w#$thumb_selected
-          # ncanvas_y:=lerp($canvas_y0,$canvas_y1,$mouse_y/$canvas_height)/h#$thumb_selected
-          # canvas_x:=lerp($canvas_x,$ncanvas_x,0.3)
-          # canvas_y:=lerp($canvas_y,$ncanvas_y,0.3)
+        if !narg($canvas_zoom_x_px)" || "$mouse_x!=$canvas_zoom_x_px" || "$mouse_y!=$canvas_zoom_y_px
+          canvas_zoom_x_px,canvas_zoom_y_px=$mouse_x,$mouse_y
+          canvas_zoom_x:=lerp($canvas_x0,$canvas_x1,$canvas_zoom_x_px/$canvas_width)/w#$thumb_selected
+          canvas_zoom_y:=lerp($canvas_y0,$canvas_y1,$canvas_zoom_y_px/$canvas_height)/h#$thumb_selected
         fi
-        canvas_zoom:=cut($canvas_zoom*(1+$delta/10),0.9,100)
+        if {*,o}>0
+          canvas_x:=lerp($canvas_x,$canvas_zoom_x,0.25)
+          canvas_y:=lerp($canvas_y,$canvas_zoom_y,0.25)
+        fi
+        canvas_zoom:=cut($canvas_zoom*(1+{*,-o}/10),0.9,100)
         rmn canvas_base
       fi
 
