@@ -2102,12 +2102,10 @@ _ndisplay :
   # Initialize other viewer variables.
   thumb_mouseover=-1
   thumb_selected=0
-  thumb_drag_absolute=
-  thumb_drag_relative=0
+  thumb_drag_x=
 
   canvas_label_alignment=0
   canvas_x,canvas_y,canvas_fact=0.5,0.5,1
-  canvas_drag_absolute,canvas_drag_relative=0
 
   # Enter user interaction loop.
   for {*}" && "!{*,ESC} {
@@ -2172,14 +2170,14 @@ _ndisplay :
         rmn thumb_view
       fi
 
-      if !narg($thumb_drag_absolute) thumb_drag_absolute={thumb_base,-16/w} fi
-      thumb_drag_px_max={thumb_coords,max(-16,i[h-1]+i(0,h-1,0,2)-$window_width+17)}
-      thumb_drag_px={thumb_base,cut(($thumb_drag_absolute+$thumb_drag_relative)*w,-16,$thumb_drag_px_max)}
+      if !narg($thumb_drag_x) thumb_drag_x={thumb_base,-16/w} fi
+      thumb_drag_x_px_max={thumb_coords,max(-16,i[h-1]+i(0,h-1,0,2)-$window_width+17)}
+      thumb_drag_x_px={thumb_base,cut($thumb_drag_x*w,-16,$thumb_drag_x_px_max)}
 
       if !0$thumb_view
-        +z[thumb_base] $thumb_drag_px,{$thumb_drag_px+$window_width-1}
+        +z[thumb_base] $thumb_drag_x_px,{$thumb_drag_x_px+$window_width-1}
         x0,y0,w,h={thumb_coords,I[$thumb_selected]}
-        x0-=$thumb_drag_px
+        x0-=$thumb_drag_x_px
         font_size:=cut($thumb_height/6,16,32)
         rectangle. $x0,$y0,{[$x0,$y0]+[$w,$h]-1},1,0xFFFFFFFF,255
         rectangle. {[$x0,$y0]+1},{[$x0,$y0]+[$w,$h]-2},1,0xFFFFFFFF,255
@@ -2187,7 +2185,7 @@ _ndisplay :
         to. "#"{image_indices,i[$thumb_selected]},{[$x0,$y0]+1},$font_size,2
         if $thumb_mouseover>=0
           x0,y0,w,h={thumb_coords,I[$thumb_mouseover]}
-          x0-=$thumb_drag_px
+          x0-=$thumb_drag_x_px
           rectangle. $x0,$y0,{[$x0,$y0]+[$w,$h]-1},0.25,200
           if $thumb_mouseover!=$thumb_selected
             rectangle. $x0,$y0,{[$x0,$y0]+[$w,$h]-1},0.75,0x33333333,0
@@ -2197,15 +2195,15 @@ _ndisplay :
         fi
 
         # Add left/right shading in thumb view.
-        if $thumb_drag_px>0
+        if $thumb_drag_x_px>0
           +z. 0,31
-          32,1,1,1,"lerp(max(0.25,1 - $thumb_drag_px/32),1,x/w)" *[-2,-1]
+          32,1,1,1,"lerp(max(0.25,1 - $thumb_drag_x_px/32),1,x/w)" *[-2,-1]
           j.. .,0 rm.
         fi
-        if {thumb_base,$thumb_drag_px+$window_width<w}
+        if {thumb_base,$thumb_drag_x_px+$window_width<w}
           x0:=w-32
           +z. $x0,100%
-          32,1,1,1,"lerp(1,max(0.25,1 - (w#$thumb_base - $window_width - $thumb_drag_px)/32),x/w)" *[-2,-1]
+          32,1,1,1,"lerp(1,max(0.25,1 - (w#$thumb_base - $window_width - $thumb_drag_x_px)/32),x/w)" *[-2,-1]
           j.. .,$x0 rm.
         fi
         => thumb_view
@@ -2347,17 +2345,17 @@ _ndisplay :
     prev_thumb_selected=$thumb_selected
     if !$thumb_is_hidden
       if $is_drag0==1" && "$is_clicked0==1
-        thumb_drag_relative={thumb_base,($drag_start_x0-$drag_end_x0)/w}
+        thumb_drag_x+={thumb_base,($drag_start_x0-$drag_end_x0)/w}
+        drag_start_x0=$drag_end_x0
         rmn thumb_view
       elif $is_drag0==1" && "($is_released0" || "!$mouse_area)
-        thumb_drag_absolute={thumb_base,$thumb_drag_px/w}
-        thumb_drag_relative=0
+        thumb_drag_x={thumb_base,$thumb_drag_x_px/w}
         is_drag0,is_released0=0
         rmn thumb_view
       fi
 
       if $mouse_area==1
-        x_ind:=$mouse_x+$thumb_drag_px
+        x_ind:=$mouse_x+$thumb_drag_x_px
         if {thumb_label,inrange($x_ind,0,w-1)" && "i[$x_ind]>=0}
           ind={thumb_label,i[$x_ind]}
           if $ind!=$thumb_mouseover
@@ -2397,10 +2395,10 @@ _ndisplay :
       # Ensure that a newly selected thumbnail is fully visible.
       if $thumb_selected!=$prev_thumb_selected
         x0,w={thumb_coords,[i(0,$thumb_selected,0,0),i(0,$thumb_selected,0,2)]}
-        if $x0<$thumb_drag_px
-          thumb_drag_absolute,thumb_drag_relative={thumb_base,($x0-48)/w},0
-        elif $x0+$w>=$thumb_drag_px+$window_width
-          thumb_drag_absolute,thumb_drag_relative={thumb_base,($x0+$w-$window_width+48)/w},0
+        if $x0<$thumb_drag_x_px
+          thumb_drag_x={thumb_base,($x0-48)/w}
+        elif $x0+$w>=$thumb_drag_x_px+$window_width
+          thumb_drag_x={thumb_base,($x0+$w-$window_width+48)/w}
         fi
       fi
     fi
