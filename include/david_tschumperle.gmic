@@ -2143,16 +2143,24 @@ _ndisplay :
             font_size:=cut($thumb_height/4,16,32)
             rm. $w,$h,1,3,100 to. \330,0.42~,0.5~,$font_size,1,1,255
           else
+            if !narg(${is_infnan$>}) sh[$>] 0,{$>,min(2,s)} is_infnan$>:="s=is;isinf(s)||isnan(s)" rm. fi
             if s>3 channels. 0,2 fi
             if d>1 volumetric2d. 50%,50%,50%,2 fi
             r. $w,$h
-            if !narg(${is_infnan$>}) is_infnan$>={$>,"s=is;isinf(s)||isnan(s)"} fi
-
-            if ${is_infnan$>}
-              replace_infnan. i>0?512:-512
+            if ${is_infnan$>} # Normalize without considering inf and NaN values
+              val_min,val_max=${$0_minmax_infnan.}
+              val_delta:=$val_max-$val_min
+              f. "
+                const im = "$val_min" - "$val_delta";
+                const iM = "$val_max" + "$val_delta";
+                const fMm = 255/(iM - im);
+                val = (i - im)*fMm;
+                isinf(val)?(val = val<0?0:255):isnan(val)?(val = 0);
+                val"
+            else
+              n. 0,255
             fi
 
-            n. 0,255
             if s==1 r. 100%,100%,1,3
             elif s==2 r. 100%,100%,1,3,0
             fi
@@ -2239,11 +2247,11 @@ _ndisplay :
           val_delta:=$val_max-$val_min
           s_infnan="const im = "$val_min" - "$val_delta";
                     const iM = "$val_max" + "$val_delta";
-                    replace_infnan(v) = (isinf(v)?(v = v<0?0:255):isnan(v)?(v = 0));"
+                    replace_infnan(val) = (isinf(val)?(val = val<0?0:255):isnan(val)?(val = 0));"
         else
           s_infnan="const im = im#$thumb_selected;
                     const iM = iM#$thumb_selected;
-                    replace_infnan(v) = 0;"
+                    replace_infnan(val) = 0;"
         fi
 
         $canvas_width,$canvas_height,1,3,":
