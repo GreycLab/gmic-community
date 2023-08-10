@@ -2092,7 +2092,7 @@ _ndisplay :
       Mh = Mwh*max($thumb_min_ratio,Mh/Mwh);
       round([ Mw,Mh ])"
     if $nb_images>1 window_height={round(($window_height+2)/(1-$thumb_height_factor))} fi
-    w[] $window_width,$window_height,$window_title
+    w[] $window_width,$window_height,0,$window_title
   fi
   window_nonfullscreen_width,window_nonfullscreen_height={*,w,h}
   is_fullscreen={*,f}
@@ -2146,7 +2146,8 @@ _ndisplay :
             if s>3 channels. 0,2 fi
             if d>1 volumetric2d. 50%,50%,50%,2 fi
             r. $w,$h
-            if s=is;isinf(s)||isnan(s) replace_naninf. i>0?512:-512 fi
+            if !narg(${is_infnan$>}) is_infnan$>={$>,"s=is;isinf(s)||isnan(s)"} fi
+            if ${is_infnan$>} replace_infnan. i>0?512:-512 fi
             n. 0,255
             if s==1 r. 100%,100%,1,3
             elif s==2 r. 100%,100%,1,3,0
@@ -2212,7 +2213,7 @@ _ndisplay :
         if s>3 channels. 0,2 fi
         volumetric2d. 50%,50%,50%,2
         r2din. {canvas_base,[w,h]},1
-        if s=is;isinf(s)||isnan(s) replace_naninf. i>0?512:-512 fi
+        if ${is_infnan$thumb_selected} replace_infnan. i>0?512:-512 fi
         n. 0,255
         if s==1 r. 100%,100%,1,3
         elif s==2 r. 100%,100%,1,3,0
@@ -2228,25 +2229,44 @@ _ndisplay :
 
         x0,y0:=[$l_canvas_x,$l_canvas_y]-$l_canvas_fact*[$canvas_width,$canvas_height]/2
         x1,y1:=[$l_canvas_x,$l_canvas_y]+$l_canvas_fact*[$canvas_width,$canvas_height]/2
+
+        if ${is_infnan$thumb_selected}
+          s_infnan="im-=dimM; iM+=dimM; replace_infnan(v) = (isinf(v)?(v = v<0?0:255):isnan(v)?(v = 0));"
+        else
+          s_infnan="replace_infnan(v) = (v);"
+        fi
+
         $canvas_width,$canvas_height,1,3,":
+          begin(
+            im = im#$thumb_selected;
+            iM = iM#$thumb_selected;
+            dimM = iM - im;
+            "$s_infnan"
+            fMm = 255/(iM - im);
+          );
           u = round(lerp($x0,$x1,x/w),1,-1);
           v = round(lerp($y0,$y1,y/h),1,-1);
-          s#$thumb_selected==1?(
-            R = i(#$thumb_selected,u,v,0,0);
-            [ R,R,R ]
-          ):s#$thumb_selected==2?(
-            R = i(#$thumb_selected,u,v,0,0);
-            G = i(#$thumb_selected,u,v,0,1);
-            [ R,G,0 ]
-          ):(
-            R = i(#$thumb_selected,u,v,0,0);
-            G = i(#$thumb_selected,u,v,0,1);
-            B = i(#$thumb_selected,u,v,0,2);
-            [ R,G,B ]
-          )" => canvas_base
-
-        if s=is;isinf(s)||isnan(s) replace_naninf. i>0?512:-512 fi
-        n. 0,255
+          inrange(u,0,w#$thumb_selected,1,0) && inrange(v,0,h#$thumb_selected,1,0)?(
+            s#$thumb_selected==1?(
+              R = i(#$thumb_selected,u,v,0,0);
+              (R-=im)*=fMm;
+              replace_infnan(R);
+              [ R,R,R ]
+            ):s#$thumb_selected==2?(
+              R = i(#$thumb_selected,u,v,0,0);
+              G = i(#$thumb_selected,u,v,0,1);
+              (R-=im)*=fMm; (G-=im)*=fMm;
+              replace_infnan(R); replace_infnan(G);
+              [ R,G,0 ]
+            ):(
+              R = i(#$thumb_selected,u,v,0,0);
+              G = i(#$thumb_selected,u,v,0,1);
+              B = i(#$thumb_selected,u,v,0,2);
+              (R-=im)*=fMm; (G-=im)*=fMm; (B-=im)*=fMm;
+              replace_infnan(R); replace_infnan(G); replace_infnan(B);
+              [ R,G,B ]
+            )
+          ):[0,0,0]" => canvas_base
       fi
     fi
 
@@ -2302,7 +2322,7 @@ _ndisplay :
       fi
     }
 
-    # Manage events related to thumbnail view.
+    # Manage thumbnail navigation events.
     prev_thumb_selected=$thumb_selected
     if !$thumb_is_hidden
       if $is_clicked0==1" && "$is_drag0
@@ -2367,7 +2387,7 @@ _ndisplay :
       fi
     fi
 
-    # Manage events related to canvas.
+    # Manage canvas events.
     if $mouse_area==2
 
       if $nb_images>1
