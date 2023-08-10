@@ -2106,7 +2106,7 @@ _ndisplay :
 
   canvas_label_alignment=0
   canvas_x,canvas_y,canvas_fact=0.5,0.5,1
-  canvas_pan_absolute,canvas_pan_relative=0
+  canvas_drag_absolute,canvas_drag_relative=0
 
   # Enter user interaction loop.
   for {*}" && "!{*,ESC} {
@@ -2239,8 +2239,8 @@ _ndisplay :
         l_canvas_x,l_canvas_y,l_canvas_fact={$thumb_selected,"
           [ $canvas_x*w, $canvas_y*h, $canvas_fact*max(w/$canvas_width,h/$canvas_height) ]"}
 
-        x0,y0:=[$l_canvas_x,$l_canvas_y]-$l_canvas_fact*[$canvas_width,$canvas_height]/2
-        x1,y1:=[$l_canvas_x,$l_canvas_y]+$l_canvas_fact*[$canvas_width,$canvas_height]/2
+        canvas_x0,canvas_y0:=[$l_canvas_x,$l_canvas_y]-$l_canvas_fact*[$canvas_width,$canvas_height]/2
+        canvas_x1,canvas_y1:=[$l_canvas_x,$l_canvas_y]+$l_canvas_fact*[$canvas_width,$canvas_height]/2
 
         if ${is_infnan$thumb_selected}
           val_min,val_max=${$0_minmax_infnan[$thumb_selected]}
@@ -2259,8 +2259,8 @@ _ndisplay :
             "$s_infnan"
             const fMm = 255/(iM - im);
           );
-          u = round(lerp($x0,$x1,x/w),1,-1);
-          v = round(lerp($y0,$y1,y/h),1,-1);
+          u = round(lerp($canvas_x0,$canvas_x1,x/w),1,-1);
+          v = round(lerp($canvas_y0,$canvas_y1,y/h),1,-1);
           inrange(u,0,w#$thumb_selected,1,0) && inrange(v,0,h#$thumb_selected,1,0)?(
             s#$thumb_selected==1?(
               R = i(#$thumb_selected,u,v,0,0);
@@ -2347,7 +2347,7 @@ _ndisplay :
       if $is_drag0==1" && "$is_clicked0==1
         thumb_drag_relative={thumb_base,($drag_start_x0-$drag_end_x0)/w}
         rmn thumb_view
-      elif $is_drag0" && "($is_released0" || "!$mouse_area)
+      elif $is_drag0==1" && "($is_released0" || "!$mouse_area)
         thumb_drag_absolute={thumb_base,$thumb_drag_px/w}
         thumb_drag_relative=0
         is_drag0,is_released0=0
@@ -2369,9 +2369,6 @@ _ndisplay :
             fi
           fi
         fi
-
-        if $is_released0 is_released0=0 fi
-        if $canvas_label_alignment canvas_label_alignment=0 rmn canvas_view fi
       fi
     fi
 
@@ -2407,18 +2404,17 @@ _ndisplay :
     fi
 
     # Manage canvas events.
-    # if $is_clicked0==2" && "$is_drag0
-    #   canvas_pan_relative=$drag_start_x0-$drag_end_x0)
-    #   rmn canvas_base
-    # elif ($is_released0" || "!$mouse_area)" && "$is_drag0
-    #   thumb_drag_absolute={thumb_base,$thumb_drag_px/w}
-    #   thumb_drag_relative=0
-    #   is_drag0,is_released0=0
-    #   rmn thumb_view
-    # fi
+    if $is_drag0==2" && "$is_clicked0==2
+      canvas_drag_relative:=($drag_start_x0-$drag_end_x0)
+      rmn canvas_view
+    elif $is_drag0==2" && "($is_released0" || "!$mouse_area)
+      canvas_drag_absolute=0
+      canvas_drag_relative=0
+      is_drag0,is_released0=0
+      rmn canvas_view
+    fi
 
     if $mouse_area==2
-
       if $nb_images>1
         if (!$canvas_label_alignment" && "{canvas_label_info,$mouse_y<$thumb_height2+h" && "$mouse_x<w})" || "\
            ($canvas_label_alignment" && "{canvas_label_info,$mouse_y>$thumb_height2+2*h})
