@@ -2516,34 +2516,19 @@ _ndisplay :
 
     # For 2D images.
     else
-      if !$is_drag0" && "$is_clicked0==2" && "[$mouse_x,$mouse_y]!=[$prev_mouse_x,$prev_mouse_y]
-        is_drag0=2 # Avoid drag latency for left button
-      fi
 
-      if $is_drag0==2" && "$is_clicked0==2 # Crop (with left mouse button)
-        cx,cy:=round(lerp($canvas_x0,$canvas_x1,$drag_end_x0/$canvas_width),1,-1),\
-               round(lerp($canvas_y0,$canvas_y1,($drag_end_y0-$thumb_height2)/$canvas_height),1,-1)
-        if !narg($canvas_crop_x0)
-          canvas_crop_x0,canvas_crop_y0,canvas_crop_x1,canvas_crop_y1=$cx,$cy,$cx,$cy
-          rmn canvas_base
-        elif [$cx,$cy]!=[$canvas_crop_x1,$canvas_crop_y1]
-          canvas_crop_x1,canvas_crop_y1=$cx,$cy
-          rmn canvas_base
-        fi
-      elif $is_drag0==2" && "($is_released0" || "!$mouse_area)
-        if $canvas_crop_x0>$canvas_crop_x1 canvas_crop_x0,canvas_crop_x1=$canvas_crop_x1,$canvas_crop_x0 fi
-        if $canvas_crop_y0>$canvas_crop_y1 canvas_crop_y0,canvas_crop_y1=$canvas_crop_y1,$canvas_crop_y0 fi
-        canvas_x,canvas_y,canvas_zoom={$thumb_selected,"
-          const wc = $canvas_width;
-          const hc = $canvas_height;
-          const f = 0.5*max(w/wc,h/hc);
-          [ 0.5*($canvas_crop_x0 + $canvas_crop_x1)/w,
-            0.5*($canvas_crop_y0 + $canvas_crop_y1)/h,
-            2*f*min(wc/max(8,$canvas_crop_x1 - $canvas_crop_x0),
-                    hc/max(8,$canvas_crop_y1 - $canvas_crop_y0)) ]"}
-        canvas_crop_x0,canvas_crop_y0,canvas_crop_x1,canvas_crop_y1=
-        is_drag0,is_released0=0
+      pan=2 # Mouse button to test for image pan.
+      if $is_CTRL" && "($is_clicked0==2" || "$is_released0==2)
+        pan=0 # Allow 'CTRL+left button' to be used for image pan
+      fi
+      if ${is_drag$pan}==2" && "${is_clicked$pan}==2 # Pan (with middle or left mouse button)
+        canvas_x-=(${drag_end_x$pan}-${drag_start_x$pan})/$canvas_width*$canvas_dx/w#$thumb_selected
+        canvas_y-=(${drag_end_y$pan}-${drag_start_y$pan})/$canvas_height*$canvas_dy/h#$thumb_selected
+        canvas_x,canvas_y:=cut([$canvas_x,$canvas_y],0,1)
+        drag_start_x$pan,drag_start_y$pan=${drag_end_x$pan},${drag_end_y$pan}
         rmn canvas_base
+      elif ${is_drag$pan}==2" && "(${is_released$pan}" || "!$mouse_area)
+        is_drag0,is_released0,is_drag2,is_released2=0
       fi
 
       if $is_drag1==2" && "$is_clicked1==2 # Zoom (with right mouse button)
@@ -2573,14 +2558,34 @@ _ndisplay :
         is_drag1,is_released1=0
       fi
 
-      if $is_drag2==2" && "$is_clicked2==2 # Pan (with middle mouse button)
-        canvas_x-=($drag_end_x2-$drag_start_x2)/$canvas_width*$canvas_dx/w#$thumb_selected
-        canvas_y-=($drag_end_y2-$drag_start_y2)/$canvas_height*$canvas_dy/h#$thumb_selected
-        canvas_x,canvas_y:=cut([$canvas_x,$canvas_y],0,1)
-        drag_start_x2,drag_start_y2=$drag_end_x2,$drag_end_y2
+      if !$is_CTRL" && "!$is_drag0" && "$is_clicked0==2" && "[$mouse_x,$mouse_y]!=[$prev_mouse_x,$prev_mouse_y]
+        is_drag0=2 # Avoid drag latency for crop with left button
+      fi
+
+      if $pan" && "$is_drag0==2" && "$is_clicked0==2 # Crop (with left mouse button)
+        cx,cy:=round(lerp($canvas_x0,$canvas_x1,$drag_end_x0/$canvas_width),1,-1),\
+               round(lerp($canvas_y0,$canvas_y1,($drag_end_y0-$thumb_height2)/$canvas_height),1,-1)
+        if !narg($canvas_crop_x0)
+          canvas_crop_x0,canvas_crop_y0,canvas_crop_x1,canvas_crop_y1=$cx,$cy,$cx,$cy
+          rmn canvas_base
+        elif [$cx,$cy]!=[$canvas_crop_x1,$canvas_crop_y1]
+          canvas_crop_x1,canvas_crop_y1=$cx,$cy
+          rmn canvas_base
+        fi
+      elif $pan" && "$is_drag0==2" && "($is_released0" || "!$mouse_area)
+        if $canvas_crop_x0>$canvas_crop_x1 canvas_crop_x0,canvas_crop_x1=$canvas_crop_x1,$canvas_crop_x0 fi
+        if $canvas_crop_y0>$canvas_crop_y1 canvas_crop_y0,canvas_crop_y1=$canvas_crop_y1,$canvas_crop_y0 fi
+        canvas_x,canvas_y,canvas_zoom={$thumb_selected,"
+          const wc = $canvas_width;
+          const hc = $canvas_height;
+          const f = 0.5*max(w/wc,h/hc);
+          [ 0.5*($canvas_crop_x0 + $canvas_crop_x1)/w,
+            0.5*($canvas_crop_y0 + $canvas_crop_y1)/h,
+            2*f*min(wc/max(8,$canvas_crop_x1 - $canvas_crop_x0),
+                    hc/max(8,$canvas_crop_y1 - $canvas_crop_y0)) ]"}
+        canvas_crop_x0,canvas_crop_y0,canvas_crop_x1,canvas_crop_y1=
+        is_drag0,is_released0=0
         rmn canvas_base
-      elif $is_drag2==2" && "($is_released2" || "!$mouse_area)
-        is_drag2,is_released2=0
       fi
 
       if $mouse_area==2
@@ -2601,7 +2606,7 @@ _ndisplay :
             rmn canvas_base
           fi
         fi
-        if {*,-ENTER} # Reset view
+        if {*,-ENTER}" || "(!$is_drag0" && "$is_released0==2) # Reset view
           canvas_x,canvas_y,canvas_zoom=0.5,0.5,1
           rmn canvas_base
         elif !$is_CTRL" && "{*,C} # Center view
@@ -2618,15 +2623,6 @@ _ndisplay :
           canvas_y:=step=$canvas_dy/10/h#$thumb_selected;cut($canvas_y+({*,ARROWUP}?-step:{*,ARROWDOWN}?step:0),0,1)
           rmn canvas_base
         fi
-
-        if !$is_drag0" && "$is_released0==2 # Single left click: reset view
-          # canvas_x,canvas_y:=\
-          #   cut(lerp($canvas_x0,$canvas_x1,$mouse_x/$canvas_width)/w#$thumb_selected,0,1),\
-          #   cut(lerp($canvas_y0,$canvas_y1,($mouse_y-$thumb_height2)/$canvas_height)/h#$thumb_selected,0,1)
-          canvas_x,canvas_y,canvas_zoom=0.5,0.5,1
-          rmn canvas_base
-        fi
-
         if [$mouse_x,$mouse_y]!=[$prev_mouse_x,$prev_mouse_y]
           rmn canvas_view
         fi
