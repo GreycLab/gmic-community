@@ -2107,6 +2107,7 @@ _ndisplay :
 
   canvas_x,canvas_y,canvas_zoom=0.5,0.5,1
   canvas_label_alignment=0
+  canvas_is_grid=1
 
   # Enter user interaction loop.
   for {*}" && "!{*,ESC} {
@@ -2254,7 +2255,8 @@ _ndisplay :
                     replace_infnan(val) = 0;"
         fi
 
-        $canvas_width,$canvas_height,1,3,":
+        # Render canvas image.
+        $canvas_width,$canvas_height,1,3,"
           begin(
             "$s_infnan"
             const fMm = 255/(fM - fm);
@@ -2285,6 +2287,39 @@ _ndisplay :
             R = xor(x,y)%32<16?64:96;
             [R,R,R]
           )" => canvas_base
+
+        # Draw grid.
+        if $canvas_is_grid
+          dx,dy:=$canvas_width/$canvas_dx,$canvas_height/$canvas_dy
+          dl:=max($dx,$dy)
+          if $dl>8 # Draw pixel outline
+            opacity:=lerp(0,1,min(($dl-8)/10,1))
+            $canvas_width,1,1,1,">
+              begin(
+                pu = -1;
+                const Y0 = max(0,-$canvas_y0/$canvas_dy*$canvas_height);
+                const Y1 = min($canvas_height - 1,(h#$thumb_selected - $canvas_y0)/$canvas_dy*$canvas_height);
+              );
+              u = round(lerp($canvas_x0,$canvas_x1,x/w),1,-1);
+              u!=pu && inrange(u,0,w#$thumb_selected)?(
+                polygon(#$canvas_base,2,x,Y0,x,Y1,$opacity,0);
+              );
+              pu = u;
+            " rm.
+            1,$canvas_height,1,1,">
+              begin(
+                pv = -1;
+                const X0 = max(0,-$canvas_x0/$canvas_dx*$canvas_width);
+                const X1 = min($canvas_width - 1,(w#$thumb_selected - $canvas_x0)/$canvas_dx*$canvas_width);
+              );
+              v = round(lerp($canvas_y0,$canvas_y1,y/h),1,-1);
+              v!=pv && inrange(v,0,h#$thumb_selected)?(
+                polygon(#$canvas_base,2,X0,y,X1,y,$opacity,0);
+              );
+              pv = v;
+            " rm.
+          fi
+        fi
       fi
       rmn canvas_view
     fi
@@ -2330,6 +2365,7 @@ _ndisplay :
                      ($icy-$canvas_y0)/$canvas_dy*$canvas_height
             nccx,nccy:=$ccx+$dx,$ccy+$dy
             ccx,ccy,nccx,nccy:=round([$ccx,$ccy],1,1),round([$nccx,$nccy],1,1)-1
+            if $canvas_is_grid ccx+=1 ccy+=1 fi
             rectangle[canvas_view] $ccx,$ccy,$nccx,$nccy,$opacity,0x33333333,0
             rectangle[canvas_view] $ccx,$ccy,$nccx,$nccy,$opacity,0xCCCCCCCC,255
           fi
@@ -2563,13 +2599,11 @@ _ndisplay :
       is_fullscreen=0
       w[] {round([max(128,0.87*$window_width),max(128,0.87*$window_height)])},0,0
       rmn thumb_base,canvas_base
-    fi
-    if $is_CTRL" && "{*,D} # Increase window size
+    elif $is_CTRL" && "{*,D} # Increase window size
       is_fullscreen=0
       w[] {round([min({*,u},1.15*$window_width),min({*,v},1.15*$window_height)])},0,0
       rmn thumb_base,canvas_base
-    fi
-    if $is_CTRL" && "{*,-F} # Toggle fullscreen mode
+    elif $is_CTRL" && "{*,-F} # Toggle fullscreen mode
       if $is_fullscreen
         is_fullscreen=0
         w[] $window_nonfullscreen_width,$window_nonfullscreen_height,0,0
@@ -2578,12 +2612,14 @@ _ndisplay :
         w[] {*,u,v},0,1
       fi
       rmn thumb_base,canvas_base
+    elif $is_CTRL" && "{*,-G} # Toggle grid mode
+      canvas_is_grid:=!$canvas_is_grid
+      rmn canvas_base
     fi
     if $nb_images>1" && "{*,-TAB} # Hide/show thumbnails
       thumb_is_hidden:=!$thumb_is_hidden
       rmn canvas_base
     fi
-
     if $is_released0 is_released0=0 fi
     skip {*,-o} # Flush mouse wheel
   }
