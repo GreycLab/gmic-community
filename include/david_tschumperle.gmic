@@ -2117,6 +2117,7 @@ _ndisplay :
     # Generate view for thumbnails.
     if $thumb_is_hidden
       thumb_height,thumb_height2=0
+
     else
       thumb_height:=max(64,round($window_height*$thumb_height_factor))
 
@@ -2145,11 +2146,10 @@ _ndisplay :
             font_size:=cut($thumb_height/4,16,32)
             rm. $w,$h,1,3,100 to. \330,0.42~,0.5~,$font_size,1,1,255
           else
-            if !narg(${is_infnan$>}) sh. 0,{min(2,s-1)} is_infnan$>:="s=is;isinf(s)||isnan(s)" rm. fi
+            if !narg(${is_infnan$>}) is_infnan$>:=${$0_is_infnan.} fi
             if s>3 channels. 0,2 fi
             if d>1 volumetric2d. 50%,50%,50%,2 fi
             if w>$w" || "h>$h r. $w,$h fi
-
             if ${is_infnan$>} # Normalize thumbnail without considering inf and NaN values
               val_min,val_max=${$0_minmax_infnan.}
               f. "
@@ -2228,6 +2228,7 @@ _ndisplay :
         if s>3 channels. 0,2 fi
         volumetric2d. 50%,50%,50%,2
         r2din. {canvas_base,[w,h]},1
+        if !narg(${is_infnan$thumb_selected}) is_infnan$thumb_selected:=${$0_is_infnan[$thumb_selected]} fi
         if ${is_infnan$thumb_selected} replace_infnan. i>0?512:-512 fi
         n. 0,255
         if s==1 r. 100%,100%,1,3
@@ -2245,6 +2246,7 @@ _ndisplay :
           const hc = $canvas_height;
           const f = 0.5*max(w/wc,h/hc)/$canvas_zoom;
           [ x - f*wc, y - f*hc, x + f*wc, y + f*hc, 2*f*wc, 2*f*hc ]"}
+        if !narg(${is_infnan$thumb_selected}) is_infnan$thumb_selected:=${$0_is_infnan[$thumb_selected]} fi
         if ${is_infnan$thumb_selected}
           val_min,val_max=${$0_minmax_infnan[$thumb_selected]}
           s_infnan="const min = $val_min; const max = $val_max; const delta = max - min;
@@ -2719,6 +2721,12 @@ _ndisplay :
   fi
   k[0-{$nb_images-1}]
   is_change 0
+
+# Return 1 or 0 if one of the 3 first channels of the selected image contains 'inf' or 'NaN' values.
+_ndisplay_is_infnan :
+  if w sh 0,{min(s-1,2)} u {s=is;isinf(s)||isnan(s)} rm.
+  else u 0
+  fi
 
 # Return non-infnan min and max values of the selected image.
 _ndisplay_minmax_infnan :
