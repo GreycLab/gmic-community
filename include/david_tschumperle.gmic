@@ -2420,27 +2420,43 @@ _ndisplay :
     fi
 
     if $is_drag1==2" && "$is_clicked1==2 # Zoom
-      canvas_x-=($drag_end_x1-$drag_start_x1)/$canvas_width*$canvas_dx/w#$thumb_selected
-      canvas_y-=($drag_end_y1-$drag_start_y1)/$canvas_height*$canvas_dy/h#$thumb_selected
-      canvas_x,canvas_y:=cut([$canvas_x,$canvas_y],0,1)
+      amount:=($drag_end_x1-$drag_start_x1)/100
+      if !narg($canvas_zoom_x) canvas_zoom_x,canvas_zoom_y=$mouse_x,$mouse_y fi
+      if $amount<0" || "($amount>0" && "max($canvas_dx,$canvas_dy)>16)
+        n_canvas_zoom:=max($canvas_zoom*(1+$amount),0.9)
+      else
+        n_canvas_zoom=$canvas_zoom
+      fi
+      if $n_canvas_zoom!=$canvas_zoom
+        xc:=lerp($canvas_x0,$canvas_x1,$canvas_zoom_x/$canvas_width)
+        yc:=lerp($canvas_y0,$canvas_y1,$canvas_zoom_y/$canvas_height)
+        ratio:=$canvas_zoom/$n_canvas_zoom
+        canvas_x:=cut(lerp($xc,$canvas_x*w#$thumb_selected,$ratio)/w#$thumb_selected,0,1)
+        canvas_y:=cut(lerp($yc,$canvas_y*h#$thumb_selected,$ratio)/h#$thumb_selected,0,1)
+        canvas_zoom=$n_canvas_zoom
+        rmn canvas_base
+      fi
       drag_start_x1,drag_start_y1=$drag_end_x1,$drag_end_y1
-      rmn canvas_base
+
     elif $is_drag1==2" && "($is_released1" || "!$mouse_area)
+      canvas_zoom_x,canvas_zoom_y=
       is_drag1,is_released1=0
     fi
 
     if $mouse_area==2
       if {*,o} # Zoom in/out
-        if {*,o}<0" || "({*,o}>0" && "max($canvas_dx,$canvas_dy)>16)
-          n_canvas_zoom:=max($canvas_zoom*(1+{*,-o}/10),0.9)
-        else n_canvas_zoom=$canvas_zoom
+        amount:={*,-o}/10
+        if $amount<0" || "($amount>0" && "max($canvas_dx,$canvas_dy)>16)
+          n_canvas_zoom:=max($canvas_zoom*(1+$amount),0.9)
+        else
+          n_canvas_zoom=$canvas_zoom
         fi
         if $n_canvas_zoom!=$canvas_zoom
-          xm:=lerp($canvas_x0,$canvas_x1,$mouse_x/$canvas_width)
-          ym:=lerp($canvas_y0,$canvas_y1,($mouse_y-$thumb_height2)/$canvas_height)
+          xc:=lerp($canvas_x0,$canvas_x1,$mouse_x/$canvas_width)
+          yc:=lerp($canvas_y0,$canvas_y1,($mouse_y-$thumb_height2)/$canvas_height)
           ratio:=$canvas_zoom/$n_canvas_zoom
-          canvas_x:=cut(lerp($xm,$canvas_x*w#$thumb_selected,$ratio)/w#$thumb_selected,0,1)
-          canvas_y:=cut(lerp($ym,$canvas_y*h#$thumb_selected,$ratio)/h#$thumb_selected,0,1)
+          canvas_x:=cut(lerp($xc,$canvas_x*w#$thumb_selected,$ratio)/w#$thumb_selected,0,1)
+          canvas_y:=cut(lerp($yc,$canvas_y*h#$thumb_selected,$ratio)/h#$thumb_selected,0,1)
           canvas_zoom=$n_canvas_zoom
           rmn canvas_base
         fi
