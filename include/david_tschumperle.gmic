@@ -2218,7 +2218,7 @@ _ndisplay :
 
     # Generate canvas view.
     if !0$canvas_base
-      if $nb_images>1 rmn canvas_label_info fi
+      rmn canvas_label_title,canvas_label_coords
 
       # For 3D volumetric images.
       if {$thumb_selected,d>1}
@@ -2325,13 +2325,33 @@ _ndisplay :
       rmn canvas_view
     fi
 
-    if $nb_images>1" && "!0$canvas_label_info
-      basename {$thumb_selected,n} basename=${}
-      font_size={canvas_base,cut(round(h/32),16,32)}
-      0 t. "["{image_indices,i[$thumb_selected]}"] "$basename" ("{``{$thumb_selected,[w,h,d,s]}}")",\
-       4,0,$font_size,1,255
+    font_size={canvas_base,cut(round(h/32),16,32)}
+
+    if !0$canvas_label_title
+      if $nb_images>1
+        basename {$thumb_selected,n} basename=${}
+        0 t. "["{image_indices,i[$thumb_selected]}"] "$basename" ("{``{$thumb_selected,[w,h,d,s]}}")",\
+         4,0,$font_size,1,255
+        +n. 100,255 to_rgb.. a[-2,-1] c
+      else
+        0
+      fi
+      => canvas_label_title
+      rmn canvas_label
+    fi
+
+    if !0$canvas_label_coords
+      0 t. "Coords: ("$mouse_x","$mouse_y")",4,0,$font_size,1,255
       +n. 100,255 to_rgb.. a[-2,-1] c
-      => canvas_label_info
+      => canvas_label_coords
+      rmn canvas_label
+    fi
+
+    if !0$canvas_label
+      0
+      if $canvas_label_title a. [canvas_label_title],y fi
+      if $canvas_label_coords a. [canvas_label_coords],y fi
+      => canvas_label
       rmn canvas_view
     fi
 
@@ -2394,10 +2414,11 @@ _ndisplay :
           line[canvas_view] $x0,$y0,$x1,$y1,0.75,0x33333333,0
           line[canvas_view] $x0,$y0,$x1,$y1,0.75,0xCCCCCCCC,255
         fi
+
+        # Draw labels.
+        ja[canvas_view] [canvas_label],1,{$canvas_label_alignment?1:0}~
       fi
-      if $canvas_label_info
-        ja[canvas_view] [canvas_label_info],1,{$canvas_label_alignment?1:0}~
-      fi
+
       rmn window_view
     fi
 
@@ -2626,15 +2647,14 @@ _ndisplay :
           rmn canvas_base
         fi
         if [$mouse_x,$mouse_y]!=[$previous_mouse_x,$previous_mouse_y]
+          rmn canvas_label_coords
           rmn canvas_view
         fi
 
-        if $nb_images>1
-          if (!$canvas_label_alignment" && "{canvas_label_info,$mouse_y<$thumb_height2+h" && "$mouse_x<w})" || "\
-             ($canvas_label_alignment" && "{canvas_label_info,$mouse_y>$thumb_height2+2*h})
-            canvas_label_alignment:=!$canvas_label_alignment
-            rmn canvas_view
-          fi
+        if (!$canvas_label_alignment" && "{canvas_label,$mouse_y<$thumb_height2+h" && "$mouse_x<w})" || "\
+           ($canvas_label_alignment" && "{canvas_label,$mouse_y>$thumb_height2+2*h})
+          canvas_label_alignment:=!$canvas_label_alignment
+          rmn canvas_view
         fi
       else
         if $previous_mouse_area==2 rmn canvas_view fi # Will hide cursor
