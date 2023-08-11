@@ -2417,105 +2417,112 @@ _ndisplay :
     fi
 
     # Manage canvas events.
-    if $is_drag2==2" && "$is_clicked2==2 # Pan (with middle mouse button)
-      canvas_x-=($drag_end_x2-$drag_start_x2)/$canvas_width*$canvas_dx/w#$thumb_selected
-      canvas_y-=($drag_end_y2-$drag_start_y2)/$canvas_height*$canvas_dy/h#$thumb_selected
-      canvas_x,canvas_y:=cut([$canvas_x,$canvas_y],0,1)
-      drag_start_x2,drag_start_y2=$drag_end_x2,$drag_end_y2
-      rmn canvas_base
-    elif $is_drag2==2" && "($is_released2" || "!$mouse_area)
-      is_drag2,is_released2=0
-    fi
 
-    if $is_drag1==2" && "$is_clicked1==2 # Zoom (with right mouse button)
-      amount:="
-        dx = $drag_end_x1 - $drag_start_x1;
-        dy = $drag_end_y1 - $drag_start_y1;
-        sign(dx)*norm(dx,dy)/200"
-      if !narg($canvas_zoom_x) canvas_zoom_x,canvas_zoom_y=$mouse_x,$mouse_y fi
-      if $amount<0" || "($amount>0" && "max($canvas_dx,$canvas_dy)>8)
-        n_canvas_zoom:=max($canvas_zoom*(1+$amount),1)
-      else
-        n_canvas_zoom=$canvas_zoom
-      fi
-      if $n_canvas_zoom!=$canvas_zoom
-        xc:=lerp($canvas_x0,$canvas_x1,$canvas_zoom_x/$canvas_width)
-        yc:=lerp($canvas_y0,$canvas_y1,$canvas_zoom_y/$canvas_height)
-        ratio:=$canvas_zoom/$n_canvas_zoom
-        canvas_x:=cut(lerp($xc,$canvas_x*w#$thumb_selected,$ratio)/w#$thumb_selected,0,1)
-        canvas_y:=cut(lerp($yc,$canvas_y*h#$thumb_selected,$ratio)/h#$thumb_selected,0,1)
-        canvas_zoom=$n_canvas_zoom
+    # Events for 3D volumetric image viewer.
+    if {$thumb_selected,d>1}
+
+    # Events for 2D image viewer.
+    else
+      if $is_drag2==2" && "$is_clicked2==2 # Pan (with middle mouse button)
+        canvas_x-=($drag_end_x2-$drag_start_x2)/$canvas_width*$canvas_dx/w#$thumb_selected
+        canvas_y-=($drag_end_y2-$drag_start_y2)/$canvas_height*$canvas_dy/h#$thumb_selected
+        canvas_x,canvas_y:=cut([$canvas_x,$canvas_y],0,1)
+        drag_start_x2,drag_start_y2=$drag_end_x2,$drag_end_y2
         rmn canvas_base
+      elif $is_drag2==2" && "($is_released2" || "!$mouse_area)
+        is_drag2,is_released2=0
       fi
-      drag_start_x1,drag_start_y1=$drag_end_x1,$drag_end_y1
 
-    elif $is_drag1==2" && "($is_released1" || "!$mouse_area)
-      canvas_zoom_x,canvas_zoom_y=
-      is_drag1,is_released1=0
-    fi
-
-    if $mouse_area==2
-      if {*,o} # Zoom (with mouse wheel)
-        amount:={*,-o}/10
+      if $is_drag1==2" && "$is_clicked1==2 # Zoom (with right mouse button)
+        amount:="
+          dx = $drag_end_x1 - $drag_start_x1;
+          dy = $drag_end_y1 - $drag_start_y1;
+          sign(dx)*norm(dx,dy)/200"
+        if !narg($canvas_zoom_x) canvas_zoom_x,canvas_zoom_y=$mouse_x,$mouse_y fi
         if $amount<0" || "($amount>0" && "max($canvas_dx,$canvas_dy)>8)
           n_canvas_zoom:=max($canvas_zoom*(1+$amount),1)
         else
           n_canvas_zoom=$canvas_zoom
         fi
         if $n_canvas_zoom!=$canvas_zoom
-          xc:=lerp($canvas_x0,$canvas_x1,$mouse_x/$canvas_width)
-          yc:=lerp($canvas_y0,$canvas_y1,($mouse_y-$thumb_height2)/$canvas_height)
+          xc:=lerp($canvas_x0,$canvas_x1,$canvas_zoom_x/$canvas_width)
+          yc:=lerp($canvas_y0,$canvas_y1,$canvas_zoom_y/$canvas_height)
           ratio:=$canvas_zoom/$n_canvas_zoom
           canvas_x:=cut(lerp($xc,$canvas_x*w#$thumb_selected,$ratio)/w#$thumb_selected,0,1)
           canvas_y:=cut(lerp($yc,$canvas_y*h#$thumb_selected,$ratio)/h#$thumb_selected,0,1)
           canvas_zoom=$n_canvas_zoom
           rmn canvas_base
         fi
-      fi
-      if {*,-ENTER} # Reset view
-        canvas_x,canvas_y,canvas_zoom=0.5,0.5,1
-        rmn canvas_base
-      elif !$is_CTRL" && "{*,C} # Center view
-        canvas_x,canvas_y=0.5
-        rmn canvas_base
-      elif !$is_CTRL" && "{*,HOME}
-        canvas_x,canvas_y:=w#$thumb_selected==1?0.5:0,h#$thumb_selected==1?0.5:0
-        rmn canvas_base
-      elif !$is_CTRL" && "{*,END}
-        canvas_x,canvas_y:=w#$thumb_selected==1?0.5:1,h#$thumb_selected==1?0.5:1
-        rmn canvas_base
-      elif !$is_CTRL" && "({*,ARROWLEFT}" || "{*,ARROWRIGHT}" || "{*,ARROWUP}" || "{*,ARROWDOWN})
-        canvas_x:=step=$canvas_dx/10/w#$thumb_selected;cut($canvas_x+({*,ARROWLEFT}?-step:{*,ARROWRIGHT}?step:0),0,1)
-        canvas_y:=step=$canvas_dy/10/h#$thumb_selected;cut($canvas_y+({*,ARROWUP}?-step:{*,ARROWDOWN}?step:0),0,1)
-        rmn canvas_base
+        drag_start_x1,drag_start_y1=$drag_end_x1,$drag_end_y1
+
+      elif $is_drag1==2" && "($is_released1" || "!$mouse_area)
+        canvas_zoom_x,canvas_zoom_y=
+        is_drag1,is_released1=0
       fi
 
-      if !$is_drag0" && "$is_released0==2 # Single left click: center view
-        canvas_x,canvas_y:=\
-          cut(lerp($canvas_x0,$canvas_x1,$mouse_x/$canvas_width)/w#$thumb_selected,0,1),\
-          cut(lerp($canvas_y0,$canvas_y1,($mouse_y-$thumb_height2)/$canvas_height)/h#$thumb_selected,0,1)
-        rmn canvas_base
-      fi
-
-      if $mouse_x!=$canvas_cursor_x" || "$mouse_y-$thumb_height2!=$canvas_cursor_y
-        canvas_cursor_x,canvas_cursor_y=$mouse_x,{$mouse_y-$thumb_height2}
-        if !inrange(lerp($canvas_x0,$canvas_x1,$canvas_cursor_x/$canvas_width),0,w#$thumb_selected,1,0)" || "\
-           !inrange(lerp($canvas_y0,$canvas_y1,$canvas_cursor_y/$canvas_height),0,h#$thumb_selected,1,0)
-          canvas_cursor_x,canvas_cursor_y=-1
+      if $mouse_area==2
+        if {*,o} # Zoom (with mouse wheel)
+          amount:={*,-o}/10
+          if $amount<0" || "($amount>0" && "max($canvas_dx,$canvas_dy)>8)
+            n_canvas_zoom:=max($canvas_zoom*(1+$amount),1)
+          else
+            n_canvas_zoom=$canvas_zoom
+          fi
+          if $n_canvas_zoom!=$canvas_zoom
+            xc:=lerp($canvas_x0,$canvas_x1,$mouse_x/$canvas_width)
+            yc:=lerp($canvas_y0,$canvas_y1,($mouse_y-$thumb_height2)/$canvas_height)
+            ratio:=$canvas_zoom/$n_canvas_zoom
+            canvas_x:=cut(lerp($xc,$canvas_x*w#$thumb_selected,$ratio)/w#$thumb_selected,0,1)
+            canvas_y:=cut(lerp($yc,$canvas_y*h#$thumb_selected,$ratio)/h#$thumb_selected,0,1)
+            canvas_zoom=$n_canvas_zoom
+            rmn canvas_base
+          fi
         fi
-        rmn canvas_view
-      fi
+        if {*,-ENTER} # Reset view
+          canvas_x,canvas_y,canvas_zoom=0.5,0.5,1
+          rmn canvas_base
+        elif !$is_CTRL" && "{*,C} # Center view
+          canvas_x,canvas_y=0.5
+          rmn canvas_base
+        elif !$is_CTRL" && "{*,HOME}
+          canvas_x,canvas_y:=w#$thumb_selected==1?0.5:0,h#$thumb_selected==1?0.5:0
+          rmn canvas_base
+        elif !$is_CTRL" && "{*,END}
+          canvas_x,canvas_y:=w#$thumb_selected==1?0.5:1,h#$thumb_selected==1?0.5:1
+          rmn canvas_base
+        elif !$is_CTRL" && "({*,ARROWLEFT}" || "{*,ARROWRIGHT}" || "{*,ARROWUP}" || "{*,ARROWDOWN})
+          canvas_x:=step=$canvas_dx/10/w#$thumb_selected;cut($canvas_x+({*,ARROWLEFT}?-step:{*,ARROWRIGHT}?step:0),0,1)
+          canvas_y:=step=$canvas_dy/10/h#$thumb_selected;cut($canvas_y+({*,ARROWUP}?-step:{*,ARROWDOWN}?step:0),0,1)
+          rmn canvas_base
+        fi
 
-      if $nb_images>1
-        if (!$canvas_label_alignment" && "{canvas_label_info,$mouse_y<$thumb_height2+h" && "$mouse_x<w})" || "\
-           ($canvas_label_alignment" && "{canvas_label_info,$mouse_y>$thumb_height2+2*h})
-          canvas_label_alignment:=!$canvas_label_alignment
+        if !$is_drag0" && "$is_released0==2 # Single left click: center view
+          canvas_x,canvas_y:=\
+            cut(lerp($canvas_x0,$canvas_x1,$mouse_x/$canvas_width)/w#$thumb_selected,0,1),\
+            cut(lerp($canvas_y0,$canvas_y1,($mouse_y-$thumb_height2)/$canvas_height)/h#$thumb_selected,0,1)
+          rmn canvas_base
+        fi
+
+        if $mouse_x!=$canvas_cursor_x" || "$mouse_y-$thumb_height2!=$canvas_cursor_y
+          canvas_cursor_x,canvas_cursor_y=$mouse_x,{$mouse_y-$thumb_height2}
+          if !inrange(lerp($canvas_x0,$canvas_x1,$canvas_cursor_x/$canvas_width),0,w#$thumb_selected,1,0)" || "\
+             !inrange(lerp($canvas_y0,$canvas_y1,$canvas_cursor_y/$canvas_height),0,h#$thumb_selected,1,0)
+            canvas_cursor_x,canvas_cursor_y=-1
+          fi
           rmn canvas_view
         fi
+
+        if $nb_images>1
+          if (!$canvas_label_alignment" && "{canvas_label_info,$mouse_y<$thumb_height2+h" && "$mouse_x<w})" || "\
+             ($canvas_label_alignment" && "{canvas_label_info,$mouse_y>$thumb_height2+2*h})
+            canvas_label_alignment:=!$canvas_label_alignment
+            rmn canvas_view
+          fi
+        fi
+      else
+        if $canvas_cursor_x>=0 rmn canvas_view fi
+        canvas_cursor_x,canvas_cursor_y=-1
       fi
-    else
-      if $canvas_cursor_x>=0 rmn canvas_view fi
-      canvas_cursor_x,canvas_cursor_y=-1
     fi
 
     # Manage global window events.
