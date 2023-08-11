@@ -2096,6 +2096,7 @@ _ndisplay :
   fi
   window_nonfullscreen_width,window_nonfullscreen_height={*,w,h}
   is_fullscreen,mouse_x,mouse_y={*,f,x,y}
+  prev_mouse_x,prev_mouse_y=-1
   is_clicked0,is_clicked1,is_clicked2,is_released0,is_released1,is_released2,is_drag0,is_drag1,is_drag2=0
   window_wait_mode=0
 
@@ -2218,7 +2219,7 @@ _ndisplay :
     if !0$canvas_base
       if $nb_images>1 rmn canvas_label_info fi
 
-      # Viewer for 3D volumetric images.
+      # For 3D volumetric images.
       if {$thumb_selected,d>1}
         $window_width,{$window_height-$thumb_height2},1,3 => canvas_base
         [$thumb_selected]
@@ -2232,7 +2233,7 @@ _ndisplay :
         fi
         j[canvas_base] .,0.5~,0.5~ rm.
 
-      # Viewer for 2D images.
+      # For 2D images.
       else
         canvas_width,canvas_height=$window_width,{$window_height-$thumb_height2}
         canvas_x0,canvas_y0,canvas_x1,canvas_y1,canvas_dx,canvas_dy={$thumb_selected,"
@@ -2301,26 +2302,38 @@ _ndisplay :
 
     if !0$canvas_view
       [canvas_base] => canvas_view
-      if $canvas_cursor_x>=0
-        line[canvas_view] $canvas_cursor_x,0,$canvas_cursor_x,100%,0.65,0xFF00FF00,255
-        line[canvas_view] $canvas_cursor_x,0,$canvas_cursor_x,100%,0.65,0x000FF00FF,0
-        line[canvas_view] 0,$canvas_cursor_y,100%,$canvas_cursor_y,0.65,0xFF00FF00,255
-        line[canvas_view] 0,$canvas_cursor_y,100%,$canvas_cursor_y,0.65,0x00FF00FF,0
 
-        dx,dy:=$canvas_width/$canvas_dx,$canvas_height/$canvas_dy
-        dl:=max($dx,$dy)
-        if $dl>8 # Draw pixel outline
-          opacity:=lerp(0,1,min(($dl-8)/10,1))
-          icx,icy:=round(lerp($canvas_x0,$canvas_x1,$canvas_cursor_x/$canvas_width),1,-1),\
-                   round(lerp($canvas_y0,$canvas_y1,$canvas_cursor_y/$canvas_height),1,-1)
-          ccx,ccy:=($icx-$canvas_x0)/$canvas_dx*$canvas_width,\
-                   ($icy-$canvas_y0)/$canvas_dy*$canvas_height
-          nccx,nccy:=$ccx+$dx,$ccy+$dy
-          ccx,ccy,nccx,nccy:=round([$ccx,$ccy],1,1),round([$nccx,$nccy],1,1)-1
-          rectangle[canvas_view] $ccx,$ccy,$nccx,$nccy,$opacity,0x33333333,0
-          rectangle[canvas_view] $ccx,$ccy,$nccx,$nccy,$opacity,0xCCCCCCCC,255
+      # For 3D volumetric images.
+      if {$thumb_selected,d>1}
+
+
+      # For 2D images.
+      else
+        canvas_cursor_x,canvas_cursor_y=$mouse_x,{$mouse_y-$thumb_height2}
+        if !inrange(lerp($canvas_x0,$canvas_x1,$canvas_cursor_x/$canvas_width),0,w#$thumb_selected,1,0)" || "\
+           !inrange(lerp($canvas_y0,$canvas_y1,$canvas_cursor_y/$canvas_height),0,h#$thumb_selected,1,0)
+          canvas_cursor_x,canvas_cursor_y=-1
         fi
+        if $canvas_cursor_x>=0
+          line[canvas_view] $canvas_cursor_x,0,$canvas_cursor_x,100%,0.65,0xFF00FF00,255
+          line[canvas_view] $canvas_cursor_x,0,$canvas_cursor_x,100%,0.65,0x000FF00FF,0
+          line[canvas_view] 0,$canvas_cursor_y,100%,$canvas_cursor_y,0.65,0xFF00FF00,255
+          line[canvas_view] 0,$canvas_cursor_y,100%,$canvas_cursor_y,0.65,0x00FF00FF,0
 
+          dx,dy:=$canvas_width/$canvas_dx,$canvas_height/$canvas_dy
+          dl:=max($dx,$dy)
+          if $dl>8 # Draw pixel outline
+            opacity:=lerp(0,1,min(($dl-8)/10,1))
+            icx,icy:=round(lerp($canvas_x0,$canvas_x1,$canvas_cursor_x/$canvas_width),1,-1),\
+                     round(lerp($canvas_y0,$canvas_y1,$canvas_cursor_y/$canvas_height),1,-1)
+            ccx,ccy:=($icx-$canvas_x0)/$canvas_dx*$canvas_width,\
+                     ($icy-$canvas_y0)/$canvas_dy*$canvas_height
+            nccx,nccy:=$ccx+$dx,$ccy+$dy
+            ccx,ccy,nccx,nccy:=round([$ccx,$ccy],1,1),round([$nccx,$nccy],1,1)-1
+            rectangle[canvas_view] $ccx,$ccy,$nccx,$nccy,$opacity,0x33333333,0
+            rectangle[canvas_view] $ccx,$ccy,$nccx,$nccy,$opacity,0xCCCCCCCC,255
+          fi
+        fi
       fi
       if $canvas_label_info
         ja[canvas_view] [canvas_label_info],1,{$canvas_label_alignment?1:0}~
@@ -2436,10 +2449,10 @@ _ndisplay :
 
     # Manage canvas events.
 
-    # Events for 3D volumetric image viewer.
+    # For 3D volumetric images.
     if {$thumb_selected,d>1}
 
-    # Events for 2D image viewer.
+    # For 2D images.
     else
       if $is_drag2==2" && "$is_clicked2==2 # Pan (with middle mouse button)
         canvas_x-=($drag_end_x2-$drag_start_x2)/$canvas_width*$canvas_dx/w#$thumb_selected
@@ -2521,12 +2534,7 @@ _ndisplay :
           rmn canvas_base
         fi
 
-        if $mouse_x!=$canvas_cursor_x" || "$mouse_y-$thumb_height2!=$canvas_cursor_y
-          canvas_cursor_x,canvas_cursor_y=$mouse_x,{$mouse_y-$thumb_height2}
-          if !inrange(lerp($canvas_x0,$canvas_x1,$canvas_cursor_x/$canvas_width),0,w#$thumb_selected,1,0)" || "\
-             !inrange(lerp($canvas_y0,$canvas_y1,$canvas_cursor_y/$canvas_height),0,h#$thumb_selected,1,0)
-            canvas_cursor_x,canvas_cursor_y=-1
-          fi
+        if $mouse_x!=$prev_mouse_x" || "$mouse_y!=$prev_mouse_y
           rmn canvas_view
         fi
 
