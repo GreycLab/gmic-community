@@ -2108,6 +2108,7 @@ _ndisplay :
   canvas_x,canvas_y,canvas_zoom=0.5,0.5,1
   canvas_label_alignment=0
   canvas_is_grid=1
+  canvas_crop_x0,canvas_crop_y0,canvas_crop_x1,canvas_crop_y1=
 
   # Enter user interaction loop.
   for {*}" && "!{*,ESC} {
@@ -2342,6 +2343,8 @@ _ndisplay :
 
       # For 2D images.
       else
+
+        # Draw cursor.
         cx,cy=$mouse_x,{$mouse_y-$thumb_height2}
         if $cy<0" || "\
            !inrange(lerp($canvas_x0,$canvas_x1,$cx/$canvas_width),0,w#$thumb_selected,1,0)" || "\
@@ -2371,6 +2374,23 @@ _ndisplay :
           fi
         else
           cursor[0] 1
+        fi
+
+        # Draw crop selection.
+        if narg($canvas_crop_x0)
+          x0:=($canvas_crop_x0-$canvas_x0)/$canvas_dx*$canvas_width
+          y0:=($canvas_crop_y0-$canvas_y0)/$canvas_dy*$canvas_height
+          x1:=($canvas_crop_x1-$canvas_x0)/$canvas_dx*$canvas_width
+          y1:=($canvas_crop_y1-$canvas_y0)/$canvas_dy*$canvas_height
+          x0,x1,y0,y1:=round([min($x0,$x1),max($x0,$x1),min($y0,$y1),max($y0,$y1)],1,1)
+          x1+=$canvas_width/$canvas_dx-1
+          y1+=$canvas_height/$canvas_dy-1
+          if $is_canvas_is_grid x0+=1 x1+=1 fi
+          rectangle[canvas_view] $x0,$y0,$x1,$y1,0.25,0
+          rectangle[canvas_view] $x0,$y0,$x1,$y1,0.75,0x33333333,0
+          rectangle[canvas_view] $x0,$y0,$x1,$y1,0.75,0xCCCCCCCC,255
+          line[canvas_view] $x0,$y0,$x1,$y1,0.75,0x33333333,0
+          line[canvas_view] $x0,$y0,$x1,$y1,0.75,0xCCCCCCCC,255
         fi
       fi
       if $canvas_label_info
@@ -2420,13 +2440,15 @@ _ndisplay :
     prev_thumb_selected=$thumb_selected
     if !$thumb_is_hidden
       if $is_drag0==1" && "$is_clicked0==1
-        thumb_x-={thumb_base,($drag_end_x0-$drag_start_x0)/w}
-        drag_start_x0=$drag_end_x0
-        rmn thumb_view
+        n_thumb_x={thumb_base,$thumb_x-($drag_end_x0-$drag_start_x0)/w}
+        if $n_thumb_x!=$thumb_x
+          thumb_x=$n_thumb_x
+          drag_start_x0=$drag_end_x0
+          rmn thumb_view
+        fi
       elif $is_drag0==1" && "($is_released0" || "!$mouse_area)
         is_drag0,is_released0=0
       fi
-
       if $mouse_area==1
         x_ind:=$mouse_x+$thumb_x_px
         if {thumb_label,inrange($x_ind,0,w-1)" && "i[$x_ind]>=0}
@@ -2442,7 +2464,6 @@ _ndisplay :
             fi
           fi
         fi
-
       else
         if $thumb_mouseover>=0 rmn thumb_view fi
         thumb_mouseover=-1
@@ -2493,14 +2514,26 @@ _ndisplay :
 
     # For 2D images.
     else
-      if $is_drag2==2" && "$is_clicked2==2 # Pan (with middle mouse button)
-        canvas_x-=($drag_end_x2-$drag_start_x2)/$canvas_width*$canvas_dx/w#$thumb_selected
-        canvas_y-=($drag_end_y2-$drag_start_y2)/$canvas_height*$canvas_dy/h#$thumb_selected
-        canvas_x,canvas_y:=cut([$canvas_x,$canvas_y],0,1)
-        drag_start_x2,drag_start_y2=$drag_end_x2,$drag_end_y2
+      if !$is_drag0" && "$is_clicked0==2" && "[$mouse_x,$mouse_y]!=[$prev_mouse_x,$prev_mouse_y]
+        is_drag0=2 # Avoid drag latency for left button
+      fi
+
+      if $is_drag0==2" && "$is_clicked0==2 # Crop (with left mouse button)
+        cx,cy:=round(lerp($canvas_x0,$canvas_x1,$drag_end_x0/$canvas_width),1,-1),\
+               round(lerp($canvas_y0,$canvas_y1,($drag_end_y0-$thumb_height2)/$canvas_height),1,-1)
+        if !narg($canvas_crop_x0)
+          canvas_crop_x0,canvas_crop_y0,canvas_crop_x1,canvas_crop_y1=$cx,$cy,$cx,$cy
+          rmn canvas_base
+        elif [$cx,$cy]!=[$canvas_crop_x1,$canvas_crop_y1]
+          canvas_crop_x1,canvas_crop_y1=$cx,$cy
+          rmn canvas_base
+        fi
+      elif $is_drag0==2" && "($is_released0" || "!$mouse_area)
+        canvas_x,canvas_y:=0.5*[($canvas_crop_x0+$canvas_crop_x1)/w#$thumb_selected,\
+                                ($canvas_crop_y0+$canvas_crop_y1)/h#$thumb_selected]
+        canvas_crop_x0,canvas_crop_y0,canvas_crop_x1,canvas_crop_y1=
+        is_drag0,is_released0=0
         rmn canvas_base
-      elif $is_drag2==2" && "($is_released2" || "!$mouse_area)
-        is_drag2,is_released2=0
       fi
 
       if $is_drag1==2" && "$is_clicked1==2 # Zoom (with right mouse button)
@@ -2528,6 +2561,16 @@ _ndisplay :
       elif $is_drag1==2" && "($is_released1" || "!$mouse_area)
         canvas_zoom_x,canvas_zoom_y=
         is_drag1,is_released1=0
+      fi
+
+      if $is_drag2==2" && "$is_clicked2==2 # Pan (with middle mouse button)
+        canvas_x-=($drag_end_x2-$drag_start_x2)/$canvas_width*$canvas_dx/w#$thumb_selected
+        canvas_y-=($drag_end_y2-$drag_start_y2)/$canvas_height*$canvas_dy/h#$thumb_selected
+        canvas_x,canvas_y:=cut([$canvas_x,$canvas_y],0,1)
+        drag_start_x2,drag_start_y2=$drag_end_x2,$drag_end_y2
+        rmn canvas_base
+      elif $is_drag2==2" && "($is_released2" || "!$mouse_area)
+        is_drag2,is_released2=0
       fi
 
       if $mouse_area==2
@@ -2573,7 +2616,7 @@ _ndisplay :
           rmn canvas_base
         fi
 
-        if $mouse_x!=$prev_mouse_x" || "$mouse_y!=$prev_mouse_y
+        if [$mouse_x,$mouse_y]!=[$prev_mouse_x,$prev_mouse_y]
           rmn canvas_view
         fi
 
