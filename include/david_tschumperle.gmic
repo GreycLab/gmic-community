@@ -2136,24 +2136,14 @@ _ndisplay :
             font_size:=cut($thumb_height/8,16,32)
             rm. $w,$h,1,3,100 to. \330,0.42~,0.5~,$font_size,1,1,255
           else
-            if !narg(${is_infnan$>}) is_infnan$>:=${$0_is_infnan.} fi
             if s>3 channels. 0,2 fi
             if d>1 volumetric2d. 50%,50%,50%,2 fi
             if w>$w" || "h>$h r. $w,$h fi
-            if ${is_infnan$>} # Normalize thumbnail without considering inf and NaN values
-              val_min,val_max=${$0_minmax_infnan.}
-              f. "
-                const min = $val_min; const max = $val_max; const delta = max - min;
-                const epsilon = delta>0?delta:1;
-                const nmin = min - epsilon; const nmax = max + epsilon; const ndelta = nmax - nmin;
-                const nfact = 255/(ndelta>0?ndelta:1);
-                val = i;
-                isinf(val)?(val<0?0:255):isnan(val)?0:(val - nmin)*nfact"
-            else
-              n. 0,255
-            fi
-            r. $w,$h
 
+            if !narg(${is_infnan$>}) is_infnan$>:=${$0_is_infnan.} fi
+            if ${is_infnan$>} $0_normalize_infnan. else n. 0,255 fi
+
+            r. $w,$h
             if s==1 r. 100%,100%,1,3
             elif s==2 r. 100%,100%,1,3,0
             fi
@@ -2248,71 +2238,26 @@ _ndisplay :
           const hc = $canvas_height;
           const f = 0.5*max(w/wc,h/hc)/$canvas_zoom;
           [ x - f*wc, y - f*hc, x + f*wc, y + f*hc, 2*f*wc, 2*f*hc ]"}
+        ix0,iy0:=round([$canvas_x0,$canvas_y0],1,-1)
+        ix1,iy1:=round([$canvas_x1,$canvas_y1],1,1);
+        ix0,ix1:=cut([$ix0,$ix1],0,w#$selected-1)
+        iy0,iy1:=cut([$iy0,$iy1],0,h#$selected-1)
+        +z[$selected] $ix0,$iy0,0,0,$ix1,$iy1,0,{$selected,min(2,s-1)}
+
         if !narg(${is_infnan$selected}) is_infnan$selected:=${$0_is_infnan[$selected]} fi
-        if ${is_infnan$selected}
-          val_min,val_max=${$0_minmax_infnan[$selected]}
-          s_infnan="const min = $val_min; const max = $val_max; const delta = max - min;
-                    const epsilon = delta>0?delta:1;
-                    const nmin = min - epsilon; const nmax = max + epsilon; const ndelta = nmax - nmin;
-                    const nfact = 255/(ndelta>0?ndelta:1);
-                    replace_infnan(val) = (isinf(val)?(val = val<0?0:255):isnan(val)?(val = 0));"
-        else
-          s_infnan="const min = im#$selected; const max = iM#$selected; const delta = max - min;
-                    const nmin = min; const nmax = max; const ndelta = nmax - nmin;
-                    const nfact = 255/(ndelta>0?ndelta:1);
-                    replace_infnan(val) = 0;"
+        if ${is_infnan$selected} $0_normalize_infnan. else n. 0,255 fi
+
+        p0:=round(($ix0-$canvas_x0)/$canvas_dx*$canvas_width,1,1)
+        q0:=round(($iy0-$canvas_y0)/$canvas_dy*$canvas_height,1,1)
+        p1:=round(($ix1+1-$canvas_x0)/$canvas_dx*$canvas_width,1,1)
+        q1:=round(($iy1+1-$canvas_y0)/$canvas_dy*$canvas_height,1,1)
+        dp,dq:=$p1-$p0,$q1-$q0
+        r. $dp,$dq
+        if s==1 r. 100%,100%,1,3
+        elif s==2 r. 100%,100%,1,3,0
         fi
-
-        if 0 # Slower version
-        $canvas_width,$canvas_height,1,3,":
-          begin("$s_infnan");
-          u = round(lerp($canvas_x0,$canvas_x1,x/w),1,-1);
-          v = round(lerp($canvas_y0,$canvas_y1,y/h),1,-1);
-          inrange(u,0,w#$selected,1,0) && inrange(v,0,h#$selected,1,0)?(
-            s#$selected==1?(
-              R = i(#$selected,u,v,0,0);
-              (R-=nmin)*=nfact;
-              replace_infnan(R);
-              [ R,R,R ]
-            ):s#$selected==2?(
-              R = i(#$selected,u,v,0,0);
-              G = i(#$selected,u,v,0,1);
-              (R-=nmin)*=nfact; (G-=nmin)*=nfact;
-              replace_infnan(R); replace_infnan(G);
-              [ R,G,0 ]
-            ):(
-              R = i(#$selected,u,v,0,0);
-              G = i(#$selected,u,v,0,1);
-              B = i(#$selected,u,v,0,2);
-              (R-=nmin)*=nfact; (G-=nmin)*=nfact; (B-=nmin)*=nfact;
-              replace_infnan(R); replace_infnan(G); replace_infnan(B);
-              [ R,G,B ]
-            )
-          ):(
-            R = xor(x,y)%32<16?64:96;
-            [R,R,R]
-          )" => canvas_base
-
-        else # Faster version
-          ix0,iy0:=round([$canvas_x0,$canvas_y0],1,-1)
-          ix1,iy1:=round([$canvas_x1,$canvas_y1],1,1);
-          ix0,ix1:=cut([$ix0,$ix1],0,w#$selected-1)
-          iy0,iy1:=cut([$iy0,$iy1],0,h#$selected-1)
-          +z[$selected] $ix0,$iy0,0,0,$ix1,$iy1,0,{$selected,min(2,s-1)}
-          n. 0,255
-
-          p0:=round(($ix0-$canvas_x0)/$canvas_dx*$canvas_width,1,1)
-          q0:=round(($iy0-$canvas_y0)/$canvas_dy*$canvas_height,1,1)
-          p1:=round(($ix1+1-$canvas_x0)/$canvas_dx*$canvas_width,1,1)
-          q1:=round(($iy1+1-$canvas_y0)/$canvas_dy*$canvas_height,1,1)
-          dp,dq:=$p1-$p0,$q1-$q0
-          r. $dp,$dq
-          if s==1 r. 100%,100%,1,3
-          elif s==2 r. 100%,100%,1,3,0
-          fi
-          +j[canvas_checkerboard] .,$p0,$q0 rm..
-          => canvas_base
-        fi
+        +j[canvas_checkerboard] .,$p0,$q0 rm..
+        => canvas_base
 
         # Draw grid.
         if $canvas_is_grid
@@ -2770,9 +2715,16 @@ _ndisplay_minmax_infnan :
       set('{}',v2s([val_min,val_max]));
     )"
 
-
-
-
+# Normalize selected image without considering inf and NaN values.
+_ndisplay_normalize_infnan :
+  val_min,val_max=${_ndisplay_minmax_infnan.}
+  f. "
+    const min = $val_min; const max = $val_max; const delta = max - min;
+    const epsilon = delta>0?delta:1;
+    const nmin = min - epsilon; const nmax = max + epsilon; const ndelta = nmax - nmin;
+    const nfact = 255/(ndelta>0?ndelta:1);
+    val = i;
+    isinf(val)?(val<0?0:255):isnan(val)?0:(val - nmin)*nfact"
 
 # Local Variables:
 # mode: sh
