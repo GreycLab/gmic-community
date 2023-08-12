@@ -2015,17 +2015,6 @@ view_surfels3d :
   rm
 
 
-
-
-foo :
-  v +
-  sp leno,16 sp eagle,zelda to_gray. transpose. 1,512,1,3,u sp balloons +noise. 30 palette curl sp cat
-#  sp portrait3 animate "blur","0","30",50
-
-#  $HOME/work/img/volumes/reference.inr s z
-
-  ndisplay
-
 #@cli nd : eq. to 'ndisplay'.
 nd :
   _gmic_s0="$?" _gmic_s1=$[] v + _ndisplay
@@ -2109,6 +2098,7 @@ _ndisplay :
   canvas_label_alignment=0
   canvas_is_grid=1
   canvas_crop_x0,canvas_crop_y0,canvas_crop_x1,canvas_crop_y1=
+  canvas_mouse_x,canvas_mouse_y=-1
 
   # Enter user interaction loop.
   for {*}" && "!{*,ESC} {
@@ -2143,7 +2133,7 @@ _ndisplay :
           line. $x0,0,{$x0+$w+1},0,1,$>
           [$>]
           if !w
-            font_size:=cut($thumb_height/4,16,32)
+            font_size:=cut($thumb_height/8,16,32)
             rm. $w,$h,1,3,100 to. \330,0.42~,0.5~,$font_size,1,1,255
           else
             if !narg(${is_infnan$>}) is_infnan$>:=${$0_is_infnan.} fi
@@ -2343,8 +2333,8 @@ _ndisplay :
 
     if !0$canvas_label_coords
       0
-      x,y:=round(lerp($canvas_x0,$canvas_x1,$mouse_x/$canvas_width),1,-1),\
-           round(lerp($canvas_y0,$canvas_y1,($mouse_y-$thumb_height2)/$canvas_height),1,-1)
+      x,y:=round(lerp($canvas_x0,$canvas_x1,$canvas_mouse_x/$canvas_width),1,-1),\
+           round(lerp($canvas_y0,$canvas_y1,$canvas_mouse_y/$canvas_height),1,-1)
       if {$thumb_selected,inrange($x,0,w,1,0)" && "inrange($y,0,h,1,0)}
         label="Point ( "$x","$y" ) = [ "{$thumb_selected,_I($x,$y)}" ]"
         t. {``$label},4,0,$font_size,1,255
@@ -2373,7 +2363,7 @@ _ndisplay :
       else
 
         # Draw cursor.
-        cx,cy=$mouse_x,{$mouse_y-$thumb_height2}
+        cx,cy=$canvas_mouse_x,$canvas_mouse_y
         if $cy<0" || "\
            !inrange(lerp($canvas_x0,$canvas_x1,$cx/$canvas_width),0,w#$thumb_selected,1,0)" || "\
            !inrange(lerp($canvas_y0,$canvas_y1,$cy/$canvas_height),0,h#$thumb_selected,1,0)
@@ -2447,6 +2437,8 @@ _ndisplay :
     previous_mouse_x,previous_mouse_y,previous_mouse_area=$mouse_x,$mouse_y,$mouse_area
     mouse_x,mouse_y,mouse_button={*,x,y,b}
     mouse_area:=$mouse_y<0?0:$mouse_y<$thumb_height?1:2
+    canvas_mouse_x,canvas_mouse_y=$mouse_x,{$mouse_y-$thumb_height2}
+
     is_button0,is_button1,is_button2:=($mouse_button&1),($mouse_button&2),($mouse_button&4)
     repeat 3 {
       if ${is_button$>}" && "$mouse_area" && "!${is_clicked$>} # Possible start of a drag
@@ -2569,7 +2561,7 @@ _ndisplay :
           dx = $drag_end_x1 - $drag_start_x1;
           dy = $drag_end_y1 - $drag_start_y1;
           sign(dx)*norm(dx,dy)/200"
-        if !narg($canvas_zoom_x) canvas_zoom_x,canvas_zoom_y=$mouse_x,{$mouse_y-$thumb_height2} fi
+        if !narg($canvas_zoom_x) canvas_zoom_x,canvas_zoom_y=$canvas_mouse_x,$canvas_mouse_y fi
         if $amount<0" || "($amount>0" && "max($canvas_dx,$canvas_dy)>8)
           n_canvas_zoom:=max($canvas_zoom*(1+$amount),1)
         else
@@ -2636,8 +2628,8 @@ _ndisplay :
             n_canvas_zoom=$canvas_zoom
           fi
           if $n_canvas_zoom!=$canvas_zoom
-            xc:=lerp($canvas_x0,$canvas_x1,$mouse_x/$canvas_width)
-            yc:=lerp($canvas_y0,$canvas_y1,($mouse_y-$thumb_height2)/$canvas_height)
+            xc:=lerp($canvas_x0,$canvas_x1,$canvas_mouse_x/$canvas_width)
+            yc:=lerp($canvas_y0,$canvas_y1,$canvas_mouse_y/$canvas_height)
             ratio:=$canvas_zoom/$n_canvas_zoom
             canvas_xcenter:=cut(lerp($xc,$canvas_xcenter*w#$thumb_selected,$ratio)/w#$thumb_selected,0,1)
             canvas_ycenter:=cut(lerp($yc,$canvas_ycenter*h#$thumb_selected,$ratio)/h#$thumb_selected,0,1)
@@ -2665,11 +2657,10 @@ _ndisplay :
         fi
         if [$mouse_x,$mouse_y]!=[$previous_mouse_x,$previous_mouse_y]
           rmn canvas_label_coords
-          rmn canvas_view
         fi
 
-        if (!$canvas_label_alignment" && "{canvas_label,$mouse_y<$thumb_height2+h" && "$mouse_x<w})" || "\
-           ($canvas_label_alignment" && "{canvas_label,$mouse_y>$thumb_height2+2*h})
+        if (!$canvas_label_alignment" && "{canvas_label,$canvas_mouse_y<h" && "$canvas_mouse_x<w})" || "\
+           ($canvas_label_alignment" && "{canvas_label,$canvas_mouse_y>4*h})
           canvas_label_alignment:=!$canvas_label_alignment
           rmn canvas_view
         fi
