@@ -2107,7 +2107,7 @@ _ndisplay :
   for {*}" && "!{*,ESC} {
     window_width,window_height={*,w,h}
 
-    # Generate view for thumbnails.
+    # Generate thumbnail navigation view.
     if $thumb_is_hidden
       thumb_height,thumb_height2=0
 
@@ -2118,6 +2118,8 @@ _ndisplay :
         thumb_height={thumb_base,h}
       else
         rmn thumb_coords,thumb_label
+
+        # Compute thumbnail coordinates and sizes.
         1,$nb_images,1,2,"
           w = w#y; h = h#y; d = d#y;
           d>1?(w+=d + 2; h+=d + 2);
@@ -2129,6 +2131,7 @@ _ndisplay :
         +f. ">begin(Sw = 0); res = [ Sw, round(($thumb_height - i1)/2) ]; Sw+=i0+2; res"
         rv[-2,-1] a[-2,-1] c => thumb_coords
 
+        # Render thumbnail navigation bar.
         sum_w={thumb_coords,i(0,h-1,0,0)+i(0,h-1,0,2)}
         {max($sum_w,$window_width)},$thumb_height,1,3 100%,1,1,1,-1
         repeat $nb_images {
@@ -2234,7 +2237,7 @@ _ndisplay :
       else
         canvas_width,canvas_height=$window_width,{$window_height-$thumb_height2}
 
-        # Render image content.
+        # Render checkerboard background.
         if {canvas_checkerboard,[w,h]!=[$canvas_width,$canvas_height]}
           rm[canvas_checkerboard]
           24,24,1,1,64 +f. 96 a[-2,-1] x +mirror. x a[-2,-1] y
@@ -2242,15 +2245,19 @@ _ndisplay :
           => canvas_checkerboard
         fi
 
-        canvas_x0,canvas_y0,canvas_x1,canvas_y1,canvas_dx,canvas_dy={$selected,"
-          const x = $canvas_xcenter*w;
-          const y = $canvas_ycenter*h;
-          const wc = $canvas_width;
-          const hc = $canvas_height;
-          const f = 0.5*max(w/wc,h/hc)/$canvas_zoom;
-          [ x - f*wc, y - f*hc, x + f*wc, y + f*hc, 2*f*wc, 2*f*hc ]"}
+        # Render canvas base image.
+        if {$selected,!w} # Empty image
+          [canvas_checkerboard]
 
-        if {$selected,w}
+        else
+          canvas_x0,canvas_y0,canvas_x1,canvas_y1,canvas_dx,canvas_dy={$selected,"
+            const x = $canvas_xcenter*w;
+            const y = $canvas_ycenter*h;
+            const wc = $canvas_width;
+            const hc = $canvas_height;
+            const f = 0.5*max(w/wc,h/hc)/$canvas_zoom;
+            [ x - f*wc, y - f*hc, x + f*wc, y + f*hc, 2*f*wc, 2*f*hc ]"}
+
           ix0,iy0:=round([$canvas_x0,$canvas_y0],1,-1)
           ix1,iy1:=round([$canvas_x1,$canvas_y1],1,1);
           ix0,ix1:=cut([$ix0,$ix1],0,w#$selected-1)
@@ -2275,13 +2282,10 @@ _ndisplay :
           elif s==2 r. 100%,100%,1,3,0
           fi
           +j[canvas_checkerboard] .,$p0,$q0 rm..
-
-        else
-          [canvas_checkerboard]
         fi
         => canvas_base
 
-        # Draw grid.
+        # Draw pixel grid.
         if $canvas_is_grid" && "{$selected,w}
           dx,dy:=$canvas_width/$canvas_dx,$canvas_height/$canvas_dy
           dl:=max($dx,$dy)
@@ -2319,6 +2323,7 @@ _ndisplay :
 
     font_size={canvas_base,cut(round(h/32),16,32)}
 
+    # Generate label for image title.
     if !0$canvas_label_title
       if $nb_images>1
         basename {$selected,n} basename=${}
@@ -2331,7 +2336,8 @@ _ndisplay :
       rmn canvas_label
     fi
 
-    if !0$canvas_label_coords
+    # Generate label for image coordinates.
+    if !0$canvas_label_coords" && "{$selected,w}
       0
       x,y:=round(lerp($canvas_x0,$canvas_x1,$canvas_mouse_x/$canvas_width),1,-1),\
            round(lerp($canvas_y0,$canvas_y1,$canvas_mouse_y/$canvas_height),1,-1)
@@ -2343,6 +2349,7 @@ _ndisplay :
       rmn canvas_label
     fi
 
+    # Render canvas label.
     if !0$canvas_label
       0
       if $canvas_label_title a. [canvas_label_title],y fi
@@ -2360,7 +2367,7 @@ _ndisplay :
       if {$selected,d>1}
 
       # For 2D images.
-      else
+      elif {$selected,w}
 
         # Draw cursor.
         cx,cy=$canvas_mouse_x,$canvas_mouse_y
@@ -2395,7 +2402,7 @@ _ndisplay :
         fi
 
         # Draw crop selection.
-        if narg($canvas_crop_x0)" && "{$selected,w}
+        if narg($canvas_crop_x0)
           x0:=($canvas_crop_x0-$canvas_x0)/$canvas_dx*$canvas_width
           y0:=($canvas_crop_y0-$canvas_y0)/$canvas_dy*$canvas_height
           x1:=($canvas_crop_x1-$canvas_x0)/$canvas_dx*$canvas_width
@@ -2536,7 +2543,7 @@ _ndisplay :
     if {$selected,d>1}
 
     # For 2D images.
-    else
+    elif {$selected,w}
 
       # Manage image pan, using middle or left mouse button (drag).
       if !narg($pan) pan=2 fi # Default mouse button used to test pan.
