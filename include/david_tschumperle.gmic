@@ -2058,7 +2058,7 @@ _ndisplay :
   if {*}
     window_width,window_height={*,d,e}
     window_previous_normalization,windows_previous_fullscreen={*,n,f}
-    is_normalized={*,n}?1:0
+    normalization_mode={*,n}?2:0
     w[] $window_width,$window_height,0,$window_title
   else
     window_width,window_height:="
@@ -2081,7 +2081,7 @@ _ndisplay :
       Mw = Mwh*max($thumb_min_ratio,Mw/Mwh);
       Mh = Mwh*max($thumb_min_ratio,Mh/Mwh);
       round([ Mw,Mh ])"
-    is_normalized=1
+    normalization_mode=2
     if $nb_images>1 window_height={round(($window_height+2)/(1-$thumb_height_factor))} fi
     w[] $window_width,$window_height,0,$window_title
   fi
@@ -2142,9 +2142,13 @@ _ndisplay :
             if s>3 channels. 0,2 fi
             if d>1 volumetric2d. 50%,50%,50%,2 fi
             if w>$w" || "h>$h r. $w,$h fi
-            if $is_normalized
+            if $normalization_mode
               if !narg(${is_infnan$>}) is_infnan$>:=${$0_is_infnan.} fi
-              if ${is_infnan$>} $0_normalize_infnan. else n. 0,255 fi
+              if $normalization_mode==1 # Channel by channel normalization
+                l. { s c if ${is_infnan$>} foreach { $0_normalize_infnan } a c else foreach { n 0,255 } fi a c }
+              else # Global normalization
+                if ${is_infnan$>} $0_normalize_infnan. else n. 0,255 fi
+              fi
             fi
             r. $w,$h
             if s==1 r. 100%,100%,1,3
@@ -2211,10 +2215,13 @@ _ndisplay :
         if s>3 channels. 0,2 fi
         volumetric2d. 50%,50%,50%,2
         r2din. {canvas_base,[w,h]},1
-        if $is_normalized
+        if $normalization_mode
           if !narg(${is_infnan$selected}) is_infnan$selected:=${$0_is_infnan[$selected]} fi
-          if ${is_infnan$selected} replace_infnan. i>0?512:-512 fi
-          n. 0,255
+          if $normalization_mode==1 # Channel by channel normalization
+            l. { s c if ${is_infnan$selected} foreach { $0_normalize_infnan } a c else foreach { n 0,255 } fi a c }
+          else # Global normalization
+            if ${is_infnan$selected} $0_normalize_infnan. else n. 0,255 fi
+          fi
         fi
         if s==1 r. 100%,100%,1,3
         elif s==2 r. 100%,100%,1,3,0
@@ -2245,9 +2252,13 @@ _ndisplay :
         ix0,ix1:=cut([$ix0,$ix1],0,w#$selected-1)
         iy0,iy1:=cut([$iy0,$iy1],0,h#$selected-1)
         +z[$selected] $ix0,$iy0,0,0,$ix1,$iy1,0,{$selected,min(2,s-1)}
-        if $is_normalized
+        if $normalization_mode
           if !narg(${is_infnan$selected}) is_infnan$selected:=${$0_is_infnan[$selected]} fi
-          if ${is_infnan$selected} $0_normalize_infnan. else n. 0,255 fi
+          if $normalization_mode==1 # Channel by channel normalization
+            l. { s c if ${is_infnan$selected} foreach { $0_normalize_infnan } a c else foreach { n 0,255 } fi a c }
+          else # Global normalization
+            if ${is_infnan$selected} $0_normalize_infnan. else n. 0,255 fi
+          fi
         fi
         p0:=round(($ix0-$canvas_x0)/$canvas_dx*$canvas_width,1,1)
         q0:=round(($iy0-$canvas_y0)/$canvas_dy*$canvas_height,1,1)
@@ -2678,7 +2689,7 @@ _ndisplay :
       canvas_is_grid:=!$canvas_is_grid
       rmn canvas_base
     elif $is_CTRL" && "{*,-N} # Toggle normalization mode
-      is_normalized:=!$is_normalized
+      normalization_mode:=($normalization_mode+1)%3
       rmn thumb_base,canvas_base
     fi
     if $nb_images>1" && "{*,-TAB} # Hide/show thumbnails
