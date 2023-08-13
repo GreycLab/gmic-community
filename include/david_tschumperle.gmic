@@ -2015,6 +2015,23 @@ view_surfels3d :
   rm
 
 
+
+#@cli nd0 : eq. to 'ndisplay0'.
+nd0 :
+  _gmic_s0="$?" _gmic_s1=$[] v + _ndisplay0
+
+#@cli ndisplay0
+#@cli : Display selected images in an interactive window, without normalization and alpha mode activated.
+ndisplay0 :
+  _gmic_s0="$?" _gmic_s1=$[] v + _ndisplay0
+
+_ndisplay0 :
+  thumb_min_ratio=0.45
+  window_width,window_height=${"_ndisplay_default_window_size[0--"{$!-1}"] "$thumb_min_ratio}
+  if $!>1 window_height={round(($window_height+2)/(1-$thumb_height_factor))} fi
+  w[] $window_width,$window_height,0
+  _ndisplay
+
 #@cli nd : eq. to 'ndisplay'.
 nd :
   _gmic_s0="$?" _gmic_s1=$[] v + _ndisplay
@@ -2025,17 +2042,18 @@ ndisplay :
   _gmic_s0="$?" _gmic_s1=$[] v + _ndisplay
 
 _ndisplay :
+  if !$! e[0--4] "Display image []." return fi
   nb_images=$!
-  if !$nb_images e[0--4] "Display image []." return fi
-  ($_gmic_s1:y) => image_indices
 
   # Initialize global state variables.
+  normalization_mode:=narg($_display_normalization_mode)?0$_display_normalization_mode:-1
+  alpha_mode:=narg($_display_alpha_mode)?0$_display_alpha_mode:0
   thumb_height_factor=0.15
   thumb_min_ratio=0.45
   thumb_is_hidden:=$nb_images==1
-  alpha_mode=0
 
   # Generate window and log titles and print log message.
+  ($_gmic_s1:y) => image_indices
   if $nb_images<=6 $nb_images,1,1,1,x sel={^} rm. is_ellipsized=0
   else sel=0,1,2,{$nb_images-[3,2,1]} is_ellipsized=1
   fi
@@ -2059,12 +2077,13 @@ _ndisplay :
   if {*}
     window_width,window_height={*,d,e}
     window_previous_normalization,windows_previous_fullscreen={*,n,f}
-    normalization_mode={*,n}?2:0
+    if $normalization_mode<0 normalization_mode={*,n}?2:0 fi
     w[] $window_width,$window_height,0,$window_title
   else
-    window_width,window_height=${"$0_default_window_size[0--"{$nb_images-1}"] "$thumb_min_ratio}
-    normalization_mode=2
+    window_width,window_height=${"$0_default_window_size[0-"{$nb_images-1}"] "$thumb_min_ratio}
     if $nb_images>1 window_height={round(($window_height+2)/(1-$thumb_height_factor))} fi
+
+    if $normalization_mode<0 normalization_mode=2 fi
     w[] $window_width,$window_height,0,$window_title
   fi
   window_nonfullscreen_width,window_nonfullscreen_height={*,w,h}
