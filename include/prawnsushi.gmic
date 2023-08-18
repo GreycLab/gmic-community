@@ -377,7 +377,6 @@ foreach {
 
   if $post
     if $emboss rep_emboss_relief 5,0,0.5,$emboss,1,0,1 fi
-    # if $emboss fx_emboss_relief 5,0,0.5,$emboss,1,0,1 fi
   fi
 
   if $com
@@ -517,8 +516,6 @@ fx_linespam: skip "${1=30},${2=3},${3=1.02},${4=0.8},${5=-1},${6=10},${7=101},${
                 col=$colr,$colg,$colb,255
               fi
               if $style==0 A,B=$>,$< elif $style==1 A,B:=[$<,$>]*[2,.5] elif $style==2 A,B=$< else A,B:=$>/2 fi
-              # calispline. {$sx*$c+$bthick}%,{$A*$sy}%,1500,1500,{$B+$ex}%,{$ey-$A*$B}%,1500,1500,0.1,$thick,0,$opac,$col
-              # pr_thickspline. {$sx*$c+$bthick}%,{$A*$sy}%,1500,1500,{$B+$ex}%,{$ey-$A*$B}%,1500,1500,$thick,$opac,$col
               thickline. {$sx*$c+$bthick}%,{$A*$sy}%,{$B+$ex}%,{$ey-$A*$B}%,$thick,$opac,$col
               thick*=$tscale
               if inrange($colr+$cvar,0,255,0,0) colr+=$cvar fi
@@ -590,8 +587,8 @@ fx_chanshuff: skip "${1=100},${2=0},${3=0},${4=1},${5=0},${6=10},${7=101},${8=10
     a[^0] c keep.
     if $2>0&&$2!=360
       rotate. -$2,0,0
-      # vx,vy:=floor((w-$wi)/2),floor((h-$he)/2)
-      vx,vy:=floor([(w-$wi)*0.5,(h-$he)*0.5])
+      vx,vy:=floor([w-$wi,h-$he]*0.5)
+      # vx,vy:=floor([(w-$wi)*0.5,(h-$he)*0.5])
       vxb,vyb:=$vx+$wi-1,$vy+$he-1
       crop. $vx,$vy,$vxb,$vyb
     fi
@@ -669,11 +666,10 @@ fx_prawn_canvas_preview:
 #@gui : Ordering = choice(1,"Forward","Backward")
 #@gui : sep = separator()
 #@gui : note = note("<span color="#EE5500"><small><b>Shadows:</b></small></span>")
-#@gui : Size = float(4,0,6)
+#@gui : Softness = float(4,0,6)
 #@gui : Opacity = float(0.6,0,1)
-#@gui : Shifting X = float(4,-10,10)
-#@gui : Shifting Y = float(4,-10,10)
-#@gui : Embossing angle = float (225,0,360)
+#@gui : Shifting = float(4,0,10)
+#@gui : Angle = float (225,0,360)
 #@gui : sep = separator()
 #@gui : Output to Multiple Layers = bool(1,0,1)
 #@gui : note = note("<small><b>First layer will contain all other layers, merged</b></small>")
@@ -693,7 +689,7 @@ fx_prawn_canvas_preview:
 #\n Preview itself is already downscaled by 50% unless you choose a value lower than 100.</small>")
 fx_papercuts :
   foreach {
-    simp,ln,lay,col,cr,cg,cb,cvar,sort,order,shb,sho,sx,sy,ang,mulay,ind,def,cvs,cstr,down=$*
+    simp,ln,lay,col,cr,cg,cb,cvar,sort,order,shb,sho,sx,ang,mulay,ind,def,cvs,cstr,down=$*
     arg0 $9,\
       "none","rv","u","xm","ym","zm","cm","xM","yM","zM","cM","R","G","B","A",\
       "im","iM","ia","iv","id","is","ip","ic","in","w","h","z"
@@ -715,7 +711,7 @@ fx_papercuts :
         if $col==0&&$cvar ap[$np--1] "adjust_colors ,,,{[u(-$8,$8),u(-$8)]},0,255" fi
         if $col==1 ap[$np--1] "fc $5,$6,$7,255 adjust_colors ,,,{[u(-$8,$8),u(-$8)]},0,255" fi
         if $col==2 ap[$np--1] "fc ${-rgb},255" fi
-        # dilate 1.5
+        dilate 1.5
       rm[$np--1]
     if $9>1 sort_list $order,$sort fi
     if $9==1 rv fi
@@ -726,17 +722,19 @@ fx_papercuts :
       wes,hes:=w,h
       repeat $np {
        # +r[$<] 50%,50%,100%,100%,0     # Trying to downscale shadows but doesn't work as expected
-        +dilate_circ[$<] {$shb*2},0,1  b. $shb spread. {$shb/4}
+        # +dilate_circ[$<] {$shb*2},0,1
+        +b[$<] $shb spread. {$shb/4}
         sh. 0,2  fc. 0,0,0 rm.
         if $sho<1 sh. 3 *. $sho rm. fi
         # r. 200%,200%,100%,100%,0 d
        [$<] mul. 0.3
-        if $sx||$sy
-          dirx,diry:=[$sx+$<,$sy+$<]*$coeff
+        if $sx
+          # dirx,diry:=[$sx+$<,$sy+$<]*$coeff
           # dirx,diry={[($sx+$<)*$coeff,($sy+$<)*$coeff]}
-          shift.. $dirx,$diry
+          # shift.. $dirx,$diry
+          shift.. {$sx*[cos($ang),sin($ang)]}
         fi
-        blend[-2,-1] multiply,2
+        blend[-2,-1] multiply,1
         shrink_xy[$<] {$<*$coeff}
         mv. $<
         blend[$<,{$<+1}] alpha
@@ -748,7 +746,7 @@ fx_papercuts :
       repeat $! {
         if $cstr fx_prawn_canvas[$<] $cstr,{u(20,30)},0 fi
       }
-      rep_emboss_relief 5,$ang,1,2,1,0,1     #  How to set angle acccording to Shadows, or the other way around?
+      rep_emboss_relief 5,{$ang+180},1,2,1,0,1     #  How to set angle acccording to Shadows, or the other way around?
       normalize_local 0.3,0.3,0,0,1
       # n 0,255
     fi
@@ -784,8 +782,6 @@ pr_thickspline : skip ${9=3},${10=2},${11=1},${12=0}
   } fi
 
 
-
-
 #@gui Sick Painter : fx_sickpaint, fx_sickpaint_preview(0)
 #@gui : Obstinacy = int(30,5,100)
 #@gui : Start X (px range) = int(0,-1000,1000)
@@ -805,15 +801,12 @@ pr_thickspline : skip ${9=3},${10=2},${11=1},${12=0}
 fx_sickpaint:
   foreach {
     div:=h/$4
-    # Rs,Gs,Bs=$10,$11,$12
     # Rstep,Gstep,Bstep:=sqrt(($13-$10)^2)/$div,sqrt(($14-$11)^2)/$div,sqrt(($15-$12)^2)/$div
-    Rstep,Gstep,Bstep:=sqrt(($13-$10)^2)/$div,sqrt(($14-$11)^2)/$div,sqrt(($15-$12)^2)/$div
+    Rstep,Gstep,Bstep:=sqrt(([${13-15}]-[${10-12}])^2)/$div
  #   l. {
       repeat $1 {
-      # sx,sy,ex,ey=1024,0,{u($2)},{u($3)}
       sx,sy,ex,ey:=u($2),u($3),u($2),u($3)
       Rs,Gs,Bs=$10,$11,$12
-      # Rstep,Gstep,Bstep={sqrt(($13-$Rs)^2)/$div},{sqrt(($14-$Gs)^2)/$div},{sqrt(($15-$Bs)^2)/$div}
       if $8<1 o:=u($8,$7) else o=1 fi
       do
         ls,d:=$6/($>+1),u($9)
@@ -821,20 +814,19 @@ fx_sickpaint:
         # if $8<1 o:=u($8,$7) else o=1 fi
         # randomize order?
         thickline $sx,$sy,$ex,$ey,$ls,$o,$Rs,$Gs,$Bs
-        thickline $sx,$sy,{[$ex+u($>*100),$ey+u($>*100)]},$ls,$o,$Rs,$Gs,$Bs
-        circle {[$sx+u($>),$sy+u($>),$ls/2]},$o,$Rs,$Gs,$Bs
-        # circle {[$sx+u($>)*2,$sy+u($>)*2,$ls,u(0.5)]},0,0,0
-        # thickline $sx,$sy,{$ex+u($>*200)},{$ey+u($>*200)},$ls,$o,$Rs,$Gs,$Bs
-
+        circle $sx,$sy,{$ls},$o,$Rs,$Gs,$Bs
+        cx,cy:=u($>*100),u($>*100)
+        thickline $sx,$sy,{[$ex+$cx,$ey+$cy]},$ls,$o,$Rs,$Gs,$Bs
+        circle {[$sx+$cx,$sy+$cy,$ls*0.5]},$o,$Rs,$Gs,$Bs
+        circle {[$sx+u($>)*2,$sy+u($>)*2,u(3),u(0.5)]},0,0,0
+        thickline {[u($sx),u($sy),$ex+u($>*200),$ey+u($>*200),u($ls)]},$o,$Rs,$Gs,$Bs
         pr_thickspline {[$sx+$>,$sy+$>,$d,0,$ex+$>,$ey+$>,$d,0,u(2,10),u(3,10),$o,$Rs,$Gs,$Bs]}
         pr_thickspline {[$sx+$>,$sy+$>,0,$d,$ex+$>,$ey+$>,0,$d,u(2,10),u(3,10),$o,0,0,0]}
-
         if $10>$13 Rs-=$Rstep else Rs+=$Rstep fi
         if $11>$14 Gs-=$Gstep else Gs+=$Gstep fi
         if $12>$15 Bs-=$Bstep else Bs+=$Bstep fi
-        # Rs,Gs,Bs+=$Rstep,$Gstep,$Bstep
         sx,sy=$ex,$ey
-        cut 0,255
+        # cut 0,255
       while $ey<=h||$ex<=w
 
       if $ey>=h||$ex>=w
@@ -843,9 +835,7 @@ fx_sickpaint:
         s x,$16 nm[0,1,2] A,B,C sort_list -,u
         mirror[0] x
         mirror[2] y
-        # ap "shift {v},{v},0,0,0,0"
         shift[1] {[floor([u(-10,10),u(-10,10)]),0,0,floor(u(3.9))]},0
-        # shift[1] {floor(u(-10,10))},{floor(u(-10,10))},0,0,{floor(u(3.9))},0
         spread[1] {u(0.3)} deform[1] {u(0.8)},0
         sort_list -,n
         a x
@@ -855,9 +845,6 @@ fx_sickpaint:
     sharpen 1800
     smooth 40,0,1,1,2
     rep_emboss_relief 5,0,0.5,1,1,0,1
-#  }
-   # sh. 3 negate. rm.
-   # blend alpha
 }
 
 
@@ -923,12 +910,6 @@ mysplines :
 "
 
 
-# Local Variables:
-# mode: sh
-# End:
-#
-# (End of G'MIC custom commands)
-
 
 #@cli splinefun : [palette],curve_plot_count,complexity_level,thickness,pen_width,pen_angle
 # By Gary Osgood
@@ -988,3 +969,9 @@ splinefun: -check ${"is_image_arg $1"}
    }
    -rm[palette]
 
+
+# Local Variables:
+# mode: sh
+# End:
+#
+# (End of G'MIC custom commands)
