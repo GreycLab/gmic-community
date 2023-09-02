@@ -2919,8 +2919,8 @@ fi
 +rep_binary_hitomezashi:
 skip "${3=}"
 
-if ${is_image_arg\ $3} 
- pass$3 0 
+if ${is_image_arg\ $3}
+ pass$3 0
  gt[-1] {ia}
 else
  (1,0,0,0,0,0,1,1,1,1,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,1,0,0,1,0,0,1,0,0,0,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,0,0,0,0,0,0,0,0,1,1,1,0,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,0,1,0,1,1,1,0,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,1,0,1,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,1)
@@ -4217,6 +4217,7 @@ eval "
 
  idx;"
 #@cli rep_r_combinations: number_of_items>0,choices>0,_axis={x,y,z}
+#@cli : Create image representing combinations given number of items and choices with repeating numbers. Empty item is a item by itself.
 rep_r_combinations:
 skip ${3=x}
 
@@ -4435,6 +4436,292 @@ eval "
   tv=mul_items[dec_half_list_size-p]*=tv;
  );
  sum(mul_items*position);"
+#@cli rep_string_permutation: string,_axis,_sort_string={ 0=do_not_sort_string | 1=sort_string }
+#@cli : Return all the permutations of set of numbers as a image with values representing the unicode representation of characters in input string. Permutations is dependent on character appearance order.
+#@cli :
+#@cli : Algorithm is based on the implementation of Narayana Pandita's algorithm by PM 2Ring at stackoverflow.
+#@cli : Implementation of Narayana Pandita's algorithm -  https://stackoverflow.com/questions/8306654/finding-all-possible-permutations-of-a-given-string-in-python
+#@cli : Description of Narayana Pandita's algorithm - https://en.wikipedia.org/wiki/Permutation#Generation_in_lexicographic_order
+#@cli : Author : Reptorian.
+#@cli : Default values: '_axis=x','_sort_string=0'
++rep_string_permutation:
+skip ${2=x},${3=0}
+check "inrange(('$2')[0],_'x',_'z',1,1)"
+
+1,1,1,2
+
+eval "
+ const bool_sort_string=$3;
+ reference_information='$1';
+
+ if(bool_sort_string,reference_information=sort(reference_information););
+
+ char_position=vector(#256,-1); # Enable O(1) index retrieval as G'MIC lack Python-like dictionary.
+
+ ind=0;
+ fill(reference_information,char_ind,
+  char=reference_information[char_ind];
+  is_char_found=char_position[char]>-1;
+  if(is_char_found
+  ,pos=char_position[char];++i(#-1,0,pos,0,1);
+  ,pos=char_position[char]=ind++;da_push(#-1,[char,1]);
+  );
+  pos;
+ );
+
+ da_freeze(#-1);
+ set('size_of_string',size(reference_information));
+ sort(reference_information);
+ "
+
+axis,number_of_string_permutations={v=crop(#-1,0,0,0,1,1,h,1,1);[_'$2'-_'x',fact(sum(v))/prod(fact(v))]}
+out_dim={v=vector(#3,1);v[$axis]=$number_of_string_permutations;v}
+
+if $number_of_string_permutations>(1<<24) error exc_permut_val:$number_of_string_permutations fi
+
+$out_dim,$size_of_string,>"begin(
+  unicode=crop(#-1,0,0,0,0,1,h#-1,1,1);
+
+  out_vector=["${}"];
+
+  const max_index=s-1;
+  const dec_max_index=max_index-1;
+
+  started=0;
+
+  reverse_array_starting_from(a)=(
+   start=a;
+   end=max_index;
+   while(start<end,
+    swap(out_vector[start++],out_vector[end--]);
+   );
+  );
+
+ );
+
+ if(started,
+
+  for(jp=dec_max_index,jp>-1,--jp,
+   if(out_vector[jp]<out_vector[jp+1],break(););
+  );
+
+  v=out_vector[jp];
+  for(kp=max_index,kp>jp,--kp,
+   if(v<out_vector[kp],break(););
+  );
+
+  swap(out_vector[kp],out_vector[jp]);
+  reverse_array_starting_from(jp+1);
+ ,
+  started=1;
+ );
+
+ out_vector;"
+
+channels[-2] 0
+map[-1] [-2]
+remove[-2]
+#@cli rep_string_permutations_index2str: reference_string,index,_sort_reference_string={ 0=do_not_sort_string | 1=sort_string }
+#@cli Return the string which is of the lexicographic index given reference string. The index is based on character appearance order unless sorting is activated. This is the first time an algorithm has been made to address this.
+#@cli : Author : Reptorian.
+rep_string_permutations_index2str:
+check "isint($2)"
+skip ${3=0}
+
+if !$2
+ if $3 status {`sort('$1')`} return
+ else status $1 return
+ fi
+fi
+
+1,1,1,1x3
+
+eval "
+ values_of_chars_in_string='$1';
+ const size_of_info=size(values_of_chars_in_string);
+ const bool_sort_string=$3;
+
+ if(bool_sort_string,values_of_chars_in_string=sort(values_of_chars_in_string););
+
+ char_position=vector(#256,-1); # Enable O(1) index retrieval as G'MIC lack Python-like dictionary.
+
+ ind=0;
+ repeat(size_of_info,char_ind,
+  char=values_of_chars_in_string[char_ind];
+  char_position[char]>-1?(
+   ++i[#-2,pos=char_position[char]];
+  ):(
+   pos=char_position[char]=ind++;
+   da_push(#-2,1);
+   da_push(#-1,char);
+  );
+  values_of_chars_in_string[char_ind]=pos;
+ );
+
+ da_freeze(#-1);
+
+ dividier=1;
+ repeat(da_size(#-2),ind,
+  dividier*=fact(i[#-2,ind]);
+ );
+
+ number_of_permutations_of_string_possible=fact(size_of_info)/dividier;
+ index=$2%number_of_permutations_of_string_possible;
+ max_index=number_of_permutations_of_string_possible-1;
+
+ if(!bool_sort_string,values_of_chars_in_string=sort(values_of_chars_in_string););
+
+ !index?(
+  values_of_chars_in_string;
+ ):
+ index==max_index?(
+  reverse(values_of_chars_in_string);
+ ):(
+  repeat(size_of_info,ind,
+   da_push(#-3,values_of_chars_in_string[ind]);
+  );
+
+  repeat(size_of_info,ind,
+   section_size=number_of_permutations_of_string_possible/da_size(#-3);
+   selected_indice=int(index/section_size);
+   char=i[#-3,selected_indice];
+   da_remove(#-3,selected_indice);
+   repeat(da_size(#-2),counts_of_letters_index,
+    counts_of_letters_index==char?(
+     --i[#-2,counts_of_letters_index];
+    ):(
+     count_of_letters=i[#-2,counts_of_letters_index];
+     if(counts_of_letters_index<char,
+      index-=count_of_letters*section_size;
+     );
+     number_of_permutations_of_string_possible-=section_size*count_of_letters;
+    );
+   );
+   values_of_chars_in_string[ind]=char;
+  );
+  values_of_chars_in_string;
+ );
+ "
+
+status {`map([${}],crop(#-1))`} remove[-3--1]
+#@cli rep_string_permutations_str2index: test_string : reference_string,test_string,_sort_reference_string={ 0=do_not_sort_string | 1=sort_string }
+#@cli : Return the lexicographic rank in which the permutation of string is found. The rank is based on character appearance order. If you provide only one argument, then rank is dependent on alphabetical order.
+#@cli :
+#@cli : Algorithm to find the lexicographic rank of string has been made by egoista of GeeksForGeeks and source code can be found here - https://www.geeksforgeeks.org/lexicographic-rank-string-duplicate-characters/
+#@cli : Author : Reptorian.
+#@cli : Default values: '_sort_reference_string=0'
+rep_string_permutations_str2index:
+skip "${2=}",${3=0}
+
+1,1,1,1
+
+eval "
+ reference_information='$1';
+ const size_of_info=size(reference_information);
+ const contain_arg_2=narg($2);
+
+ contain_arg_2?(
+  const bool_sort_string=$3;
+  reference_information='$1';
+  test_string='$2';
+  if(size(reference_information)!=size(test_string),run('error diff_str_dims'););
+  if(bool_sort_string,reference_information=sort(reference_information););
+ ):(
+  test_string='$1';
+  reference_information=sort(test_string);
+ );
+
+ test_string==reference_information?(
+  0;
+ ):(
+  char_position=vector(#256,-1); # Enable O(1) index retrieval as G'MIC lack Python-like dictionary.
+
+  ind=0;
+  repeat(size_of_info,char_ind,
+   char=reference_information[char_ind];
+   char_position[char]>-1?(
+    ++i[#-1,char_position[char]];
+   ):(
+    char_position[char]=ind++;
+    da_push(#-1,1);
+   );
+  );
+
+  test_string==reverse(reference_information)?(
+   dividier=1;
+   repeat(da_size(#-1),ind,
+    dividier*=fact(i[#-1,ind]);
+   );
+
+   fact(size_of_info)/dividier-1;
+  ):(
+
+   fill(test_string,char_ind,
+    new_val=char_position[test_string[char_ind]];
+    if(new_val<0,run('error inval_char'););
+    if(--i[#-1,new_val]==-1,run('error exec_chars_det'););
+    new_val;
+   );
+
+   str_index=0;
+
+   repeat(size_of_info,ind,
+    count_of_less_index_value=0;
+
+    for(alt_ind=ind+1,alt_ind<size_of_info,++alt_ind,
+     if(test_string[ind]>test_string[alt_ind],++count_of_less_index_value;);
+    );
+
+    if(count_of_less_index_value,
+     for(alt_ind=ind,alt_ind<size_of_info,++alt_ind,++i[#-1,test_string[alt_ind]];);
+
+     dividier_factorial=1;
+     repeat(da_size(#-1),element,
+      dividier_factorial*=fact(i[#-1,element]);
+      i[#-1,element]=0;
+     );
+
+     str_index+=(fact(size_of_info-ind-1)*count_of_less_index_value)/dividier_factorial;
+    );
+
+   );
+
+   str_index;
+  );
+
+ );
+ "
+remove[-1]
+#@cli rep_chars_repetition: str_containing_chars,char_1_repeat,char_2_repeat,...
+#@cli : Generate string with characters to repeat and number of repeat per characters. The number of repetition must be integer!
+#@cli : $ echo ${rep_chars_repetition\ ABC,5,2,3}
+rep_chars_repetition:
+size_of_str:=size('$1')
+
+{sum(vector$size_of_str(${2--1}))},1,1,1,">begin(
+  characters='$1';
+
+  number_of_repeats=vector$size_of_str(${2--1});
+
+  if(!(isint(number_of_repeats)==number_of_repeats>0),
+   run('error inval_repet_num');
+  );
+
+  current_index=position=0;
+ );
+
+ char=characters[current_index];
+
+ ++position;
+ if(position==number_of_repeats[current_index],
+  ++current_index;
+  position=0;
+ );
+
+ char;
+ "
+
+status {t} rm.
 #@cli rep_rrd: eq. to 'rep_random_rectangular_division'
 rep_rrd: rep_random_rectangular_division $*
 #@cli rep_random_rectangular_division: split>1,_additional_thickness>=0,_max_iter>=2,_probability[%]>0,_loop_limit>1,0<=_border[%]>=100%,_seed,_normalize,border_color,palette_mode
