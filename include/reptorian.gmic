@@ -3739,7 +3739,7 @@ $out_dim,$1,$mode"
     pos=int(index/division_number);
     permutation[iter]=init_permutation[pos];
     copy(init_permutation[pos],init_permutation[pos+1],init_array_size-pos);
-    index=index%division_number;
+    index-=pos*division_number;
     --init_array_size;
     --fn;
    );
@@ -3779,7 +3779,7 @@ else
    new_arr_num=i[#-1,pos];
    new_arr[iter]=new_arr_num;
    da_remove(#-1,pos);
-   permutation_position%=division_number;
+   permutation_position-=pos*division_number;
    --fn;
   );
 
@@ -4558,6 +4558,7 @@ eval "
   values_of_chars_in_string[char_ind]=pos;
  );
 
+ size_of_last_array=da_size(#-1);
  da_freeze(#-1);
 
  dividier=1;
@@ -4565,9 +4566,9 @@ eval "
   dividier*=fact(i[#-2,ind]);
  );
 
- number_of_permutations_of_string_possible=fact(size_of_info)/dividier;
- index=$2%number_of_permutations_of_string_possible;
- max_index=number_of_permutations_of_string_possible-1;
+ level_length=fact(size_of_info)/dividier;
+ index=$2%level_length;
+ max_index=level_length-1;
 
  if(!bool_sort_string,values_of_chars_in_string=sort(values_of_chars_in_string););
 
@@ -4580,25 +4581,36 @@ eval "
   repeat(size_of_info,ind,
    da_push(#-3,values_of_chars_in_string[ind]);
   );
-
-  repeat(size_of_info,ind,
-   section_size=number_of_permutations_of_string_possible/da_size(#-3);
-   selected_indice=int(index/section_size);
-   char=i[#-3,selected_indice];
-   da_remove(#-3,selected_indice);
-   repeat(da_size(#-2),counts_of_letters_index,
-    counts_of_letters_index==char?(
-     --i[#-2,counts_of_letters_index];
-    ):(
-     count_of_letters=i[#-2,counts_of_letters_index];
-     if(counts_of_letters_index<char,
-      index-=count_of_letters*section_size;
-     );
-     number_of_permutations_of_string_possible-=section_size*count_of_letters;
-    );
+  
+  size_of_last_array==size_of_info?(
+   fn=size_of_info-1;
+   repeat(size_of_info,iter,
+    division_number=fact(fn);
+    pos=int(index/division_number);
+    values_of_chars_in_string[iter]=i[#-3,pos];
+    da_remove(#-3,pos);
+    index-=pos*division_number;
+    --fn;
    );
-   values_of_chars_in_string[ind]=char;
+  ):(
+   repeat(size_of_info,ind,
+    section_size=level_length/da_size(#-3);
+    selected_indice=int(index/section_size);
+   
+    char=i[#-3,selected_indice];
+    da_remove(#-3,selected_indice);
+   
+    level_length=section_size*i[#-2,char];
+    --i[#-2,char];
+   
+    for(count_of_letters_index=0,count_of_letters_index<char,count_of_letters_index++,
+     index-=i[#-2,count_of_letters_index]*section_size;
+    );
+   
+    values_of_chars_in_string[ind]=char;
+   );
   );
+
   values_of_chars_in_string;
  );
  "
