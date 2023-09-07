@@ -48,6 +48,40 @@
 #
 #-------------------------------
 
+#@cli rep_return_image_data:
+#@cli : Echo the data that represents the image.
+rep_echo_image_data:
+foreach {
+ ('{0,^}')
+
+ fill[-1] >"begin(p=1;);
+  const _comma=_',';
+  const height_point=w#0;
+  const depth_point=w#0*h#0;
+  const channel_point=depth_point*d#0;
+  const use_height=h#0>1;
+  const use_depth=d#0>1;
+  const use_channel=s#0>1;
+  out=i;
+  if(i==_comma,
+   use_height&&(!(p%channel_point))?(
+    out=_'^';
+   ):
+   use_depth&&(!(p%depth_point))?(
+    out=_'/';
+   ):
+   use_channel&&(!(p%height_point))?(
+    out=_';';
+   );
+   ++p;
+  );
+  out;
+  "
+
+ echo ({t})
+
+ rm.
+}
 #@cli rep_python_insert_integer_value:
 #@cli : Allows user to insert integer values from the cli interface. Then, return the integer value.
 rep_python_insert_integer_value:
@@ -15245,6 +15279,56 @@ repeat $# {
 
 v + e[^-1] "Create palette(s) '"$out"'." v -
 status $out
+#@cli rep_hex8args2pal: hex_a,hex_b...
+#@cli : Convert 8-bit hexadecimal arguments into palette representation.
++rep_hex8args2pal:
+if size('$-1')==1
+ axis,axis_arg={_'$-1'-_'x'},1
+ if $#==1 error no_hex_arg fi
+else
+ axis,axis_arg=0,0
+fi
+
+('$*')
+
+{L=$#-$axis_arg;v=[1,1,1];v[$axis]=L;[v,size('$1')>>1]},>"begin(
+  const length_of_hex_str=s<<1;
+  const separator_point=length_of_hex_str+1;
+  const _0=_'0';
+  const _9=_'9';
+  const _a=_'a';
+  const _f=_'f';
+  const _A=_'A';
+  const _F=_'F';
+  const sub_a=_a-10;
+  const sub_A=_A-10;
+  color=vector(#3,0);
+  position()="${arg\ $axis+1,x,y,z}";
+ );
+ str=crop(#-1,separator_point*position(),0,0,0,length_of_hex_str,1,1,1);
+ repeat(length_of_hex_str,ind,
+  channel=ind>>1;
+  char=str[ind];
+  inrange(char,_0,_9,1,1)?(
+   v=char-_0;
+  ):
+  inrange(char,_a,_f,1,1)?(
+   v=char-sub_a;
+  ):
+  inrange(char,_A,_F,1,1)?(
+   v=char-sub_A;
+  ):(
+   run('error inv_args');
+  );
+  ind&1?(
+   color[channel]+=v;
+  ):(
+   color[channel]=v<<4;
+  );
+ );
+ color;"
+
+remove[-2]
 #@cli rep_transfer_color_reduced: [palette],0<=_dither<=1,_pixel_ratio_w>=0,_pixel_ratio_h>=0,_windows_width>=0,_window_height>=0,_color_restriction_per_window>=0,_color_restriction_per_whole>=0,_number_of_alpha>=0,_alpha_dithering>=0,_alpha_mode={ 0=index | 1=window-index | 2=ordered },_alpha_restrict>=0 : { bit_depth | bit_a:...:bit_z | :[palette] },0<=_dither<=1,_pixel_ratio_w>=0,_pixel_ratio_h>=0,_color_restriction_per_whole>=0,_number_of_alpha>=0,_alpha_dithering>=0,_alpha_mode={ 0=index | 1=ordered }
 #@cli : Change images to look as if it was reduced. Can be used to emulate old hardware.
 rep_transfer_color_reduced:
