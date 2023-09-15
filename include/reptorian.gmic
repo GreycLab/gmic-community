@@ -48,6 +48,90 @@
 #
 #-------------------------------
 
+#@cli rep_van_neumann_condition_tiling: width,height,whole_number_count_starting_from_zero>=4
+#@cli : Generate random tiles which meets van neumann condition.
++rep_van_neumann_condition_tiling:
+check "$3>=2&&isint($3)"
+
+${1-2} => map_diagonal
+
+eval "
+  const md=$map_diagonal;
+  const Ws=$3;
+
+  const mx=w#md-1; # maximum(o) x-index(o)
+  const my=h#md-1; # maximum(o) y-index(o)
+
+  ce_a=[mx,0];  # Corner/Esquina A
+  ce_b=[0,my];  # Corner/Esquina B
+  ce_f=[mx,my]; # Corner/Esquina Final(le)
+
+  diag_trans=[1,-1];
+  trans_a=[0,1];
+  trans_b=[1,0];
+  trans_mode=paint_using_x=paint_using_y=0;
+
+  ref_coords=[0,0];
+  sel_rn=int(u(0,Ws,1,0));
+  i(#md,ref_coords)=sel_rn;
+
+  rn_exlc(arg...)=(
+    ref([arg],excl_num);
+    out_rn=sel_rn;
+    repeat(size(excl_num),p,
+      out_rn>=excl_num[p]?(
+        ++out_rn;
+      ):(break(););
+    );
+    out_rn;
+  );
+
+  coords_in_bord()=(!ref_coords[0]||ref_coords[0]==mx)||(!ref_coords[1]||ref_coords[1]==my);
+
+  while(ref_coords!=ce_f,
+    trans_mode?(
+      ref_coords+=trans_b;
+    ):(
+      ref_coords+=trans_a;
+    );
+
+    to_other_side=ref_coords==ce_f;
+    repeat(inf,
+      paint_using_x=ref_coords[0]?1;
+      paint_using_y=ref_coords[1]?1;
+
+      if(ref_coords==ce_a,
+        swap(trans_b[0],trans_b[1]);
+      );
+
+      if(ref_coords==ce_b,
+        swap(trans_a[0],trans_a[1]);
+      );
+
+      if(paint_using_x,temp_num_a=i(#md,ref_coords[0]-1,ref_coords[1]););
+      if(paint_using_y,temp_num_b=i(#md,ref_coords[0],ref_coords[1]-1););
+      if(paint_using_x&&paint_using_y,paint_using_y=temp_num_a!=temp_num_b);
+
+      paint_using_x&&paint_using_y?(
+        if(temp_num_b<temp_num_a,swap(temp_num_a,temp_num_b););
+        sel_rn=int(u(0,Ws-paint_using_x-paint_using_y,1,0));
+        i(#md,ref_coords)=rn_exlc(temp_num_a,temp_num_b);
+      ):(
+        sel_rn=int(u(0,Ws-1,1,0));
+        i(#md,ref_coords)=rn_exlc(paint_using_x?temp_num_a:temp_num_b);
+      );
+
+      (to_other_side?coords_in_bord())?(
+        break();
+      ):(
+        ref_coords+=diag_trans;
+        to_other_side=1;
+      );
+    );
+
+    trans_mode=!trans_mode;
+    swap(diag_trans[0],diag_trans[1]);
+  );"
 #@cli rep_echo_image_data:
 #@cli : Echo the data that represents the image.
 rep_echo_image_data:
