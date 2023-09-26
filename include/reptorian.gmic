@@ -966,59 +966,60 @@ if $act_arr_sortclass rm..
 else
  if $shift -. {im} fi
 fi
-#@cli rep_vibrance_ych: 0<vibrance<=1
+#@cli rep_vibrance_ych: -100[%]<vibrance<=100[%]
 #@cli : Increase chroma of Image with minimal to no impact on high-chroma areas. Based on Darktable YCH "Vibrance" code.
 rep_vibrance_ych:
-_vibrance_factor_ych={cut($1,-1,1)}
+vibrance_factor_ych={cut($1,-1,1)}
 
-if !$_vibrance_factor_ych return fi
+if !$vibrance_factor_ych return fi
 
-if $_vibrance_factor_ych>0
- command "vibrance_ych_adj :
+if $vibrance_factor_ych>0
+ m "vibrance_ych_adj:
   f \"begin(
-    const vibrance_factor=$_vibrance_factor_ych;
-   );
+     const vibrance_factor="$vibrance_factor_ych";
+    );
    v=vibrance_factor*(0.63235455751419067^vibrance_factor-i^vibrance_factor);
    chroma_factor=max(0,1+v);
    i*chroma_factor;
    \"
- "
+  "
 else
- _abs_vibrance_factor_adj={1-abs($_vibrance_factor_ych)}
- command "vibrance_ych_adj : * $_abs_vibrance_factor_adj"
+ vibrance_factor_ych={1-abs($vibrance_factor_ych)}
+ m "vibrance_ych_adj: * "$vibrance_factor_ych""
 fi
 
-foreach {
- if s<3||s>4 continue fi
- if s==4 sh. 0,2 fi
-
+m "cmd_vibrance:
  f. 255*((I/255)^1.5)
  rgb2yuv.
-
- sh. 1,2
-
- f. "
-  V=I;
-  [norm(V),atan2(V[1],V[0])];"
-
- sh. 0
+ 
+ shared. 1,2
+ f. [norm(I),atan2(i1,i0)] # i0 is r and i1 is ang
+ shared. 0
  vibrance_ych_adj.
-
- f.. "
-  polar_coordinates=I;
-  r=polar_coordinates[0];
-  ang=polar_coordinates[1];
-  [r*cos(ang),r*sin(ang)];
-  "
-
- rm[-2,-1]
-
+ rm.
+ f. [i0*cos(i1),i0*sin(i1)] # i0 is r and i1 is ang
+ rm.
+ 
  yuv2rgb.
  f. 255*((I/255)^0.66666666666666666)
- rm.
+ "
+
+remove_shared=0
+foreach {
+ if inrange(s,3,4,1,1)
+  if s==4 
+   shared. 0,2
+   remove_shared=1
+  fi
+  cmd_vibrance.
+  if $remove_shared
+   remove.
+   remove_shared=0
+  fi
+ fi
 }
 
-uncommand vibrance_ych_adj
+uncommand cmd_vibrance,vibrance_factor_ych
 #@cli rep_import_pdn_txt: file_a...file_z...,_discard_alpha={ 0=keep | 1=discard_alpha | 2=auto }
 #@cli : Import PDN Palette (.txt)
 #@cli : There can be as many files. This import file relative to your current directory.
