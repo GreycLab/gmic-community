@@ -48,6 +48,447 @@
 #
 #-------------------------------
 
+#@cli rep_decompose_bitplanes: _number_of_bits>0
+#@cli : Decompose images into bitplanes.
+#@cli : Default values: '_number_of_bits=8'
+#@cli : Author : Reptorian.
+rep_decompose_bitplanes:
+l[] {
+  check "${1=8}>1 && isint(${1=8})"
+  $=arg
+
+  onfail
+    if isnum($1)
+      if !isint($1)||$1<1 error inv_num_inp fi
+    else
+      noarg arg1=8
+    fi
+ }
+
+d_bpi={$arg1-1}
+
+foreach { repeat $d_bpi { +>>[-1] 1 &[-2] 1 } &[-1] 1 }
+#@cli rep_compose_bitplanes: _number_of_bits>0
+#@cli : Compose bitplanes into images.
+#@cli : Default values: '_number_of_bits=8'
+#@cli : Author : Reptorian.
+rep_compose_bitplanes:
+l[] {
+  check "${1=8}>1 && isint(${1=8})"
+  $=arg
+
+  onfail
+    if isnum($1)
+      if !isint($1)||$1<1 error inv_num_inp fi
+    else
+      noarg arg1=8
+    fi
+ }
+
+d_bpi={$arg1-1}
+
+P,Q=-1,-2
+repeat inf {
+ repeat $d_bpi { <<[$P] 1 |[$P,$Q] }
+ if ($>+1)==$! break fi
+ P,Q-=1
+}
+#@cli utf8str2vint: string
+#@cli : Return vector of integer representation of UTF-8 string.
+#@cli : Author : Reptorian.
+utf8str2vint:
+skip "${1=}"
+if !$# status "" return fi
+
+eval "
+ str='$1';
+ const size_str=size(str);
+ num_set=vector(#size_str,0);
+
+ pos=num_of_chars=0;
+ while(pos<size_str,
+  current_binary=str[pos]>>4; # Extract first 4 bits of first byte. pos is used to select and extract the relevant numbers.
+
+  current_binary<8?(
+   ++pos;
+   num_set[num_of_chars]=1;
+  ):
+  current_binary<=13?(
+   pos+=2;
+   num_set[num_of_chars]=2;
+  ):
+  current_binary==14?(
+   pos+=3;
+   num_set[num_of_chars]=3;
+  ):
+  current_binary==15?(
+   pos+=4;
+   num_set[num_of_chars]=4;
+  );
+
+  ++num_of_chars;
+ );
+
+ if(pos!=size_str,run('error not_a_UTF-8_string!'););
+
+ const N=0xff; # Base for the mathematics involving encoding or decoding UTF-8 strings.
+ const M=N>>2; # Used to select binary numbers within x section of 10xxxxxx.
+
+ pos=0;
+ repeat(num_of_chars,k,  # This loop is responsible for convert multiple integer representation into the index.
+  size_of_ints_per_char=num_set[k];
+
+  size_of_ints_per_char==4?(
+   num_set[k]=(str[pos]&(N>>5))<<18|(str[pos+1]&M)<<12|(str[pos+2]&M)<<6|(str[pos+3]&M);
+  ):
+  size_of_ints_per_char==3?(
+   num_set[k]=(str[pos]&(N>>4))<<12|(str[pos+1]&M)<<6|(str[pos+2]&M);
+  ):
+  size_of_ints_per_char==2?(
+   num_set[k]=(str[pos]&(N>>3))<<6|(str[pos+1]&M);
+  ):(
+   num_set[k]=str[pos];
+  );
+
+  pos+=size_of_ints_per_char;
+ );
+
+ set('num_of_chars',num_of_chars);
+ num_set;
+ "
+
+status {([${}])[0,$num_of_chars]}
+#@cli vint2utf8str: int_a>=0,...
+#@cli : Return corresponding integer(s) representation of UTF-8 as a string.
+#@cli : Author : Reptorian.
+vint2utf8str:
+skip "${1=}"
+if !$# status "" return fi
+
+eval "
+ list_of_ints=[$*];
+ if(min(list_of_ints)<0||max(list_of_ints)>0x10ffff,run('error range_exc'););
+
+ const list_size=size(list_of_ints);
+ const init_size=list_size<<2;
+
+ new_list=vector(#init_size,0);
+
+ const M=1<<7; # 10xxxxxx . The starting number in binary is 10000000. x will be replaced by corresponding numbers associated with integer representation.
+ const N=0xff; # Base for the mathematics involving encoding or decoding UTF-8 strings.
+ const S=N>>2; # Used to select binary numbers to insert into x section of 10xxxxxx.
+ const X1=xor(N,S);    #110xxxxx.
+ const X2=xor(N,S>>1); #1110xxxx.
+ const X3=xor(N,S>>2); #11110xxx.
+
+ final_size=0;
+ repeat(list_size,k,
+  cv=list_of_ints[k];
+
+  cv>0x10000?(LS=3;XC=X3;): # LS is shorthand for loops, which will be used to aid into inserting values into x series.
+  cv>0x800?(  LS=2;XC=X2;):
+  cv>0x80?(   LS=1;XC=X1;):
+  (           LS=0;      );
+
+  LS?(
+   for(ind=final_size+LS,ind>final_size,--ind,
+    new_list[ind]=M|(cv&S);
+    cv>>=6;
+   );
+   new_list[final_size]=XC|cv;
+  ):(
+   new_list[final_size]=cv;
+  );
+
+  final_size+=LS+1;
+ );
+
+ set('final_size',final_size);
+ new_list;
+ "
+
+status {`([${}])[0,$final_size]`}
+#@cli rep_nonexistent_colors_pal: number_of_new_colors, _appended_into_palette={ 0=do_not_append | 1=append into palette },_method={ 0=random | 1=farthest (slow) },0<_mask_factor[%]<=1,_cube_size>=7
+#@cli : Generates a palette of non-existent colors on each images. Either, appended onto the image, or as a new palette.
+#@cli : '_appended_into_palette=1','_method=0','_mask_factor=1','_cube_size=16'
+rep_nonexistent_colors_pal:
+skip ${2=1},${3=0},${4=1},${5=64}
+check "isint($1)&&$1>=1"
+
+number_of_new_colors,append_into_pal,cube_size=$1,$2,$5
+
+if isint($3) far_mode={$3&1}
+else
+ r,rand,random,aleatoria=0 far,farthest,distant,lejos=1
+ far_mode=$$3 if !narg($far_mode) error inval_arg fi
+fi
+
+if $far_mode
+
+ mask_factor={1-$4}
+ if !inrange($4,0,1,0,1)
+  error 0<\$\4<=1==F
+ fi
+
+ if !isint($cube_size)||!inrange($cube_size,7,256,1,1)
+  error inv_inp_\$\5
+ fi
+
+ if $cube_size==256
+  initial_code=i(#-1,I)=1
+  xyz_code=[xM,yM,zM]
+  m "rep_nonexistent_colors_pal_insert_new_color: point 0,$""1,0,1,$""2,$""3,$""4"
+ else
+  d_cube_size={$cube_size-1}
+  initial_code=i(#-1,I*{$d_cube_size/255})=1
+  xyz_code=round([xM,yM,zM])
+  m "rep_nonexistent_colors_pal_insert_new_color: point 0,$""1,0,1,{round([$""2,$""3,$""4]*"{255/$d_cube_size}")}"
+ fi
+
+ if $mask_factor
+  m "rep_nonexistent_colors_pal_generate_pal:
+   current_number_of_colors=$""1
+
+   if "$append_into_pal"
+    1,{"$number_of_new_colors"+$current_number_of_colors},1,1,y
+    map[-1] [-3]
+    rm[-3]
+   else
+    1,"$number_of_new_colors",1,{s#-2}
+    rm[-3]
+    current_number_of_colors=0
+   fi
+
+   +fill[-2] :\"const max_coords="$d_cube_size";!i?(inrange(x,0,max_coords,0,0)&&inrange(y,0,max_coords,0,0)&&inrange(z,0,max_coords,0,0));\"
+   +inpaint_pde[-3] [-1],100%,0
+   remove[-2]
+   erode_circ. 2,1,1 blur. 2 +. 1 ^. "$mask_factor"
+
+   repeat "$number_of_new_colors" {
+    +distance... 1,2 *. .. xyz:="$xyz_code" rm.
+    point... $xyz,1,1
+    rep_nonexistent_colors_pal_insert_new_color.. $current_number_of_colors,$xyz
+    current_number_of_colors+=1
+   }
+
+   remove[-3,-1]
+   "
+ else
+  m "rep_nonexistent_colors_pal_generate_pal:
+   current_number_of_colors=$""1
+
+   if "$append_into_pal"
+    1,{"$number_of_new_colors"+$current_number_of_colors},1,1,y
+    map[-1] [-3]
+    rm[-3]
+   else
+    1,"$number_of_new_colors",1,{s#-2}
+    rm[-3]
+    current_number_of_colors=0
+   fi
+
+   repeat "$number_of_new_colors" {
+    +distance.. 1,2 xyz:="$xyz_code" rm.
+    point.. $xyz,1,1
+    rep_nonexistent_colors_pal_insert_new_color. $current_number_of_colors,$xyz
+    current_number_of_colors+=1
+   }
+
+   remove[-2]
+   "
+ fi
+
+fi
+
+foreach { # For each images
+
+ current_number_of_colors:=whd
+
+ if $far_mode
+
+  if s!=3 error inv_chans_num fi
+
+  {vector3($cube_size)},1
+  eval[-2] $initial_code
+  rep_nonexistent_colors_pal_generate_pal $current_number_of_colors
+
+ else
+
+  if !inrange(1,6,1,1)
+   error inv_chans_num
+  fi
+
+  if $append_into_pal
+   1,{$number_of_new_colors+$current_number_of_colors},1,1,y
+   map[-1] [-2]
+   rm[-2]
+   1,1,1,100%
+  else
+   1,1,1,100%x2
+  fi
+
+  eval "  # Enter JIT compiler
+   const number_of_new_colors=$number_of_new_colors;
+   const number_of_channels=s#0;
+   const current_number_of_colors=$current_number_of_colors;
+   const append_into_pal=$append_into_pal;
+   const maximum_integer_value=256^number_of_channels;
+
+   bitshift_factors=expr('x?1<<(2+x)',number_of_channels);
+
+   convert_color2int(color_values)=sum(color_values<<bitshift_factors);
+   convert_int2color(value)=(value>>bitshift_factors)&0xff;
+
+   min_pos_val=-1;
+   max_pos_val=inf;
+
+   state_check=mode=0;
+   old_value=middle_pivot=pivot_value=-1;
+
+   repeat(current_number_of_colors,p,
+
+    current_color=I[#0,p];
+    current_value=convert_color2int(current_color);
+
+    mode==3?(
+
+     state_check=0;
+
+     current_value==min_pos_val||current_value==max_pos_val||current_value==pivot_value||current_value==old_value?(
+      continue();
+     ):(
+      old_value=current_value;
+
+      current_value<min_pos_val?(
+       min_pos_val=current_value;
+       da_insert(#-1,0,current_color);
+      ):
+      current_value>max_pos_val?(
+       max_pos_val=current_value;
+       da_push(#-1,current_color);
+      ):
+      current_value>pivot_value?(
+       for(q=middle_pivot+1,q<da_size(#-1),++q,
+        test_value=convert_color2int(I[#-1,q]);
+        test_value>current_value?(
+         break();
+        ):
+        test_value==current_value?(
+         state_check=1;
+         break();
+        );
+       );
+       if(state_check
+       ,continue();
+       ,da_insert(#-1,q,current_color);
+       );
+      ):( # current_value<pivot_value
+      for(q=middle_pivot-1,q>0,--q,
+        test_value=convert_color2int(I[#-1,q]);
+        current_value>test_value?(
+         break();
+        ):
+        test_value==current_value?(
+         state_check=1;
+         break();
+        );
+       );
+       if(state_check
+       ,continue();
+       ,da_insert(#-1,q+1,current_color);
+       );
+      );
+      middle_pivot=da_size(#-1)>>1;
+      pivot_value=convert_color2int(I[#-1,middle_pivot]);
+     );
+
+    ):
+    mode==2?(
+
+     if(!state_check,
+      min_pos_val=convert_color2int(I[#-1,0]);
+      max_pos_val=convert_color2int(I[#-1,1]);
+      state_check=1;
+     );
+
+     current_value==min_pos_val||current_value==max_pos_val?(
+      continue();
+     ):(
+      middle_pivot=1;
+      mode=3;
+      state_check=0;
+
+      current_value<min_pos_val?(
+       pivot_value=min_pos_val;
+       min_pos_val=current_value;
+       da_insert(#-1,0,current_color);
+      ):
+      current_value<max_pos_val?(
+       pivot_value=current_value;
+       da_insert(#-1,1,current_color);
+      ):
+      current_value>max_pos_val?(
+       pivot_value=max_pos_val;
+       max_pos_val=current_value;
+       da_push(#-1,current_color);
+      );
+     );
+
+    ):
+    mode?(
+
+     current_value>old_value?(
+      da_push(#-1,current_color);
+      old_value=current_value;
+      mode=2;
+     ):
+     current_value<old_value?(
+      da_insert(#-1,0,current_color);
+      old_value=current_value;
+      mode=2;
+     );
+
+    ):(
+
+     da_push(#-1,current_color);
+     old_value=current_value;
+     mode=1;
+
+    );
+
+   );
+
+   append_into_pal?(
+    insertion_pos=current_number_of_colors;
+    insert_new_color(color)=I[#-2,insertion_pos++]=color;
+   ):(
+    insert_new_color(color)=da_push(#-2,color);
+   );
+
+   last_rn=inf;
+   q=0; # Inserted position
+   repeat(number_of_new_colors,
+    selec_u=int(u(0,maximum_integer_value-da_size(#-1),1,0));
+    for(q=(selec_u>=last_rn?++q),q<da_size(#-1),++q,
+     selec_u>=convert_color2int(I[#-1,q])?(
+      ++selec_u;
+     ):(break(););
+    );
+    new_color=convert_int2color(selec_u);
+    da_insert(#-1,q,new_color);
+    insert_new_color(new_color);
+    last_rn=selec_u;
+   );
+
+   if(!append_into_pal,da_freeze(#-2););
+   "
+
+  keep[{!$append_into_pal}]
+
+ fi
+}
+
+um rep_nonexistent_colors_pal_insert_new_color,rep_nonexistent_colors_pal_generate_pal
 #@cli rep_van_neumann_condition_tiling: width,height,whole_number_count_starting_from_zero>=4
 #@cli : Generate random tiles which meets van neumann condition.
 +rep_van_neumann_condition_tiling:
@@ -88,23 +529,84 @@ ${1-2},1,1,>"begin(
 #@cli : Echo the data that represents the image.
 rep_echo_image_data:
 repeat $! {
-
- echo [gmic]./" "({$>,`"put_sep(s,_k) = (
-                      for (k = _k; p = find(s,_','), p>=0, p = find(s,_',',++p),
-                      s[p] = k%w?_',':k%wh?_';':k%whd?_'/':_'^'; ++k); s
-                    );
-                    s = v2s(crop(),-1); put_sep(s,1);"`}) # Code taken from print in G'MIC STDLIB
+ echo [gmic]./" "({0,`"put_sep(s,_k)=(
+                       for(k=_k;p=find(s,_','),p>=0,p = find(s,_',',++p),
+                         s[p]=k%w?_',':k%wh?_';':k%whd?_'/':_'^';
+                         ++k;
+                       );
+                       s;
+                     );
+                     s=v2s(crop(),-1);
+                     put_sep(s,1);
+                     "`}) # Code taken from print in G'MIC STDLIB
 }
 #@cli rep_python_print_files_dir:
 #@cli : Print existing files in current directory.
 #@cli : As the 'python' denotes, this command requires Python. Python Version Requirement: 3.6+
 rep_python_print_files_dir:
 exec 1,"python -c \"import os; d=os.listdir(); c=','; print(f'\\n[gmic][python]-"$^"./ {c.join(d)}')\""
-#@cli rep_python_insert_integer_value:
-#@cli : Allows user to insert integer values from the cli interface. Then, return the integer value.
-#@cli :  As the 'python' denotes, this command requires Python. Python Version Requirement: 2.x+
-rep_python_insert_integer_value:
-exec 1,"python -c \"import sys; sys.exit(int(input('\\n[gmic][python]-"$^"./ Input Integer Value: ')))\""
+#@cli rep_cin: '_message'
+#@cli : Allows users to type output number into status. Only numbers, A-Z english letters, comma, period, minus sign, and space are accepted!
+#@cli : Default values: '_message=G'MIC rep_cin output:'
+rep_cin:
+skip "${1=}"
+screen_w,screen_h={*,u},{*,v}
+screen_h>>=1
+
+started,stack_point=0
+current_str_0=""
+
+if narg("$1")
+ message="$1"
+else
+ message="G'MIC rep_cin output: "
+fi
+
+do
+
+ if {*,BACKSPACE}
+  if $stack_point>0
+   stack_point-=1
+   if $stack_point<0 stack_point=0 fi
+   o=${current_str_$stack_point}
+  fi
+
+  w[] $screen_w,1,0,0,$message$o
+
+  wait 250
+ elif {*,ENTER}" || "{*,ESC}
+  break
+ else
+  key={*,k}
+
+  is_comma={$key==188}
+  is_negative={$key==189}
+  is_period={$key==190}
+
+  if inrange($key,_'0',_'9',1,1)||inrange($key,_'A',_'Z',1,1)||$key==_'\ '||$is_comma||$is_period||$is_negative
+   stack_point+=1
+
+   if $is_comma o.=,
+   elif $is_negative o.=-
+   elif $is_period o.=.
+   else o.={`$key`}
+   fi
+
+   current_str_$stack_point=$o
+  fi
+
+  if $started w[] $screen_w,1,0,0,$message$o
+  else
+   w[] $screen_w,1,0,0,0,$screen_h,$message$o
+   started=1
+  fi
+
+ fi
+
+ wait
+while {*}
+
+status $o
 #@cli rep_closest_number_in_ordered_list_of_numbers: number_to_search,number_a,number_b....
 #@cli : Find closest number in list of number
 rep_closest_number_in_ordered_list_of_numbers:
@@ -4207,6 +4709,8 @@ eval "
  idx;"
 #@cli rep_r_combinations: number_of_items>0,choices>0,_axis={x,y,z}
 #@cli : Create image representing combinations given number of items and choices with repeating numbers. Empty item is a item by itself.
+#@cli : Code to find combinations given index is taken from Joseph Wood at codereview.stackexchange - https://codereview.stackexchange.com/questions/285415/find-the-list-of-combination-with-repetition-given-rank-and-number-of-items/287944#287944
+#@cli : Author : Reptorian.
 +rep_r_combinations:
 skip ${3=x}
 
@@ -4220,7 +4724,9 @@ elif $axis==1 out_dim=1,$num_combs,1
 else          out_dim=$num_combs,1,1
 fi
 
-$out_dim,$choices,>"
+if $num_combs>131072 mode=: fi
+
+$out_dim,$choices,$mode"
  begin(
   const n_items=$n_items;
   const max_ind=s-1;
@@ -4229,9 +4735,9 @@ $out_dim,$choices,>"
   axis==1?(index()=y;):
            index()=x;
   comb=vector(#s,0);
-  val=0;
+  started=0;
  );
- if(index(),
+ started?(
   if(++comb[max_ind]==n_items,
    for(p=max_ind-1,p>-1,--p,
     if(++comb[p]<n_items,
@@ -4240,64 +4746,60 @@ $out_dim,$choices,>"
    );
    copy(comb[p+1],comb[p],max_ind-p,1,0);
   );
+ ):(
+  index()?(
+   m_items=n_items;
+   m_choices=$choices;
+   m_index=index();
+   temp=permut(m_choices-1,m_items+m_choices-2,0);
+   --m_choices;
+   item_choice=0;
+   repeat($choices,k,
+    while(temp<=m_index,
+     m_index-=temp;
+     temp*=m_items-1;
+     temp=int(temp/(m_items+m_choices-1));
+     --m_items;
+     ++item_choice;
+    );
+    temp*=m_choices;
+    if((m_items+m_choices)>2,temp=int(temp/(m_items+m_choices-1)););
+    comb[k]=item_choice;
+    --m_choices;
+   );
+  );
+  started=1;
  );
  comb;"
 #@cli rep_r_combination_index2list: n,k,index
 #@cli : Return the list of numbers which correspond to the index provided based on a list of all possible combinations with repetition.
+#@cli : Code is taken from Joseph Wood at codereview.stackexchange - https://codereview.stackexchange.com/questions/285415/find-the-list-of-combination-with-repetition-given-rank-and-number-of-items/287944#287944
 #@cli : Author : Reptorian.
 rep_r_combination_index2list:
 check "sum(isint([${1-2}]))==2&&$1>1&&$2>0&&$#==3"
 
 eval "
- const n=$1;
- const k=$2;
- const d_k=k-1;
- const num_of_combs=permut($2,$1+$2-1,0);
- const max_comb_ind=num_of_combs-1;
- index=$3%$num_of_combs;
- Tc=n-1;
- calc_approximate_n(v,r)=max(r,int((v*fact(r)-r)^(1/r)));
-
- if((max_comb_ind*fact(Tc)-Tc)>200287698057897074364579839981,
-  run('error exec_comb_limit');
- );
-
- output_list=vector(#k,0);
- !index?(
-  output_list;
- ):
- index==max_comb_ind?(
-  output_list=vector(#k,n-1);
- ):(
-  index<n?(
-   output_list[d_k]=index;
-   output_list;
-  ):(
-
-   repeat(inf,
-    Tn=calc_approximate_n(index,Tc);
-    FTn=Tn-Tc+1;
-    ncr_val=last_n=permut(Tc,Tn,0);
-
-    while(ncr_val<index,
-     ncr_val=permut(Tc,++Tn,0);
-     if(ncr_val<=index,
-      last_n=ncr_val;
-      ++FTn;
-     );
-    );
-
-    index-=last_n;
-    --Tc;
-
-    copy(output_list[d_k],1,FTn,-1,0,-1);
-
-    if(!index||!Tc,break(););
-   );
-
-   output_list;
+ m_items=$1;
+ m_choices=$2;
+ m_index=$3%permut(m_choices,m_items+m_choices-1,0);
+ output_list=vector(#$2,0);
+ temp=permut(m_choices-1,m_items+m_choices-2,0);
+ --m_choices;
+ item_choice=0;
+ repeat($2,k,
+  while(temp<=m_index,
+   m_index-=temp;
+   temp*=m_items-1;
+   temp=int(temp/(m_items+m_choices-1));
+   --m_items;
+   ++item_choice;
   );
- );"
+  temp*=m_choices;
+  if((m_items+m_choices)>2,temp=int(temp/(m_items+m_choices-1)););
+  output_list[k]=item_choice;
+  --m_choices;
+ );
+ output_list;"
 #@cli rep_r_combination_list2index: number_of_items,index_a,index_b,...
 #@cli : Return the index which correspond to the list of numbers provided based on a list of all possible combinations with repetition.
 #@cli : Note: All numbers must be in range [0,number_of_items). They must be in integer only.
@@ -4438,8 +4940,8 @@ eval "
   tv=mul_items[dec_half_list_size-p]*=tv;
  );
  sum(mul_items*position);"
-#@cli rep_string_permutations: string,_axis,_sort_string={ 0=do_not_sort_string | 1=sort_string }
-#@cli : Return all the permutations of set of numbers as a image with values representing the unicode representation of characters in input string. Permutations is dependent on character appearance order.
+#@cli rep_string_permutations: string,_axis,_sort_string={ 0=do_not_sort_string | 1=sort_string | 2=logical_sort_string }
+#@cli : Return all the unique permutations of characters of string as a image with values representing the unicode representation of characters in input string. Permutations is dependent on character appearance order.
 #@cli :
 #@cli : Algorithm is based on the implementation of Narayana Pandita's algorithm by PM 2Ring at stackoverflow.
 #@cli : Implementation of Narayana Pandita's algorithm -  https://stackoverflow.com/questions/8306654/finding-all-possible-permutations-of-a-given-string-in-python
@@ -4448,15 +4950,29 @@ eval "
 #@cli : Default values: '_axis=x','_sort_string=0'
 +rep_string_permutations:
 skip ${2=x},${3=0}
-check "inrange(('$2')[0],_'x',_'z',1,1)"
+check "inrange(_'$2',_'x',_'z',1,1)"
 
 1,1,1,2
 
 eval "
- const bool_sort_string=$3;
+ const sort_string=$3%3;
  reference_information='$1';
 
- if(bool_sort_string,reference_information=sort(reference_information););
+ sort_string==2?(
+  const str_size=size(reference_information);
+  sort_indexes=[242,243,0,1,2,3,4,26,27,244,245,84,56,246,5,6,7,8,51,52,53,54,55,247,248,249,250,251,252,253,254,18,96,70,89,99,17,85,74,88,62,63,77,80,90,81,91,92,108,109,110,111,112,113,114,115,116,117,94,95,64,83,65,73,97,119,127,128,130,132,137,138,139,140,145,146,147,148,149,151,158,159,160,161,163,165,170,171,172,173,175,58,93,59,76,57,86,176,184,185,187,188,193,194,195,196,201,202,203,204,205,207,215,216,217,218,220,222,227,228,229,230,233,60,75,61,69,255,107,28,162,29,30,31,32,34,35,24,36,37,38,40,41,42,39,43,44,48,33,45,46,47,49,50,9,10,11,12,13,14,238,71,19,21,22,20,239,25,118,15,237,66,68,240,16,100,98,82,105,106,87,23,241,234,235,104,236,67,101,102,103,72,120,121,122,123,124,125,126,129,133,134,135,136,141,142,143,144,131,150,152,153,154,155,156,78,157,166,167,168,169,174,164,219,177,178,179,180,181,182,183,186,189,190,191,192,197,198,199,200,213,206,208,209,210,211,212,79,214,223,224,225,226,231,221,232];
+  sort_reference=resize(reference_information,str_size<<1,1,0);
+  repeat(str_size,ind,
+   pos=ind<<1;
+   current_char=sort_reference[pos];
+   sort_reference[pos]=sort_indexes[current_char];
+  );
+  sort_reference=sort(sort_reference,1,str_size,2);
+  reference_information=(sort_reference)[1,str_size,2];
+ ):
+ sort_string==1?(
+  reference_information=sort(reference_information);
+ );
 
  char_position=vector(#256,-1); # Enable O(1) index retrieval as G'MIC lack Python-like dictionary.
 
@@ -4523,17 +5039,37 @@ $out_dim,$size_of_string,>"begin(
 channels[-2] 0
 map[-1] [-2]
 remove[-2]
-#@cli rep_string_permutation_index2str: reference_string,index,_sort_reference_string={ 0=do_not_sort_string | 1=sort_string }
+#@cli rep_string_permutation_index2str: reference_string,index,_sort_reference_string={ 0=do_not_sort_string | 1=sort_string | 2=logical_sort_string }
 #@cli Return the string which is of the lexicographic index given reference string. The index is based on character appearance order unless sorting is activated. This is the first time an algorithm has been made to address this.
 #@cli : Author : Reptorian.
+#@cli : Default values: '_sort_reference_string=0'
 rep_string_permutation_index2str:
-check "isint($2)"
+check "isint($2)&&isint($3)"
 skip ${3=0}
 
+sort_string={$3%3}
+
 if !$2
- if $3 status {`sort('$1')`} return
- else status $1 return
+ if $sort_string==2
+  status {`"
+   target_string='$1';
+   const str_size=size(target_string);
+   sort_indexes=[242,243,0,1,2,3,4,26,27,244,245,84,56,246,5,6,7,8,51,52,53,54,55,247,248,249,250,251,252,253,254,18,96,70,89,99,17,85,74,88,62,63,77,80,90,81,91,92,108,109,110,111,112,113,114,115,116,117,94,95,64,83,65,73,97,119,127,128,130,132,137,138,139,140,145,146,147,148,149,151,158,159,160,161,163,165,170,171,172,173,175,58,93,59,76,57,86,176,184,185,187,188,193,194,195,196,201,202,203,204,205,207,215,216,217,218,220,222,227,228,229,230,233,60,75,61,69,255,107,28,162,29,30,31,32,34,35,24,36,37,38,40,41,42,39,43,44,48,33,45,46,47,49,50,9,10,11,12,13,14,238,71,19,21,22,20,239,25,118,15,237,66,68,240,16,100,98,82,105,106,87,23,241,234,235,104,236,67,101,102,103,72,120,121,122,123,124,125,126,129,133,134,135,136,141,142,143,144,131,150,152,153,154,155,156,78,157,166,167,168,169,174,164,219,177,178,179,180,181,182,183,186,189,190,191,192,197,198,199,200,213,206,208,209,210,211,212,79,214,223,224,225,226,231,221,232];
+   sort_reference=resize(target_string,str_size<<1,1,0);
+   repeat(str_size,ind,
+    pos=ind<<1;
+    current_char=sort_reference[pos];
+    sort_reference[pos]=sort_indexes[current_char];
+   );
+   sort_reference=sort(sort_reference,1,str_size,2);
+   (sort_reference)[1,str_size,2];
+  "`}
+ elif $sort_string==1
+  status {`sort('$1')`}
+ else
+  status $1
  fi
+ return
 fi
 
 1,1,1,1x3
@@ -4541,9 +5077,23 @@ fi
 eval "
  values_of_chars_in_string='$1';
  const size_of_info=size(values_of_chars_in_string);
- const bool_sort_string=$3;
+ const sort_string=$sort_string;
 
- if(bool_sort_string,values_of_chars_in_string=sort(values_of_chars_in_string););
+ sort_string==2?(
+  const str_size=size(values_of_chars_in_string);
+  sort_indexes=[242,243,0,1,2,3,4,26,27,244,245,84,56,246,5,6,7,8,51,52,53,54,55,247,248,249,250,251,252,253,254,18,96,70,89,99,17,85,74,88,62,63,77,80,90,81,91,92,108,109,110,111,112,113,114,115,116,117,94,95,64,83,65,73,97,119,127,128,130,132,137,138,139,140,145,146,147,148,149,151,158,159,160,161,163,165,170,171,172,173,175,58,93,59,76,57,86,176,184,185,187,188,193,194,195,196,201,202,203,204,205,207,215,216,217,218,220,222,227,228,229,230,233,60,75,61,69,255,107,28,162,29,30,31,32,34,35,24,36,37,38,40,41,42,39,43,44,48,33,45,46,47,49,50,9,10,11,12,13,14,238,71,19,21,22,20,239,25,118,15,237,66,68,240,16,100,98,82,105,106,87,23,241,234,235,104,236,67,101,102,103,72,120,121,122,123,124,125,126,129,133,134,135,136,141,142,143,144,131,150,152,153,154,155,156,78,157,166,167,168,169,174,164,219,177,178,179,180,181,182,183,186,189,190,191,192,197,198,199,200,213,206,208,209,210,211,212,79,214,223,224,225,226,231,221,232];
+  sort_reference=resize(values_of_chars_in_string,str_size<<1,1,0);
+  repeat(str_size,ind,
+   pos=ind<<1;
+   current_char=sort_reference[pos];
+   sort_reference[pos]=sort_indexes[current_char];
+  );
+  sort_reference=sort(sort_reference,1,str_size,2);
+  values_of_chars_in_string=(sort_reference)[1,str_size,2];
+ ):
+ sort_string==1?(
+  values_of_chars_in_string=sort(values_of_chars_in_string);
+ );
 
  char_position=vector(#256,-1); # Enable O(1) index retrieval as G'MIC lack Python-like dictionary.
 
@@ -4572,7 +5122,7 @@ eval "
  index=$2%level_length;
  max_index=level_length-1;
 
- if(!bool_sort_string,values_of_chars_in_string=sort(values_of_chars_in_string););
+ if(!sort_string,values_of_chars_in_string=sort(values_of_chars_in_string););
 
  !index?(
   values_of_chars_in_string;
@@ -4618,7 +5168,7 @@ eval "
  "
 
 status {`map([${}],crop(#-1))`} remove[-3--1]
-#@cli rep_string_permutation_str2index: test_string : reference_string,test_string,_sort_reference_string={ 0=do_not_sort_string | 1=sort_string }
+#@cli rep_string_permutation_str2index: test_string : reference_string,test_string,_sort_reference_string={ 0=do_not_sort_string | 1=sort_string | 2=logical_sort_string }
 #@cli : Return the lexicographic rank in which the permutation of string is found. The rank is based on character appearance order. If you provide only one argument, then rank is dependent on alphabetical order.
 #@cli :
 #@cli : Algorithm to find the lexicographic rank of string has been made by egoista of GeeksForGeeks and source code can be found here - https://www.geeksforgeeks.org/lexicographic-rank-string-duplicate-characters/
@@ -4631,18 +5181,32 @@ skip "${2=}",${3=0}
 
 eval "
  reference_information='$1';
- const size_of_info=size(reference_information);
+ const size_ref_str=size(reference_information);
  const contain_arg_2=narg($2);
 
  contain_arg_2?(
-  const bool_sort_string=$3;
-  reference_information='$1';
   test_string='$2';
-  if(size(reference_information)!=size(test_string),run('error diff_str_dims'););
-  if(bool_sort_string,reference_information=sort(reference_information););
+  const sort_string=$3%3;
+
+  if(size(test_string)!=size_ref_str,run('error diff_str_dims'););
+
+  sort_string==2?(
+   sort_indexes=[242,243,0,1,2,3,4,26,27,244,245,84,56,246,5,6,7,8,51,52,53,54,55,247,248,249,250,251,252,253,254,18,96,70,89,99,17,85,74,88,62,63,77,80,90,81,91,92,108,109,110,111,112,113,114,115,116,117,94,95,64,83,65,73,97,119,127,128,130,132,137,138,139,140,145,146,147,148,149,151,158,159,160,161,163,165,170,171,172,173,175,58,93,59,76,57,86,176,184,185,187,188,193,194,195,196,201,202,203,204,205,207,215,216,217,218,220,222,227,228,229,230,233,60,75,61,69,255,107,28,162,29,30,31,32,34,35,24,36,37,38,40,41,42,39,43,44,48,33,45,46,47,49,50,9,10,11,12,13,14,238,71,19,21,22,20,239,25,118,15,237,66,68,240,16,100,98,82,105,106,87,23,241,234,235,104,236,67,101,102,103,72,120,121,122,123,124,125,126,129,133,134,135,136,141,142,143,144,131,150,152,153,154,155,156,78,157,166,167,168,169,174,164,219,177,178,179,180,181,182,183,186,189,190,191,192,197,198,199,200,213,206,208,209,210,211,212,79,214,223,224,225,226,231,221,232];
+   sort_reference=resize(reference_information,size_ref_str<<1,1,0);
+   repeat(size_ref_str,ind,
+    pos=ind<<1;
+    current_char=sort_reference[pos];
+    sort_reference[pos]=sort_indexes[current_char];
+   );
+   sort_reference=sort(sort_reference,1,size_ref_str,2);
+   reference_information=(sort_reference)[1,size_ref_str,2];
+  ):
+  sort_string==1?(
+   reference_information=sort(reference_information);
+  );
  ):(
   test_string='$1';
-  reference_information=sort(test_string);
+  reference_information=sort(reference_information);
  );
 
  test_string==reference_information?(
@@ -4651,7 +5215,7 @@ eval "
   char_position=vector(#256,-1); # Enable O(1) index retrieval as G'MIC lack Python-like dictionary.
 
   ind=0;
-  repeat(size_of_info,char_ind,
+  repeat(size_ref_str,char_ind,
    char=reference_information[char_ind];
    char_position[char]>-1?(
     ++i[#-1,char_position[char]];
@@ -4667,7 +5231,7 @@ eval "
     dividier*=fact(i[#-1,ind]);
    );
 
-   fact(size_of_info)/dividier-1;
+   fact(size_ref_str)/dividier-1;
   ):(
 
    fill(test_string,char_ind,
@@ -4679,15 +5243,15 @@ eval "
 
    str_index=0;
 
-   repeat(size_of_info,ind,
+   repeat(size_ref_str,ind,
     count_of_less_index_value=0;
 
-    for(alt_ind=ind+1,alt_ind<size_of_info,++alt_ind,
+    for(alt_ind=ind+1,alt_ind<size_ref_str,++alt_ind,
      if(test_string[ind]>test_string[alt_ind],++count_of_less_index_value;);
     );
 
     if(count_of_less_index_value,
-     for(alt_ind=ind,alt_ind<size_of_info,++alt_ind,++i[#-1,test_string[alt_ind]];);
+     for(alt_ind=ind,alt_ind<size_ref_str,++alt_ind,++i[#-1,test_string[alt_ind]];);
 
      dividier_factorial=1;
      repeat(da_size(#-1),element,
@@ -4695,7 +5259,7 @@ eval "
       i[#-1,element]=0;
      );
 
-     str_index+=(fact(size_of_info-ind-1)*count_of_less_index_value)/dividier_factorial;
+     str_index+=(fact(size_ref_str-ind-1)*count_of_less_index_value)/dividier_factorial;
     );
 
    );
@@ -4703,8 +5267,8 @@ eval "
    str_index;
   );
 
- );
- "
+ );"
+
 remove[-1]
 #@cli rep_inverse_permutation: number_list
 #@cli : Return the inverse permutation.
@@ -5312,7 +5876,7 @@ check narg($1)||(narg(${2--1})>1)
 
 if narg($1)
 
- if ${is_percent\ $1}
+ if ispercentage($1)
 
   f "begin(
     const num_val=iM+1;
@@ -7120,12 +7684,12 @@ foreach {
    const symmetry_mode=$15%3;
    const inversion_mode=($16+2)%3;
 
-   "${is_percent\ $1}"?(
+   ispercentage($1)?(
     const bar_width=max($sub,round((abs($1)*diag_img/4)));
    ):(
     const bar_width=max($sub,round(abs($1)*$sub));
    );
-   "${is_percent\ $2}"?(
+   ispercentage($2)?(
     const space_width=abs($2)>0?max($sub,round((abs($2)*diag_img/4)));
    ):(
     const space_width=round(abs($2)*$sub);
@@ -7547,7 +8111,7 @@ else
 
    1,1,1,$ls 1,1,1,1
 
-   eval... :${-math_lib}"begin(
+   eval... :${-math_lib}${-dar_lib}"begin(
      const ls=$ls;
     );
     if(i,
@@ -7637,7 +8201,7 @@ rep_cstdmap:rep_chirikov_taylor $*
 rep_chirikov_taylor:
 skip ${2=500},${3=5000},${4=1},${5=0},${6=0},${7=0},${8=1}
 
-if ${is_percent\ $1}
+if ispercentage($1)
  if $!
   if $1>0
    mw=${-max_w}
@@ -8556,11 +9120,11 @@ fi
 foreach {
 
  half_img_diag={norm(w,h)/2}
- if ${is_percent\ $1} length={round(abs($1)*$half_img_diag)}
+ if ispercentage($1) length={round(abs($1)*$half_img_diag)}
  else length={round(abs($1))}
  fi
 
- if ${is_percent\ $4} thickness={round(abs($4)*$half_img_diag)}
+ if ispercentage($4) thickness={round(abs($4)*$half_img_diag)}
  else thickness={round(abs($4))}
  fi
 
@@ -8588,8 +9152,8 @@ ang={($3/180)*pi*-1}
 cos_ang={cos($ang)};
 sin_ang={sin($ang)};
 diag={norm($6,$7)/2}
-if ${is_percent\ $1} length={round($1*$diag)} else length={round($1)} fi
-if ${is_percent\ $2} thickness={max(round($2*$diag),1)} else thickness={max(round($2),1)} fi
+if ispercentage($1) length={round($1*$diag)} else length={round($1)} fi
+if ispercentage($2) thickness={max(round($2*$diag),1)} else thickness={max(round($2),1)} fi
 
 point_b_x=0
 point_b_y={$length/2}
@@ -9859,7 +10423,7 @@ number_of_images={$!}
 if !$number_of_images error no_imgs fi
 
 num_of_ind,direction,all_channels={$#-2},{$1&1},{!$2}
-size_of_map={2^$num_of_ind}
+size_of_map={1<<$num_of_ind}
 
 whole_numbers=[{expr('x',$num_of_ind)}]
 order=[${3--1}]
@@ -9920,7 +10484,7 @@ fi
 #@cli : Default values: '_exponential_factor=0','_nl_amplitude=0','_n_smooth=4%','_a_smooth=5%'
 rep_edgefade:
 skip ${2=1},${3=0},${4=4%},${5=2%}
-percent_mode=0 if ${is_percent\ $1} percent_mode=1 fi
+percent_mode=0 if ispercentage($1) percent_mode=1 fi
 foreach {
  if s==2||s>=4
 
@@ -14464,7 +15028,7 @@ command "rep_frblur_alp :
 command "rep_frblur_nalp : rep_frblur_sdaxy_add $""1 / $_ti"
 
 foreach {
- if ${is_percent\ $2} dist={abs($2)*norm(w,h)/2}
+ if ispercentage($2) dist={abs($2)*norm(w,h)/2}
  else dist={abs($2)} fi
 
  tcr,convert_back=3,0
@@ -15881,7 +16445,7 @@ skip ${3=1},${4=1},${5=1},${6=},${7=},${8=},${9=},${10=},${11=},${12=},${13=},${
 
 num_of_images,mode,special_effect={$!},$1,0
 
-if isnum($3)||${is_percent\ $3}
+if isnum($3)||ispercentage($3)
   dither={cut($3,0,1)}
 else
   # This is where special effect are set up in
@@ -16733,7 +17297,7 @@ if ${is_image_arg\ $3}
  name[-1] channel_values_image
  utilize_channel_values_image=1
 else
- use_percent_mode=${is_percent\ $3}
+ use_percent_mode:=ispercentage($3)
  if !$3
   if $modular_mode==2||$modular_mode>3 return
   else
@@ -17873,13 +18437,13 @@ modulo_mode,random_offset_mode,random_strip_mode,seed_off,seed_strip,boundary,su
 if narg($seed_strip) has_strip_seed=1 fi
 if narg($seed_off)   has_off_seed=1   fi
 
-if ${is_percent\ $1} use_perc_off=1
+if ispercentage($1) use_perc_off=1
 else
  use_perc_off,offset=0,{abs($1)*$sublevel}
  if !$offset return fi
 fi
 
-if ${is_percent\ $2} use_perc_thk=1
+if ispercentage($2) use_perc_thk=1
 else
  use_perc_thk,thickness=0,{max(1,int(abs($2)*$sublevel))}
 fi
@@ -24991,14 +25555,19 @@ u "{$1}_"{!$3?2}\
 "{$7}_"{$5?2:1}\
 "{$8}"\
 "{$9,$10}"
-#@gui Bit-Plane Shuffler: fx_rep_bitplane_shuffle,fx_rep_bitplane_shuffle_preview
+#@gui Bit-Plane Shuffler:fx_rep_bitplane_shuffle,fx_rep_bitplane_shuffle_preview
 #@gui:_=separator(),_=note("<b>Main</b>)
-#@gui:Direction=choice(1,"Backward","Forward")
+#@gui:Direction=choice(0,"Forward","Backward")
 #@gui:Depth=choice(0,"8-Bit","16-Bit")
 #@gui:Use Alpha?=bool(0)
+#@gui:_=separator(),_=note("<b>CLI Command</b>")
+#@gui:CLI version=text("Here is where you copy command to command line interface.")
+#@gui:CLI version=text("This is just a reference text")_0
 #@gui:_=separator(),_=note("<b>Plane Shuffling</b>)
-#@gui:Index=int(100,1,40320)
-#@gui:Index=int(100,1,40320)_0
+#@gui:Shuffle Index=int(0,0,40319)
+#@gui:Shuffle Index=int(0,0,40319)_0
+#@gui:Shuffle Index=text("0")_0
+#@gui:Plane Shift Method=_choice(0,"Move","Swap")
 #@gui:Plane A=int(1,1,8)
 #@gui:Plane B=int(2,1,8)
 #@gui:Plane C=int(3,1,8)
@@ -25015,9 +25584,6 @@ u "{$1}_"{!$3?2}\
 #@gui:Plane F=int(6,1,8)_0
 #@gui:Plane G=int(7,1,8)_0
 #@gui:Plane H=int(8,1,8)_0
-#@gui:Randomize Index=button()
-#@gui:Index=text("9896398100167")_0
-#@gui:Index=text("9896398100167")_0
 #@gui:Plane A=int(8,1,16)
 #@gui:Plane B=int(10,1,16)
 #@gui:Plane C=int(9,1,16)
@@ -25050,322 +25616,253 @@ u "{$1}_"{!$3?2}\
 #@gui:Plane N=int(5,1,16)_0
 #@gui:Plane O=int(15,1,16)_0
 #@gui:Plane P=int(16,1,16)_0
-#@gui:Randomize Order=button()
-#@gui:Direction=choice(1,"Backward","Forward")_0
+#@gui:Randomize=button()
 #@gui:Depth=choice(0,"8-Bit","16-Bit")_0
+#@gui:Visited 8-Bit=bool(0)_0
+#@gui:Visited 16-Bit=bool(0)_0
 #@gui:_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"),Preview Split=point(50,50,0,0,200,200,200,0,10)_0
-#@gui:_=separator(),_=note("<small>Author: <i>Reptorian</i> Latest update: <i>2022/09/02</i>.</small>")
+#@gui:_=separator(),_=note("<small>Author: <i>Reptorian</i> Latest update: <i>2023/11/27</i>.</small>")
 fx_rep_bitplane_shuffle:
-if $2?$23==1:$4==1 return fi
+skip "$*"
 
 if narg($_persistent)
-  if $3
-    if $2 *[^-1] 257 fi
-    $_persistent
-    map[^-1] [-1]
-    rm.
-    if $2 / 257 fi
-  else
-    foreach {
-      if !(s&1) sh 0,{s-2} fi
-      if $2 *. 257 fi
-      $_persistent
-      map[-2] [-1]
-      if $2 /[-2] 257 fi
-      k[0]
-    }
-  fi
-else
-  args=$1,{!$3}
-  if $2 rep_bitplane_shuffle $args,${rep_permutation_index2list\ 16,{$23-1}}
-  else  rep_bitplane_shuffle $args,${rep_permutation_index2list\ 8,{$4-1}}
-  fi
+ if $3
+  if $2 * 257 fi
+  $_persistent channels. $1
+  map[^-1] [-1] rm.
+  if $2 / 257 fi
+ else
+  $_persistent channels. $1 store. _persistent
+  foreach {
+   if !(s&1) sh 0,{s-2} fi
+   if $2 *. 257 fi
+   $_persistent
+   map[-2] [-1] rm.
+   if $2 /. 257 fi
+   k[0]
+  }
+ fi
+else rep_bitplane_shuffle {![$1,$3]},$cli_base
 fi
 fx_rep_bitplane_shuffle_preview:
-direction,use_16_bits_depth,_use_alpha,index_8_bits,old_index_8_bits,index_16_bits,old_index_16_bits,depth_changed=${1-5},${23-24},{$2!=$59}
-direction_change:=$direction!=$58
+skip "${4=}"
 
-plane_8bits_a,plane_8bits_b,plane_8bits_c,\
-plane_8bits_d,plane_8bits_e,plane_8bits_f,\
-plane_8bits_g,plane_8bits_h\
-=${6-13}
+cli_base="$5"
+activate_randomize=$58
 
-plane_16bits_a,plane_16bits_b,plane_16bits_c,\
-plane_16bits_d,plane_16bits_e,plane_16bits_f,\
-plane_16bits_g,plane_16bits_h,plane_16bits_i,\
-plane_16bits_j,plane_16bits_k,plane_16bits_l,\
-plane_16bits_m,plane_16bits_n,plane_16bits_o,\
-plane_16bits_p\
-=${25-40}
+use_reverse_permutation,mode_16,mode_alpha,index_8,index_16,\
+old_mode_16,old_index_8\
+=${1-3},$6,$8,\
+ $59,$7
 
-activate_random_order={$use_16_bits_depth?$57:$22}
-
-if $use_16_bits_depth
-
-  change_detected={$depth_changed||$activate_random_order||$direction_change}
-
-  if !narg($_persistent)&&$index_16_bits>1
-
-    order:=[${25-40}]-1
-
-    plane_16bits_a,plane_16bits_b,plane_16bits_c,\
-    plane_16bits_d,plane_16bits_e,plane_16bits_f,\
-    plane_16bits_g,plane_16bits_h,plane_16bits_i,\
-    plane_16bits_j,plane_16bits_k,plane_16bits_l,\
-    plane_16bits_m,plane_16bits_n,plane_16bits_o,\
-    plane_16bits_p\
-    :=[$order]+1
-
-    if !$direction order=${rep_inverse_permutation\ $order} fi
-    order=[$order]
-
-    65536,1,1,1,sum((x>>[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]&1)<<$order)
-    store. _persistent
-
-  fi
-
-  user_array_changed:=[${25-40}]!=[${41-56}]
-  change_detected+=$user_array_changed
-
-  if $change_detected
-
-    if $user_array_changed
-
-      eval "
-        a=[${25-40}];
-        b=[${41-56}];
-        diff_pos=argmax(abs(a-b));
-        swap_pos=find(b,a[diff_pos],0,1);
-        swap(b[diff_pos],b[swap_pos]);
-        b;"
-
-      plane_16bits_a,plane_16bits_b,plane_16bits_c,\
-      plane_16bits_d,plane_16bits_e,plane_16bits_f,\
-      plane_16bits_g,plane_16bits_h,plane_16bits_i,\
-      plane_16bits_j,plane_16bits_k,plane_16bits_l,\
-      plane_16bits_m,plane_16bits_n,plane_16bits_o,\
-      plane_16bits_p\
-      =${}
-
-      new_order:=[${}]-1
-      index_16_bits:=${rep_permutation_list2index\ $new_order}+1
-      if !$direction new_order=${rep_inverse_permutation\ $new_order} fi
-      new_order=[$new_order]
-
-      65536,1,1,1,sum((x>>[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]&1)<<$new_order)
-      store. _persistent
-
-    elif $depth_changed||$direction_change
-      order:=[${25-40}]-1
-      if !$direction order=${rep_inverse_permutation\ $order} fi
-      order=[$order]
-
-      65536,1,1,1,sum((x>>[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]&1)<<$order)
-      store. _persistent
-    else
-      index_16_bits={int(u(0,20922789888000,1,0))}
-      new_order=${rep_permutation_index2list\ 16,$index_16_bits}
-      index_16_bits+=1
-
-      plane_16bits_a,plane_16bits_b,plane_16bits_c,\
-      plane_16bits_d,plane_16bits_e,plane_16bits_f,\
-      plane_16bits_g,plane_16bits_h,plane_16bits_i,\
-      plane_16bits_j,plane_16bits_k,plane_16bits_l,\
-      plane_16bits_m,plane_16bits_n,plane_16bits_o,\
-      plane_16bits_p\
-      :=[$new_order]+1
-
-      if !$direction new_order=${rep_inverse_permutation\ $new_order} fi
-      new_order=[$new_order]
-
-      65536,1,1,1,sum((x>>[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]&1)<<$new_order)
-      store. _persistent
-    fi
-
-  fi
-
-  if $index_16_bits>1
-    gui_split_preview "
-      * 257
-      if !$_use_alpha&&(!(s%2)) sh 0,{s-2} fi
-      $_persistent
-      map[-2] [-1]
-      k[0]
-      / 257
-     ",${-3--1}
-  else
-    gui_split_preview "skip $*",${3--1}
-  fi
-
-else
-
-  change_detected,index_change={v=$4!=$5;[v||$depth_changed||$activate_random_order||$direction_change,v];}
-
-  if !narg($_persistent)&&$index_8_bits>1
-
-    order:=${rep_permutation_index2list\ 8,{$index_8_bits-1}}
-
-    plane_8bits_a,plane_8bits_b,plane_8bits_c,\
-    plane_8bits_d,plane_8bits_e,plane_8bits_f,\
-    plane_8bits_g,plane_8bits_h\
-    :=[$order]+1
-
-    if !$direction order=${rep_inverse_permutation\ $order} fi
-    order=[$order]
-
-    256,1,1,1,sum((x>>[0,1,2,3,4,5,6,7]&1)<<$order)
-    store. _persistent
-
-  fi
-
-  user_array_changed:=[${6-13}]!=[${14-21}]
-  change_detected+=$user_array_changed
-
-  if $change_detected
-
-    if $user_array_changed
-
-      eval "
-        a=[${6-13}];
-        b=[${14-21}];
-        diff_pos=argmax(abs(a-b));
-        swap_pos=find(b,a[diff_pos],0,1);
-        swap(b[diff_pos],b[swap_pos]);
-        b;"
-
-      plane_8bits_a,plane_8bits_b,plane_8bits_c,\
-      plane_8bits_d,plane_8bits_e,plane_8bits_f,\
-      plane_8bits_g,plane_8bits_h\
-      =${}
-
-      new_order:=[${}]-1
-      index_8_bits:=${rep_permutation_list2index\ $new_order}+1
-      if !$direction new_order=${rep_inverse_permutation\ $new_order} fi
-      new_order=[$new_order]
-
-      256,1,1,1,sum((x>>[0,1,2,3,4,5,6,7]&1)<<$new_order)
-      store. _persistent
-
-    elif $depth_changed||$direction_change
-
-      order:=[${6-13}]-1
-      if !$direction order=${rep_inverse_permutation\ $order} fi
-      order=[$order]
-
-      256,1,1,1,sum((x>>[0,1,2,3,4,5,6,7]&1)<<$order)
-      store. _persistent
-
-    elif $index_change
-
-      new_order=${rep_permutation_index2list\ 8,{$index_8_bits-1}}
-
-      plane_8bits_a,plane_8bits_b,plane_8bits_c,\
-      plane_8bits_d,plane_8bits_e,plane_8bits_f,\
-      plane_8bits_g,plane_8bits_h\
-      :=[$new_order]+1
-
-      if !$direction new_order=${rep_inverse_permutation\ $new_order} fi
-      new_order=[$new_order]
-
-      256,1,1,1,sum((x>>[0,1,2,3,4,5,6,7]&1)<<$new_order)
-      store. _persistent
-
-    else
-
-      index_8_bits={int(u(0,40320,1,0))}
-      new_order=${rep_permutation_index2list\ 8,$index_8_bits}
-      index_8_bits+=1
-
-      plane_8bits_a,plane_8bits_b,plane_8bits_c,\
-      plane_8bits_d,plane_8bits_e,plane_8bits_f,\
-      plane_8bits_g,plane_8bits_h\
-      :=[$new_order]+1
-
-      if !$direction new_order=${rep_inverse_permutation\ $new_order} fi
-      new_order=[$new_order]
-
-      256,1,1,1,sum((x>>[0,1,2,3,4,5,6,7]&1)<<$new_order)
-      store. _persistent
-
-    fi
-
-  fi
-
-  if $index_8_bits>1
-    gui_split_preview "
-      round 0
-      if !$_use_alpha&&(!(s%2)) sh 0,{s-2} fi
-      $_persistent
-      map[-2] [-1]
-      k[0]
-     ",${-3--1}
-  else
-    gui_split_preview "skip $*",${3--1}
-  fi
-
+if narg($_persistent) visited_8,visited_16=$60,$61
+else                  visited_8,visited_16=0
 fi
 
-visible_8_bits,visible_16_bits={$use_16_bits_depth?[0,2]:[2,0]}
+plane_8_series=plane_8_0,plane_8_1,plane_8_2,plane_8_3,\
+               plane_8_4,plane_8_5,plane_8_6,plane_8_7
 
-u "{"$direction"}"\
-"{"$use_16_bits_depth"}"\
-"{"$_use_alpha"}"\
-"{"$index_8_bits"}_"$visible_8_bits\
-"{"$index_8_bits"}"\
-"{"$plane_8bits_a"}_"$visible_8_bits\
-"{"$plane_8bits_b"}_"$visible_8_bits\
-"{"$plane_8bits_c"}_"$visible_8_bits\
-"{"$plane_8bits_d"}_"$visible_8_bits\
-"{"$plane_8bits_e"}_"$visible_8_bits\
-"{"$plane_8bits_f"}_"$visible_8_bits\
-"{"$plane_8bits_g"}_"$visible_8_bits\
-"{"$plane_8bits_h"}_"$visible_8_bits\
-"{"$plane_8bits_a"}"\
-"{"$plane_8bits_b"}"\
-"{"$plane_8bits_c"}"\
-"{"$plane_8bits_d"}"\
-"{"$plane_8bits_e"}"\
-"{"$plane_8bits_f"}"\
-"{"$plane_8bits_g"}"\
-"{"$plane_8bits_h"}"\
-"{0}_"$visible_8_bits\
-"{"$index_16_bits"}"\
-"{"$index_16_bits"}"\
-"{"$plane_16bits_a"}_"$visible_16_bits\
-"{"$plane_16bits_b"}_"$visible_16_bits\
-"{"$plane_16bits_c"}_"$visible_16_bits\
-"{"$plane_16bits_d"}_"$visible_16_bits\
-"{"$plane_16bits_e"}_"$visible_16_bits\
-"{"$plane_16bits_f"}_"$visible_16_bits\
-"{"$plane_16bits_g"}_"$visible_16_bits\
-"{"$plane_16bits_h"}_"$visible_16_bits\
-"{"$plane_16bits_i"}_"$visible_16_bits\
-"{"$plane_16bits_j"}_"$visible_16_bits\
-"{"$plane_16bits_k"}_"$visible_16_bits\
-"{"$plane_16bits_l"}_"$visible_16_bits\
-"{"$plane_16bits_m"}_"$visible_16_bits\
-"{"$plane_16bits_n"}_"$visible_16_bits\
-"{"$plane_16bits_o"}_"$visible_16_bits\
-"{"$plane_16bits_p"}_"$visible_16_bits\
-"{"$plane_16bits_a"}"\
-"{"$plane_16bits_b"}"\
-"{"$plane_16bits_c"}"\
-"{"$plane_16bits_d"}"\
-"{"$plane_16bits_e"}"\
-"{"$plane_16bits_f"}"\
-"{"$plane_16bits_g"}"\
-"{"$plane_16bits_h"}"\
-"{"$plane_16bits_i"}"\
-"{"$plane_16bits_j"}"\
-"{"$plane_16bits_k"}"\
-"{"$plane_16bits_l"}"\
-"{"$plane_16bits_m"}"\
-"{"$plane_16bits_n"}"\
-"{"$plane_16bits_o"}"\
-"{"$plane_16bits_p"}"\
-"{0}_"$visible_16_bits\
-"{"$direction"}"\
-"{"$use_16_bits_depth"}"\
+plane_16_series=plane_16_0,plane_16_1,plane_16_2,plane_16_3,\
+                plane_16_4,plane_16_5,plane_16_6,plane_16_7,\
+                plane_16_8,plane_16_9,plane_16_a,plane_16_b,\
+                plane_16_c,plane_16_d,plane_16_e,plane_16_f
+
+$plane_8_series=${10-17}
+$plane_16_series=${26-41}
+persistent_change,depth_changed=0,{$mode_16!=$old_mode_16}
+
+if $mode_16
+ activate_randomize|=!$visited_16?!$index_16
+ shift_plane={"a=[${26-41}];
+               b=[${42-57}];
+               diff_mode=a!=b;
+               if(diff_mode,
+                const use_swap_mode=$9;
+                diff_pos=argmax(abs(a-b));
+                use_swap_mode?(
+                 swap_pos=find(b,a[diff_pos],0,1);
+                 swap(b[diff_pos],b[swap_pos]);
+                 set('order',v2s(b-1));
+                ):(
+                 position_start=b[diff_pos];
+                 position_final=a[diff_pos];
+                 differential=position_final<position_start?1:-1;
+                 fill(a,p,
+                  v=b[p];
+                  inrange(v,position_start,position_final,1,1)?(
+                   v+=differential;
+                  );
+                  v;
+                 );
+                 a[diff_pos]=position_final;
+                 set('order',v2s(a-1));
+                );
+               );
+              diff_mode;"}
+ persistent_change:=$activate_randomize||$shift_plane
+
+ if $activate_randomize
+  index_16:=$index_16?int(u(1,20922789888000,1,0)):(v=int(u(1,20922789887999,1,0));v+=v>=$index_16;);
+  order=${rep_permutation_index2list\ 16,$index_16}
+ elif $shift_plane
+  index_16=${rep_permutation_list2index\ $order}
+ elif $depth_changed||!$visited_16
+  order={[${26-41}]-1}
+  inverse_order=${rep_inverse_permutation\ $order}
+ fi
+
+ if $persistent_change
+  $plane_16_series:=[$order]+1
+  inverse_order=${rep_inverse_permutation\ $order}
+  cli_base=$order
+ fi
+
+ if $persistent_change||$depth_changed||!$visited_16
+  65536,1,1,2,sum((x>>[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]&1)<<(c?[$inverse_order]:[$order]))
+  store. _persistent
+  cli_base=$order
+ fi
+
+ visited_16=1
+else
+ activate_randomize|=!$visited_8?!$index_8
+ index_change:=$index_8!=$old_index_8
+ shift_plane={"a=[${10-17}];
+               b=[${18-25}];
+               diff_mode=a!=b;
+               if(diff_mode,
+                const use_swap_mode=$9;
+                diff_pos=argmax(abs(a-b));
+                use_swap_mode?(
+                 swap_pos=find(b,a[diff_pos],0,1);
+                 swap(b[diff_pos],b[swap_pos]);
+                 set('order',v2s(b-1));
+                ):(
+                 position_start=b[diff_pos];
+                 position_final=a[diff_pos];
+                 differential=position_final<position_start?1:-1;
+                 fill(a,p,
+                  v=b[p];
+                  inrange(v,position_start,position_final,1,1)?(
+                   v+=differential;
+                  );
+                  v;
+                 );
+                 a[diff_pos]=position_final;
+                 set('order',v2s(a-1));
+                );
+               );
+               diff_mode;"}
+ persistent_change:=$activate_randomize||$index_change||$shift_plane
+
+ if $activate_randomize
+  index_8:=$index_8?int(u(1,40320,1,0)):(v=int(u(1,40319,1,0));v+=v>=$index_8;);
+  index_change=1
+ fi
+
+ if $index_change
+  order=${rep_permutation_index2list\ 8,$index_8}
+ elif $shift_plane
+  index_8=${rep_permutation_list2index\ $order}
+ elif $depth_changed||!$visited_8
+  order={[${10-17}]-1}
+  inverse_order=${rep_inverse_permutation\ $order}
+ fi
+
+ if $persistent_change
+  $plane_8_series:=[$order]+1
+  inverse_order=${rep_inverse_permutation\ $order}
+  cli_base=$order
+ fi
+
+ if $persistent_change||$depth_changed||!$visited_8
+  256,1,1,2,sum((x>>[0,1,2,3,4,5,6,7]&1)<<(c?[$inverse_order]:[$order]))
+  store. _persistent
+  cli_base=$order
+ fi
+
+ visited_8=1
+fi
+
+cli_text=image.jpg\ rep_bitplane_shuffle\ {![$use_reverse_permutation,$mode_alpha]},$cli_base
+
+if $mode_16?$index_16:$index_8
+ gui_split_preview "
+  round 0
+  if "$mode_16" * 257 fi
+  if !"$mode_alpha"&&(!(s&1)) shared 0,{s-2} fi
+  $_persistent
+  channels. "$use_reverse_permutation"
+  map[-2] [-1]
+  k[0]
+  if "$mode_16" / 257 fi
+  ",${-3--1}
+else gui_split_preview "skip \"$*\"",${-3--1}
+fi
+
+visible_8,visible_16:=[!$mode_16,$mode_16]<<1;
+
+u "{"$use_reverse_permutation"}"\
+"{"$mode_16"}"\
+"{$3}"\
+"{"$cli_text"}"\
+"{"$cli_base"}"\
+"{"$index_8"}_"$visible_8\
+"{"$index_8"}"\
+"{"$index_16"}"\
+"{$9}"\
+"{"$plane_8_0"}_"$visible_8\
+"{"$plane_8_1"}_"$visible_8\
+"{"$plane_8_2"}_"$visible_8\
+"{"$plane_8_3"}_"$visible_8\
+"{"$plane_8_4"}_"$visible_8\
+"{"$plane_8_5"}_"$visible_8\
+"{"$plane_8_6"}_"$visible_8\
+"{"$plane_8_7"}_"$visible_8\
+"{"$plane_8_0"}"\
+"{"$plane_8_1"}"\
+"{"$plane_8_2"}"\
+"{"$plane_8_3"}"\
+"{"$plane_8_4"}"\
+"{"$plane_8_5"}"\
+"{"$plane_8_6"}"\
+"{"$plane_8_7"}"\
+"{"$plane_16_0"}_"$visible_16\
+"{"$plane_16_1"}_"$visible_16\
+"{"$plane_16_2"}_"$visible_16\
+"{"$plane_16_3"}_"$visible_16\
+"{"$plane_16_4"}_"$visible_16\
+"{"$plane_16_5"}_"$visible_16\
+"{"$plane_16_6"}_"$visible_16\
+"{"$plane_16_7"}_"$visible_16\
+"{"$plane_16_8"}_"$visible_16\
+"{"$plane_16_9"}_"$visible_16\
+"{"$plane_16_a"}_"$visible_16\
+"{"$plane_16_b"}_"$visible_16\
+"{"$plane_16_c"}_"$visible_16\
+"{"$plane_16_d"}_"$visible_16\
+"{"$plane_16_e"}_"$visible_16\
+"{"$plane_16_f"}_"$visible_16\
+"{"$plane_16_0"}"\
+"{"$plane_16_1"}"\
+"{"$plane_16_2"}"\
+"{"$plane_16_3"}"\
+"{"$plane_16_4"}"\
+"{"$plane_16_5"}"\
+"{"$plane_16_6"}"\
+"{"$plane_16_7"}"\
+"{"$plane_16_8"}"\
+"{"$plane_16_9"}"\
+"{"$plane_16_a"}"\
+"{"$plane_16_b"}"\
+"{"$plane_16_c"}"\
+"{"$plane_16_d"}"\
+"{"$plane_16_e"}"\
+"{"$plane_16_f"}"\
+"{0}"\
+"{"$mode_16"}"\
+"{"$visited_8"}"\
+"{"$visited_16"}"\
 "{$-3}"\
 "{$-2,$-1}"
 #@gui Graphical Tiling Glitch (Interactive): fx_rep_x_graphical_tiling,fx_rep_x_graphical_tiling_preview(0)

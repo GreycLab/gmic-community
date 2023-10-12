@@ -1,0 +1,475 @@
+# Finger Exercises
+%% x "mkdir -p img" %%
+
+|-![fingers](images/fingers.png) | G'MIC's singular terseness stems, in part, from _[substitution techniques](https://gmic.eu/reference/substitution_rules.html#top)_. These permeate the language, typically making short work of overlong elements. Coupling names to pipelines — the making of _custom commands_ — is a preeminent way to clarify code, hiding complexity behind nice names.\n\nPerhaps an esoteric topic for newcomers, but the mechanism is straightforward and shows how G'MIC extends itself from the core built-ins to an ever-widening _réseau_ of custom commands.\n\nIn line with this, custom commands associate easy-to-recall names with what might be otherwise ungainly [riffs](riffs.html). We situate such inside the walled-gardens that amount to custom commands. Within our gardens, we trim, train and perhaps optimize what is there. Finally, we link to the outside realm through _[$-expressions](https://gmic.eu/reference/adding_custom_commands.html#top)_, laying the groundwork for _finger exercises_.
+
+Like riffs, finger exercises are iterative: change the code, review the result, design the next iteration. Unlike riffs, finger exercises take place within the confines of custom commands. The pipeline so embodied produces an overall result which may vary in particulars through the agency of command line _arguments_. `$-expressions` convey these to the embodied pipeline; the culmination may very well be a [custom command of one's own making](bouncing_balls_tutorial.html), behaving not unlike other G'MIC commands. No surprise there. G'MIC commands are — for the most part — custom G'MIC pipelines as well.
+
+## Basics
+
+The eponymous ''-command'' takes either a string, URL, or a local file argument, interpreting it as a custom command. However delivered, these sources have an overall form:
+
+~~~
+name : pipeline
+~~~
+
+The colon character could be regarded (somewhat) as a syncopated equal sign. ''-command'' converts this pattern into a key-value pair. The name to the colon's left sets a retrieval key, the custom command's name. The right associates a pipeline with the key.
+
+The pipeline on the right can be empty, a curiosity that yet proffers practical results. By way of illustration, G'MIC defines such a no-op command: `cli_start`, which always runs first, though implicitly. For the unenlightened, `cli_start` does nothing at all — as it's initially associated with an empty string — but, among the _cognoscenti_ it can be re-keyed to implicitly execute whatever it is that the _cognoscenti_ desire to have executed as the interpreter gets under way. Typically — but not necessarily — such could be a series of ''-command'' invocations. These might extend G'MIC with site-specific customs so as to be always available — without a special effort — as with the custom commands making up the standard G'MIC distribution.
+
+Newcomers may tuck this `cli_start` curiosity off to one side. The key takeaway is the fundamental character of the `:` operator: it is the mechanism that extends the G'MIC command line interpreter so that it can ingest open-ended collections of custom commands. Absent this, and G'MIC would be limited to its core set of built-ins and would be a far less versatile tool. For our finger exercising purposes, we shall harness the `:` operator to hide ungainly riffs behind nice names. So, without knowing much about G'MIC at all, we can commence extending it to suit our own purposes.
+
+### Processing Custom Commands
+During pipeline processing, G'MIC's command line interpreter first tries to match encountered command names with built-ins. Should this fail, it sallies a similar bid with registered custom command names. If one matches, the interpreter substitutes the registered pipeline for the custom command name, embarking on an _itemization_ step where `$-expressions`, marking [substitution points](#command_arguments), are replaced by corresponding command line arguments.
+
+Itemization complete, the command line interpreter then enters a new _[scope](https://gmic.eu/tutorial/debug_cheat.html#debuggery)_. From this elevated prospect, the command line interpreter operates on the custom command pipeline, that of the prior "parent" scope effectively on hold. So it remains until the interpreter completes the elevated scope and resumes processing the parent. Of course, it may encounter yet another custom command in the elevated scope, setting off a further scope passage — and so goes the larger game of pipeline processing, a tree-like course, in which we can register our own branches — custom commands — stemming from some pipeline that we have composed.
+
+## A First Custom Command
+Making a custom command from a riff is of particular interest. Perhaps we'd like to hide the pipeline that makes _[Difference Ellipses](riffs.html#ungainlyriff)_ and instead invoke such with a simple name. This can be readily done with copy-and-pasting the riff to a fresh text file, one to be later employed by ''-command''. Here is the text file's content:
+
+===
+~~~
+diffellipse:
+input 150,150,1,1,255*x/(w-1) polar2euclidean 50%,50% name. circle apply_curve[circle] 1,0,0,63,64,127,200,191,64,255,0 resize[circle] 60%,100%,100%,100%,5,1 expand_x[circle] {w/3},2 +map[circle] balance name. balance rotate[balance] 57,2,1,50%,50% +apply_curve[circle] 1,0,0,63,30,127,250,191,64,255,0 map. delta name. delta rotate[delta] -27,2,1,50%,50% blend[balance] [delta],difference,1,0 remove[^balance] normalize 0,255 name. DifferenceEllipses
+~~~
+===
+
+No prettifying here. We just copied the ''-run'' command argument — the latest [riff](riffs.html#ungainlyriff). To this pipeline, we prepended a custom command name ("diffellipse") and the `:` operator.  So written, the colon operator defines a custom command named `diffellipse` and keys it to our riff. We then write this compilation out to a file using the name `diffellipse.gmic`, as it is customary, though not necessary, to give such files `.gmic` extensions.
+
+When given `diffellipse.gmic` as an argument, G'MIC's ''-command'' reads the definition within and registers it under the key `diffellipse`, defining a new custom command. To see how all this plays out, type:
+
+===
+~~~
+$ gmic command diffellipse.gmic diffellipse
+
+[gmic]./ Start G'MIC interpreter (v.3.3.3).
+[gmic]./ Import commands from file 'diffellipse.gmic', with debug info (1 new, total: 4675).
+[gmic]./ Display image [0] = 'DifferenceEllipses'.
+[0] = 'DifferenceEllipses':
+  size = (150,150,1,3) [263.7 Kio of float32].
+  data = …
+~~~
+
+|-%% 150,150,1,1,255*x/(w-1) polar2euclidean 50%,50% =>. circle apply_curve[circle] 1,0,0,63,64,127,200,191,64,255,0 r[circle] 60%,100%,100%,100%,5,1 expand_x[circle] {w/3},2 +map[circle] balance =>. balance rotate[balance] 57,2,1,50%,50% +apply_curve[circle] 1,0,0,63,30,127,250,191,64,255,0 map. delta =>. delta rotate[delta] -27,2,1,50%,50% blend[balance] [delta],difference,1,0 remove[^balance] =>. "DifferenceEllipses" n. 0,255 _parse_cli_images a x r2dx. 50% %%
+| *DifferenceEllipses*
+
+===
+
+where the file `diffellipse.gmic` occupies the shell's present working directory — `$PWD` in Unix and Windows Powershell; anywhere else and your mileage may vary. And that is all that is _needed_ to introduce a custom command to G'MIC.
+
+### Debug dumping
+
+Since the custom command has been endowed with "debug info," those afflicted with a tenacious and unrelenting curiosity could try:
+= debugexample
+~~~
+$ gmic debug command diffellipse.gmic diffellipse verbose -1
+
+[gmic]./ Start G'MIC interpreter (v.3.3.3, debug mode).
+<gmic>./ Initial command line: 'cli_start , debug command diffellipse.gmic diffellipse v -1'.
+<gmic>./ Enter scope './'.
+<gmic>./ Item[0]: 'cli_start', selection [].
+<gmic>./ Found custom command 'cli_start: ' (takes no arguments).
+<gmic>./ Expand command line for command 'cli_start' to: ''.
+<gmic>./cli_start/ Return from empty command 'cli_start/'.
+<gmic>./ Item[2]: 'debug', selection [].
+<gmic>./ Item[3]: 'command', selection [].
+<gmic>./ Command 'command': arguments = 'diffellipse.gmic'.
+[gmic]./ Import commands from file 'diffellipse.gmic', with debug info (1 new, total: 4675).
+<gmic>./ Item[5]: 'diffellipse', selection [].
+<gmic>./ Found custom command 'diffellipse:  input 150,150,1,1,255*x/(w-1) …
+~~~
+and compare the ensuing ''-debug''-induced fire hose of pipeline processing steps, elided here, with the précis given in [Processing Custom Commands](#processing_custom_commands), above. [Debuggery Cheat](debug_cheat.html) provides useful background as well.
+
+It is worth learning the dark art of debug dumps. While voluminous, they show the interpreter's progression through divers processing phases: itemization, scope entry, execution and scope return. Those spelunking their G'MIC environments may trace command interpretation through any number of scope passages. Such enhances peripheral vision, disclosing, perhaps, an involvement of commands thought to be unrelated to some vexatious G'MIC behavior. Outside of debug dumps, such interrelations can be hard to track down. Germane to this, hark ye in this debug dump the emergence of `cli_start`. But for this dump, it flits through command processing like a neutrino. 
+
+### Refining Custom Commands
+
+While we may have done the minimum for creating a custom command, the effort falls short of a decipherable version. So here is the next cut:
+
+~~~
+ 1 diffellipse:
+ 2    # Black-to-white ramp.
+ 3    -input 150,150,1,1,255*x/(w-1)
+ 4
+ 5    # Wrap ramp around center: now circular.
+ 6    -polar2euclidean 50%,50%
+ 7    -name. circle
+ 8
+ 9    # transfer function: Means to
+10    # white, extremes to black.
+11    -apply_curve[circle] 1,0,0,63,64,127,200,191,64,255,0
+12
+13    # Squeeze circle to an ellipse.
+14    -resize[circle] 60%,100%,100%,100%,5,1
+15
+16    # Restore image size.
+17    -expand_x[circle] {w/3},2
+18
+19    # Grays to 'balance' palette.
+20    +map[circle] balance
+21    -name. balance
+22
+23    # Tilt image +57 degrees.
+24    -rotate[balance] 57,2,1,50%,50%
+25
+26    # Duplicate circle image and
+27    # 'Frequency double' it.
+28    +apply_curve[circle] 1,0,0,63,30,127,250,191,64,255,0
+29
+30    # Grays to 'delta' map.
+31    -map. delta
+32    -name. delta
+33
+34    # Tilt image -27 degrees.
+35    -rotate[delta] -27,2,1,50%,50%
+36
+37    # Compose 'delta' and 'balance'
+38    # absolute('balance' – 'delta')
+39    -blend[balance] [delta],difference,1,0
+40
+41    # Clean up: remove all save output image
+42    -remove[^balance]
+43    -normalize 0,255
+~~~
+
+Such clean-ups provide good returns for time invested. From such, warrantable practices emerge:
+= tutorialstyle
+|  1.   |Write just one command per line.
+|  2.   |Always provide specialization prefixes (`+/-`).
+|  3.   |Keep comments as terse as possible — but _do_ comment!
+|  4.   |Favor standard command names over shortcuts.
+|  5.   |[Label images with names](name.html) and use these, where possible, for clarity in selections.
+|  6.   |Use pips (`.`, `..`, `...`) in the common case of choosing the last, penultimate, and third-from-last images on the stack.
+|  7.   |Indent [flow control commands](https://gmic.eu/reference/list_of_commands.html#flow_control).
+
+These practices might be called the _tutorial style_. Many _cognoscenti_ eschew any or all of such — G'MIC still works. Indeed, with waxing expertise, you may even run with that crowd, using shortcuts, omitting command prefixes, shunning names, multiplexing commands across single lines, indenting haphazardly, if at all — and you will not be struck by lightning.
+
+That said, these practices are for _your_ benefit. They augment what scripts convey about their means of working, and, as an initiate, you can use all the insights, observations and reminders that you might leave to your future self. Even in the present tense, should you aim to collaborate with colleagues over perplexing facets of G'MIC, taking care to be understood is at least a sociable and gracious way of advancing the cause.
+
+## Command Arguments
+As written, `diffellipse` is a one-trick pony. It is uncoupled from outside influences and produces unvarying outcomes. There can be use for such commands — ''-remove_empty'' performs a clean-up operation so particular in its character that any argument is superfluous. Yet, by and large, commands are capable of broad behavior — perhaps quite broad, as with ''-blend'' — from which arguments coax narrower particulars.
+
+With G'MIC, couplings to the outside world proceed along two lines, _[Command Selections](selections.html#image_selection)_ and _argument lists_:
+
+| 1.  |Command selections define sets of images upon which commands _can_ operate. [Selections](selections.html) cover this practical art.
+| 2.  |Arguments establish _how_ the command operates. `$-expressions` establish a system of markers that correlate argument lists with substitution points. The interpreter transposes argument items into scripts at the various substitution points.
+
+In pipelines, arguments follow their affiliated commands, set off from it by spaces and themselves forming a comma-delimited sequence, one embedding no white space unless quoted. Depending on shell environments, such quotes may need to be escaped as well.
+
+The interpreter assigns ordinals to the command itself and follow-on arguments. The command itself gets zero; argument items get sequentially higher ordinals. So, for some fictional command `foo`:
+
+~~~
+$ gmic foo 45,192,dog,800A,1-800-555-1212,\"Now is the time for every good boy to eat fudge!\",[singlepixel]
+
+Argument No. 0 and its value: foo
+Argument No. 1 and its value: 45
+Argument No. 2 and its value: 192
+Argument No. 3 and its value: dog
+Argument No. 4 and its value: 800A
+Argument No. 5 and its value: 1-800-555-1212
+Argument No. 6 and its value: Now is the time for every good boy to eat fudge!
+Argument No. 7 and its value: [singlepixel]
+~~~
+Concurrently, custom command `foo` harbors [substitution points](https://gmic.eu/reference/adding_custom_commands.html#top) marking where argument values go. They appear as dollar signs followed by ordinals, each referencing the corresponding argument:
+~~~
+…
+  program_name=$0
+  one_half_right_angle=$1
+  twice_ninety_six=$2
+  not_a_cat=$3
+  eight_hundred_and_A=$4
+  att_us_direct_assist=$5
+  eat_fudge_now=$6
+  small_image_selection=$7
+…
+~~~
+Taking a lead from image list indices, `$-expressions` may be negative, indexing from the last argument to the first. With a four-argument command, reference the last item with `$4` or `$-1`; reference the penultimate with `$3` or `$-2`, and so on.
+
+Such `$-expressions` are often taken to be [substitution variables](https://gmic.eu/reference/substitution_rules.html#top). The leading `$` lends a superficial resemblance, but their substitution mechanisms differ.
+
+When it first identifies a custom command, the interpreter undertakes a substitution pass, marked in [debugging sessions](#debugexample) with banners like `<gmic>./ Found custom command 'diffellipse:`. During such, the command line interpreter "expands" the custom command, preparatory to entering its scope.
+
+This expansion, in part, entails substituting `$-expressions` with corresponding argument values. Once the interpreter "enters the scope" of the custom command — that is, begins interpreting it — all `$-expressions` have been replaced by their commensurate argument values, such that `twice_ninety_six=$2` becomes `twice_ninety_six=192`. Markers like `$2` may occur anywhere and in any multiplicity. Nor are there any constraints on an order of appearance. The only cautionary is that `$-expressions` are not substitution variables.
+
+With `$-expressions` in our kit, we can now couple finger exercises to the external world of arguments. We begin with a version of `diffellipse` that admits ''-apply_curve'' adjustments, this to see how vertex movement affects rendering.
+= diffellipselist
+===
+~~~
+ 1 diffellipse:
+ 2    lo=$1
+ 3    hi=$2
+ 4    step=$3
+ 5    # Black-to-white ramp.
+ 6    -input 150,150,1,1,255*x/(w-1)
+ 7
+ 8    # Wrap ramp around center: now circular.
+ 9    -polar2euclidean 50%,50%
+10    -name. circle
+11
+12    # Squeeze circle to an ellipse.
+13    -resize[circle] 60%,100%,100%,100%,5,1
+14
+15    # Restore image size.
+16    -expand_x[circle] {w/3},2
+17
+18    -repeat $step {
+19       factor={$lo+($hi-$lo)*($</($step-1))}
+20       # transfer function:
+21       +apply_curve[circle] 1,0,0,63,64,127,$factor,191,64,255,0
+22       -name. acurv
+23
+24       # Grays to 'balance' palette.
+25       +map[acurv] balance
+26       -name. balance
+27
+28       # Tilt 'balance' +57 degrees.
+29       -rotate[balance] 57,2,1,50%,50%
+30
+31       # Duplicate 'acurv' and
+32       # 'Frequency double' it.
+33       +apply_curve[acurv] 1,0,0,63,30,127,$factor,191,64,255,0
+34
+35       # Grays to 'delta' map.
+36       -map. delta
+37       -name. delta
+38
+39       # Tilt 'delta' -27 degrees.
+40       -rotate[delta] -27,2,1,50%,50%
+41
+42       # Compose 'delta' and 'balance'
+43       # absolute('balance' – 'delta')
+44       -blend[balance] [delta],difference,1,0
+45
+46       # Save differenced ellipses
+47       -name[balance] diffellipse
+48       -move.. 0
+49       -remove[^diffellipse,circle]
+50    }
+51    # Clean up: remove all save output image
+52    -remove[^diffellipse]
+53    -normalize 0,255
+~~~
+===
+Invoking `diffellipse` with arguments `0,255,5` produces a "[Whitman's Sampler](https://en.wikipedia.org/wiki/Whitman%27s#Whitman's_Sampler)" of variations — the finger exercise realized:
+===
+~~~
+$ gmic command diffellipse.gmic diffellipse 0,255,5
+~~~
+
+|-![ellipses](images/ellipse_sample.jpg)
+| *Variations on an elliptical theme*
+===
+
+??? Diffellipse Notes:
+|  __Line__  |  __Remark__
+|  **2-4** | __Substitution markers:__ Here are the three `$-expressions` that the interpreter substitutes for the first, second and third arguments. A subsequent assignment of argument values to substitution variables with purposeful names purchases a bit of readability for a tiny price paid in performance. Mark the substitution sequences at play here: First, the interpreter replaces `$-expressions` with argument values, preparatory to scope entry. Second, the interpreter enters the elevated scope, that is, commences interpreting the pipeline which `diffellipse` embodies. Third, while processing lines **2-4**, the interpreter keys numeric values `0` to `lo`, `255` to `hi` and `5` to `step`. When operating within this elevated scope, the interpreter suffers total amnesia concerning matters of the parent scope. It sees naught strings like `$1`, `$2` or `$3` but their argument values, `0`, `255` and `5`.
+|  **8-10**  | __Reverse lookup:__ It has been asseverated elsewhere that G'MIC largely stems from a built-in self-extension mechanism, the `:` operator. Take ''-polar2euclidean''. We may write `gmic -help polar2euclidean` in a shell and receive intelligence, perhaps, of the `y`-axis collapse to an origin-situated singularity, with points hitherto at infinity mapping to a circumference situated Way Out There on the Circle at Infinity. The sense of what that means — _really_ — is palpably absent. From there, one might sally forth with `gmic run 'r=16 {64*$r},{64*$r} grid. {2*$r},{2*$r},{$r},{$r},1,0xaaaffaaa,255 polar2euclidean.'` and behold the transformation of a rectangular grid into a pretty fair dinkum spider web — Polar to Euclidean visualized.\n\nThat may be good for a gut feel, but what is _really_ going on? For that, ask G'MIC via its own self-deconstruction mechanism: `gmic echo $${` _<custom command>_ `}.` Write: `gmic run 'echo $${polar2euclidean}'`\n\nPerhaps what results hurts your head. Indeed, it looks like a riff. But, if you have been paying attention so far, you _ [know what to do with riffs!](#refining_custom_commands) _ That is, take the deconstructed command, drop it in a file called (say) `yowhutsthis.gmic` and prepend that Delphic string with `yowhutsthis: `. Save the file. Apply to its contents [the tutorial style](#tutorialstyle): add comments, whitespace, regroup commands one-to-a-line, label images with names, run your new `yowhutsthis` command from time to time in place of `polar2euclidean` because it's _yours_ now. You can break it however you see fit as a means toward a better understanding: comment lines out, change commands, reorder lines — you won't be hurting `polar2euclidean` in any unkind way — yet you can see how its mechanism, now transposed to `yowhutsthis`, goes about its game. Drop the G'MIC ''-display'' command here and there to stop the script and see what is going on. It's G'MIC's script breakpoint command, travelling _incognito_.\n\nFrom time to time, G'MIC's deconstruction mechanism will tell you — nothing at all. Why? G'MIC is not wholly self-referential. Try as it might, it can't deconstruct its built-in parts. It's like calling itself up on the telephone: it always gets a busy signal.
+|**13,16,21\n25,29,33\n40,44,49\n52…**|__Named collections:__ In these and other lines, we frequently reference images through _[names](name.html#selection_label)_. Invoking the ''-name'' command enrolls its selected images into a named collection identified by the command's argument, creating the collection as necessary. Further on, referencing such collections in selections goes on to picking its members. So frequently are single images enrolled as collections-of-one, it becomes easy to think that ''-name'' directly labels images. This blearing of a [grouping mechanism](name.html#naming_and_classifying_images) is largely free of serious consequences, so long as the complete mechanism is remembered when needed.\n\nAs a practical matter, referencing images through name collections relieves one of explicit index tracking. image indices change as list items appear, disappear and shift position. Enrollments in named collections persist across such volatility.
+|  **18-50** | __Repeat loop:__ The construct `repeat` _ <step_count>_ `{…}` allied with the pre-defined substitutions `$>` and `$<` constitutes one of G'MIC's [flow-control](https://gmic.eu/reference/list_of_commands.html#flow_control) commands. This and other flow-control commands of the ilk make for _command blocks;_ ''-repeat'' 's initial argument sets the number of iterations that the block undergoes. Within such blocks, substitution variables `$>` and `$<` assume ascending $$ c $$ and descending $$ s-c $$ values, respectively, for step counts $$ c $$ and a step number $$ s $$.
+|  **19** | __Image directives:__ Expressions of the form `{` _<index>,<math expression>_ `}` establish a [Math expression](math.html) image directive, a means to compute image-dependent values with respect to a _reference image_ and export such to substitution variable like `$factor`. _<index>_, if present, specifies the reference image; absent such, the last image on the list serves as the reference.\n\nHere, the stated math expression performs step (`$>`) dependent interpolations between the argument-given limits `lo` and `hi`:
+
+===
+$$
+f=l+(h-l)\frac{s-c-1}{s-1}
+$$
+===
+
+|            | a factor, $$ f $$, ranges from a high pixel elevation $$ h $$ — with count, $$ c $$, equal 0 — to a low pixel elevation, $$ l $$, when $$ c $$ equals $$ s–1 $$; the "elevation" of transfer function vertices thus vary from a high to a low as the iteration proceeds, affecting image rendering with each step and giving rise to the "Whitman Sampler" outcome.
+|  **49,52** | __Hat (^) selections:__ In [Selection Notation](selections.html#image_selection), the caret ("hat") negates selection expressions, specifying "everything _but_ the selection", so `[^diffellipse,circle]` selects every image on the stack _but_ the members of the combined `diffellipse` and `circle` collections.
+
+???
+
+A casual perusal of [diffellipse.gmic](#diffellipselist) offers many other places where numeric literals can be replaced by `$-expressions`, allowing command line manipulations at distinct locations in the script. We could institute "squeezing factors" for ellipses at line **13**. Or pick different image rotations at lines **29** or **40**. Or make additional vertices dance in ''-apply_curve'' argument lists at lines **21** and **33**. Carrying on any of these lines of investigation is the quintessential realm of finger exercises, which can be thought of as plotting various outcomes against ranges of arguments for the purpose of better understanding how commands behave.
+
+### Exploring Custom Commands
+Finger exercises and G'MIC's [Mathematical Expressions](https://gmic.eu/reference/mathematical_expressions.html#top) operate in close league; the latter oft furnishes the computational engines for the former. This is especially true with [command behavior explorations](math.html#example_three). Of those commands in the official distribution there may be the (vary rare) [tutorial](https://gmic.eu/tutorial/command_guide.html) illustrating a command's behavior under a range of circumstances. Given the effort to set such tutorials up, the usual provender are the pithy examples found in the [Technical Reference](https://gmic.eu/reference/list_of_commands.html). These constitute terse little finger exercises in their own right, subject to augmentation along some line that piques one's curiosity — to wit, this riff off of the ''-shift'' command:
+
+===
+~~~
+cshift :
+   rcnt=$1
+   stride=$2
+   -foreach {
+      -repeat $rcnt {
+         +shift. 0,0,0,{$stride*($>+1)},2,1
+         -move. 0
+         }
+   }
+   # Arrange unshifted to max-shifted
+   -reverse
+~~~
+   – §§§ –
+~~~
+
+   $ gmic -command cshift.gmic -input example.png cshift. 4,0.25
+
+~~~
+|-%% images/example.png =>. ShiftE repeat 4 { +shift. 0,0,0,{($>+1)/4},2,1 =>. ShiftE_{$>+1} mv. 0 } rv _parse_cli_images a x r2dx. 67% %%
+| *Shifty-colored E's*
+===
+
+`cshift` is a finger exercise for exploring ''-shift'' 's color space behavior, the likes of which may not be manifestly obvious from its _Technical Reference_ entry. [G'MIC Images](https://gmic.eu/tutorial/images.html) possess four dimensions, one being the spectral axis; we may shift along that as well as the width, height or depth axes — the spectral axis is as geometrical as the other three. That said, intuiting a 10% shift along the spectral axis is not as clear as a like shift along the width or height axes. So `cshift` has been designed to see just how shifts along the spectral dimension go. Observe that ''-shift'' 's fifth argument sets a cyclic or periodic [image boundary policy](images_have_edges_now_what.html), so data shifting off of one edge automagically appears at its opposite edge; the spectral axis behaves like a ring buffer, blue data cycling into red or red into blue as the direction goes. 
+
+### Checking Arguments
+`cshift` takes two arguments, a repeat count, `rcnt`, and a shift step, `stride`. This `stride` may be positive or negative — or zero! pointless though that may seem. The sign of the stride argument controls whether we channel-shift toward blue (positive) or red (negative).
+
+On the other hand, a negative repeat count (`rcnt`) just perplexes. What could a negative number of trials mean? So does a zero count bewilder. There ought to be a way to rule out nonsensical arguments — and there is.
+
+The ''-check'' command nominally tests logical expressions, these rules taking the form of mathematical assertions. if an assertion proves to be false, ''-check'' stops script execution. The G'MIC interpreter commences a special mode of operation called _exception processing_, which, [absent special steps](https://gmic.eu/reference/local.html#top), halts the script with an error message. Otherwise, a true assertion allows the script to proceed.
+
+For our purposes, we compose mathematical assertions from `$-expressions`, writing them in such a way that `$-expressions` falling within acceptable ranges lead to true assertions; silly ones lead to falsehoods. With that in mind, we modify `cshift`:
+
+~~~
+cshift : -check ${1=10}>0 -skip ${2=1}
+   rcnt,stride=${1-2}
+   -foreach {
+      -repeat $rcnt {
+         +shift. 0,0,0,{$stride*($>+1)},2,1
+         -move. 0
+         }
+   }
+   # Arrange unshifted to max-shifted
+   -reverse
+~~~
+= newexpress
+Here, we encounter new `$-expressions`, these extending beyond the elementary forms found in [differentiating ellipses](#diffellipselist):
+
+|- `${n=m}`  | __Default Values:__ allows the omission of arguments. If the _nth_ ordinal is omitted, then the corresponding marker in scripts defaults to _m_. If the omitted item appears in the beginning or interior of an argument list, retain commas. Thus `a,b,,d` omits `$3` and raises an error unless `{$3=` _n_ `}` has been set. Commas may be omitted with trailing arguments. Thus, `a,b,c` omits `$4` and raises an error unless`{$4=` _n_ `}` has been set.
+| `a,b,c,d=${1,2,3,4}`\n `a,b,c,d=${1,2-4}` \n `a,b,c,d=${1-4}` | __List Assignments:__ `$-expressions` may be written in list form, commas separating ordinals, and hyphens can abbreviate consecutive ordinals. So written, such `$-expressions` can initialize corresponding lists of substitution variables.
+| `a,b,c`=`${^1}` | __Excepted List Assignments:__ defines three substitution variables with initializers `$0`, `$2` and `$3`, omitting the first item in the argument list.
+
+With these new expressions, we can rewrite the initial lines of [differentiating ellipses](#diffellipselist) more compactly:
+
+~~~
+ 1 diffellipse:
+ 2    lo,hi,step=${1-3}
+…
+~~~
+
+### Skipping Arguments
+We see what ''-check'' is for, but what about `-skip ${2=1}`? 
+
+G'MIC's ''-help'' command, in its pithy way, furnishes prosaic help: "Do nothing but skip specified item." Well, yes, _but what for?_
+
+Sometimes the command interpreter needs to be told not to itemize an item. The ''-skip'' command effects this by making its argument disappear. That argument, having been made to disappear, no longer figures in the subsequent command line itemization. There are circumstances where that can be useful.
+
+A quandry arises with [processing custom commands](#processing_custom_commands). Recall that whenever it encounters a custom command, the interpreter passes through three phases: itemization, scope-entry, then, in an elevated scope, interpretation of a now-itemized custom command. During itemization, the interpreter encounters `$-expressions` declarations like `${2=1}`. This asserts that the second argument has a default value of `1`. That is all well and good. But recall that during itemization, the interpreter _also_ substitutes `$-expressions` with argument values, so the interpreter substitutes the `${2=1}` expression with the value given by the second command line argument, if one has been given, or the default value of `1`, otherwise. In any case, the substituted value, instead of the `$-expression` that spawned it, becomes an item on the pipeline, awaiting further evaluation when the interpreter works its way up to the last phase: processing the elevated custom command pipeline. The question arises, does this item on the pipeline become an inconvenience?
+
+Maybe yes. Maybe no. Depends on how the script writer goes about handling arguments. Should the interpreter find a command preceding the wayward item, it then becomes an argument of that command. If that command happens to be ''-skip'', then the item is processed by ''-skip''. By design, ''-skip'' just consumes it. The script writer may desire such, having only the aim of setting a default. An item lands on the pipeline but the script writer has no plans for it, just wanting it to go away. In consuming its arguments — and nothing else — ''-skip'' serves that end perfectly. Alternatively, the script writer can still make use of the item, perhaps by writing `stride=${2=1}` instead, defining the default for the second argument and making use of the resulting itemization in one fell swoop — a waste not, want not, ploy.
+
+## The Custom Command Environment
+Linking a name with a pipeline, the unassuming colon character in: `name : pipeline` brings about an appreciable extension to G'MIC's repertoire. Once established, the interpreter does more than bring forth a pipeline keyed to a name. It sets out the milieu in which the interpreter operates, necessary, for when it enters the elevated scope of a custom command the interpreter commences operation within a "walled-garden": a practical amnesia to limit what the interpreter must track. This cannot be total amnesia; descry that `$-expressions` and [selection decorations](selections.html), each in their own, especial way, convey beyond-the-wall facets into the garden: the arguments given to the command and the images upon which it is to operate.
+
+We've seen how some `$-expressions` work to import argument values from beyond the pale and close with the remaining ones. Along with a collection of predefined substitution variables, these make up the interpreter's custom command environment:
+
+|- `$*` | is substituted by a verbatim copy of argument list. As a verbatim copy, elided arguments are _not_ represented with their [default values](#newexpress), should any be defined.
+| `$"*"` | is substituted by the sequence of specified arguments, separated by commas `,` and includes any elided arguments; these are set to default values.
+| `$#` | is substituted by the maximum index of known arguments. The pre-defined substitution variable `$!` furnishes the count of selected images.
+| `$[]` | is substituted by the list of selected image indices that have been specified in the command invocation.
+| `$?` | is substituted by a printable version of `$[]`. Typically these forms are used in command descriptions.
+| `$=var` | is substituted by the set of instructions that will define substitution variables with keys: `var$i` for each argument, _i_. for _i_ in `[0...$#]`. The key for the custom command name is `var0`. The key for retrieving the first argument value is `var1`. Useful for giving custom commands variable-sized argument lists. Template names (`var`) must use character set `[a-zA-Z0-9_]` and cannot start with a number. See the following example for a typical use case.
+
+To see these in operation, give some thought to `argfun.gmic`:
+
+===
+~~~
+argfun.gmic:
+
+ 1 argfun: -skip ${1=123}
+ 2    -echo "Arguments: "$*
+ 3    -echo "Arguments and defaults: "$"*"
+ 4    -echo "Argument count: "$#
+ 5    -echo "Selected images: "$[]
+ 6    -echo "Selected images pretty-printed: "$?
+ 7    -echo "Escaped: "$""3
+ 8    $=myargs
+ 9    -repeat {$#+1}
+10       -echo "    "$>": "${myargs{$>}}
+11    -done
+~~~
+– §§§ –
+~~~
+$ gmic -command argfun.gmic                      \
+       -input example.png                        \
+       -name. "StainedGlassE"                    \
+       -argfun[StainedGlassE] ,cats,dogs,'Foo\!'
+
+ [gmic]./ Start G'MIC interpreter (v.3.3.3).
+ [gmic]./ Import commands from file 'argfun.gmic', with debug info (1 new, total: 4701).
+ [gmic]./ Input file 'example.png' at position 0 (1 image 250x250x1x3).
+ [gmic]./ Set name of image [0] to 'StainedGlassE'.
+ Arguments: ,cats,dogs,Foo!
+ Arguments and defaults: 123,cats,dogs,Foo!
+ Argument count: 4
+ Selected images: 0
+ Selected images pretty-printed:  [0]
+ Escaped: $3
+     0: argfun
+     1: 123
+     2: cats
+     3: dogs
+     4: Foo!
+ [gmic]./ Display image [0] = 'StainedGlassE'.
+ [0] = 'StainedGlassE':
+ size = (250,250,1,3) [732.4 Kio of float32].
+ …
+~~~
+===
+
+??? Arg Fun Notes:
+
+|  __Line__  |  __Remark__
+|  **7** | __Dollar Signs and Numerals:__ As with any `$-expressions`, the interpreter substitutes them for their argument values early on. A consequence of this is that `$-expressions` are _always_ replaced with the value that the current environment provides during itemization; notions of escaping with single or double quotes do not provide the expected protection. Should one absolutely _need_ to have a numeral follow a dollar sign, avoid triggering `$-expression` substitution with a pair of double quotes following the dollar sign, as in: `$""1`.
+|  **8** | __Variable-length Argument Lists:__ During itemization, the interpreter substitutes the `$-expression` of the form: `$=myargs` with a sequence of substitution variable definitions. In the present example, given above at line 8, the interpreter substitutes for the `$-expression` `$=myargs`  the replacement string: `myargs0,myargs1,myargs2,myargs3,myargs4="argfun","123","cats","dogs","Foo!"`, a rewriting taking place during the itemization phase of `argfun` and following the [List Assignment](#newexpress) form given above. In the follow-on scope-elevation phase, the interpreter's second encounter with line 8, now rewritten, finds the substitution variable definitions. A script writer may verily proceed with dereferencing such keys as `$myargs0` to obtain the custom command name, or `$myargs2` to obtain `cats,` but might hesitate on how best to dereference the last or penultimate values of an argument list, as that can vary in length from one command invocation to the next.\n\nThe `$-expression` `$#` comes to the rescue; during itemization, the interpreter transforms it into the maximum index of known arguments — one less than the list length. The string `${myargs{$#}}` resolves first to `${myargs{4}}`, during itemization, thence to `Foo!` during scope elevation and interpretation; the script writer may accomplish relative indexing with respect to the end of argument list though subtractions from the base value `$#`.
+|  **9-11** | __Nested substitutions:__ As an additional boon, the interpreter can dereference nested substitutions, working from the innermost substitution outward. In truth, the multiple dereferences occur internally and the interpreter negotiates the substitutions atomically. The `repeat … done` loop, comprising lines **9-11**, harnesses the technique. Recall that `$>` is a pre-defined substitution variable that dereferences to the forward count of `repeat … done` loops — while `$<` dereferences the reverse count. So on the second iteration, the construct `${myargs{$>}}` resolves first to `${myargs1}` — recall that we count from zero — then resolves to `123`, given the present example.\n\nObserve that nested curly braces are necessary. The alternative notation, `$myargs$>`, does not construct a nested sequence but is a simple concatenation. So — in one fell swoop — `$>` simultaneously resolves to the current forward loop count, while the other concatenation element, `$myargs`, resolves to an empty string. Recall that the key `myargs` has never been defined, just keys like `myargs0` and the like, all ending in ordinals.
+
+???
+
+## Uncommand
+
+''-uncommand'' provides the counterpoint to ''-command''. It erases custom commands. From its invocation forward, its arguments, keys to custom commands and their corresponding pipelines, are removed from the environment. 
+
+You could — should you so desire — cosplay Dr. David Bowman, back in some alternative-history 2001, whilst he progressively unmounted the cognition modules in the Heuristically Programmed Algorithmic Computer Mark 9000 (HAL-9000), akin, perhaps, to removing all custom commands:
+
+===
+~~~
+
+$ gmic -uncommand '*'
+[gmic]./ Start G'MIC interpreter (v.3.3.3).
+[gmic]./ Discard definitions of all custom commands (4700 commands).
+[gmic]./ End G'MIC interpreter.
+
+~~~
+===
+
+Now, isn't that _fun?_
+
+But — _but_ — (you might \'but\'), how could such a possibility even be allowed to be possible? Shouldn't there be — well — _safeguards?_
+
+Well — in a word — why? Aren't you grown up now?
+
+This, for newcomers, may be G'MIC's most peculiar, yet beguiling, facet. Without question, G'MIC allows you to inflict near-total amnesia and nary a prompt: "I'm sorry Dave, I'm afraid that I can't allow you to do that." will arise. No. You are free to do what you want — free to do what you will — including being silly. 
+
+It is possible, sensing the lack of training wheels, that newcomers get nervous. Don't let that be a hinderance. It's not like practicing flight training stalls at fifteen hundred meters and inadvertently yawing into a spin (oops). Nothing about G'MIC should put you in the midsts of a grimy fireball at the end of some cornfield somewhere. At worse, you'll get some enigmatic message from the uncaught exception and be no more bemused than awakening in an Empire-style luxury suite with some damn sarsen at the foot of the bed. Even the example given above is no where near the averred Cretaceous–Paleogene extinction event. ''-uncommand'' cannot uncommand the built-ins. The basic fabric of G'MIC remains intact. You could still input an image (a built-in) and blur it (another built-in), and only run to the ruts when the implied ''-display'' command at the pipeline's end turns out not to be there, nor anywhere:
+
+===
+~~~
+$ gmic -uncommand '*' -input example.png -blur 10,1
+[gmic]./ Start G'MIC interpreter (v.3.3.3).
+[gmic]./ Discard definitions of all custom commands (4700 commands).
+[gmic]./ Input file 'example.png' at position 0 (1 image 250x250x1x3).
+[gmic]./ Blur image [0] with standard deviation 10, neumann boundary conditions and gaussian kernel.
+[gmic]./ Input file 'd' at position 1
+[gmic]./ *** Error *** Unknown command or filename 'd'; did you mean 'do'?
+~~~
+===
+
+That arises because ''-display'' is the default output command, should one not be given and, in recent G'MIC implementations, is a custom command — that you have just thrown out with a few thousand others. No mind. Add `-output. example_blur-10.png` or some such to the end of the pipeline — ''-output'' is yet another built-in — and the much-abridged interpreter will still save the ensuing image and land safely. What's more, after the `End G'MIC interpreter` advisory, you are back to the shell, nothing has happened to the installed G'MIC binaries and all the essential command scripts are still in place. Next invocation, you are back with a full deck. So, no worries, mate.
+
+Let's close with this: do your [riffs](riffs.html). They embody full-on play. You can't possibly break anything important and the more that you select unfamiliar commands and riff with them, the faster that your grasp of G'MIC solidifies. From time to time, here and again, you may write a riff that shows promise: make it a custom command. Work out good arguments. Extend G'MIC your way.
+
+And have fun.
+
+Previous: [Riffs](riffs.html)
+
+Updated: 16-December-2023 16:45 UTC Commit: 3e43b535fb842e69cc968e6d24c166e3889447dc

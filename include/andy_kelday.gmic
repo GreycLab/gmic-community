@@ -619,6 +619,48 @@ gcd_unstereo_preview :
 #@gui _<b>Testing</b>
 #@gui <i>Garagecoder</i>
 
+#@gui Canny Edge Detection : fx_gcd_canny, fx_gcd_canny(0)
+#@gui : note = note("<i>Locate image edges using canny edge detector</i>"), sep = separator()
+#@gui : Sigma = float(1,0,10)
+#@gui : Lower Threshold = float(0.05,0,1)
+#@gui : Upper Threshold = float(0.15,0,1)
+#@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2023/12/04</i>.</small>")
+fx_gcd_canny :
+  foreach {
+    split_opacity
+    gcd_canny[0] $1,{[max($2,1e-6),max($3,1e-6)]}
+    *[0] 255 a c
+  }
+
+#@cli gcd_canny : sigma,_low_threshold,_high_threshold
+#@cli : Locate image edges using canny edge detector.
+#@cli : Default values: 'sigma=1', '_low_threshold=0.05' and 'high_threshold=0.15'.
+#@cli : $ image.jpg gcd_canny 1.5
+gcd_canny : skip ${1=1},${2=0.05},${3=0.15}
+  e[^-1] "Apply canny edge detection for image$?, with sigma $1."
+  foreach {
+    low,high:=[$2*$3,$3]
+    # gaussian
+    b $1
+    # sobel
+    (1,2,1;0,0,0;-1,-2,-1)
+    +convolve[0] . transpose.. convolve[0] .. rm..
+    # polar coord regions
+    +atan2.. . sqr[0,1] +[0,1] sqrt..
+    mul. {4/pi} round. 1 mod. 4
+    # non-maximum suppression
+    f.. "
+      A=i#1;
+      Y=A<1?max(j(0,-1),j(0,1)):A<2?max(j(-1,-1),j(1,1)):A<3?max(j(-1),j(1)):max(j(-1,1),j(1,-1));
+      i>=Y?i:0
+    " rm.
+    # double thresholds
+    div {iM} +ge $high ge.. $low
+    # hysteresis
+    f. ">max(crop(x-1,y-1,z,c,3,3,1,1))&&i#0?1:i"
+    f. "<max(crop(x-1,y-1,z,c,3,3,1,1))&&i#0?1:i" rm..
+  }
+
 #@gui Simple Dehaze : gcd_simple_dehaze, gcd_simple_dehaze(1)
 #@gui : note = note("<i>Simple sRGB dehaze</i>"), sep = separator()
 #@gui : Haze = float(0.75,0,1)
@@ -2624,7 +2666,7 @@ gcd_poisson_disk : check "${1=8}>0 && ${3=30}>0" skip ${2=1}
     f. "P=[x,y,z]-int([w/2,h/2,d/2]);[sum(sqr(P)),dot(P,[1,w#2,w#2*h#2])]"
     r. {[whd,s,1,1,-1]} sort. +,x z. 0,1,100%,100% y. c # sort kernel by distance
     =>[1] dims =>[2] grid =>[3] samples =>[4] active =>[5] prox
-    eval ${-math_lib}"
+    eval ${-math_lib}${-dar_lib}"
       const N = "$dim";
       const radius = "$R";
       const grid_cw = "$cw";
@@ -2836,6 +2878,35 @@ gcd_inpaint_pyramid : check ${"is_image_arg $1"}
     rm[0,-1] z {[$X,$Y,$X+$W-1,$Y+$H-1]},1 # restore dimensions
   done done
 
+#@cli gcd_inpaint_flat : [mask]
+#@cli : Inpaint selected images by specified mask using flat fill.
+#@cli : $ image.jpg 100%,100% circle. 50%,50%,50,1,1 gcd_inpaint_flat.. .
+gcd_inpaint_flat : check ${"is_image_arg $1"}
+  img=$! pass$1 0 lt. 1 mul[^-1] . => mask
+  +boxfilter[mask] 3 eq[mask] 0 => xmask
+  +gt[xmask] 0 => bound
+  +eq[xmask] 0 add[xmask] .
+  j. [mask] label. 0 add. 1 mul. [mask] => segs
+  repeat $img {
+    l[$>,mask,xmask,bound,segs] {
+      # buffer for inpaints
+      [0],[0],[0],{s#0+1}
+      j. [bound] j. [0],0,0,0,1 => inp
+      # inpaint edges by 1px
+      sh[inp] 1,100% boxfilter. 3 div. [xmask] rm.
+      # vector histogram
+      {segs,iM+1},1,1,[inp] => hist
+      eval[segs] "I[#6,i]+=I#5"
+      sh[hist] 1,100% sh[hist] 0
+      +eq. 0 add[-2,-1] div[-2,-1]
+      rm. channels. 1,100%
+      # set segment colours and draw
+      channels[inp] 0 j[inp] [segs] map[inp] [hist]
+      j[0] [inp],0,0,0,0,1,[mask] rm[inp,hist]
+    }
+  }
+  rm[mask,xmask,bound,segs]
+
 #@cli gcd_dither_srgb : _nb_levels>=2
 #@cli : Dither selected sRGB images.
 #@cli : Default values: 'nb_levels=2'.
@@ -2976,6 +3047,88 @@ gcd_solve_kernel : skip ${3=1},${4=1} check ${"is_image_arg $1"}" && isint(${2=1
     }
   fi
   rm[target]
+
+#@cli gcd_solve_nonnegative : [image]
+#@cli : Non-negative least squares using FNNLS algorithm.
+#@cli : Solve Ax = b : xi>0 for selected A matrix and specified b vector.
+#@cli : $ (7,0,5;5,7,7;9,3,10) (1;5;2) +gcd_solve_nonnegative.. .
+gcd_solve_nonnegative : check ${"is_image_arg $1"}
+  e[^-1] "Solve non-negative least squares for image$?."
+  pass$1 0 => B
+  repeat $!-1 { l[$>,-1] {
+    M,N:=[h#0,w#0] act=$N best:=inf
+    # Active and passive indexes are held in a single vector: [ind]
+    1,$N,1,1 => X . => S . => W +f. y => ind
+    +transpose[0] . mmul.. [0] mmul. [B] =>.. AtA => AtB
+
+    for $act>0 {
+      # W = AtB - AtA*x (negative gradient)
+      j[W] [AtB] +mmul[AtA] [X] sub[W,-1]
+      1,$act,1,1,"i[#$W,i[#$ind,y]]" => Wact
+
+      # EXIT if most negative gradient hasn't improved
+      new:=iM
+      if $new<1e-6" || "$new>=$best rm[Wact] break fi
+      best=$new
+
+      # Move index of max Wact element from active to passive list
+      eval "
+        a_index = yM;
+        w_index = i[#$ind,a_index];
+        copy(i[#$ind,a_index],i[#$ind,a_index+1],$N-1-a_index);
+        i[#$ind,$N-1] = w_index;"
+      rm[Wact] act:=$act-1
+
+      # Enforce non-negative constraint
+      for 1 {
+        # Solve As = b for current passive set
+        part:=$N-$act
+        sh[ind] $act,100%,0,0 => psv # passive indexes
+        $part,$part,1,1,"i(#$AtA,i[#$psv,x],i[#$psv,y])" => Apsv
+        1,$part,1,1,"i[#$AtB,i[#$psv,y]]" => Bpsv
+        +solve[Bpsv] [Apsv] => Spsv
+
+        # Copy passive solution to S, set to zero for active variables
+        eval[S] "i[i[#$ind,y]]=y<$act?0:i[#$Spsv,y-$act]"
+        rm[Apsv,Bpsv]
+
+        # EXIT moving negatives if passive solution is all non-negative
+        if im>0 rm[psv,Spsv] break fi
+
+        # Calculate possible scaling ratios
+        1,$part,1,1,"i[#$X,i[#$psv,y]]" => Xpsv
+        1,$part,1,1,"XP=i[#$Xpsv,y];XP==0?0:XP/(XP-i[#$Spsv,y])" => ratio
+
+        # Find minimum ratio
+        eval[Spsv] "
+          begin(MR=inf;MP=-1);
+            CR=i[#$ratio,y];
+            if(i<=0&&CR<MR,
+                MR=CR;
+                MP=i[#$psv,y];
+              );
+          end(set('alpha',MR);set('minpos',MP))"
+        rm[Xpsv,ratio]
+        
+        # X = X + alpha*(S-X) (Do the scaling)
+        +sub[S] [X] mul. $alpha add[X,-1] =[X] 0,0,$minpos
+        
+        # Move indexes from passive to active where X[p_index] <= 0
+        eval[psv] "
+          begin(t=0);
+            p_index = i;
+            if(i[#$X,p_index]<=0,
+                copy(i[#$ind,1],i[#$ind,0],y+$act);
+                i[#$ind,0] = p_index;
+                t++;
+              );
+          end(set('act',$act+t))"
+        rm[psv,Spsv]
+      }
+      j[X] [S]
+    }
+    k[X]
+  } }
 
 #=============================================
 #************* FILE BROWSER ******************
