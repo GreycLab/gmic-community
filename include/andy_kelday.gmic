@@ -3006,6 +3006,83 @@ gcd_solve_kernel : skip ${3=1},${4=1} check ${"is_image_arg $1"}" && isint(${2=1
   fi
   rm[target]
 
+#@cli gcd_solve_nonnegative : [image]
+#@cli : Non-negative least squares using FNNLS algorithm.
+#@cli : Solve Ax = b : xi>0 for selected A matrix and specified b vector.
+#@cli : $ (7,0,5;5,7,7;9,3,10) (1;5;2) +gcd_solve_nonnegative.. .
+gcd_solve_nonnegative : check ${"is_image_arg $1"}
+  pass$1 0 => B
+  repeat $!-1 { l[$>,-1] {
+    M,N:=[h#0,w#0] act=$N best:=inf
+    # Active and passive indexes are held in a single vector: [ind]
+    1,$N,1,1 => X . => S . => W +f. y => ind
+    +transpose[0] . mmul.. [0] mmul. [B] =>.. AtA => AtB
+
+    for $act>0 {
+      # W = AtB - AtA*x (negative gradient)
+      j[W] [AtB] +mmul[AtA] [X] sub[W,-1]
+      1,$act,1,1,"i[#$W,i[#$ind,y]]" => Wact
+
+      # EXIT if most negative gradient hasn't improved
+      new:=iM
+      if $new<1e-6" || "$new>=$best rm[Wact] break fi
+      best=$new
+
+      # Move index of max Wact element from active to passive list
+      eval "
+        a_index = yM;
+        w_index = i[#$ind,a_index];
+        copy(i[#$ind,a_index],i[#$ind,a_index+1],$N-1-a_index);
+        i[#$ind,$N-1] = w_index;"
+      rm[Wact] act:=$act-1
+
+      # Enforce non-negative constraint
+      for 1 {
+        # Solve As = b for current passive set
+        part:=$N-$act
+        sh[ind] $act,100%,0,0 => psv # passive indexes
+        $part,$part,1,1,"i(#$AtA,i[#$psv,x],i[#$psv,y])" => Apsv
+        1,$part,1,1,"i[#$AtB,i[#$psv,y]]" => Bpsv
+        +solve[Bpsv] [Apsv] => Spsv
+
+        # Copy passive solution to S, set to zero for active variables
+        eval[S] "i[i[#$ind,y]]=y<$act?0:i[#$Spsv,y-$act]"
+        rm[Apsv,Bpsv]
+
+        # EXIT moving negatives if passive solution is all non-negative
+        if im>=0 rm[psv,Spsv] break fi
+
+        # Calculate possible scaling ratios
+        1,$part,1,1,"i[#$X,i[#$psv,y]]" => Xpsv
+        1,$part,1,1,"XP=i[#$Xpsv,y];XP/(XP-i[#$Spsv,y])" => ratio
+
+        # Find minimum ratio
+        eval[Spsv] "
+          begin(MR=inf);
+            MR=i>0?MR:min(MR,i[#$ratio,y]);
+          end(set('alpha',MR))"
+        rm[Xpsv,ratio]
+        
+        # X = X + alpha*(S-X) (Do the scaling)
+        +sub[S] [X] mul. $alpha add[X,-1]
+        
+        # Move indexes from passive to active where X[p_index] <= 0
+        eval[psv] "
+          begin(t=0);
+            p_index = i;
+            if(i[#$X,p_index]<=0,
+                copy(i[#$ind,1],i[#$ind,0],y+$act);
+                i[#$ind,0] = p_index;
+                t++;
+              );
+          end(set('act',$act+t))"
+        rm[psv,Spsv]
+      }
+      j[X] [S]
+    }
+    k[X]
+  } }
+
 #=============================================
 #************* FILE BROWSER ******************
 #=============================================
