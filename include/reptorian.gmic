@@ -48,6 +48,287 @@
 #
 #-------------------------------
 
+#@cli rep_nonexistent_colors_pal: number_of_new_colors, _appended_into_palette={ 0=do_not_append | 1=append into palette },_method={ 0=random | 1=farthest (slow) },0<_mask_factor[%]<=1,_cube_size>=7
+#@cli : Generates a palette of non-existent colors on each images. Either, appended onto the image, or as a new palette.
+#@cli : '_appended_into_palette=1','_method=0','_mask_factor=1','_cube_size=16'
+rep_nonexistent_colors_pal:
+skip ${2=1},${3=0},${4=1},${5=64}
+check "isint($1)&&$1>=1"
+
+number_of_new_colors,append_into_pal,cube_size=$1,$2,$5
+
+if isint($3) far_mode={$3&1}
+else
+ r,rand,random,aleatoria=0 far,farthest,distant,lejos=1
+ far_mode=$$3 if !narg($far_mode) error inval_arg fi
+fi
+
+if $far_mode
+
+ mask_factor={1-$4}
+ if !inrange($4,0,1,0,1)
+  error 0<\$\4<=1==F
+ fi
+
+ if !isint($cube_size)||!inrange($cube_size,7,256,1,1) 
+  error inv_inp_\$\5
+ fi
+ 
+ if $cube_size==256
+  initial_code=i(#-1,I)=1
+  xyz_code=[xM,yM,zM]
+  m "rep_nonexistent_colors_pal_insert_new_color: point 0,$""1,0,1,$""2,$""3,$""4"
+ else
+  d_cube_size={$cube_size-1}
+  initial_code=i(#-1,I*{$d_cube_size/255})=1
+  xyz_code=round([xM,yM,zM])
+  m "rep_nonexistent_colors_pal_insert_new_color: point 0,$""1,0,1,{round([$""2,$""3,$""4]*"{255/$d_cube_size}")}"
+ fi
+ 
+ if $mask_factor
+  m "rep_nonexistent_colors_pal_generate_pal:
+   current_number_of_colors=$""1
+   
+   if "$append_into_pal"
+    1,{"$number_of_new_colors"+$current_number_of_colors},1,1,y
+    map[-1] [-3]
+    rm[-3]
+   else
+    1,"$number_of_new_colors",1,{s#-2}
+    rm[-3]
+    current_number_of_colors=0
+   fi
+   
+   +fill[-2] :\"const max_coords="$d_cube_size";!i?(inrange(x,0,max_coords,0,0)&&inrange(y,0,max_coords,0,0)&&inrange(z,0,max_coords,0,0));\"
+   +inpaint_pde[-3] [-1],100%,0
+   remove[-2]
+   erode_circ. 2,1,1 blur. 2 +. 1 ^. "$mask_factor"
+   
+   repeat "$number_of_new_colors" {
+    +distance... 1,2 *. .. xyz:="$xyz_code" rm.
+    point... $xyz,1,1
+    rep_nonexistent_colors_pal_insert_new_color.. $current_number_of_colors,$xyz
+    current_number_of_colors+=1
+   }
+   
+   remove[-3,-1]
+   "
+ else
+  m "rep_nonexistent_colors_pal_generate_pal:
+   current_number_of_colors=$""1
+   
+   if "$append_into_pal"
+    1,{"$number_of_new_colors"+$current_number_of_colors},1,1,y
+    map[-1] [-3]
+    rm[-3]
+   else
+    1,"$number_of_new_colors",1,{s#-2} 
+    rm[-3]
+    current_number_of_colors=0
+   fi
+   
+   repeat "$number_of_new_colors" {
+    +distance.. 1,2 xyz:="$xyz_code" rm.
+    point.. $xyz,1,1
+    rep_nonexistent_colors_pal_insert_new_color. $current_number_of_colors,$xyz
+    current_number_of_colors+=1
+   }
+   
+   remove[-2]
+   "
+ fi
+ 
+fi
+
+foreach { # For each images
+
+ current_number_of_colors:=whd
+
+ if $far_mode
+ 
+  if s!=3 error inv_chans_num fi
+  
+  {vector3($cube_size)},1
+  eval[-2] $initial_code
+  rep_nonexistent_colors_pal_generate_pal $current_number_of_colors
+
+ else
+ 
+  if !inrange(1,6,1,1) 
+   error inv_chans_num
+  fi
+  
+  if $append_into_pal
+   1,{$number_of_new_colors+$current_number_of_colors},1,1,y 
+   map[-1] [-2] 
+   rm[-2]
+   1,1,1,100%
+  else
+   1,1,1,100%x2
+  fi
+
+  eval "  # Enter JIT compiler
+   const number_of_new_colors=$number_of_new_colors;
+   const number_of_channels=s#0;
+   const current_number_of_colors=$current_number_of_colors;
+   const append_into_pal=$append_into_pal;
+   const maximum_integer_value=256^number_of_channels;
+ 
+   bitshift_factors=expr('x?1<<(2+x)',number_of_channels);
+ 
+   convert_color2int(color_values)=sum(color_values<<bitshift_factors);
+   convert_int2color(value)=(value>>bitshift_factors)&0xff;
+  
+   min_pos_val=-1;
+   max_pos_val=inf;
+  
+   state_check=mode=0;
+   old_value=middle_pivot=pivot_value=-1;
+ 
+   repeat(current_number_of_colors,p,
+  
+    current_color=I[#0,p];
+    current_value=convert_color2int(current_color);
+   
+    mode==3?(
+   
+     state_check=0;
+   
+     current_value==min_pos_val||current_value==max_pos_val||current_value==pivot_value||current_value==old_value?(
+      continue();
+     ):(
+      old_value=current_value;
+     
+      current_value<min_pos_val?(
+       min_pos_val=current_value;
+       da_insert(#-1,0,current_color);
+      ):
+      current_value>max_pos_val?(
+       max_pos_val=current_value;
+       da_push(#-1,current_color);
+      ):
+      current_value>pivot_value?(
+       for(q=middle_pivot+1,q<da_size(#-1),++q,
+        test_value=convert_color2int(I[#-1,q]);
+        test_value>current_value?(
+         break();
+        ):
+        test_value==current_value?(
+         state_check=1;
+         break();
+        );
+       );
+       if(state_check
+       ,continue();
+       ,da_insert(#-1,q,current_color);
+       );
+      ):( # current_value<pivot_value
+      for(q=middle_pivot-1,q>0,--q,
+        test_value=convert_color2int(I[#-1,q]);
+        current_value>test_value?(
+         break();
+        ):
+        test_value==current_value?(
+         state_check=1;
+         break();
+        );
+       );
+       if(state_check
+       ,continue();
+       ,da_insert(#-1,q+1,current_color);
+       );
+      );
+      middle_pivot=da_size(#-1)>>1;
+      pivot_value=convert_color2int(I[#-1,middle_pivot]);
+     );
+    
+    ):
+    mode==2?(
+   
+     if(!state_check,
+      min_pos_val=convert_color2int(I[#-1,0]);
+      max_pos_val=convert_color2int(I[#-1,1]);
+      state_check=1;
+     );
+    
+     current_value==min_pos_val||current_value==max_pos_val?(
+      continue();
+     ):(
+      middle_pivot=1;
+      mode=3;
+      state_check=0;
+     
+      current_value<min_pos_val?(
+       pivot_value=min_pos_val;
+       min_pos_val=current_value;
+       da_insert(#-1,0,current_color);
+      ):
+      current_value<max_pos_val?(
+       pivot_value=current_value;
+       da_insert(#-1,1,current_color);
+      ):
+      current_value>max_pos_val?(
+       pivot_value=max_pos_val;
+       max_pos_val=current_value;
+       da_push(#-1,current_color);
+      );
+     );
+    
+    ):
+    mode?(
+   
+     current_value>old_value?(
+      da_push(#-1,current_color);
+      old_value=current_value;
+      mode=2;
+     ):
+     current_value<old_value?(
+      da_insert(#-1,0,current_color);
+      old_value=current_value;
+      mode=2;
+     );
+    
+    ):(
+   
+     da_push(#-1,current_color);
+     old_value=current_value;
+     mode=1;
+    
+    );
+   
+   );
+   
+   append_into_pal?(
+    insertion_pos=current_number_of_colors;
+    insert_new_color(color)=I[#-2,insertion_pos++]=color;
+   ):(
+    insert_new_color(color)=da_push(#-2,color);
+   );
+   
+   last_rn=inf;
+   q=0; # Inserted position
+   repeat(number_of_new_colors,
+    selec_u=int(u(0,maximum_integer_value-da_size(#-1),1,0));
+    for(q=(selec_u>=last_rn?++q),q<da_size(#-1),++q,
+     selec_u>=convert_color2int(I[#-1,q])?(
+      ++selec_u;
+     ):(break(););
+    );
+    new_color=convert_int2color(selec_u);
+    da_insert(#-1,q,new_color);
+    insert_new_color(new_color);
+    last_rn=selec_u;
+   );
+   
+   if(!append_into_pal,da_freeze(#-2););
+   "
+  
+  keep[{!$append_into_pal}]
+  
+ fi
+}
+
+um rep_nonexistent_colors_pal_insert_new_color,rep_nonexistent_colors_pal_generate_pal
 #@cli rep_van_neumann_condition_tiling: width,height,whole_number_count_starting_from_zero>=4
 #@cli : Generate random tiles which meets van neumann condition.
 +rep_van_neumann_condition_tiling:
@@ -88,12 +369,16 @@ ${1-2},1,1,>"begin(
 #@cli : Echo the data that represents the image.
 rep_echo_image_data:
 repeat $! {
-
- echo [gmic]./" "({$>,`"put_sep(s,_k) = (
-                      for (k = _k; p = find(s,_','), p>=0, p = find(s,_',',++p),
-                      s[p] = k%w?_',':k%wh?_';':k%whd?_'/':_'^'; ++k); s
-                    );
-                    s = v2s(crop(),-1); put_sep(s,1);"`}) # Code taken from print in G'MIC STDLIB
+ echo [gmic]./" "({0,`"put_sep(s,_k)=(
+                       for(k=_k;p=find(s,_','),p>=0,p = find(s,_',',++p),
+                         s[p]=k%w?_',':k%wh?_';':k%whd?_'/':_'^';
+                         ++k;
+                       );
+                       s;
+                     );
+                     s=v2s(crop(),-1); 
+                     put_sep(s,1);
+                     "`}) # Code taken from print in G'MIC STDLIB
 }
 #@cli rep_python_print_files_dir:
 #@cli : Print existing files in current directory.
