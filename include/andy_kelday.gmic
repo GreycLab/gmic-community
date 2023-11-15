@@ -3011,6 +3011,7 @@ gcd_solve_kernel : skip ${3=1},${4=1} check ${"is_image_arg $1"}" && isint(${2=1
 #@cli : Solve Ax = b : xi>0 for selected A matrix and specified b vector.
 #@cli : $ (7,0,5;5,7,7;9,3,10) (1;5;2) +gcd_solve_nonnegative.. .
 gcd_solve_nonnegative : check ${"is_image_arg $1"}
+  e[^-1] "Solve non-negative least squares for image$?."
   pass$1 0 => B
   repeat $!-1 { l[$>,-1] {
     M,N:=[h#0,w#0] act=$N best:=inf
@@ -3050,21 +3051,25 @@ gcd_solve_nonnegative : check ${"is_image_arg $1"}
         rm[Apsv,Bpsv]
 
         # EXIT moving negatives if passive solution is all non-negative
-        if im>=0 rm[psv,Spsv] break fi
+        if im>0 rm[psv,Spsv] break fi
 
         # Calculate possible scaling ratios
         1,$part,1,1,"i[#$X,i[#$psv,y]]" => Xpsv
-        1,$part,1,1,"XP=i[#$Xpsv,y];XP/(XP-i[#$Spsv,y])" => ratio
+        1,$part,1,1,"XP=i[#$Xpsv,y];XP==0?0:XP/(XP-i[#$Spsv,y])" => ratio
 
         # Find minimum ratio
         eval[Spsv] "
-          begin(MR=inf);
-            MR=i>0?MR:min(MR,i[#$ratio,y]);
-          end(set('alpha',MR))"
+          begin(MR=inf;MP=-1);
+            CR=i[#$ratio,y];
+            if(i<=0&&CR<MR,
+                MR=CR;
+                MP=i[#$psv,y];
+              );
+          end(set('alpha',MR);set('minpos',MP))"
         rm[Xpsv,ratio]
         
         # X = X + alpha*(S-X) (Do the scaling)
-        +sub[S] [X] mul. $alpha add[X,-1]
+        +sub[S] [X] mul. $alpha add[X,-1] =[X] 0,0,$minpos
         
         # Move indexes from passive to active where X[p_index] <= 0
         eval[psv] "
