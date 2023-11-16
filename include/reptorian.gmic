@@ -4492,6 +4492,8 @@ eval "
  idx;"
 #@cli rep_r_combinations: number_of_items>0,choices>0,_axis={x,y,z}
 #@cli : Create image representing combinations given number of items and choices with repeating numbers. Empty item is a item by itself.
+#@cli : Code to find combinations given index is taken from Joseph Wood at codereview.stackexchange - https://codereview.stackexchange.com/questions/285415/find-the-list-of-combination-with-repetition-given-rank-and-number-of-items/287944#287944
+#@cli : Author : Reptorian.
 +rep_r_combinations:
 skip ${3=x}
 
@@ -4505,7 +4507,9 @@ elif $axis==1 out_dim=1,$num_combs,1
 else          out_dim=$num_combs,1,1
 fi
 
-$out_dim,$choices,>"
+if $num_combs>131072 mode=: fi
+
+$out_dim,$choices,$mode"
  begin(
   const n_items=$n_items;
   const max_ind=s-1;
@@ -4514,9 +4518,10 @@ $out_dim,$choices,>"
   axis==1?(index()=y;):
            index()=x;
   comb=vector(#s,0);
-  val=0;
+  started=0;
+  
  );
- if(index(),
+ started?(
   if(++comb[max_ind]==n_items,
    for(p=max_ind-1,p>-1,--p,
     if(++comb[p]<n_items,
@@ -4525,6 +4530,29 @@ $out_dim,$choices,>"
    );
    copy(comb[p+1],comb[p],max_ind-p,1,0);
   );
+ ):(
+  index()?(
+   m_items=n_items;
+   m_choices=$choices;
+   m_index=index();
+   temp=permut(m_choices-1,m_items+m_choices-2,0);
+   --m_choices;
+   item_choice=0;
+   repeat($choices,k,
+    while(temp<=m_index,
+     m_index-=temp;
+     temp*=m_items-1;
+     temp=int(temp/(m_items+m_choices-1));
+     --m_items;
+     ++item_choice;
+    );
+    temp*=m_choices;
+    if((m_items+m_choices)>2,temp=int(temp/(m_items+m_choices-1)););
+    comb[k]=item_choice;
+    --m_choices;
+   );
+  );
+  started=1;
  );
  comb;"
 #@cli rep_r_combination_index2list: n,k,index
