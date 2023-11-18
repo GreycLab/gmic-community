@@ -4723,7 +4723,7 @@ eval "
   tv=mul_items[dec_half_list_size-p]*=tv;
  );
  sum(mul_items*position);"
-#@cli rep_string_permutations: string,_axis,_sort_string={ 0=do_not_sort_string | 1=sort_string }
+#@cli rep_string_permutations: string,_axis,_sort_string={ 0=do_not_sort_string | 1=sort_string | 2=logical_sort_string }
 #@cli : Return all the unique permutations of characters of string as a image with values representing the unicode representation of characters in input string. Permutations is dependent on character appearance order.
 #@cli :
 #@cli : Algorithm is based on the implementation of Narayana Pandita's algorithm by PM 2Ring at stackoverflow.
@@ -4738,10 +4738,24 @@ check "inrange(_'$2',_'x',_'z',1,1)"
 1,1,1,2
 
 eval "
- const bool_sort_string=$3;
+ const sort_string=$3%3;
  reference_information='$1';
-
- if(bool_sort_string,reference_information=sort(reference_information););
+ 
+ sort_string==2?(
+  const str_size=size(reference_information);
+  sort_indexes=[242,243,0,1,2,3,4,26,27,244,245,84,56,246,5,6,7,8,51,52,53,54,55,247,248,249,250,251,252,253,254,18,96,70,89,99,17,85,74,88,62,63,77,80,90,81,91,92,108,109,110,111,112,113,114,115,116,117,94,95,64,83,65,73,97,119,127,128,130,132,137,138,139,140,145,146,147,148,149,151,158,159,160,161,163,165,170,171,172,173,175,58,93,59,76,57,86,176,184,185,187,188,193,194,195,196,201,202,203,204,205,207,215,216,217,218,220,222,227,228,229,230,233,60,75,61,69,255,107,28,162,29,30,31,32,34,35,24,36,37,38,40,41,42,39,43,44,48,33,45,46,47,49,50,9,10,11,12,13,14,238,71,19,21,22,20,239,25,118,15,237,66,68,240,16,100,98,82,105,106,87,23,241,234,235,104,236,67,101,102,103,72,120,121,122,123,124,125,126,129,133,134,135,136,141,142,143,144,131,150,152,153,154,155,156,78,157,166,167,168,169,174,164,219,177,178,179,180,181,182,183,186,189,190,191,192,197,198,199,200,213,206,208,209,210,211,212,79,214,223,224,225,226,231,221,232];
+  sort_reference=resize(reference_information,str_size<<1,1,0);
+  repeat(str_size,ind,
+   pos=ind<<1;
+   current_char=sort_reference[pos];
+   sort_reference[pos]=sort_indexes[current_char];
+  );
+  sort_reference=sort(sort_reference,1,str_size,2);
+  reference_information=(sort_reference)[1,str_size,2];
+ ):
+ sort_string==1?(
+  reference_information=sort(reference_information);
+ );
 
  char_position=vector(#256,-1); # Enable O(1) index retrieval as G'MIC lack Python-like dictionary.
 
@@ -4808,17 +4822,37 @@ $out_dim,$size_of_string,>"begin(
 channels[-2] 0
 map[-1] [-2]
 remove[-2]
-#@cli rep_string_permutation_index2str: reference_string,index,_sort_reference_string={ 0=do_not_sort_string | 1=sort_string }
+#@cli rep_string_permutation_index2str: reference_string,index,_sort_string={ 0=do_not_sort_string | 1=sort_string | 2=logical_sort_string }
 #@cli Return the string which is of the lexicographic index given reference string. The index is based on character appearance order unless sorting is activated. This is the first time an algorithm has been made to address this.
 #@cli : Author : Reptorian.
+#@cli : Default values: '_sort_string=0'
 rep_string_permutation_index2str:
-check "isint($2)"
+check "isint($2)&&isint($3)"
 skip ${3=0}
 
+sort_string={$3%3}
+
 if !$2
- if $3 status {`sort('$1')`} return
- else status $1 return
+ if $sort_string==2
+  status {`"
+   target_string='$1';
+   const str_size=size(target_string);
+   sort_indexes=[242,243,0,1,2,3,4,26,27,244,245,84,56,246,5,6,7,8,51,52,53,54,55,247,248,249,250,251,252,253,254,18,96,70,89,99,17,85,74,88,62,63,77,80,90,81,91,92,108,109,110,111,112,113,114,115,116,117,94,95,64,83,65,73,97,119,127,128,130,132,137,138,139,140,145,146,147,148,149,151,158,159,160,161,163,165,170,171,172,173,175,58,93,59,76,57,86,176,184,185,187,188,193,194,195,196,201,202,203,204,205,207,215,216,217,218,220,222,227,228,229,230,233,60,75,61,69,255,107,28,162,29,30,31,32,34,35,24,36,37,38,40,41,42,39,43,44,48,33,45,46,47,49,50,9,10,11,12,13,14,238,71,19,21,22,20,239,25,118,15,237,66,68,240,16,100,98,82,105,106,87,23,241,234,235,104,236,67,101,102,103,72,120,121,122,123,124,125,126,129,133,134,135,136,141,142,143,144,131,150,152,153,154,155,156,78,157,166,167,168,169,174,164,219,177,178,179,180,181,182,183,186,189,190,191,192,197,198,199,200,213,206,208,209,210,211,212,79,214,223,224,225,226,231,221,232];
+   sort_reference=resize(target_string,str_size<<1,1,0);
+   repeat(str_size,ind,
+    pos=ind<<1;
+    current_char=sort_reference[pos];
+    sort_reference[pos]=sort_indexes[current_char];
+   );
+   sort_reference=sort(sort_reference,1,str_size,2);
+   (sort_reference)[1,str_size,2];
+  "`}
+ elif $sort_string==1
+  status {`sort('$1')`}
+ else 
+  status $1
  fi
+ return
 fi
 
 1,1,1,1x3
@@ -4826,9 +4860,23 @@ fi
 eval "
  values_of_chars_in_string='$1';
  const size_of_info=size(values_of_chars_in_string);
- const bool_sort_string=$3;
-
- if(bool_sort_string,values_of_chars_in_string=sort(values_of_chars_in_string););
+ const sort_string=$sort_string;
+ 
+ sort_string==2?(
+  const str_size=size(values_of_chars_in_string);
+  sort_indexes=[242,243,0,1,2,3,4,26,27,244,245,84,56,246,5,6,7,8,51,52,53,54,55,247,248,249,250,251,252,253,254,18,96,70,89,99,17,85,74,88,62,63,77,80,90,81,91,92,108,109,110,111,112,113,114,115,116,117,94,95,64,83,65,73,97,119,127,128,130,132,137,138,139,140,145,146,147,148,149,151,158,159,160,161,163,165,170,171,172,173,175,58,93,59,76,57,86,176,184,185,187,188,193,194,195,196,201,202,203,204,205,207,215,216,217,218,220,222,227,228,229,230,233,60,75,61,69,255,107,28,162,29,30,31,32,34,35,24,36,37,38,40,41,42,39,43,44,48,33,45,46,47,49,50,9,10,11,12,13,14,238,71,19,21,22,20,239,25,118,15,237,66,68,240,16,100,98,82,105,106,87,23,241,234,235,104,236,67,101,102,103,72,120,121,122,123,124,125,126,129,133,134,135,136,141,142,143,144,131,150,152,153,154,155,156,78,157,166,167,168,169,174,164,219,177,178,179,180,181,182,183,186,189,190,191,192,197,198,199,200,213,206,208,209,210,211,212,79,214,223,224,225,226,231,221,232];
+  sort_reference=resize(values_of_chars_in_string,str_size<<1,1,0);
+  repeat(str_size,ind,
+   pos=ind<<1;
+   current_char=sort_reference[pos];
+   sort_reference[pos]=sort_indexes[current_char];
+  );
+  sort_reference=sort(sort_reference,1,str_size,2);
+  values_of_chars_in_string=(sort_reference)[1,str_size,2];
+ ):
+ sort_string==1?(
+  values_of_chars_in_string=sort(values_of_chars_in_string);
+ );
 
  char_position=vector(#256,-1); # Enable O(1) index retrieval as G'MIC lack Python-like dictionary.
 
@@ -4857,7 +4905,7 @@ eval "
  index=$2%level_length;
  max_index=level_length-1;
 
- if(!bool_sort_string,values_of_chars_in_string=sort(values_of_chars_in_string););
+ if(!sort_string,values_of_chars_in_string=sort(values_of_chars_in_string););
 
  !index?(
   values_of_chars_in_string;
@@ -4903,7 +4951,7 @@ eval "
  "
 
 status {`map([${}],crop(#-1))`} remove[-3--1]
-#@cli rep_string_permutation_str2index: test_string : reference_string,test_string,_sort_reference_string={ 0=do_not_sort_string | 1=sort_string }
+#@cli rep_string_permutation_str2index: test_string : reference_string,test_string,_sort_reference_string={ 0=do_not_sort_string | 1=sort_string | 2=logical_sort_string }
 #@cli : Return the lexicographic rank in which the permutation of string is found. The rank is based on character appearance order. If you provide only one argument, then rank is dependent on alphabetical order.
 #@cli :
 #@cli : Algorithm to find the lexicographic rank of string has been made by egoista of GeeksForGeeks and source code can be found here - https://www.geeksforgeeks.org/lexicographic-rank-string-duplicate-characters/
@@ -4916,18 +4964,32 @@ skip "${2=}",${3=0}
 
 eval "
  reference_information='$1';
- const size_of_info=size(reference_information);
+ const size_ref_str=size(reference_information);
  const contain_arg_2=narg($2);
 
  contain_arg_2?(
-  const bool_sort_string=$3;
-  reference_information='$1';
   test_string='$2';
-  if(size(reference_information)!=size(test_string),run('error diff_str_dims'););
-  if(bool_sort_string,reference_information=sort(reference_information););
+  const sort_string=$3%3;
+  
+  if(size(test_string)!=size_ref_str,run('error diff_str_dims'););
+  
+  sort_string==2?(
+   sort_indexes=[242,243,0,1,2,3,4,26,27,244,245,84,56,246,5,6,7,8,51,52,53,54,55,247,248,249,250,251,252,253,254,18,96,70,89,99,17,85,74,88,62,63,77,80,90,81,91,92,108,109,110,111,112,113,114,115,116,117,94,95,64,83,65,73,97,119,127,128,130,132,137,138,139,140,145,146,147,148,149,151,158,159,160,161,163,165,170,171,172,173,175,58,93,59,76,57,86,176,184,185,187,188,193,194,195,196,201,202,203,204,205,207,215,216,217,218,220,222,227,228,229,230,233,60,75,61,69,255,107,28,162,29,30,31,32,34,35,24,36,37,38,40,41,42,39,43,44,48,33,45,46,47,49,50,9,10,11,12,13,14,238,71,19,21,22,20,239,25,118,15,237,66,68,240,16,100,98,82,105,106,87,23,241,234,235,104,236,67,101,102,103,72,120,121,122,123,124,125,126,129,133,134,135,136,141,142,143,144,131,150,152,153,154,155,156,78,157,166,167,168,169,174,164,219,177,178,179,180,181,182,183,186,189,190,191,192,197,198,199,200,213,206,208,209,210,211,212,79,214,223,224,225,226,231,221,232];
+   sort_reference=resize(reference_information,size_ref_str<<1,1,0);
+   repeat(size_ref_str,ind,
+    pos=ind<<1;
+    current_char=sort_reference[pos];
+    sort_reference[pos]=sort_indexes[current_char];
+   );
+   sort_reference=sort(sort_reference,1,size_ref_str,2);
+   reference_information=(sort_reference)[1,size_ref_str,2];
+  ):
+  sort_string==1?(
+   reference_information=sort(reference_information);
+  );
  ):(
   test_string='$1';
-  reference_information=sort(test_string);
+  reference_information=sort(reference_information);
  );
 
  test_string==reference_information?(
@@ -4936,7 +4998,7 @@ eval "
   char_position=vector(#256,-1); # Enable O(1) index retrieval as G'MIC lack Python-like dictionary.
 
   ind=0;
-  repeat(size_of_info,char_ind,
+  repeat(size_ref_str,char_ind,
    char=reference_information[char_ind];
    char_position[char]>-1?(
     ++i[#-1,char_position[char]];
@@ -4952,7 +5014,7 @@ eval "
     dividier*=fact(i[#-1,ind]);
    );
 
-   fact(size_of_info)/dividier-1;
+   fact(size_ref_str)/dividier-1;
   ):(
 
    fill(test_string,char_ind,
@@ -4964,15 +5026,15 @@ eval "
 
    str_index=0;
 
-   repeat(size_of_info,ind,
+   repeat(size_ref_str,ind,
     count_of_less_index_value=0;
 
-    for(alt_ind=ind+1,alt_ind<size_of_info,++alt_ind,
+    for(alt_ind=ind+1,alt_ind<size_ref_str,++alt_ind,
      if(test_string[ind]>test_string[alt_ind],++count_of_less_index_value;);
     );
 
     if(count_of_less_index_value,
-     for(alt_ind=ind,alt_ind<size_of_info,++alt_ind,++i[#-1,test_string[alt_ind]];);
+     for(alt_ind=ind,alt_ind<size_ref_str,++alt_ind,++i[#-1,test_string[alt_ind]];);
 
      dividier_factorial=1;
      repeat(da_size(#-1),element,
@@ -4980,7 +5042,7 @@ eval "
       i[#-1,element]=0;
      );
 
-     str_index+=(fact(size_of_info-ind-1)*count_of_less_index_value)/dividier_factorial;
+     str_index+=(fact(size_ref_str-ind-1)*count_of_less_index_value)/dividier_factorial;
     );
 
    );
@@ -4988,8 +5050,8 @@ eval "
    str_index;
   );
 
- );
- "
+ );"
+ 
 remove[-1]
 #@cli rep_inverse_permutation: number_list
 #@cli : Return the inverse permutation.
