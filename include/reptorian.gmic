@@ -48,6 +48,101 @@
 #
 #-------------------------------
 
+#@cli utf8str2vint: string
+#@cli : Return vector of integer representation of UTF-8 string.
+utf8str2vint:
+
+eval "
+ str='$1';
+ const size_str=size(str);
+ num_set=vector(#size_str,0);
+ pos=num_of_chars_analyzed=0;
+ while(pos!=size_str,
+  current_binary=str[pos]>>4;
+  !current_binary?(
+   ++pos;
+   num_set[num_of_chars_analyzed]=1;
+  ):
+  current_binary<=13?(
+   pos+=2;
+   num_set[num_of_chars_analyzed]=2;
+  ):
+  current_binary==14?(
+   pos+=3;
+   num_set[num_of_chars_analyzed]=3;
+  ):
+  current_binary==15?(
+   pos+=4;
+   num_set[num_of_chars_analyzed]=4;
+  );
+  ++num_of_chars_analyzed;
+ );
+ 
+ const N=0xff;
+ const M=N>>2;
+ 
+ pos=0;
+ repeat(num_of_chars_analyzed,k,
+  size_of_ints_per_char=num_set[k];
+  
+  size_of_ints_per_char==4?(
+   num_set[k]=(str[pos]&(N>>5))<<18|(str[pos+1]&M)<<12|(str[pos+2]&M)<<6|(str[pos+3]&M);
+  ):
+  size_of_ints_per_char==3?(
+   num_set[k]=(str[pos]&(N>>4))<<12|(str[pos+1]&M)<<6|(str[pos+2]&M);
+  ):
+  size_of_ints_per_char==2?(
+   num_set[k]=(str[pos]&(N>>3))<<6|(str[pos+1]&M);
+  ):(
+   num_set[k]=str[pos];
+  );
+  
+  pos+=size_of_ints_per_char;
+ );
+
+ set('num_of_chars',num_of_chars_analyzed);
+ num_set;
+ "
+
+status {([${}])[0,$num_of_chars]}
+#@cli vint2utf8str: int_a>=0,...
+#@cli : Return corresponding integer(s) representation of UTF-8 as a string.
+vint2utf8str:
+eval "
+ list_of_ints=[$*];
+ const list_size=size(list_of_ints);
+ const init_size=list_size<<2;
+ new_list=vector(#init_size,0);
+ final_size=0;
+ const M=1<<7; # 10xxxxxx . The starting number in binary is 10000000. x will be replaced by corresponding numbers associated with integer representation.
+ const N=0xff; # Base for the mathematics involving decoding.
+ const S=N>>2; # Used to select binary numbers to insert into x section of 10xxxxxx.
+ const X1=xor(N,S);    #110xxxxx.
+ const X2=xor(N,S>>1); #1110xxxx.
+ const X3=xor(N,S>>2); #11110xxx.
+ repeat(list_size,k,
+  cv=list_of_ints[k];
+  cv>0x10000?(LS=3;XC=X3;): # LS is shorthand for loops, which will be used to aid into inserting values into x series. 
+  cv>0x800?(  LS=2;XC=X2;):
+  cv>0x80?(   LS=1;XC=X1;):
+  (           LS=0;
+  );
+  LS?(
+   for(ind=final_size+LS,ind>final_size,--ind,
+    new_list[ind]=M|(cv&S);
+    cv>>=6;
+   );
+   new_list[final_size]=XC|cv;
+  ):(
+   new_list[final_size]=cv;
+  );
+  final_size+=LS+1;
+ );
+ set('final_size',final_size);
+ new_list;
+ "
+
+status {`([${}])[0,$final_size]`}
 #@cli rep_nonexistent_colors_pal: number_of_new_colors, _appended_into_palette={ 0=do_not_append | 1=append into palette },_method={ 0=random | 1=farthest (slow) },0<_mask_factor[%]<=1,_cube_size>=7
 #@cli : Generates a palette of non-existent colors on each images. Either, appended onto the image, or as a new palette.
 #@cli : '_appended_into_palette=1','_method=0','_mask_factor=1','_cube_size=16'
