@@ -48,6 +48,121 @@
 #
 #-------------------------------
 
+#@cli utf8str2vint: string
+#@cli : Return vector of integer representation of UTF-8 string.
+#@cli : Author : Reptorian.
+utf8str2vint:
+skip "${1=}"
+if !$# status "" return fi
+
+eval "
+ str='$1';
+ const size_str=size(str);
+ num_set=vector(#size_str,0);
+
+ pos=num_of_chars=0;
+ while(pos<size_str,
+  current_binary=str[pos]>>4; # Extract first 4 bits of first byte. pos is used to select and extract the relevant numbers.
+
+  current_binary<8?(
+   ++pos;
+   num_set[num_of_chars]=1;
+  ):
+  current_binary<=13?(
+   pos+=2;
+   num_set[num_of_chars]=2;
+  ):
+  current_binary==14?(
+   pos+=3;
+   num_set[num_of_chars]=3;
+  ):
+  current_binary==15?(
+   pos+=4;
+   num_set[num_of_chars]=4;
+  );
+
+  ++num_of_chars;
+ );
+
+ if(pos!=size_str,run('error not_a_UTF-8_string!'););
+ 
+ const N=0xff; # Base for the mathematics involving encoding or decoding UTF-8 strings.
+ const M=N>>2; # Used to select binary numbers within x section of 10xxxxxx.
+
+ pos=0;
+ repeat(num_of_chars,k,  # This loop is responsible for convert multiple integer representation into the index.
+  size_of_ints_per_char=num_set[k];
+
+  size_of_ints_per_char==4?(
+   num_set[k]=(str[pos]&(N>>5))<<18|(str[pos+1]&M)<<12|(str[pos+2]&M)<<6|(str[pos+3]&M);
+  ):
+  size_of_ints_per_char==3?(
+   num_set[k]=(str[pos]&(N>>4))<<12|(str[pos+1]&M)<<6|(str[pos+2]&M);
+  ):
+  size_of_ints_per_char==2?(
+   num_set[k]=(str[pos]&(N>>3))<<6|(str[pos+1]&M);
+  ):(
+   num_set[k]=str[pos];
+  );
+
+  pos+=size_of_ints_per_char;
+ );
+
+ set('num_of_chars',num_of_chars);
+ num_set;
+ "
+
+status {([${}])[0,$num_of_chars]}
+#@cli vint2utf8str: int_a>=0,...
+#@cli : Return corresponding integer(s) representation of UTF-8 as a string.
+#@cli : Author : Reptorian.
+vint2utf8str:
+skip "${1=}"
+if !$# status "" return fi
+
+eval "
+ list_of_ints=[$*];
+ if(min(list_of_ints)<0||max(list_of_ints)>0x10ffff,run('error range_exc'););
+
+ const list_size=size(list_of_ints);
+ const init_size=list_size<<2;
+
+ new_list=vector(#init_size,0);
+
+ const M=1<<7; # 10xxxxxx . The starting number in binary is 10000000. x will be replaced by corresponding numbers associated with integer representation.
+ const N=0xff; # Base for the mathematics involving encoding or decoding UTF-8 strings.
+ const S=N>>2; # Used to select binary numbers to insert into x section of 10xxxxxx.
+ const X1=xor(N,S);    #110xxxxx.
+ const X2=xor(N,S>>1); #1110xxxx.
+ const X3=xor(N,S>>2); #11110xxx.
+
+ final_size=0;
+ repeat(list_size,k,
+  cv=list_of_ints[k];
+
+  cv>0x10000?(LS=3;XC=X3;): # LS is shorthand for loops, which will be used to aid into inserting values into x series.
+  cv>0x800?(  LS=2;XC=X2;):
+  cv>0x80?(   LS=1;XC=X1;):
+  (           LS=0;      );
+
+  LS?(
+   for(ind=final_size+LS,ind>final_size,--ind,
+    new_list[ind]=M|(cv&S);
+    cv>>=6;
+   );
+   new_list[final_size]=XC|cv;
+  ):(
+   new_list[final_size]=cv;
+  );
+
+  final_size+=LS+1;
+ );
+
+ set('final_size',final_size);
+ new_list;
+ "
+
+status {`([${}])[0,$final_size]`}
 #@cli rep_nonexistent_colors_pal: number_of_new_colors, _appended_into_palette={ 0=do_not_append | 1=append into palette },_method={ 0=random | 1=farthest (slow) },0<_mask_factor[%]<=1,_cube_size>=7
 #@cli : Generates a palette of non-existent colors on each images. Either, appended onto the image, or as a new palette.
 #@cli : '_appended_into_palette=1','_method=0','_mask_factor=1','_cube_size=16'
@@ -70,10 +185,10 @@ if $far_mode
   error 0<\$\4<=1==F
  fi
 
- if !isint($cube_size)||!inrange($cube_size,7,256,1,1) 
+ if !isint($cube_size)||!inrange($cube_size,7,256,1,1)
   error inv_inp_\$\5
  fi
- 
+
  if $cube_size==256
   initial_code=i(#-1,I)=1
   xyz_code=[xM,yM,zM]
@@ -84,11 +199,11 @@ if $far_mode
   xyz_code=round([xM,yM,zM])
   m "rep_nonexistent_colors_pal_insert_new_color: point 0,$""1,0,1,{round([$""2,$""3,$""4]*"{255/$d_cube_size}")}"
  fi
- 
+
  if $mask_factor
   m "rep_nonexistent_colors_pal_generate_pal:
    current_number_of_colors=$""1
-   
+
    if "$append_into_pal"
     1,{"$number_of_new_colors"+$current_number_of_colors},1,1,y
     map[-1] [-3]
@@ -98,46 +213,46 @@ if $far_mode
     rm[-3]
     current_number_of_colors=0
    fi
-   
+
    +fill[-2] :\"const max_coords="$d_cube_size";!i?(inrange(x,0,max_coords,0,0)&&inrange(y,0,max_coords,0,0)&&inrange(z,0,max_coords,0,0));\"
    +inpaint_pde[-3] [-1],100%,0
    remove[-2]
    erode_circ. 2,1,1 blur. 2 +. 1 ^. "$mask_factor"
-   
+
    repeat "$number_of_new_colors" {
     +distance... 1,2 *. .. xyz:="$xyz_code" rm.
     point... $xyz,1,1
     rep_nonexistent_colors_pal_insert_new_color.. $current_number_of_colors,$xyz
     current_number_of_colors+=1
    }
-   
+
    remove[-3,-1]
    "
  else
   m "rep_nonexistent_colors_pal_generate_pal:
    current_number_of_colors=$""1
-   
+
    if "$append_into_pal"
     1,{"$number_of_new_colors"+$current_number_of_colors},1,1,y
     map[-1] [-3]
     rm[-3]
    else
-    1,"$number_of_new_colors",1,{s#-2} 
+    1,"$number_of_new_colors",1,{s#-2}
     rm[-3]
     current_number_of_colors=0
    fi
-   
+
    repeat "$number_of_new_colors" {
     +distance.. 1,2 xyz:="$xyz_code" rm.
     point.. $xyz,1,1
     rep_nonexistent_colors_pal_insert_new_color. $current_number_of_colors,$xyz
     current_number_of_colors+=1
    }
-   
+
    remove[-2]
    "
  fi
- 
+
 fi
 
 foreach { # For each images
@@ -145,22 +260,22 @@ foreach { # For each images
  current_number_of_colors:=whd
 
  if $far_mode
- 
+
   if s!=3 error inv_chans_num fi
-  
+
   {vector3($cube_size)},1
   eval[-2] $initial_code
   rep_nonexistent_colors_pal_generate_pal $current_number_of_colors
 
  else
- 
-  if !inrange(1,6,1,1) 
+
+  if !inrange(1,6,1,1)
    error inv_chans_num
   fi
-  
+
   if $append_into_pal
-   1,{$number_of_new_colors+$current_number_of_colors},1,1,y 
-   map[-1] [-2] 
+   1,{$number_of_new_colors+$current_number_of_colors},1,1,y
+   map[-1] [-2]
    rm[-2]
    1,1,1,100%
   else
@@ -173,32 +288,32 @@ foreach { # For each images
    const current_number_of_colors=$current_number_of_colors;
    const append_into_pal=$append_into_pal;
    const maximum_integer_value=256^number_of_channels;
- 
+
    bitshift_factors=expr('x?1<<(2+x)',number_of_channels);
- 
+
    convert_color2int(color_values)=sum(color_values<<bitshift_factors);
    convert_int2color(value)=(value>>bitshift_factors)&0xff;
-  
+
    min_pos_val=-1;
    max_pos_val=inf;
-  
+
    state_check=mode=0;
    old_value=middle_pivot=pivot_value=-1;
- 
+
    repeat(current_number_of_colors,p,
-  
+
     current_color=I[#0,p];
     current_value=convert_color2int(current_color);
-   
+
     mode==3?(
-   
+
      state_check=0;
-   
+
      current_value==min_pos_val||current_value==max_pos_val||current_value==pivot_value||current_value==old_value?(
       continue();
      ):(
       old_value=current_value;
-     
+
       current_value<min_pos_val?(
        min_pos_val=current_value;
        da_insert(#-1,0,current_color);
@@ -241,23 +356,23 @@ foreach { # For each images
       middle_pivot=da_size(#-1)>>1;
       pivot_value=convert_color2int(I[#-1,middle_pivot]);
      );
-    
+
     ):
     mode==2?(
-   
+
      if(!state_check,
       min_pos_val=convert_color2int(I[#-1,0]);
       max_pos_val=convert_color2int(I[#-1,1]);
       state_check=1;
      );
-    
+
      current_value==min_pos_val||current_value==max_pos_val?(
       continue();
      ):(
       middle_pivot=1;
       mode=3;
       state_check=0;
-     
+
       current_value<min_pos_val?(
        pivot_value=min_pos_val;
        min_pos_val=current_value;
@@ -273,10 +388,10 @@ foreach { # For each images
        da_push(#-1,current_color);
       );
      );
-    
+
     ):
     mode?(
-   
+
      current_value>old_value?(
       da_push(#-1,current_color);
       old_value=current_value;
@@ -287,24 +402,24 @@ foreach { # For each images
       old_value=current_value;
       mode=2;
      );
-    
+
     ):(
-   
+
      da_push(#-1,current_color);
      old_value=current_value;
      mode=1;
-    
+
     );
-   
+
    );
-   
+
    append_into_pal?(
     insertion_pos=current_number_of_colors;
     insert_new_color(color)=I[#-2,insertion_pos++]=color;
    ):(
     insert_new_color(color)=da_push(#-2,color);
    );
-   
+
    last_rn=inf;
    q=0; # Inserted position
    repeat(number_of_new_colors,
@@ -319,12 +434,12 @@ foreach { # For each images
     insert_new_color(new_color);
     last_rn=selec_u;
    );
-   
+
    if(!append_into_pal,da_freeze(#-2););
    "
-  
+
   keep[{!$append_into_pal}]
-  
+
  fi
 }
 
@@ -376,7 +491,7 @@ repeat $! {
                        );
                        s;
                      );
-                     s=v2s(crop(),-1); 
+                     s=v2s(crop(),-1);
                      put_sep(s,1);
                      "`}) # Code taken from print in G'MIC STDLIB
 }
@@ -4740,7 +4855,7 @@ check "inrange(_'$2',_'x',_'z',1,1)"
 eval "
  const sort_string=$3%3;
  reference_information='$1';
- 
+
  sort_string==2?(
   const str_size=size(reference_information);
   sort_indexes=[242,243,0,1,2,3,4,26,27,244,245,84,56,246,5,6,7,8,51,52,53,54,55,247,248,249,250,251,252,253,254,18,96,70,89,99,17,85,74,88,62,63,77,80,90,81,91,92,108,109,110,111,112,113,114,115,116,117,94,95,64,83,65,73,97,119,127,128,130,132,137,138,139,140,145,146,147,148,149,151,158,159,160,161,163,165,170,171,172,173,175,58,93,59,76,57,86,176,184,185,187,188,193,194,195,196,201,202,203,204,205,207,215,216,217,218,220,222,227,228,229,230,233,60,75,61,69,255,107,28,162,29,30,31,32,34,35,24,36,37,38,40,41,42,39,43,44,48,33,45,46,47,49,50,9,10,11,12,13,14,238,71,19,21,22,20,239,25,118,15,237,66,68,240,16,100,98,82,105,106,87,23,241,234,235,104,236,67,101,102,103,72,120,121,122,123,124,125,126,129,133,134,135,136,141,142,143,144,131,150,152,153,154,155,156,78,157,166,167,168,169,174,164,219,177,178,179,180,181,182,183,186,189,190,191,192,197,198,199,200,213,206,208,209,210,211,212,79,214,223,224,225,226,231,221,232];
@@ -4849,7 +4964,7 @@ if !$2
   "`}
  elif $sort_string==1
   status {`sort('$1')`}
- else 
+ else
   status $1
  fi
  return
@@ -4861,7 +4976,7 @@ eval "
  values_of_chars_in_string='$1';
  const size_of_info=size(values_of_chars_in_string);
  const sort_string=$sort_string;
- 
+
  sort_string==2?(
   const str_size=size(values_of_chars_in_string);
   sort_indexes=[242,243,0,1,2,3,4,26,27,244,245,84,56,246,5,6,7,8,51,52,53,54,55,247,248,249,250,251,252,253,254,18,96,70,89,99,17,85,74,88,62,63,77,80,90,81,91,92,108,109,110,111,112,113,114,115,116,117,94,95,64,83,65,73,97,119,127,128,130,132,137,138,139,140,145,146,147,148,149,151,158,159,160,161,163,165,170,171,172,173,175,58,93,59,76,57,86,176,184,185,187,188,193,194,195,196,201,202,203,204,205,207,215,216,217,218,220,222,227,228,229,230,233,60,75,61,69,255,107,28,162,29,30,31,32,34,35,24,36,37,38,40,41,42,39,43,44,48,33,45,46,47,49,50,9,10,11,12,13,14,238,71,19,21,22,20,239,25,118,15,237,66,68,240,16,100,98,82,105,106,87,23,241,234,235,104,236,67,101,102,103,72,120,121,122,123,124,125,126,129,133,134,135,136,141,142,143,144,131,150,152,153,154,155,156,78,157,166,167,168,169,174,164,219,177,178,179,180,181,182,183,186,189,190,191,192,197,198,199,200,213,206,208,209,210,211,212,79,214,223,224,225,226,231,221,232];
@@ -4970,9 +5085,9 @@ eval "
  contain_arg_2?(
   test_string='$2';
   const sort_string=$3%3;
-  
+
   if(size(test_string)!=size_ref_str,run('error diff_str_dims'););
-  
+
   sort_string==2?(
    sort_indexes=[242,243,0,1,2,3,4,26,27,244,245,84,56,246,5,6,7,8,51,52,53,54,55,247,248,249,250,251,252,253,254,18,96,70,89,99,17,85,74,88,62,63,77,80,90,81,91,92,108,109,110,111,112,113,114,115,116,117,94,95,64,83,65,73,97,119,127,128,130,132,137,138,139,140,145,146,147,148,149,151,158,159,160,161,163,165,170,171,172,173,175,58,93,59,76,57,86,176,184,185,187,188,193,194,195,196,201,202,203,204,205,207,215,216,217,218,220,222,227,228,229,230,233,60,75,61,69,255,107,28,162,29,30,31,32,34,35,24,36,37,38,40,41,42,39,43,44,48,33,45,46,47,49,50,9,10,11,12,13,14,238,71,19,21,22,20,239,25,118,15,237,66,68,240,16,100,98,82,105,106,87,23,241,234,235,104,236,67,101,102,103,72,120,121,122,123,124,125,126,129,133,134,135,136,141,142,143,144,131,150,152,153,154,155,156,78,157,166,167,168,169,174,164,219,177,178,179,180,181,182,183,186,189,190,191,192,197,198,199,200,213,206,208,209,210,211,212,79,214,223,224,225,226,231,221,232];
    sort_reference=resize(reference_information,size_ref_str<<1,1,0);
@@ -5051,7 +5166,7 @@ eval "
   );
 
  );"
- 
+
 remove[-1]
 #@cli rep_inverse_permutation: number_list
 #@cli : Return the inverse permutation.
@@ -5659,7 +5774,7 @@ check narg($1)||(narg(${2--1})>1)
 
 if narg($1)
 
- if ${is_percent\ $1}
+ if ispercentage($1)
 
   f "begin(
     const num_val=iM+1;
@@ -7467,12 +7582,12 @@ foreach {
    const symmetry_mode=$15%3;
    const inversion_mode=($16+2)%3;
 
-   "${is_percent\ $1}"?(
+   ispercentage($1)?(
     const bar_width=max($sub,round((abs($1)*diag_img/4)));
    ):(
     const bar_width=max($sub,round(abs($1)*$sub));
    );
-   "${is_percent\ $2}"?(
+   ispercentage($2)?(
     const space_width=abs($2)>0?max($sub,round((abs($2)*diag_img/4)));
    ):(
     const space_width=round(abs($2)*$sub);
@@ -7984,7 +8099,7 @@ rep_cstdmap:rep_chirikov_taylor $*
 rep_chirikov_taylor:
 skip ${2=500},${3=5000},${4=1},${5=0},${6=0},${7=0},${8=1}
 
-if ${is_percent\ $1}
+if ispercentage($1)
  if $!
   if $1>0
    mw=${-max_w}
@@ -8903,11 +9018,11 @@ fi
 foreach {
 
  half_img_diag={norm(w,h)/2}
- if ${is_percent\ $1} length={round(abs($1)*$half_img_diag)}
+ if ispercentage($1) length={round(abs($1)*$half_img_diag)}
  else length={round(abs($1))}
  fi
 
- if ${is_percent\ $4} thickness={round(abs($4)*$half_img_diag)}
+ if ispercentage($4) thickness={round(abs($4)*$half_img_diag)}
  else thickness={round(abs($4))}
  fi
 
@@ -8935,8 +9050,8 @@ ang={($3/180)*pi*-1}
 cos_ang={cos($ang)};
 sin_ang={sin($ang)};
 diag={norm($6,$7)/2}
-if ${is_percent\ $1} length={round($1*$diag)} else length={round($1)} fi
-if ${is_percent\ $2} thickness={max(round($2*$diag),1)} else thickness={max(round($2),1)} fi
+if ispercentage($1) length={round($1*$diag)} else length={round($1)} fi
+if ispercentage($2) thickness={max(round($2*$diag),1)} else thickness={max(round($2),1)} fi
 
 point_b_x=0
 point_b_y={$length/2}
@@ -10267,7 +10382,7 @@ fi
 #@cli : Default values: '_exponential_factor=0','_nl_amplitude=0','_n_smooth=4%','_a_smooth=5%'
 rep_edgefade:
 skip ${2=1},${3=0},${4=4%},${5=2%}
-percent_mode=0 if ${is_percent\ $1} percent_mode=1 fi
+percent_mode=0 if ispercentage($1) percent_mode=1 fi
 foreach {
  if s==2||s>=4
 
@@ -14811,7 +14926,7 @@ command "rep_frblur_alp :
 command "rep_frblur_nalp : rep_frblur_sdaxy_add $""1 / $_ti"
 
 foreach {
- if ${is_percent\ $2} dist={abs($2)*norm(w,h)/2}
+ if ispercentage($2) dist={abs($2)*norm(w,h)/2}
  else dist={abs($2)} fi
 
  tcr,convert_back=3,0
@@ -16228,7 +16343,7 @@ skip ${3=1},${4=1},${5=1},${6=},${7=},${8=},${9=},${10=},${11=},${12=},${13=},${
 
 num_of_images,mode,special_effect={$!},$1,0
 
-if isnum($3)||${is_percent\ $3}
+if isnum($3)||ispercentage($3)
   dither={cut($3,0,1)}
 else
   # This is where special effect are set up in
@@ -17080,7 +17195,7 @@ if ${is_image_arg\ $3}
  name[-1] channel_values_image
  utilize_channel_values_image=1
 else
- use_percent_mode=${is_percent\ $3}
+ use_percent_mode:=ispercentage($3)
  if !$3
   if $modular_mode==2||$modular_mode>3 return
   else
@@ -18220,13 +18335,13 @@ modulo_mode,random_offset_mode,random_strip_mode,seed_off,seed_strip,boundary,su
 if narg($seed_strip) has_strip_seed=1 fi
 if narg($seed_off)   has_off_seed=1   fi
 
-if ${is_percent\ $1} use_perc_off=1
+if ispercentage($1) use_perc_off=1
 else
  use_perc_off,offset=0,{abs($1)*$sublevel}
  if !$offset return fi
 fi
 
-if ${is_percent\ $2} use_perc_thk=1
+if ispercentage($2) use_perc_thk=1
 else
  use_perc_thk,thickness=0,{max(1,int(abs($2)*$sublevel))}
 fi
