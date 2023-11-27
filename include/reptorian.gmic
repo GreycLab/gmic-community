@@ -85,7 +85,7 @@ eval "
  );
 
  if(pos!=size_str,run('error not_a_UTF-8_string!'););
- 
+
  const N=0xff; # Base for the mathematics involving encoding or decoding UTF-8 strings.
  const M=N>>2; # Used to select binary numbers within x section of 10xxxxxx.
 
@@ -25453,14 +25453,19 @@ u "{$1}_"{!$3?2}\
 "{$7}_"{$5?2:1}\
 "{$8}"\
 "{$9,$10}"
-#@gui Bit-Plane Shuffler: fx_rep_bitplane_shuffle,fx_rep_bitplane_shuffle_preview
+#@gui Bit-Plane Shuffler:fx_rep_bitplane_shuffle,fx_rep_bitplane_shuffle_preview
 #@gui:_=separator(),_=note("<b>Main</b>)
-#@gui:Direction=choice(1,"Backward","Forward")
+#@gui:Direction=choice(0,"Forward","Backward")
 #@gui:Depth=choice(0,"8-Bit","16-Bit")
 #@gui:Use Alpha?=bool(0)
+#@gui:_=separator(),_=note("<b>CLI Command</b>")
+#@gui:CLI version=text("Here is where you copy command to command line interface.")
+#@gui:CLI version=text("This is just a reference text")_0
 #@gui:_=separator(),_=note("<b>Plane Shuffling</b>)
-#@gui:Index=int(100,1,40320)
-#@gui:Index=int(100,1,40320)_0
+#@gui:Shuffle Index=int(0,0,40319)
+#@gui:Shuffle Index=int(0,0,40319)_0
+#@gui:Shuffle Index=text("0")_0
+#@gui:Plane Shift Method=_choice(0,"Move","Swap")
 #@gui:Plane A=int(1,1,8)
 #@gui:Plane B=int(2,1,8)
 #@gui:Plane C=int(3,1,8)
@@ -25477,9 +25482,6 @@ u "{$1}_"{!$3?2}\
 #@gui:Plane F=int(6,1,8)_0
 #@gui:Plane G=int(7,1,8)_0
 #@gui:Plane H=int(8,1,8)_0
-#@gui:Randomize Index=button()
-#@gui:Index=text("9896398100167")_0
-#@gui:Index=text("9896398100167")_0
 #@gui:Plane A=int(8,1,16)
 #@gui:Plane B=int(10,1,16)
 #@gui:Plane C=int(9,1,16)
@@ -25512,322 +25514,254 @@ u "{$1}_"{!$3?2}\
 #@gui:Plane N=int(5,1,16)_0
 #@gui:Plane O=int(15,1,16)_0
 #@gui:Plane P=int(16,1,16)_0
-#@gui:Randomize Order=button()
-#@gui:Direction=choice(1,"Backward","Forward")_0
+#@gui:Randomize=button()
 #@gui:Depth=choice(0,"8-Bit","16-Bit")_0
+#@gui:Visited 8-Bit=bool(0)_0
+#@gui:Visited 16-Bit=bool(0)_0
 #@gui:_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"),Preview Split=point(50,50,0,0,200,200,200,0,10)_0
-#@gui:_=separator(),_=note("<small>Author: <i>Reptorian</i> Latest update: <i>2022/09/02</i>.</small>")
+#@gui:_=separator(),_=note("<small>Author: <i>Reptorian</i> Latest update: <i>2023/11/27</i>.</small>")
 fx_rep_bitplane_shuffle:
-if $2?$23==1:$4==1 return fi
+skip "$*"
 
 if narg($_persistent)
-  if $3
-    if $2 *[^-1] 257 fi
-    $_persistent
-    map[^-1] [-1]
-    rm.
-    if $2 / 257 fi
-  else
-    foreach {
-      if !(s&1) sh 0,{s-2} fi
-      if $2 *. 257 fi
-      $_persistent
-      map[-2] [-1]
-      if $2 /[-2] 257 fi
-      k[0]
-    }
-  fi
-else
-  args=$1,{!$3}
-  if $2 rep_bitplane_shuffle $args,${rep_permutation_index2list\ 16,{$23-1}}
-  else  rep_bitplane_shuffle $args,${rep_permutation_index2list\ 8,{$4-1}}
-  fi
+ if $3
+  if $2 * 257 fi
+  $_persistent channels. $1
+  map[^-1] [-1]
+  rm.
+  if $2 / 257 fi
+ else
+  $_persistent channels. $1 store. _persistent
+  foreach {
+   if !(s&1) sh 0,{s-1} fi
+   if $2 *. 257 fi
+   $_persistent
+   map[-2] [-1] rm.
+   if $2 /. 257 fi
+   k[0]
+  }
+ fi
+else $4
 fi
 fx_rep_bitplane_shuffle_preview:
-direction,use_16_bits_depth,_use_alpha,index_8_bits,old_index_8_bits,index_16_bits,old_index_16_bits,depth_changed=${1-5},${23-24},{$2!=$59}
-direction_change:=$direction!=$58
+skip "${4=}"
 
-plane_8bits_a,plane_8bits_b,plane_8bits_c,\
-plane_8bits_d,plane_8bits_e,plane_8bits_f,\
-plane_8bits_g,plane_8bits_h\
-=${6-13}
+cli_base="$5"
+activate_randomize=$58
 
-plane_16bits_a,plane_16bits_b,plane_16bits_c,\
-plane_16bits_d,plane_16bits_e,plane_16bits_f,\
-plane_16bits_g,plane_16bits_h,plane_16bits_i,\
-plane_16bits_j,plane_16bits_k,plane_16bits_l,\
-plane_16bits_m,plane_16bits_n,plane_16bits_o,\
-plane_16bits_p\
-=${25-40}
+use_reverse_permutation,mode_16,mode_alpha,index_8,index_16,\
+old_mode_16,old_index_8\
+=${1-3},$6,$8,\
+ $59,$7
 
-activate_random_order={$use_16_bits_depth?$57:$22}
-
-if $use_16_bits_depth
-
-  change_detected={$depth_changed||$activate_random_order||$direction_change}
-
-  if !narg($_persistent)&&$index_16_bits>1
-
-    order:=[${25-40}]-1
-
-    plane_16bits_a,plane_16bits_b,plane_16bits_c,\
-    plane_16bits_d,plane_16bits_e,plane_16bits_f,\
-    plane_16bits_g,plane_16bits_h,plane_16bits_i,\
-    plane_16bits_j,plane_16bits_k,plane_16bits_l,\
-    plane_16bits_m,plane_16bits_n,plane_16bits_o,\
-    plane_16bits_p\
-    :=[$order]+1
-
-    if !$direction order=${rep_inverse_permutation\ $order} fi
-    order=[$order]
-
-    65536,1,1,1,sum((x>>[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]&1)<<$order)
-    store. _persistent
-
-  fi
-
-  user_array_changed:=[${25-40}]!=[${41-56}]
-  change_detected+=$user_array_changed
-
-  if $change_detected
-
-    if $user_array_changed
-
-      eval "
-        a=[${25-40}];
-        b=[${41-56}];
-        diff_pos=argmax(abs(a-b));
-        swap_pos=find(b,a[diff_pos],0,1);
-        swap(b[diff_pos],b[swap_pos]);
-        b;"
-
-      plane_16bits_a,plane_16bits_b,plane_16bits_c,\
-      plane_16bits_d,plane_16bits_e,plane_16bits_f,\
-      plane_16bits_g,plane_16bits_h,plane_16bits_i,\
-      plane_16bits_j,plane_16bits_k,plane_16bits_l,\
-      plane_16bits_m,plane_16bits_n,plane_16bits_o,\
-      plane_16bits_p\
-      =${}
-
-      new_order:=[${}]-1
-      index_16_bits:=${rep_permutation_list2index\ $new_order}+1
-      if !$direction new_order=${rep_inverse_permutation\ $new_order} fi
-      new_order=[$new_order]
-
-      65536,1,1,1,sum((x>>[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]&1)<<$new_order)
-      store. _persistent
-
-    elif $depth_changed||$direction_change
-      order:=[${25-40}]-1
-      if !$direction order=${rep_inverse_permutation\ $order} fi
-      order=[$order]
-
-      65536,1,1,1,sum((x>>[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]&1)<<$order)
-      store. _persistent
-    else
-      index_16_bits={int(u(0,20922789888000,1,0))}
-      new_order=${rep_permutation_index2list\ 16,$index_16_bits}
-      index_16_bits+=1
-
-      plane_16bits_a,plane_16bits_b,plane_16bits_c,\
-      plane_16bits_d,plane_16bits_e,plane_16bits_f,\
-      plane_16bits_g,plane_16bits_h,plane_16bits_i,\
-      plane_16bits_j,plane_16bits_k,plane_16bits_l,\
-      plane_16bits_m,plane_16bits_n,plane_16bits_o,\
-      plane_16bits_p\
-      :=[$new_order]+1
-
-      if !$direction new_order=${rep_inverse_permutation\ $new_order} fi
-      new_order=[$new_order]
-
-      65536,1,1,1,sum((x>>[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]&1)<<$new_order)
-      store. _persistent
-    fi
-
-  fi
-
-  if $index_16_bits>1
-    gui_split_preview "
-      * 257
-      if !$_use_alpha&&(!(s%2)) sh 0,{s-2} fi
-      $_persistent
-      map[-2] [-1]
-      k[0]
-      / 257
-     ",${-3--1}
-  else
-    gui_split_preview "skip $*",${3--1}
-  fi
-
-else
-
-  change_detected,index_change={v=$4!=$5;[v||$depth_changed||$activate_random_order||$direction_change,v];}
-
-  if !narg($_persistent)&&$index_8_bits>1
-
-    order:=${rep_permutation_index2list\ 8,{$index_8_bits-1}}
-
-    plane_8bits_a,plane_8bits_b,plane_8bits_c,\
-    plane_8bits_d,plane_8bits_e,plane_8bits_f,\
-    plane_8bits_g,plane_8bits_h\
-    :=[$order]+1
-
-    if !$direction order=${rep_inverse_permutation\ $order} fi
-    order=[$order]
-
-    256,1,1,1,sum((x>>[0,1,2,3,4,5,6,7]&1)<<$order)
-    store. _persistent
-
-  fi
-
-  user_array_changed:=[${6-13}]!=[${14-21}]
-  change_detected+=$user_array_changed
-
-  if $change_detected
-
-    if $user_array_changed
-
-      eval "
-        a=[${6-13}];
-        b=[${14-21}];
-        diff_pos=argmax(abs(a-b));
-        swap_pos=find(b,a[diff_pos],0,1);
-        swap(b[diff_pos],b[swap_pos]);
-        b;"
-
-      plane_8bits_a,plane_8bits_b,plane_8bits_c,\
-      plane_8bits_d,plane_8bits_e,plane_8bits_f,\
-      plane_8bits_g,plane_8bits_h\
-      =${}
-
-      new_order:=[${}]-1
-      index_8_bits:=${rep_permutation_list2index\ $new_order}+1
-      if !$direction new_order=${rep_inverse_permutation\ $new_order} fi
-      new_order=[$new_order]
-
-      256,1,1,1,sum((x>>[0,1,2,3,4,5,6,7]&1)<<$new_order)
-      store. _persistent
-
-    elif $depth_changed||$direction_change
-
-      order:=[${6-13}]-1
-      if !$direction order=${rep_inverse_permutation\ $order} fi
-      order=[$order]
-
-      256,1,1,1,sum((x>>[0,1,2,3,4,5,6,7]&1)<<$order)
-      store. _persistent
-
-    elif $index_change
-
-      new_order=${rep_permutation_index2list\ 8,{$index_8_bits-1}}
-
-      plane_8bits_a,plane_8bits_b,plane_8bits_c,\
-      plane_8bits_d,plane_8bits_e,plane_8bits_f,\
-      plane_8bits_g,plane_8bits_h\
-      :=[$new_order]+1
-
-      if !$direction new_order=${rep_inverse_permutation\ $new_order} fi
-      new_order=[$new_order]
-
-      256,1,1,1,sum((x>>[0,1,2,3,4,5,6,7]&1)<<$new_order)
-      store. _persistent
-
-    else
-
-      index_8_bits={int(u(0,40320,1,0))}
-      new_order=${rep_permutation_index2list\ 8,$index_8_bits}
-      index_8_bits+=1
-
-      plane_8bits_a,plane_8bits_b,plane_8bits_c,\
-      plane_8bits_d,plane_8bits_e,plane_8bits_f,\
-      plane_8bits_g,plane_8bits_h\
-      :=[$new_order]+1
-
-      if !$direction new_order=${rep_inverse_permutation\ $new_order} fi
-      new_order=[$new_order]
-
-      256,1,1,1,sum((x>>[0,1,2,3,4,5,6,7]&1)<<$new_order)
-      store. _persistent
-
-    fi
-
-  fi
-
-  if $index_8_bits>1
-    gui_split_preview "
-      round 0
-      if !$_use_alpha&&(!(s%2)) sh 0,{s-2} fi
-      $_persistent
-      map[-2] [-1]
-      k[0]
-     ",${-3--1}
-  else
-    gui_split_preview "skip $*",${3--1}
-  fi
-
+if narg($_persistent) visited_8,visited_16=$60,$61
+else                  visited_8,visited_16=0
 fi
 
-visible_8_bits,visible_16_bits={$use_16_bits_depth?[0,2]:[2,0]}
+plane_8_series=plane_8_0,plane_8_1,plane_8_2,plane_8_3,\
+               plane_8_4,plane_8_5,plane_8_6,plane_8_7
 
-u "{"$direction"}"\
-"{"$use_16_bits_depth"}"\
-"{"$_use_alpha"}"\
-"{"$index_8_bits"}_"$visible_8_bits\
-"{"$index_8_bits"}"\
-"{"$plane_8bits_a"}_"$visible_8_bits\
-"{"$plane_8bits_b"}_"$visible_8_bits\
-"{"$plane_8bits_c"}_"$visible_8_bits\
-"{"$plane_8bits_d"}_"$visible_8_bits\
-"{"$plane_8bits_e"}_"$visible_8_bits\
-"{"$plane_8bits_f"}_"$visible_8_bits\
-"{"$plane_8bits_g"}_"$visible_8_bits\
-"{"$plane_8bits_h"}_"$visible_8_bits\
-"{"$plane_8bits_a"}"\
-"{"$plane_8bits_b"}"\
-"{"$plane_8bits_c"}"\
-"{"$plane_8bits_d"}"\
-"{"$plane_8bits_e"}"\
-"{"$plane_8bits_f"}"\
-"{"$plane_8bits_g"}"\
-"{"$plane_8bits_h"}"\
-"{0}_"$visible_8_bits\
-"{"$index_16_bits"}"\
-"{"$index_16_bits"}"\
-"{"$plane_16bits_a"}_"$visible_16_bits\
-"{"$plane_16bits_b"}_"$visible_16_bits\
-"{"$plane_16bits_c"}_"$visible_16_bits\
-"{"$plane_16bits_d"}_"$visible_16_bits\
-"{"$plane_16bits_e"}_"$visible_16_bits\
-"{"$plane_16bits_f"}_"$visible_16_bits\
-"{"$plane_16bits_g"}_"$visible_16_bits\
-"{"$plane_16bits_h"}_"$visible_16_bits\
-"{"$plane_16bits_i"}_"$visible_16_bits\
-"{"$plane_16bits_j"}_"$visible_16_bits\
-"{"$plane_16bits_k"}_"$visible_16_bits\
-"{"$plane_16bits_l"}_"$visible_16_bits\
-"{"$plane_16bits_m"}_"$visible_16_bits\
-"{"$plane_16bits_n"}_"$visible_16_bits\
-"{"$plane_16bits_o"}_"$visible_16_bits\
-"{"$plane_16bits_p"}_"$visible_16_bits\
-"{"$plane_16bits_a"}"\
-"{"$plane_16bits_b"}"\
-"{"$plane_16bits_c"}"\
-"{"$plane_16bits_d"}"\
-"{"$plane_16bits_e"}"\
-"{"$plane_16bits_f"}"\
-"{"$plane_16bits_g"}"\
-"{"$plane_16bits_h"}"\
-"{"$plane_16bits_i"}"\
-"{"$plane_16bits_j"}"\
-"{"$plane_16bits_k"}"\
-"{"$plane_16bits_l"}"\
-"{"$plane_16bits_m"}"\
-"{"$plane_16bits_n"}"\
-"{"$plane_16bits_o"}"\
-"{"$plane_16bits_p"}"\
-"{0}_"$visible_16_bits\
-"{"$direction"}"\
-"{"$use_16_bits_depth"}"\
+plane_16_series=plane_16_0,plane_16_1,plane_16_2,plane_16_3,\
+                plane_16_4,plane_16_5,plane_16_6,plane_16_7,\
+                plane_16_8,plane_16_9,plane_16_a,plane_16_b,\
+                plane_16_c,plane_16_d,plane_16_e,plane_16_f
+
+$plane_8_series=${10-17}
+$plane_16_series=${26-41}
+persistent_change,depth_changed=0,{$mode_16!=$old_mode_16}
+
+if $mode_16
+ activate_randomize|=!$visited_16?!$index_16
+ shift_plane={"a=[${26-41}];
+               b=[${42-57}];
+               diff_mode=a!=b;
+               if(diff_mode,
+                const use_swap_mode=$9;
+                diff_pos=argmax(abs(a-b));
+                use_swap_mode?(
+                 swap_pos=find(b,a[diff_pos],0,1);
+                 swap(b[diff_pos],b[swap_pos]);
+                 set('order',v2s(b-1));
+               ):(
+                 position_start=b[diff_pos];
+                 position_final=a[diff_pos];
+                 differential=position_final<position_start?1:-1;
+                fill(a,p,
+                 v=b[p];
+                 inrange(v,position_start,position_final,1,1)?(
+                  v+=differential;
+                 );
+                 v;
+                );
+                a[diff_pos]=position_final;
+                set('order',v2s(a-1));
+               );
+              );
+              diff_mode;"}
+ persistent_change:=$activate_randomize||$shift_plane
+
+ if $activate_randomize
+  index_16:=$index_16?int(u(1,20922789888000,1,0)):(v=int(u(1,20922789887999,1,0));v+=v>=$index_16;);
+  order=${rep_permutation_index2list\ 16,$index_16}
+ elif $shift_plane
+  index_16=${rep_permutation_list2index\ $order}
+ elif $depth_changed||visited_16
+  order={[${26-41}]-1}
+  inverse_order=${rep_inverse_permutation\ $order}
+ fi
+
+ if $persistent_change
+  $plane_16_series:=[$order]+1
+  inverse_order=${rep_inverse_permutation\ $order}
+  cli_base=$order
+ fi
+
+ if $persistent_change||$depth_changed||visited_16
+  65536,1,1,2,sum((x>>[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]&1)<<(c?[$inverse_order]:[$order]))
+  store. _persistent
+  cli_base=$order
+ fi
+
+ visited_16=1
+else
+ activate_randomize|=!$visited_8?!$index_8
+ index_change:=$index_8!=$old_index_8
+ shift_plane={"a=[${10-17}];
+               b=[${18-25}];
+               diff_mode=a!=b;
+               if(diff_mode,
+                const use_swap_mode=$9;
+                diff_pos=argmax(abs(a-b));
+                use_swap_mode?(
+                 swap_pos=find(b,a[diff_pos],0,1);
+                 swap(b[diff_pos],b[swap_pos]);
+                 set('order',v2s(b-1));
+                ):(
+                 position_start=b[diff_pos];
+                 position_final=a[diff_pos];
+                 differential=position_final<position_start?1:-1;
+                 fill(a,p,
+                  v=b[p];
+                  inrange(v,position_start,position_final,1,1)?(
+                   v+=differential;
+                  );
+                  v;
+                 );
+                 a[diff_pos]=position_final;
+                 set('order',v2s(a-1));
+                );
+               );
+               diff_mode;"}
+ persistent_change:=$activate_randomize||$index_change||$shift_plane
+
+ if $activate_randomize
+  index_8:=$index_8?int(u(1,40320,1,0)):(v=int(u(1,40319,1,0));v+=v>=$index_8;);
+  index_change=1
+ fi
+
+ if $index_change
+  order=${rep_permutation_index2list\ 8,$index_8}
+ elif $shift_plane
+  index_8=${rep_permutation_list2index\ $order}
+ elif $depth_changed||!$visited_8
+  order={[${10-17}]-1}
+  inverse_order=${rep_inverse_permutation\ $order}
+ fi
+
+ if $persistent_change
+  $plane_8_series:=[$order]+1
+  inverse_order=${rep_inverse_permutation\ $order}
+  cli_base=$order
+ fi
+
+ if $persistent_change||$depth_changed||!$visited_8
+  256,1,1,2,sum((x>>[0,1,2,3,4,5,6,7]&1)<<(c?[$inverse_order]:[$order]))
+  store. _persistent
+  cli_base=$order
+ fi
+
+ visited_8=1
+fi
+
+cli_text=image.jpg\ rep_bitplane_shuffle\ {![$use_reverse_permutation,$mode_alpha]},$cli_base
+
+if $mode_16?$index_16:$index_8
+ gui_split_preview "
+  round 0
+  if "$mode_16" * 257 fi
+  if !"$mode_alpha"&&(!(s&1)) shared 0,{s-2} fi
+  $_persistent
+  channels. "$use_reverse_permutation"
+  map[-2] [-1]
+  k[0]
+  if "$mode_16" / 257 fi
+  ",${-3--1}
+else gui_split_preview "skip \"$*\"",${-3--1}
+fi
+
+visible_8,visible_16:=[!$mode_16,$mode_16]<<1;
+
+u "{"$use_reverse_permutation"}"\
+"{"$mode_16"}"\
+"{$3}"\
+"{"$cli_text"}"\
+"{"$cli_base"}"\
+"{"$index_8"}_"$visible_8\
+"{"$index_8"}"\
+"{"$index_16"}"\
+"{$9}"\
+"{"$plane_8_0"}_"$visible_8\
+"{"$plane_8_1"}_"$visible_8\
+"{"$plane_8_2"}_"$visible_8\
+"{"$plane_8_3"}_"$visible_8\
+"{"$plane_8_4"}_"$visible_8\
+"{"$plane_8_5"}_"$visible_8\
+"{"$plane_8_6"}_"$visible_8\
+"{"$plane_8_7"}_"$visible_8\
+"{"$plane_8_0"}"\
+"{"$plane_8_1"}"\
+"{"$plane_8_2"}"\
+"{"$plane_8_3"}"\
+"{"$plane_8_4"}"\
+"{"$plane_8_5"}"\
+"{"$plane_8_6"}"\
+"{"$plane_8_7"}"\
+"{"$plane_16_0"}_"$visible_16\
+"{"$plane_16_1"}_"$visible_16\
+"{"$plane_16_2"}_"$visible_16\
+"{"$plane_16_3"}_"$visible_16\
+"{"$plane_16_4"}_"$visible_16\
+"{"$plane_16_5"}_"$visible_16\
+"{"$plane_16_6"}_"$visible_16\
+"{"$plane_16_7"}_"$visible_16\
+"{"$plane_16_8"}_"$visible_16\
+"{"$plane_16_9"}_"$visible_16\
+"{"$plane_16_a"}_"$visible_16\
+"{"$plane_16_b"}_"$visible_16\
+"{"$plane_16_c"}_"$visible_16\
+"{"$plane_16_d"}_"$visible_16\
+"{"$plane_16_e"}_"$visible_16\
+"{"$plane_16_f"}_"$visible_16\
+"{"$plane_16_0"}"\
+"{"$plane_16_1"}"\
+"{"$plane_16_2"}"\
+"{"$plane_16_3"}"\
+"{"$plane_16_4"}"\
+"{"$plane_16_5"}"\
+"{"$plane_16_6"}"\
+"{"$plane_16_7"}"\
+"{"$plane_16_8"}"\
+"{"$plane_16_9"}"\
+"{"$plane_16_a"}"\
+"{"$plane_16_b"}"\
+"{"$plane_16_c"}"\
+"{"$plane_16_d"}"\
+"{"$plane_16_e"}"\
+"{"$plane_16_f"}"\
+"{0}"\
+"{"$mode_16"}"\
+"{"$visited_8"}"\
+"{"$visited_16"}"\
 "{$-3}"\
 "{$-2,$-1}"
 #@gui Graphical Tiling Glitch (Interactive): fx_rep_x_graphical_tiling,fx_rep_x_graphical_tiling_preview(0)
