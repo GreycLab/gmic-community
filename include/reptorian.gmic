@@ -546,7 +546,7 @@ repeat $! {
 rep_python_print_files_dir:
 exec 1,"python -c \"import os; d=os.listdir(); c=','; print(f'\\n[gmic][python]-"$^"./ {c.join(d)}')\""
 #@cli rep_cin: '_message'
-#@cli : Allows users to type output number into status. Only numbers, A-Z english letters, comma, period, minus sign, and space are accepted!
+#@cli : Allows users to type output number into status. Only numbers, A-Z english letters, comma, period, minus sign, and space are accepted! Maximum string length is 1024!
 #@cli : Default values: '_message=G'MIC rep_cin output:'
 rep_cin:
 skip "${1=}"
@@ -555,6 +555,7 @@ screen_h>>=1
 
 started,stack_point=0
 current_str_0=""
+max_stack_size:=(1<<10)+1
 
 if narg("$1")
  message="$1"
@@ -579,20 +580,18 @@ do
  else
   key={*,k}
 
-  is_comma={$key==188}
-  is_negative={$key==189}
-  is_period={$key==190}
+  in_char_set:=inrange($key,188,190,1,1)
 
-  if inrange($key,_'0',_'9',1,1)||inrange($key,_'A',_'Z',1,1)||$key==_'\ '||$is_comma||$is_period||$is_negative
-   stack_point+=1
+  if $stack_point<$max_stack_size
+   if inrange($key,_'0',_'9',1,1)||inrange($key,_'A',_'Z',1,1)||$key==_'\ '||$in_char_set
+    stack_point+=1
 
-   if $is_comma o.=,
-   elif $is_negative o.=-
-   elif $is_period o.=.
-   else o.={`$key`}
+    if $in_char_set o.={`(',-.')[$key-188]`}
+    else            o.={`$key`}
+    fi
+
+    current_str_$stack_point=$o
    fi
-
-   current_str_$stack_point=$o
   fi
 
   if $started w[] $screen_w,1,0,0,$message$o
