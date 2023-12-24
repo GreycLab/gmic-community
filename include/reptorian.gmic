@@ -2740,14 +2740,14 @@ if !isint($2)
 else base=$2
 fi
 
-if $base==10 
+if $base==10
  ('$1')
  if im<_'0'||iM>_'9' error inv_char_det fi
  -. {_'0'}
  return
 fi
 
-if $1<(1<<53)
+if ($1<(1<<53))&&0
  {1+int(log($1)/log($base))},1,1,1,<"begin(
    const base=$base;
    n=$1;
@@ -2758,57 +2758,81 @@ if $1<(1<<53)
   "
 else
  if $base>10
-  eval "
-   dec_inp='$1'-_'0';
-   if(min(dec_inp)<0||max(dec_inp)>9,run('error inv_char_det'););
-   const LenDecStr=size(dec_inp);
-   const d_LenDecStr=LenDecStr-1;
-   const base=$base;
-   new_base_arr=vector(#LenDecStr,0);
-   starting_digit=inf;
-   repeat(size(dec_inp),p,
-    carry_over=dec_inp[p];
-    tmp=0;
-    for(q=d_LenDecStr,q>-1,--q,
-     tmp=(new_base_arr[q]*10)+carry_over;
-     new_base_arr[q]=test_num=tmp%base;
-     if(test_num,if(q<starting_digit,starting_digit=q;););
-     carry_over=int(tmp/base);
-    );
-   );
-   set('starting_digit',starting_digit);
-   set('new_len',LenDecStr-starting_digit);
-   new_base_arr;
-   "
+  ('$1') -. {_'0'}
+  if im#-1<0||iM#-1>9 error inv_char_det fi
 
-  ({([${}])[$starting_digit,$new_len]})
- else
-  1
   eval "
-   const _0=_'0';
    const base=$base;
-   dec_inp='$1'-_0;
-   if(min(dec_inp)<0||max(dec_inp)>9,run('error inv_char_det'););
-   LenDecStr=size(dec_inp);
-   while(LenDecStr>=16,
-    shift_num=dec_inp[0]<base;
-    remainder=shift_num?dec_inp[0];
-    for(p=shift_num,p<LenDecStr,++p,
-     tmp=remainder*10+dec_inp[p];
+   const init_shift_num=int(log10(base));
+   const start_digits_count=init_shift_num+1;
+   const start_LenDecStr=w#-1;
+   LenDecStr=start_LenDecStr;
+   remainders_count=0;
+   while(LenDecStr>15,
+    start_num=0;
+    repeat(start_digits_count,p,
+     start_num=start_num*10+i[#-1,p];
+    );
+    start_num>=base?(
+     i[#-1,0]=int(start_num/base);
+     remainder=start_num-i[#-1,0]*base;
+     shift_num=init_shift_num;
+    ):(
+     shift_num=init_shift_num+1;
+     remainder=start_num;
+    );
+    for(p,p<LenDecStr,++p,
+     tmp=remainder*10+i[#-1,p];
      new_num=int(tmp/base);
      remainder=tmp-new_num*base;
-     dec_inp[p-shift_num]=new_num;
+     i[#-1,p-shift_num]=new_num;
+    );
+    ++remainders_count;
+    i[#-1,start_LenDecStr-remainders_count]=remainder;
+    LenDecStr-=shift_num;
+   );
+   n=0;
+   repeat(LenDecStr,p,
+    n=n*10+i[#-1,p];
+   );
+   while(n,
+    remainder=n%base;
+    remainders_count++;
+    i[#-1,start_LenDecStr-remainders_count]=remainder;
+    n=int(n/base);
+   );
+   remainders_count;
+   "
+
+  crop. {w#-1-${}},100%
+ else
+
+  ('$1') -. {_'0'} => input
+  if im#-1<0||iM#-1>9 error inv_char_det fi
+
+  1
+
+  eval "
+   const base=$base;
+   const input=$input;
+   LenDecStr=w#input;
+   while(LenDecStr>15,
+    shift_num=i[#input,0]<base;
+    remainder=shift_num?i[#input,0];
+    for(p=shift_num,p<LenDecStr,++p,
+     tmp=remainder*10+i[#input,p];
+     new_num=int(tmp/base);
+     remainder=tmp-new_num*base;
+     i[#input,p-shift_num]=new_num;
     );
     da_insert(#-1,0,remainder);
     if(shift_num,--LenDecStr);
    );
    resize(#-1,da_size(#-1),1,1,1,-1);
-   dec_inp+=_0;
-   set('num_of_digits_left',LenDecStr);
-   dec_inp;
+   resize(#input,LenDecStr,1,1,1,-1);
    "
 
-  n={`([${}])[0,$num_of_digits_left]`}
+  n={`crop(#$input)+_'0'`} rm[$input]
 
   {1+int(log($n)/log($base))},1,1,1,<"begin(
     const base=$base;
