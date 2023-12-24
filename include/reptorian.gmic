@@ -873,16 +873,17 @@ skip ${1=1}
 
 n0={'0'}
 
-foreach
+foreach {
 
  if !(s&1) to_graya s c /. 255 *
  else to_gray
  fi
 
- if !iv
+ if !iv?($1?im:!im)
   if $> out.=,0
   else out=0
   fi
+  continue
  fi
 
  height={h}
@@ -891,16 +892,16 @@ foreach
 
  gt {(im+iM)/2}
  +store. image
- if $1 negate fi
+ if $1 xor 1 fi
 
  rotate 90
  unroll x
- crop {xM+1},100%
+ crop {xM},100%
 
  1
 
  eval[-2] >"begin(
-   da_push(#-1,1);
+   da_push(#-1,0);
   );
 
   max_index=da_size(#-1)-1;
@@ -931,18 +932,16 @@ foreach
   carry_over=int(n/10);
   n%10;
   end(
-   if(carry_over,
     set('carry_over',carry_over);
-   );
   );"
 
- + $n0
-
  if $carry_over
-  ('{$carry_over}')
+  ($carry_over)
   reverse
   append x
  fi
+
+ + $n0
 
  if $> out.=,{t}
  else out={t}
@@ -950,7 +949,7 @@ foreach
 
  rm $image
 
-done
+}
 
 status $out
 #@cli rep_tuppers_self: _K>=h,_apply_negate={ 0=false | 1=true }
@@ -962,24 +961,28 @@ skip ${1=96093937991895888497167296212785275471500433966012930665150551927170280
 
 if $!!=1 error n_imgs_inv fi
 if d>1 error imgs_dims_inv fi
-if $1<h error inv_inp fi
+if $1<h&&$1 error inv_inp fi
 
-fill y+x*h mirror. x
+if $1>=h
+ fill y+x*h mirror. x
 
-+rep_posdec2base_img ${rep_BIGINT_division\ $1,{h}},base_float
-{24*(w-1)+int(log2(i[#-1,0]))+1}
-eval[-2] "
- const mx=w-1;
- xp=mx-x;
- point=xp*24;
- digit=i;
- while(digit,
-  i(#-1,point++)=digit&1;
-  digit>>=1;
- );
- "
- 
-map[-3] [-1] rm[-2,-1]
+ +rep_posdec2base_img ${rep_BIGINT_division\ $1,{h}},base_float
+ {24*(w-1)+int(log2(i[#-1,0]))+1}
+ eval[-2] "
+  const mx=w-1;
+  xp=mx-x;
+  point=xp*24;
+  digit=i;
+  while(digit,
+   i(#-1,point++)=digit&1;
+   digit>>=1;
+  );
+  i;
+  "
+
+ map[-3] [-1] rm[-2,-1]
+else fill 0
+fi
 if $2 negate fi
 #@cli rep_nearest_ratio: value_a>0,value_b>0,_maximum_proposition_number>0,_output_whether_true_ratio={ 0=False | 1=True }
 #@cli : Return nearest ratio from 2 different values
@@ -2625,7 +2628,7 @@ check "isint($2)&&$1>=0&&inrange($2,1,1<<53,1,1)"
 if $1<(1<<53) status {int($1/$2)}
 else
  if $2>$1 status 0 return
- elif $2==1 
+ elif $2==1
   if v='$1';min(v)<_'0'||max(v)>_'9'; error inv_char_det fi
   status $1
  else
