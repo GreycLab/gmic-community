@@ -870,6 +870,14 @@ fi
 +rep_num2base_float_max:
 user_number,base_float=$1,{"1<<24"}
 
+#################################################################################
+# Dear Reptorian,                                                               #
+# When you're done refactoring rep_tuppers command, please retire this command. #
+# It is to be replaced with +rep_posdec2base_img command.                       #
+# Thank you for reading your self-note,                                         #
+# Reptorian                                                                     #
+#################################################################################
+
 ('$1') fill[-1] inrange(i,_'0',_'9',1,1) if !im error inv_char_det fi rm.
 
 1
@@ -2719,9 +2727,112 @@ repeat h#0 {
 }
 
 rm[-3--1]
+#@cli rep_posdec2base_img: 'decimal_number',base
+#@cli : Output numberical representation of a decimal number in given base as a image. Each pixels are digit representation of a number. This can also be used to represent really huge decimal number. 1000+ digits decimal number is supported.
+#@cli :
+#@cli : 'base' can be a integer number between 2 to 16777216 (Inclusive for both). In addition, you can use the following string as argument for 'base': bin,oct,dec,base_float.
++rep_posdec2base_img:
+check "isint($2)?inrange($2,2,16777216,1,1):isnum($2)?0:1"
+
+if !isint($2)
+ bin,oct,dec,hex,base_float=2,8,10,16,16777216
+ base:=$$2
+else base=$2
+fi
+
+if $base==10 
+ ('$1')
+ if im<_'0'||iM>_'9' error inv_char_det fi
+ -. {_'0'}
+ return
+fi
+
+if $1<(1<<53)
+ {1+int(log($1)/log($base))},1,1,1,<"begin(
+   const base=$base;
+   n=$1;
+  );
+  remainder=n%base;
+  n=int(n/base);
+  remainder;
+  "
+else
+ if $base>10
+  eval "
+   dec_inp='$1'-_'0';
+   if(min(dec_inp)<0||max(dec_inp)>9,run('error inv_char_det'););
+   const LenDecStr=size(dec_inp);
+   const d_LenDecStr=LenDecStr-1;
+   const base=$base;
+   new_base_arr=vector(#LenDecStr,0);
+   starting_digit=inf;
+   repeat(size(dec_inp),p,
+    carry_over=dec_inp[p];
+    tmp=0;
+    for(q=d_LenDecStr,q>-1,--q,
+     tmp=(new_base_arr[q]*10)+carry_over;
+     new_base_arr[q]=test_num=tmp%base;
+     if(test_num,if(q<starting_digit,starting_digit=q;););
+     carry_over=int(tmp/base);
+    );
+   );
+   set('starting_digit',starting_digit);
+   set('new_len',LenDecStr-starting_digit);
+   new_base_arr;
+   "
+
+  ({([${}])[$starting_digit,$new_len]})
+ else
+  1
+  eval "
+   const _0=_'0';
+   const base=$base;
+   dec_inp='$1'-_0;
+   if(min(dec_inp)<0||max(dec_inp)>9,run('error inv_char_det'););
+   LenDecStr=size(dec_inp);
+   while(LenDecStr>=16,
+    shift_num=dec_inp[0]<base;
+    remainder=shift_num?dec_inp[0];
+    for(p=shift_num,p<LenDecStr,++p,
+     tmp=remainder*10+dec_inp[p];
+     new_num=int(tmp/base);
+     remainder=tmp-new_num*base;
+     dec_inp[p-shift_num]=new_num;
+    );
+    da_insert(#-1,0,remainder);
+    if(shift_num,--LenDecStr);
+   );
+   ;resize(#-1,da_size(#-1),1,1,1,-1);
+   dec_inp+=_0;
+   set('num_of_digits_left',LenDecStr);
+   dec_inp;
+   "
+
+  n={`([${}])[0,$num_of_digits_left]`}
+
+  {1+int(log($n)/log($base))},1,1,1,<"begin(
+    const base=$base;
+    n=$n;
+   );
+   remainder=n%base;
+   n=int(n/base);
+   remainder;
+   "
+
+  rv[-2,-1] a[-2,-1] x
+ fi
+fi
 #@cli rep_num2altbase: abs_num,base
 #@cli : Insert number in bases other than 10. Each numbers are represented as digits by themselves.
 +rep_num2altbase:
+
+####################################################################################
+# Dear Reptorian,                                                                  #
+# When you're done refactoring Mitchell Concatenation, please retire this command. #
+# It is to be replaced with +rep_posdec2base_img command.                          #
+# Thank you for reading your self-note,                                            #
+# Reptorian                                                                        #
+####################################################################################
 
 number,base={int(abs([$1,$2]))}
 
@@ -5039,7 +5150,7 @@ channels[-2] 0
 map[-1] [-2]
 remove[-2]
 #@cli rep_string_permutation_index2str: reference_string,index,_sort_reference_string={ 0=do_not_sort_string | 1=sort_string | 2=logical_sort_string }
-#@cli Return the string which is of the lexicographic index given reference string. The index is based on character appearance order unless sorting is activated. This is the first time an algorithm has been made to address this.
+#@cli : Return the string which is of the lexicographic index given reference string. The index is based on character appearance order unless sorting is activated. This is the first time an algorithm has been made to address this.
 #@cli : Author : Reptorian.
 #@cli : Default values: '_sort_reference_string=0'
 rep_string_permutation_index2str:
