@@ -2727,7 +2727,50 @@ repeat h#0 {
 }
 
 rm[-3--1]
-#@cli rep_posdec2base_img: 'decimal_number',base
+#@cli rep_BIGINT_division: 'decimal_number'>=0,1<=divisor<=9007199254740992
+#@cli : Perform division on decimal number, then return the value. Supports 1000+ digits positive integer number for decimal_number only!
+rep_BIGINT_division:
+check "isint($2)&&$1>=0&&inrange($2,1,1<<53,1,1)"
+
+if $1<(1<<53) status {int($1/$2)}
+else
+ if $2>$1 status 0 return
+ else
+  ('$1')
+  if im<_'0'||iM>_'9' error inv_char_det fi
+
+  eval "
+   const _0=_'0';
+   const divisor=$2;
+   const init_shift_num=int(log10(divisor));
+   const start_digits_count=init_shift_num+1;
+   const LenDecStr=w#-1;
+   start_num=0;
+   repeat(start_digits_count,p,
+    start_num=start_num*10+i[#-1,p]-_0;
+   );
+   start_num>=divisor?(
+    tmp=int(start_num/divisor);
+    i[#-1,0]=tmp+_0;
+    remainder=start_num-tmp*divisor;
+    shift_num=init_shift_num;
+   ):(
+    shift_num=init_shift_num+1;
+    remainder=start_num;
+   );
+   for(p,p<LenDecStr,++p,
+    tmp=remainder*10+i[#-1,p]-_0;
+    new_num=int(tmp/divisor);
+    remainder=tmp-new_num*divisor;
+    i[#-1,p-shift_num]=new_num+_0;
+   );
+   set('trim_end_point',LenDecStr-shift_num-1);
+   "
+
+  crop. 0,$trim_end_point status {t} rm.
+ fi
+fi
+#@cli rep_posdec2base_img: 'decimal_number'>=0,1<base<=16777216
 #@cli : Output numberical representation of a decimal number in given base as a image. Each pixels are digit representation of a number. This can also be used to represent really huge decimal number. 1000+ digits decimal number is supported.
 #@cli :
 #@cli : 'base' can be a integer number between 2 to 16777216 (Inclusive for both). In addition, you can use the following string as argument for 'base': bin,oct,dec,base_float.
