@@ -897,32 +897,7 @@ foreach {
  rotate 90
  unroll x
  crop {xM},100%
-
- 1
-
- eval[-2] >"begin(
-   da_push(#-1,0);
-  );
-
-  max_index=da_size(#-1)-1;
-  carry_over=0;
-
-  repeat(da_size(#-1),pos,
-   dec_digit_pos=max_index-pos;
-   new_number=(i[#-1,dec_digit_pos]<<1)+carry_over;
-   carry_over=int(new_number/10);
-   i[#-1,dec_digit_pos]=new_number%10;
-  );
-
-  if(carry_over,da_insert(#-1,0,1););
-  if(i,++i[#-1,da_size(#-1)-1]);
-
-  end(
-   resize(#-1,da_size(#-1),1,1,1,-1);
-  );
-  "
-
- remove[-2]
+ rep_binimg2decimg
 
  fill <"begin(
    const height=$height;
@@ -984,6 +959,66 @@ if $1>=h
 else fill 0
 fi
 if $2 negate fi
+#@cli rep_bin2dec:
+#@cli : Convert binary numbers to digit representation using the double dabble method. Large binary number is supported here.
+#@cli : $ echo ${rep_bin2dec_dd\ 111111111111000000000001011111111111111100000000000011111111111111111111111111111111111111111111100000000000000000000000000001111111111111111111111111110000000000000000}
+rep_bin2dec:
+$=arg
+n0={_'0'}
+
+res,sep=
+
+repeat $# {
+ p:=$>+1
+ ('${arg$p}')
+ if im<_'0'||iM>_'1' error inv_char_det fi
+ crop. {xM},100%
+ -. {'0'}
+ 
+ if w<=53
+  eval[-1] <begin(m=0;n=0;);n|=i<<m;++m;end(set('\{\}',n););
+ else
+  rep_binimg2decimg[-1]
+  +. $n0
+  status {t}
+ fi
+  
+ res.=$sep${}
+ sep=,
+ rm.
+}
+
+status $res
+#@cli rep_binimg2decimg: [image_0],[image_1]....
+#@cli : Convert image representing a binary number as a image representing the decimal represntation of the binary number within image(s).
+rep_binimg2decimg:
+foreach {
+ if im<0||iM>1 error not_bin fi
+ 1
+
+ eval[-2] >"begin(
+   da_push(#-1,0);
+  );
+
+  max_index=da_size(#-1)-1;
+  carry_over=0;
+
+  repeat(da_size(#-1),pos,
+   dec_digit_pos=max_index-pos;
+   new_number=(i[#-1,dec_digit_pos]<<1)+carry_over;
+   carry_over=int(new_number/10);
+   i[#-1,dec_digit_pos]=new_number%10;
+  );
+
+  if(carry_over,da_insert(#-1,0,1););
+  if(i,++i[#-1,da_size(#-1)-1]);
+
+  end(
+   resize(#-1,da_size(#-1),1,1,1,-1);
+  );"
+
+  rm..
+}
 #@cli rep_nearest_ratio: value_a>0,value_b>0,_maximum_proposition_number>0,_output_whether_true_ratio={ 0=False | 1=True }
 #@cli : Return nearest ratio from 2 different values
 #@cli : Default value: '_maximum_divisor=0'
