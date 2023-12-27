@@ -3130,6 +3130,48 @@ gcd_solve_nonnegative : check ${"is_image_arg $1"}
     k[X]
   } }
 
+#@cli gcd_softcut : _low_threshold,_high_threshold,0<=_rolloff<=0.5
+#@cli : Soft cut values of selected images to specified range.
+#@cli : Default values: 'low_threshold=0', 'high_threshold=1' and 'rolloff=0.05'.
+#@cli : $ image.jpg n 0,255 gcd_softcut 100,200
+gcd_softcut : check "isnum(${1=0}) && isnum(${2=1}) && isnum(${3=0.05}) && $3>=0 && $3<=0.5"
+  e[^-1] "Soft cut image$? range to [$1,$2] with rolloff $3."
+  f "begin(
+      const B = max($1,im);
+      const T = min($2,iM);
+      const P = $3 * (T - B);
+      const bt = B + P;
+      const tt = T - P;
+      const br = bt - im;
+      const tr = iM - tt;
+      const G = br / P;
+      const H = P / tr;
+      f(X,A) = (X / (X * (1 - A) + A));
+    );
+    i < bt ? P * f((i-im)/br,G) + B :
+    i > tt ? P * f((i-tt)/tr,H) + tt : i"
+
+#@cli gcd_unsoftcut : _low_threshold,_high_threshold,0<=_rolloff<=0.5
+#@cli : Reverse soft cut values of selected images to specified range.
+#@cli : Default values: 'low_threshold=0', 'high_threshold=1' and 'rolloff=0.05'.
+#@cli : $ image.jpg n 0,255 gcd_softcut 100,200 +gcd_unsoftcut 0,255
+gcd_unsoftcut : check "isnum(${1=0}) && isnum(${2=1}) && isnum(${3=0.05}) && $3>=0 && $3<=0.5"
+  e[^-1] "Reverse soft cut image$? range to [$1,$2] with rolloff $3."
+  f "begin(
+      const B = min($1,im);
+      const T = max($2,iM);
+      const P = $3 * (iM - im);
+      const bt = im + P;
+      const tt = iM - P;
+      const br = bt - B;
+      const tr = T - tt;
+      const G = P / br;
+      const H = tr / P;
+      f(X,A) = (X / (X * (1 - A) + A));
+    );
+    i < bt ? br * f((i-im)/P,G) + B :
+    i > tt ? tr * f((i-tt)/P,H) + tt : i"
+
 #=============================================
 #************* FILE BROWSER ******************
 #=============================================
