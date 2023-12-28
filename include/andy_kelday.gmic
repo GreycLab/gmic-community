@@ -619,6 +619,55 @@ gcd_unstereo_preview :
 #@gui _<b>Testing</b>
 #@gui <i>Garagecoder</i>
 
+#@gui Simple Tone Curve : gcd_simple_tonecurve, gcd_simple_tonecurve(1)
+#@gui : note = note("<i>Luminance adjustment with local contrast restoration</i>"), sep = separator()
+#@gui : Contrast = float(0.5,0,1)
+#@gui : Brightness = float(0.5,0,1)
+#@gui : Saturation = float(1,0,2)
+#@gui : note = note("\n<i>Advanced Options</i>"), sep = separator()
+#@gui : Fulcrum = float(0.18,0,0.5)
+#@gui : Detail = float(0.75,0,2)
+#@gui : Input = choice(1,"Linear RGB","sRGB")
+#@gui : sep = separator(), note = note("<small>Author : <i>Garagecoder</i>.      Latest update : <i>2023/12/28</i>.</small>")
+gcd_simple_tonecurve : skip ${1=0.5},${2=0.5},${3=1},${4=0.18},${5=0},${6=1}
+  foreach {
+    contrast,bright,sat,F={T=1e-5;[vmax(vmin([$1,$2],1-T),T),$3,$4]}
+
+    sh 0,2
+    if $6 gcd_srgb2rgb. fi
+    # rgb2xyz illuminant E
+    mix_rgb. {[0.488718,0.3106803,0.2006017,\
+              0.1762044,0.8129847,0.0108109,\
+              0,0.0102048,0.9897952]/255}
+
+    # norm = luminance
+    +channels. 1
+
+    # local contrast
+    +gcd_weighted_box. $5%,1 gcd_divnz.. .
+
+    if $6 m:=1 else m:=iM fi
+
+    # contrast = (x-F) / ((1-A)*(x-F)/R + A) + F # R = (x-F)>0 ? 1-F : -F
+    A:=t=0.5;(t-t*$contrast)/($contrast-t*$contrast)
+    /. $m -. $F +gt. 0 -. $F ^. -1 *. .. *. {1-$A} +. $A /[-2,-1] +. $F *. $m
+
+    # brightness = x / (x - Ax + A)
+    A:=t=0.5;(t-t*$bright)/($bright-t*$bright)
+    +*. {(1-$A)/$m} +. $A /[-2,-1]
+
+    # saturation and recombine norm
+    *[-2,-1] ^.. $sat +channels.. 1 +eq. 0 +[-2,-1] /[-3,-1] *[-2,-1]
+
+    # xyz2rgb illuminant E
+    mix_rgb. {[2.3706743,-0.9000405,-0.4706338,\
+              -0.513885,1.4253036,0.0885814,\
+              0.0052982,-0.0146949,1.0093968]*255}
+    gcd_softcut. 0,255
+    if $6 gcd_rgb2srgb. fi
+    rm.
+  }
+
 #@gui Weighted Boxfilter : fx_gcd_weighted_boxfilter, fx_gcd_weighted_boxfilter(0)
 #@gui : note = note("<i>Weighted box average filter</i>"), sep = separator()
 #@gui : Radius = float(1,0,2)
