@@ -989,35 +989,90 @@ repeat $# {
 }
 
 status $res
-#@cli rep_binimg2decimg: [image_0],[image_1]....
-#@cli : Convert image representing a binary number as a image representing the decimal represntation of the binary number within image(s).
+#@cli rep_binimg2decimg:
+#@cli : Convert image(s) representing a binary number as a image representing the decimal representation of the binary number within image(s).
 rep_binimg2decimg:
 foreach {
- if im<0||iM>1 error not_bin fi
- 1
+    if im<0||iM>1 
+        error not_binary_number_image 
+    fi
+    
+    name. binary_image
+ 
+    {ceil(w/24)},1,1,1,"begin(
+            const max_x = w#-1-1;
+            const bits = 24;
+        );
+        start_point = max_x-(x*bits);
+        end_block = max(-1,start_point-bits);
+        bitshift_factor = 0;
+        output_value = 0;
+        for(ind = start_point, ind>end_block, --ind,
+            output_value |= i[#-1,ind] << bitshift_factor;
+            bitshift_factor++;
+        );
+        output_value;" => base_float_ref_img
+  
+    remove[binary_image]
+    ('{i[#-1,0]}') => result
+    ('{1<<24}')    => value_of_base_float_power_to_N
+    -[result,value_of_base_float_power_to_N] {_'0'} 
+    
+    if w#$base_float_ref_img==1
+        keep[result]
+    else
+        crop[base_float_ref_img] 1,100%
+        
+        foreach[result,value_of_base_float_power_to_N] {
+            resize 1,{whd#-1},1,100%,-1 ({h}) append y
+        }
 
- eval[-2] >"begin(
-   da_push(#-1,0);
-  );
-
-  max_index=da_size(#-1)-1;
-  carry_over=0;
-
-  repeat(da_size(#-1),pos,
-   dec_digit_pos=max_index-pos;
-   new_number=(i[#-1,dec_digit_pos]<<1)+carry_over;
-   carry_over=int(new_number/10);
-   i[#-1,dec_digit_pos]=new_number%10;
-  );
-
-  if(carry_over,da_insert(#-1,0,1););
-  if(i,++i[#-1,da_size(#-1)-1]);
-
-  end(
-   resize(#-1,da_size(#-1),1,1,1,-1);
-  );"
-
-  rm..
+        eval[base_float_ref_img] >"begin(
+                const base_float=1<<24;
+                const result = $result;
+                const value_of_base_float_power_to_N=$value_of_base_float_power_to_N;
+                const mx=w-1;
+            );
+            if(i,
+                indexes = [da_size(#result)-1,da_size(#value_of_base_float_power_to_N)-1];
+                carry_over_for_mult_of_value_of_base_float = 0;
+                carry_over_for_result = 0;
+                resulting_digit = 0;
+                for(indexes,indexes[1]>-1,--indexes,
+                    mult_of_base_power_float_num = i[#value_of_base_float_power_to_N,indexes[1]] * i + carry_over_for_mult_of_value_of_base_float;
+                    ref_val_into_result= ( ( mult_of_base_power_float_num % 10 ) + i[#result,indexes[0]] + carry_over_for_result );
+                    if(indexes[0]<0
+                    ,da_insert(#result,0,ref_val_into_result % 10 );
+                    ,i[#result,indexes[0]]= ref_val_into_result % 10;
+                    );
+                    carry_over_for_mult_of_value_of_base_float = int( mult_of_base_power_float_num / 10 );
+                    carry_over_for_result = int ( ref_val_into_result / 10 );
+                );
+                total_carry_over=carry_over_for_mult_of_value_of_base_float+carry_over_for_result;
+                while(total_carry_over,
+                    da_insert(#result,0,total_carry_over % 10);
+                    total_carry_over = int ( total_carry_over / 10 );
+                );
+            );
+            if(x<mx,
+                remainder = 0;
+                for(p=da_size(#value_of_base_float_power_to_N)-1, p>-1, --p,
+                    res = i[#value_of_base_float_power_to_N,p] * base_float + remainder;
+                    i[#value_of_base_float_power_to_N,p] = res % 10;
+                    remainder = int ( res / 10 );
+                );
+                while(remainder,
+                    da_insert(#value_of_base_float_power_to_N,0,remainder%10);
+                    remainder = int ( remainder / 10 );
+                );
+            );
+            end(
+             resize(#result,da_size(#result),1,1,1,-1);
+            );
+            "
+            
+        keep[result]
+    fi
 }
 #@cli rep_nearest_ratio: value_a>0,value_b>0,_maximum_proposition_number>0,_output_whether_true_ratio={ 0=False | 1=True }
 #@cli : Return nearest ratio from 2 different values
