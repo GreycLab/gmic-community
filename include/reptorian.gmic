@@ -897,7 +897,10 @@ foreach {
  rotate 90
  unroll x
  crop {xM},100%
- rep_binimg2decimg
+
+ if w<=53 eval[-1] <begin(m=0;n=0;);n|=i<<m;++m;end(set('\{\}',n);); ('${}') -. {_'0'} rm..
+ else rep_binimg2decimg
+ fi
 
  fill <"begin(
    const height=$height;
@@ -1014,43 +1017,43 @@ foreach {
         output_value;" => base_float_ref_img
   
     remove[binary_image]
-    ('{i[#-1,0]}') => result
+    ('{i[#-1,0]}') => bin2dec_result_img
     ('{1<<24}')    => value_of_base_float_power_to_N
-    -[result,value_of_base_float_power_to_N] {_'0'} 
+    -[bin2dec_result_img,value_of_base_float_power_to_N] {_'0'} 
     
     if w#$base_float_ref_img==1
-        keep[result]
+        keep[bin2dec_result_img]
     else
         crop[base_float_ref_img] 1,100%
         
-        foreach[result,value_of_base_float_power_to_N] {
+        foreach[bin2dec_result_img,value_of_base_float_power_to_N] {
             resize 1,{whd#-1},1,100%,-1 ({h}) append y
         }
 
         eval[base_float_ref_img] >"begin(
                 const base_float=1<<24;
-                const result = $result;
+                const bin2dec_result_img = $bin2dec_result_img;
                 const value_of_base_float_power_to_N=$value_of_base_float_power_to_N;
                 const mx=w-1;
             );
             if(i,
-                indexes = [da_size(#result)-1,da_size(#value_of_base_float_power_to_N)-1];
+                indexes = [da_size(#bin2dec_result_img)-1,da_size(#value_of_base_float_power_to_N)-1];
                 carry_over_for_mult_of_value_of_base_float = 0;
                 carry_over_for_result = 0;
                 resulting_digit = 0;
                 for(indexes,indexes[1]>-1,--indexes,
                     mult_of_base_power_float_num = i[#value_of_base_float_power_to_N,indexes[1]] * i + carry_over_for_mult_of_value_of_base_float;
-                    ref_val_into_result= ( ( mult_of_base_power_float_num % 10 ) + i[#result,indexes[0]] + carry_over_for_result );
+                    ref_val_into_result= ( ( mult_of_base_power_float_num % 10 ) + i[#bin2dec_result_img,indexes[0]] + carry_over_for_result );
                     if(indexes[0]<0
-                    ,da_insert(#result,0,ref_val_into_result % 10 );
-                    ,i[#result,indexes[0]]= ref_val_into_result % 10;
+                    ,da_insert(#bin2dec_result_img,0,ref_val_into_result % 10 );
+                    ,i[#bin2dec_result_img,indexes[0]]= ref_val_into_result % 10;
                     );
                     carry_over_for_mult_of_value_of_base_float = int( mult_of_base_power_float_num / 10 );
                     carry_over_for_result = int ( ref_val_into_result / 10 );
                 );
                 total_carry_over=carry_over_for_mult_of_value_of_base_float+carry_over_for_result;
                 while(total_carry_over,
-                    da_insert(#result,0,total_carry_over % 10);
+                    da_insert(#bin2dec_result_img,0,total_carry_over % 10);
                     total_carry_over = int ( total_carry_over / 10 );
                 );
             );
@@ -1067,11 +1070,11 @@ foreach {
                 );
             );
             end(
-             resize(#result,da_size(#result),1,1,1,-1);
+             resize(#bin2dec_result_img,da_size(#bin2dec_result_img),1,1,1,-1);
             );
             "
             
-        keep[result]
+        keep[bin2dec_result_img]
     fi
 }
 #@cli rep_nearest_ratio: value_a>0,value_b>0,_maximum_proposition_number>0,_output_whether_true_ratio={ 0=False | 1=True }
