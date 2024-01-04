@@ -40,7 +40,7 @@
 #  The fact that you are presently reading this means that you have had
 #  knowledge of the CeCILL license and that you accept its terms.
 #
-### === Version 17 May 29 19:30 EDT 2021  ==================== ###
+### === Version 18 Jan 03 18:30 EST 2024  ==================== ###
 #@gui <b>Testing</b>
 #@gui <i>Gmic Tutorials</i>
 #@gui Blur by Color : gtutor_blur_img, gtutor_blur_img_preview
@@ -576,6 +576,286 @@ fcolor=$8
       -fi # else doing light and shade
    -done
 -done
+
+# American Bank Note Scroll Works
+# ---------------------------------------------------------------------------
+#@gui __
+#@gui <b>Testing</b>
+#@gui <i>Gmic Tutorials</i>
+#@gui ABN Filigrees : fx_gtutor_abn, fx_gtutor_abn_preview(1)
+#@gui : note              = note(<b><span color="#FF9600">The American Bank Note Co. Filigree Machine</span></b>)
+#@gui : Red Spinner  (%)  = point(60,40,0,1,255,100,25,127,1%)_2
+#@gui : Red Frequency     = int(1,-50,50)_2
+#@gui : Green Spinner (%) = point(50,50,-1,1,185,255,25,127,1%)_2
+#@gui : Green Frequency   = int(1,-50,50)_2
+#@gui : Blue Spinner (%)  = point(50,50,-1,1,25,185,255,127,1%)_2
+#@gui : Blue Frequency    = int(1,-50,50)_2
+#@gui : Gray Spinner  (%) = point(50,50,-1,1,200,200,200,127,1%)_2
+#@gui : Gray Frequency    = int(1,-50,50)_2
+#@gui : sep               = separator()
+#@gui : note              = note(<b><span color="#FF9600">Pen Settings:</span></b>)
+#@gui : Relative Width    = float(50,1,100)_2
+#@gui : Color             = color(255,255,255,255)_2
+#@gui : Shape (Flat-Full) = float(100,0,100)_2
+#@gui : Tilt°             = float(0,0,90)_2
+#@gui : sep3              = separator()
+#@gui : note = note("<small>Author: <i>Garry R. Osgood</i>.      Latest Update: <i>2024/03/01</i>.</small>")
+
+fx_gtutor_abn:
+   xr,yr,fr,xg,yg,fg,xb,yb,fb,xz,yz,fz,pw,pcr,pcg,pcb,pca,ps,pt=$*
+
+   # Preview background color
+   -if 0$_is_preview
+      -if s>3
+         -fill_color 0,0,0,0
+      -elif s>4
+         -error "Too many channels. Expected no more than four, got "{s}"."
+      -else
+         -fill_color 120,120,120
+      -fi
+   -fi
+
+   # Plot vector integrity and range checks
+
+   nl=1
+   polyx=50
+   polyy=50
+   mat=0.02,0,-1,0,-0.02,1,0,0,1
+   -if !isnan(sum($xr,$yr))
+      txr:=$xr>100?100:($xr<0?0:$xr)
+      tyr:=$yr>100?100:($yr<0?0:$yr)
+      polyx=$polyx,$txr
+      polyy=$polyy,$tyr
+      dnr:=([$mat]*[$txr,$tyr,1])[0,2]
+      prr:=norm2([$dnr])
+      par:=rad2deg(atan2([$dnr][1],[$dnr][0]))
+      nl+=1
+   -else
+      dnr=0,0
+      prr=0
+      par=0
+   -fi
+   -if !isnan(sum($xg,$yg))
+      txg:=$xg>100?100:($xg<0?0:$xg)
+      tyg:=$yg>100?100:($yg<0?0:$yg)
+      polyx=$polyx,$txg
+      polyy=$polyy,$tyg
+      dng:=([$mat]*[$txg,$tyg,1])[0,2]
+      prg:=norm2([[$dng][0]-[$dnr][0],[$dng][1]-[$dnr][1]])
+      pag:=rad2deg(atan2([$dng][1]-[$dnr][1],[$dng][0]-[$dnr][0]))-$par
+      nl+=1
+   -else
+      dng=0,0
+      prg=0
+      pag=0
+   -fi
+   -if !isnan(sum($xb,$yb))
+      txb={$xb>100?100:($xb<0?0:$xb)}
+      tyb={$yb>100?100:($yb<0?0:$yb)}
+      polyx=$polyx,$txb
+      polyy=$polyy,$tyb
+      dnb:=([$mat]*[$txb,$tyb,1])[0,2]
+      prb:=norm2([[$dnb][0]-[$dng][0],[$dnb][1]-[$dng][1]])
+      pab:=rad2deg(atan2([$dnb][1]-[$dng][1],[$dnb][0]-[$dng][0]))-$pag
+      nl+=1
+   -else
+      dnb=0,0
+      prb=0
+      pab=0
+   -fi
+   -if !isnan(sum($xz,$yz))
+      txz={$xz>100?100:($xz<0?0:$xz)}
+      tyz={$yz>100?100:($yz<0?0:$yz)}
+      polyx=$polyx,$txz
+      polyy=$polyy,$tyz
+      dnz:=([$mat]*[$txz,$tyz,1])[0,2]
+      prz:=norm2([[$dnz][0]-[$dnb][0],[$dnz][1]-[$dnb][1]])
+      paz:=rad2deg(atan2([$dnz][1]-[$dnb][1],[$dnz][0]-[$dnb][0]))-$pab
+      nl+=1
+   -else
+      dnz=0,0
+      prz=0
+      paz=0
+   -fi
+
+   -if $nl<2
+      -error "Insufficient control point pairs. Have: "$nl"!"
+   -fi
+
+   -if 0$_is_preview
+
+      # Draw coordinate axes, spinner radii and trial
+      # arabesque, scaling to preview screen space.
+
+      dnl={2*$nl}
+      qnl={4*$nl}
+      rpoly:="PX=vector"$nl"("$_preview_width"*["$polyx"]/100);
+              PY=vector"$nl"("$_preview_height"*["$polyy"]/100);
+              RX=vector"$nl"(reverse(PX));
+              RY=vector"$nl"(reverse(PY));
+              CX=vector"$dnl"(PX,RX);
+              CY=vector"$dnl"(PY,RY);
+              C=vector"$qnl"(0);
+              fill(
+                    C,
+                    j,
+                    C[j]=(j%2?CY[j>>1]:CX[j>>1])
+                  );
+              C"
+      # Axes…
+      -if s>3
+         -line {$_preview_width/2},0,{$_preview_width/2},{$_preview_height},0.875,0xfcfcfcfc,180,220,255,255
+         -line 0,{$_preview_height/2},{$_preview_width},{$_preview_height/2},0.875,0xfcfcfcfc,180,220,255,255
+      -else
+         -line {$_preview_width/2},0,{$_preview_width/2},{$_preview_height},0.5,0xf0f0f0f0,180,220,255
+         -line 0,{$_preview_height/2},{$_preview_width},{$_preview_height/2},0.5,0xf0f0f0f0,180,220,255
+      -fi
+      # Spinners…
+
+      -polygon. {2*$nl},$rpoly,1,0xffffffff,200,60,0
+
+      # Arabesque…
+      -abn_mkspectral[0] $_preview_width,$prr,$par,$fr,$prg,$pag,$fg,$prb,$pab,$fb,$prz,$paz,$fz
+      -abn_specplot.. . rm.
+
+   -else # Plot final output image with calligraphic pen effects
+      -input {4*w#-1},{4*h#-1},1,4,0,0,0,0
+      -name[-1] target
+      minw:=min(w#$target,h#$target)
+      -abn_mkspectral[target] {w#$target},$prr,$par,$fr,$prg,$pag,$fg,$prb,$pab,$fb,$prz,$paz,$fz
+      -split[-1] c
+      -ifft[-2,-1]
+      -append[-2,-1] c
+      -name. temporal
+      -resize[temporal] {w+1},{h},{d},{s},0,1
+      -shift[temporal] 1,0,0,0,2
+      sw={min(w#$target,h#$target)}
+      # Screenspace transform.
+      ss:=specw=$sw/2;ss=eye(3);ss[0]=specw;ss[2]=specw;ss[4]=-specw;ss[5]=specw;ss
+      -fill[temporal] ([$ss]*[I(x,y),1])[0,2];
+
+      # Calligraphic pen
+
+      refv:=cexp([0,$pt°]) # GUI parameter: 'Tilt°:'
+      relw:=$pw*$sw/2000   # GUI parameter: 'Relative Width:'
+      fac:=$ps/100         # GUI parameter: 'Flat⇒Full' relative 0→1 with Flat: 0
+
+      # Fix Filler Factor (Make this go away…)
+
+      expand=0.10       # Nudge factor for too-short plotting segments
+      exmat:=[$expand,0,0,0,$expand,0,0,0,1]
+      -repeat {w#$temporal-1} # Traverse over plot point pairs…
+         pp:=[I(#$temporal,$>,0),I(#$temporal,$>+1,0)]  # Plot points:(x₀,y₀),(x₁,y₁)
+         delta:=[$pp][2,2]-[$pp][0,2]
+         ex:=[[$exmat]*[$delta,1]][0,2]
+         sf:=abs(dot([$refv],unitnorm([[$pp][2,2]-[$pp][0,2]],2)))
+         lw:=lerp($relw*$sf,$relw,$fac)
+         -thickline[target] {[$pp][0,2]},{[$pp][2,2]+[$ex]},$lw,1,$pcr,$pcg,$pcb,$pca
+      -done
+      -resize[target] {0.25*w#$target},{0.25*h#$target},{d#$target},{s#$target},3
+      -remove[temporal]
+      -blend[0] [target],alpha,1
+      -remove[target]
+   -fi
+
+fx_gtutor_abn_preview:
+   _is_preview=1
+   -fx_gtutor_abn $*
+
+#  ----------------------------------------------------------------------
+#  Spectral Arabesque Section
+#  ----------------------------------------------------------------------
+#@cli abn_mkspectral : spectral_width,radius₀,orientation₀,angular_velocity₀…
+#@cli: Generate a two channel discrete frequency domain image
+#@cli: corresponding to the supplied delta wheelie parameters:
+#@cli: +r, ±θ and ±f on the command line, one triplet for each
+#@cli: delta wheelie. Image suitable as a gtutor_specplot
+#@cli: selection, which draws the arabesque.
+#@cli: $ abn_mkspectral 512,0.5,90,1,0.25,0,-3,0.125,0,-5 1024,1024,1,1 gtutor_specplot. [-2] rm..
+abn_mkspectral: -check "isint(${1}) && ${1}>0 && !(($#-1)%3)"
+   -echo[^-1] "Generate spectral domain image given "{($#-1)/3}" delta wheelies."
+   # Expect spectral width followed by data triplets $a1,$a2,$a3…
+   dwheelcnt={($#-1)/3}
+   specw=$1
+   -input 3,1,1,$dwheelcnt,${2--1}
+   -name. args
+   -store[args] deltawheelies
+
+   #coeffcient image: 'carray'
+   -input $specw,1,1,2
+   -name. carray
+   -store[carray] coefficientarray
+
+   # Find canonical sum by aggregating delta wheelies.
+   # Insert terms into spectral image using rotation
+   # rate as spectral coordinates.
+   # Σf -> $accsf; Σθ → $acca
+   -eval "const wc=$dwheelcnt;
+          const sw=$specw;
+          dw=get('deltawheelies',wc*3);
+          ca=get('coefficientarray',sw*2);
+          acca=0;
+          accsf=0;
+          repeat(wc,k,
+                 r=dw[3*k];
+                 acca+=deg2rad(dw[3*k+1]);
+                 accsf+=dw[3*k+2];
+                 aidx=accsf%sw;
+                 ca[aidx]+=r*cos(acca);
+                 ca[sw+aidx]+=r*sin(acca);
+                );
+          store('coefficientarray',ca,sw,1,1,2)"
+
+   # carray: frequency domain image generated
+   # from the given delta wheelie chain.
+   -input $coefficientarray
+   -name. carray
+
+   # Scale freq. domain by domain length.
+   -mul[carray] $specw
+
+#@cli abn_specplot : [spectrum]
+#@cli: Generate an arabesque on selected images from
+#@cli: the given argument: a frequency domain spectrum image.
+#@cli: $ -input (0,0,0,0,0^1,0,0,{0.625*cexp([0,90°])}^{-1%256},0,0,0,0^{-2%256},0,0,{0.375*cexp([0,90°])}^7,0,0,{0.125*cexp([0,90°])}^{-6%256},0,0,{0.0625*cexp([0,90°])}) -permute. cyzx -pointcloud. , -mul. {w/2} -input 600,600,1,1 -gtutor_specplot. [-2] -remove.. -name. Pickelhaube
+abn_specplot : -is_image_arg $1 gotimg=${} -check "$#==1 && $gotimg"
+    -echo[^-1] "Generate an arabesque on image$? given spectral domain coefficients in "${1}"."
+    pass$1 0
+    -name. carray
+    # Frequency domain → time domain
+    -split[-1] c
+    -ifft[-2,-1]
+    -append[-2,-1] c
+    -name. temporal
+    -foreach[^temporal] {
+        pass[temporal] 0
+        sw={min(w#-2,h#-2)}
+
+        # Screenspace transform.
+        -fill[temporal] ">
+                         begin(
+                                specw=$sw/2;
+                                id=eye(3);
+                                id[0]=specw;
+                                id[2]=specw;
+                                id[4]=-specw;
+                                id[5]=specw;
+                              );
+                         (id*[I(x,y),1])[0,2];
+                       "
+        -permute[temporal] cyzx
+        -eval "PV=crop(#$temporal);
+               polygon(#-2,
+                        -int(size(PV)/2),
+                        PV,
+                        1,
+                        0xffffffff,
+                        255
+                      )
+              "
+        -keep[-2]
+     } #foreach[^temporal]
+     -remove[temporal]
 
 #@gui __
 #@gui <b>Artistic</b>
