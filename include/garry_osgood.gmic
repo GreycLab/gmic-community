@@ -587,17 +587,17 @@ fcolor=$8
 #@gui <b>Rendering</b>
 #@gui ABN Filigrees : fx_abn, fx_abn_preview(1)
 #@gui : note              = note(<b><span color="#FF9600">The American Bank Note Co. Filigree Machine</span></b>)
-#@gui : Red Spinner  (%)  = point(60,40,0,1,255,100,25,127,1%)_2
+#@gui : Red Spinner  (%)  = point(60,40,0,0,255,100,25,127,1%)_2
 #@gui : Red Frequency     = int(1,-50,50)_2
-#@gui : Green Spinner (%) = point(50,50,-1,1,185,255,25,127,1%)_2
+#@gui : Green Spinner (%) = point(50,50,-1,0,185,255,25,127,1%)_2
 #@gui : Green Frequency   = int(1,-50,50)_2
-#@gui : Blue Spinner (%)  = point(50,50,-1,1,25,185,255,127,1%)_2
+#@gui : Blue Spinner (%)  = point(50,50,-1,0,25,185,255,127,1%)_2
 #@gui : Blue Frequency    = int(1,-50,50)_2
-#@gui : Gray Spinner  (%) = point(50,50,-1,1,200,200,200,127,1%)_2
+#@gui : Gray Spinner  (%) = point(50,50,-1,0,200,200,200,127,1%)_2
 #@gui : Gray Frequency    = int(1,-50,50)_2
 #@gui : sep               = separator()
 #@gui : note              = note(<b><span color="#FF9600">Pen Settings:</span></b>)
-#@gui : Relative Width    = float(50,1,100)_2
+#@gui : Relative Width    = float(5,1,100)_2
 #@gui : Color             = color(255,255,255,255)_2
 #@gui : Opacity           = float(100,0,100)_2
 #@gui : Shape (Flat-Full) = float(100,0,100)_2
@@ -616,7 +616,7 @@ fx_abn:
       -elif s>4
          -error "Too many channels. Expected no more than four, got "{s}"."
       -else
-         -fill_color 120,120,120
+         -fill_color 0,0,0
       -fi
    -fi
 
@@ -718,9 +718,23 @@ fx_abn:
 
       -polygon. {2*$nl},$rpoly,1,0xffffffff,200,60,0
 
-      # Arabesque…
+      # Derive plot points from spinner positions, lengths, orientations and rates of spin
       -_pvt_mkspectral[0] $_preview_width,$prr,$par,$fr,$prg,$pag,$fg,$prb,$pab,$fb,$prz,$paz,$fz
-      -_pvt_specplot.. . rm.
+      -split[-1] c
+      -ifft[-2,-1]
+      -append[-2,-1] c
+      -name. temporal
+      sw:=min($_preview_width,$_preview_height)
+      ss:=specw=$sw/2;ss=eye(3);ss[0]=specw;ss[2]=specw;ss[4]=-specw;ss[5]=specw;ss
+      -fill[temporal] ([$ss]*[I(x,y),1])[0,2];
+
+      # Arabesque: Draw with calligraphic pen
+      relw:=$pw*$sw/2000   # GUI parameter: 'Relative Width' => $pw
+      opac:=$pco/100       # GUI parameter: 'Opacity'        => $pco
+      pent:=$pt+90         # GUI parameter: 'Tilt°'          => $pt
+      fac:=1-($ps/100)     # GUI parameter: 'Flat=>Full'     => $ps
+      -curve[0] [temporal],$relw,$pent,$fac,1,$opac,$pcr,$pcg,$pcb,$pca
+      -remove[temporal]
 
    -else # Plot final output image with calligraphic pen effects
 
@@ -807,45 +821,6 @@ _pvt_mkspectral: -check "isint(${1}) && ${1}>0 && !(($#-1)%3)"
 
    # Scale freq. domain by domain length.
    -mul[carray] $specw
-
-_pvt_specplot : -is_image_arg $1 gotimg=${} -check "$#==1 && $gotimg"
-    -echo[^-1] "Generate an arabesque on image$? given spectral domain coefficients in "${1}"."
-    pass$1 0
-    -name. carray
-    # Frequency domain → time domain
-    -split[-1] c
-    -ifft[-2,-1]
-    -append[-2,-1] c
-    -name. temporal
-    -foreach[^temporal] {
-        pass[temporal] 0
-        sw={min(w#-2,h#-2)}
-
-        # Screenspace transform.
-        -fill[temporal] ">
-                         begin(
-                                specw=$sw/2;
-                                id=eye(3);
-                                id[0]=specw;
-                                id[2]=specw;
-                                id[4]=-specw;
-                                id[5]=specw;
-                              );
-                         (id*[I(x,y),1])[0,2];
-                       "
-        -permute[temporal] cyzx
-        -eval "PV=crop(#$temporal);
-               polygon(#-2,
-                        -int(size(PV)/2),
-                        PV,
-                        1,
-                        0xffffffff,
-                        255
-                      )
-              "
-        -keep[-2]
-     } #foreach[^temporal]
-     -remove[temporal]
 
 #@gui __
 #@gui <b>Artistic</b>
