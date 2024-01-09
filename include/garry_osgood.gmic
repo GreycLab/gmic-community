@@ -585,7 +585,7 @@ fcolor=$8
 # ---------------------------------------------------------------------------
 #@gui __
 #@gui <b>Rendering</b>
-#@gui ABN Filigrees : fx_abn, fx_abn_preview(1)
+#@gui ABN Filigrees : fx_abn, fx_abn_preview(0)
 #@gui : note              = note(<b><span color="#FF9600">The American Bank Note Co. Filigree Machine</span></b>)
 #@gui : Red Spinner  (%)  = point(60,40,0,0,255,100,25,127,1%)_2
 #@gui : Red Frequency     = int(1,-50,50)_2
@@ -621,9 +621,12 @@ fx_abn:
    -fi
 
    # Plot vector integrity and range checks
+   iw:=min(w,h)
    nl=1
    polyx=50
    polyy=50
+
+   #Relative image measure => spectral coefficients
    mat=0.02,0,-1,0,-0.02,1,0,0,1
    -if !isnan(sum($xr,$yr))
       txr:=$xr>100?100:($xr<0?0:$xr)
@@ -693,8 +696,8 @@ fx_abn:
 
       dnl={2*$nl}
       qnl={4*$nl}
-      rpoly:="PX=vector"$nl"("$_preview_width"*["$polyx"]/100);
-              PY=vector"$nl"("$_preview_height"*["$polyy"]/100);
+      rpoly:="PX=vector"$nl"("$iw"*["$polyx"]/100);
+              PY=vector"$nl"("$iw"*["$polyy"]/100);
               RX=vector"$nl"(reverse(PX));
               RY=vector"$nl"(reverse(PY));
               CX=vector"$dnl"(PX,RX);
@@ -708,28 +711,27 @@ fx_abn:
               C"
       # Axes…
       -if s>3
-         -line {$_preview_width/2},0,{$_preview_width/2},{$_preview_height},0.875,0xfcfcfcfc,180,220,255,255
-         -line 0,{$_preview_height/2},{$_preview_width},{$_preview_height/2},0.875,0xfcfcfcfc,180,220,255,255
+         -line {$iw/2},0,{$iw/2},{$iw},0.875,0xfcfcfcfc,180,220,255,255
+         -line 0,{$iw/2},{$iw},{$iw/2},0.875,0xfcfcfcfc,180,220,255,255
       -else
-         -line {$_preview_width/2},0,{$_preview_width/2},{$_preview_height},0.5,0xf0f0f0f0,180,220,255
-         -line 0,{$_preview_height/2},{$_preview_width},{$_preview_height/2},0.5,0xf0f0f0f0,180,220,255
+         -line {$iw/2},0,{$iw/2},{$iw},0.5,0xf0f0f0f0,180,220,255
+         -line 0,{$iw/2},{$iw},{$iw/2},0.5,0xf0f0f0f0,180,220,255
       -fi
       # Spinners…
 
       -polygon. {2*$nl},$rpoly,1,0xffffffff,200,60,0
 
       # Derive plot points from spinner positions, lengths, orientations and rates of spin
-      -_pvt_mkspectral[0] $_preview_width,$prr,$par,$fr,$prg,$pag,$fg,$prb,$pab,$fb,$prz,$paz,$fz
+      -_pvt_mkspectral[0] $iw,$prr,$par,$fr,$prg,$pag,$fg,$prb,$pab,$fb,$prz,$paz,$fz
       -split[-1] c
       -ifft[-2,-1]
       -append[-2,-1] c
       -name. temporal
-      sw:=min($_preview_width,$_preview_height)
-      ss:=specw=$sw/2;ss=eye(3);ss[0]=specw;ss[2]=specw;ss[4]=-specw;ss[5]=specw;ss
+      ss:=specw=$iw/2;ss=eye(3);ss[0]=specw;ss[2]=$iw/2;ss[4]=-specw;ss[5]=$iw/2;ss
       -fill[temporal] ([$ss]*[I(x,y),1])[0,2];
 
       # Arabesque: Draw with calligraphic pen
-      relw:=$pw*$sw/2000   # GUI parameter: 'Relative Width' => $pw
+      relw:=$pw*$iw/2000   # GUI parameter: 'Relative Width' => $pw
       opac:=$pco/100       # GUI parameter: 'Opacity'        => $pco
       pent:=$pt+90         # GUI parameter: 'Tilt°'          => $pt
       fac:=1-($ps/100)     # GUI parameter: 'Flat=>Full'     => $ps
@@ -740,9 +742,9 @@ fx_abn:
 
       # Plot internally to 4x: [target]. Later, ¼× arabesque
       # on target and alpha blend that with given image.
-      -input {4*w#-1},{4*h#-1},1,4,0,0,0,0
+      minw:=4*$iw
+      -input {$minw},{$minw},1,4,0,0,0,0
       -name. target
-      minw:=min(w#$target,h#$target)
 
       # Get image of spectral coefficients
       -_pvt_mkspectral[target] {w#$target},$prr,$par,$fr,$prg,$pag,$fg,$prb,$pab,$fb,$prz,$paz,$fz
@@ -754,26 +756,35 @@ fx_abn:
       -name. temporal
 
       # Complex plane to screenspace transform.
-      sw:=min(w#$target,h#$target)
-      ss:=specw=$sw/2;ss=eye(3);ss[0]=specw;ss[2]=specw;ss[4]=-specw;ss[5]=specw;ss
+      ss:=specw=$minw/2;ss=eye(3);ss[0]=specw;ss[2]=specw;ss[4]=-specw;ss[5]=specw;ss
       -fill[temporal] ([$ss]*[I(x,y),1])[0,2];
 
       # Draw with calligraphic pen
-      relw:=$pw*$sw/2000   # GUI parameter: 'Relative Width' => $pw
+      relw:=$pw*$minw/2000 # GUI parameter: 'Relative Width' => $pw
       opac:=$pco/100       # GUI parameter: 'Opacity'        => $pco
       pent:=$pt+90         # GUI parameter: 'Tilt°'          => $pt
       fac:=1-($ps/100)     # GUI parameter: 'Flat=>Full'     => $ps
-      curve[target] [temporal],$relw,$pent,$fac,1,$opac,$pcr,$pcg,$pcb,$pca
+      -curve[target] [temporal],$relw,$pent,$fac,1,$opac,$pcr,$pcg,$pcb,$pca
+      -remove[temporal]
 
       # Target image: 4× => 1× and alpha blend with given layer.
       -resize[target] {0.25*w#$target},{0.25*h#$target},{d#$target},{s#$target},3
-      -remove[temporal]
-      -blend[0] [target],alpha,1
+      -resize[target] {w#0},{h#0},{d#0},{s#$target},0
+      -if s#0<4
+          -to_rgba[0]
+          -blend[0] [target],alpha,1
+          -to_rgb
+      -else
+          -blend[0] [target],alpha,1
+      -fi
       -remove[target]
    -fi
 
 fx_abn_preview:
    _is_preview=1
+
+   # Require a 1:1 aspect preview image
+   -remove {s=2*min($_preview_width,$_preview_height)/2;[s,s]},1,3
    -fx_abn $*
 
 #  ----------------------------------------------------------------------
