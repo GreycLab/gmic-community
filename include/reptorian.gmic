@@ -873,6 +873,8 @@ skip ${1=1}
 
 n0={'0'}
 
+out,sep=
+
 foreach {
 
  if !(s&1) to_graya s c /. 255 *
@@ -896,37 +898,29 @@ foreach {
 
  rotate 90
  unroll x
- crop {xM},100%
-
- if w<=53 eval[-1] <begin(m=0;n=0;);n|=i<<m;++m;end(set('\{\}',n);); ('${}') -. {_'0'} rm..
- else rep_binimg2decimg
- fi
-
- fill <"begin(
-   const height=$height;
+ 
+ rep_binimg2dec_base 0,1
+ 
+ eval "begin(
+   const=height=$height;
    carry_over=0;
   );
-  n=carry_over+i*height;
-  carry_over=int(n/10);
-  n%10;
-  end(
-    set('carry_over',carry_over);
-  );"
+  current_digit_pos=da_size(#-1);
+  while(current_digit_pos--,
+   n=carry_over+i[#-1,current_digit_pos]*height;
+   carry_over=int(n/1e7);
+   i[#-1,current_digit_pos]=n%1e7;
+  );
+  if(carry_over,da_insert(#-1,0,carry_over););
+  "
 
- + $n0
-
- if $carry_over
-  ('$carry_over')
-  reverse
-  append x
- fi
-
- if $> out.=,{t}
- else out={t}
- fi
-
+ _rep_binimg2dec_base 1
+ 
+ out.=$sep{t}
+ sep=,
+ 
  rm $image
-
+ 
 }
 
 status $out
@@ -962,121 +956,264 @@ if $1>=h
 else fill 0
 fi
 if $2 negate fi
-#@cli rep_bin2dec:
-#@cli : Convert binary numbers to digit representation using the carry-over method. Large binary number is supported here.
-#@cli : $ echo ${rep_bin2dec_dd\ 111111111111000000000001011111111111111100000000000011111111111111111111111111111111111111111111100000000000000000000000000001111111111111111111111111110000000000000000}
+#@cli rep_bin2dec: binary_a,binary_b,....
+#@cli : Return the converted binary numbers to decimal representating using base-10M and Schönhage-Strassen multiplication. Large binary number is supported here.
 rep_bin2dec:
+check "$#>0"
 $=arg
-n0={_'0'}
+I={$!}
+repeat $# { p:=$>+1 ('${arg$p}') }
+rep_binimg2dec_base[$I--1] 1
+#@cli rep_binimg2dec_base: '_mode_unicode={ 0=false | 1=true }','_preserve_base10M_dynamic_array={ 0=false | 1=true },'_unicode_img_out={ 0=false | 1=true }
+#@cli : Used as base command to process binary-value images and to output decimal or base-10M images. Schönhage-Strassen multiplication was used as basis for multiplication part of the binary to decimal, in addition to using base 10M for easy output of decimal image.
+#@cli : Note : Arguments can also be strings such as true,false,TRUE,FALSE. In addition, 'int','unicode','dec','decimal','integer' can be used as argument for $1 and $3.
+#@cli : Default values: '_mode_unicode=0','_preserve_base10M_dynamic_array=0','_unicode_img_out=_mode_unicode'
+#@cli : Author : Reptorian.
+rep_binimg2dec_base:
+skip ${2=0}
+
+false,true,FALSE,TRUE={expr('x&1',4)}
+unicode=1
+dec,decimal,int,integer=0
+
+if $#>3 error exc_num_args fi
+
+l[] {
+  check "isnum($1)"
+  $=arg
+
+  if $#==3 
+    if !isnum($-1)   
+      arg3=$$-1
+    fi
+  else arg3=$arg1
+  fi
+  
+  dec,decimal,int,integer,unicode=
+
+  if !isnum($arg2)       
+    arg2=$$2
+  fi
+
+  onfail
+    
+    missing_arg3=0
+    if $#==3
+        if isnum($-1) 
+          arg3=$-1
+        else
+          arg3=$$-1
+        fi
+    else missing_arg3=1
+    fi
+    
+    if narg($$1)||isnum($1)
+     
+      if isnum($1) 
+        arg1=$1
+      else         
+        arg1=$$1
+      fi
+      
+      if $missing_arg3 
+        arg3=$arg1 
+      fi
+      
+      dec,decimal,int,integer,unicode=
+      
+      if isnum($2) 
+        arg2=$2
+      else         
+        arg2=$$2
+      fi
+     
+    else noarg arg1,arg2,arg3=0,0,0
+    fi
+ }
+ 
+mode_unicode,preserve_base10_dynamic_array_image,unicode_out=$arg1,$arg2,$arg3
 
 res,sep=
 
-repeat $# {
- p:=$>+1
- ('${arg$p}')
- if im<_'0'||iM>_'1' error inv_char_det fi
- crop. {xM},100%
- -. {'0'}
- 
- if w<=53
-  eval[-1] <begin(m=0;n=0;);n|=i<<m;++m;end(set('\{\}',n););
- else
-  rep_binimg2decimg[-1]
-  +. $n0
-  status {t}
- fi
-  
- res.=$sep${}
- sep=,
- rm.
-}
+if $mode_unicode
+    n0,n1:='01'
+    str_code=<begin(m=0;n=0;);n|=(i==$n1)<<m;++m;end(set('\{\}',v2s(n)););
+else
+    n0,n1=0,1
+    str_code=<begin(m=0;n=0;);n|=i<<m;++m;end(set('\{\}',v2s(n)););
+fi
 
-status $res
-#@cli rep_binimg2decimg:
-#@cli : Convert image(s) representing a binary number as a image representing the decimal representation of the binary number within image(s).
-rep_binimg2decimg:
 foreach {
-    if im<0||iM>1 
-        error not_binary_number_image 
-    fi
+    if im<$n0||iM>$n1 error no_binary_image fi
     
-    name. binary_image
- 
-    {ceil(w/24)},1,1,1,"begin(
-            const max_x = w#-1-1;
-            const bits = 24;
-        );
-        start_point = max_x-(x*bits);
-        end_block = max(-1,start_point-bits);
-        bitshift_factor = 0;
-        output_value = 0;
-        for(ind = start_point, ind>end_block, --ind,
-            output_value |= i[#-1,ind] << bitshift_factor;
-            bitshift_factor++;
-        );
-        output_value;" => base_float_ref_img
-  
-    remove[binary_image]
-    ('{i[#-1,0]}') => bin2dec_result_img
-    ('{1<<24}')    => value_of_base_float_power_to_N
-    -[bin2dec_result_img,value_of_base_float_power_to_N] {_'0'} 
+    crop {xM},100%
     
-    if w#$base_float_ref_img==1
-        keep[bin2dec_result_img]
-    else
-        crop[base_float_ref_img] 1,100%
+    name binary_image
+    
+    if w>53
+    
+        {ceil(w/24)},1,1,1,"begin(
+                const max_x = w#-1-1;
+                const bits = 24;
+                const mode_unicode=$mode_unicode;
+                mode_unicode?(
+                   is_one()=i[#-1,ind]==$n1;
+                ):(is_one()=i[#-1,ind];);
+            );
+            start_point = max_x-(x*bits);
+            end_block = max(-1,start_point-bits);
+            bitshift_factor = output_value = 0;
+            for(ind = start_point, ind>end_block, --ind,
+                output_value |= is_one() << bitshift_factor;
+                bitshift_factor++;
+            );
+            output_value;" => base_float_ref_img
         
-        foreach[bin2dec_result_img,value_of_base_float_power_to_N] {
-            resize 1,{whd#-1},1,100%,-1 ({h}) append y
-        }
-
-        eval[base_float_ref_img] >"begin(
-                const base_float=1<<24;
+        remove[binary_image]
+        
+        bool_v10M={i[#-1,0]>=1e7}
+        1,1,1,{2+$bool_v10M},v=i[#-1,0];$bool_v10M?[1,v%1e7,2]:[v,1]; permute. xcyz => bin2dec_result_img
+        crop[base_float_ref_img] 1,100%
+        (1;6777216;2) => mult_ref
+        
+        eval[base_float_ref_img] >"
+            begin(
+                const base_10M = 1e7;
+                const multiplier_reference = $mult_ref;
                 const bin2dec_result_img = $bin2dec_result_img;
-                const value_of_base_float_power_to_N=$value_of_base_float_power_to_N;
-                const mx=w-1;
+                const second_digit = 6777216;
+                const mx = w-1;
             );
             if(i,
-                indexes = [da_size(#bin2dec_result_img)-1,da_size(#value_of_base_float_power_to_N)-1];
-                carry_over_for_mult_of_value_of_base_float = 0;
-                carry_over_for_result = 0;
-                resulting_digit = 0;
-                for(indexes,indexes[1]>-1,--indexes,
-                    mult_of_base_power_float_num = i[#value_of_base_float_power_to_N,indexes[1]] * i + carry_over_for_mult_of_value_of_base_float;
-                    ref_val_into_result= ( ( mult_of_base_power_float_num % 10 ) + i[#bin2dec_result_img,indexes[0]] + carry_over_for_result );
-                    if(indexes[0]<0
-                    ,da_insert(#bin2dec_result_img,0,ref_val_into_result % 10 );
-                    ,i[#bin2dec_result_img,indexes[0]]= ref_val_into_result % 10;
+                current_second_digit = i%base_10M;
+                use_first_digit = i>=base_10M;
+                result_remainder = remainder = old_value = t_old_value = 0;
+                repeat_factor = da_size(#multiplier_reference);
+                result_digit_pos = da_size(#bin2dec_result_img)-1;
+                while( repeat_factor--,
+                    t_old_value = i[#multiplier_reference, repeat_factor];
+                    reference_value =  t_old_value*current_second_digit+old_value+remainder; 
+                    target_value = ( reference_value % base_10M ) + result_remainder + i[#bin2dec_result_img,result_digit_pos] ;
+                    if(result_digit_pos>-1
+                    ,i[#bin2dec_result_img,result_digit_pos--] = target_value % base_10M ;
+                    ,da_insert(#bin2dec_result_img,0,target_value % base_10M);
                     );
-                    carry_over_for_mult_of_value_of_base_float = int( mult_of_base_power_float_num / 10 );
-                    carry_over_for_result = int ( ref_val_into_result / 10 );
+                    if(use_first_digit , old_value = t_old_value );
+                    result_remainder = int ( target_value / base_10M );
+                    remainder        = int ( reference_value / base_10M ) ;
                 );
-                total_carry_over=carry_over_for_mult_of_value_of_base_float+carry_over_for_result;
-                while(total_carry_over,
-                    da_insert(#bin2dec_result_img,0,total_carry_over % 10);
-                    total_carry_over = int ( total_carry_over / 10 );
+                result_remainder+=remainder;
+                if(use_first_digit, result_remainder+= old_value);
+                while(result_remainder,
+                    da_insert(#bin2dec_result_img,0, (result_remainder ) % base_10M );
+                    result_remainder = int ( result_remainder / base_10M );
                 );
             );
             if(x<mx,
-                remainder = 0;
-                for(p=da_size(#value_of_base_float_power_to_N)-1, p>-1, --p,
-                    res = i[#value_of_base_float_power_to_N,p] * base_float + remainder;
-                    i[#value_of_base_float_power_to_N,p] = res % 10;
-                    remainder = int ( res / 10 );
+                remainder=old_value=0;
+                repeat_factor = da_size(#multiplier_reference);
+                while( repeat_factor--,
+                    t_old_value = i[#multiplier_reference,repeat_factor];
+                    result = t_old_value*second_digit+old_value+remainder;
+                    i[#multiplier_reference,repeat_factor] = result % base_10M;
+                    remainder = int( result / base_10M );
+                    old_value = t_old_value;                
                 );
-                while(remainder,
-                    da_insert(#value_of_base_float_power_to_N,0,remainder%10);
-                    remainder = int ( remainder / 10 );
+                remainder+=old_value;
+                while( remainder,
+                    da_insert(#multiplier_reference,0,remainder%base_10M);
+                    remainder = int ( remainder / base_10M );
                 );
-            );
-            end(
-             resize(#bin2dec_result_img,da_size(#bin2dec_result_img),1,1,1,-1);
-            );
-            "
+            );"
             
-        keep[bin2dec_result_img]
+            keep[bin2dec_result_img]
+            
+            if !$preserve_base10_dynamic_array_image
+                _$0 $unicode_out
+                if $unicode_out
+                    res.=$sep{t} rm.
+                    sep=,
+                fi
+            else name[-1] bin2dec_result_img_base_10M
+            fi
+    else
+        
+        eval[-1] $str_code rm.
+        
+        if $preserve_base10_dynamic_array_image
+            1,{1+int(log(${})/log(1e7))},1,1,<"begin(
+                    n=${};
+                );
+                remainder=n%1e7;
+                n=int(n/1e7);
+                remainder;
+                "
+            ({h})
+            
+            append y
+            
+            name[-1] bin2dec_result_img_base_10M
+        else
+            if $unicode_out
+                res.=$sep${}
+                sep=,
+            else
+                ('${}') -. $n0 => bin2dec_result_img
+            fi
+        fi
+        
+       
     fi
 }
+
+if !$preserve_base10_dynamic_array_image?$unicode_out 
+    status $res 
+fi
+_rep_binimg2dec_base:
+da_freeze[-1]
+number_of_digits_for_first_digit={int(log10(i[#-1,0]))+1}
+name={n}
+
+length_of_output={$number_of_digits_for_first_digit+(h-1)*7}
+$length_of_output
+
+if w>1024 ps=:
+else      ps=>
+fi
+
+eval[-2] $ps"
+    begin(
+        const unicode_out=$1;
+        const number_of_digits_for_first_digit=$number_of_digits_for_first_digit;
+        const _0=_'0';
+        unicode_out?(
+            format_output()=(shift(tv,shift_factor,0);tv+=!tv*_0);
+            insert2first(value)=value%10+_0;
+        ):(
+            format_output()=(tv-=_0;shift(tv,shift_factor,0));
+            insert2first(value)=value%10;
+        );
+    );
+    y?(
+        insertion_pos=((y-1)*7)+number_of_digits_for_first_digit;
+        i?(
+            shift_factor=6-int(log10(i));
+            tv=v2s(i,0,7);
+            format_output();
+            copy(i[#-1,insertion_pos],tv[0],7,1,1);
+            0;
+        );
+    ):(
+        n=i;
+        insertion_pos=number_of_digits_for_first_digit;
+        while(insertion_pos--,
+            i[#-1,insertion_pos]=insert2first(n);
+            n=int(n/10);
+        );
+        0;
+    );"
+    
+remove.. => $name
 #@cli rep_nearest_ratio: value_a>0,value_b>0,_maximum_proposition_number>0,_output_whether_true_ratio={ 0=False | 1=True }
 #@cli : Return nearest ratio from 2 different values
 #@cli : Default value: '_maximum_divisor=0'
