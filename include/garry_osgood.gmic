@@ -40,7 +40,7 @@
 #  The fact that you are presently reading this means that you have had
 #  knowledge of the CeCILL license and that you accept its terms.
 #
-### === Version 19 Jan 07 16:00 EST 2024  ==================== ###
+### === Version 20 Jan 10 21:30 EST 2024  ==================== ###
 #@gui __
 #@gui <b>Testing</b>
 #@gui <i>Gmic Tutorials</i>
@@ -580,7 +580,6 @@ fcolor=$8
       -fi # else doing light and shade
    -done
 -done
-
 # American Bank Note Scroll Works
 # ---------------------------------------------------------------------------
 #@gui __
@@ -603,7 +602,7 @@ fcolor=$8
 #@gui : Shape (Flat-Full) = float(100,0,100)_2
 #@gui : Tilt°             = float(0,0,90)_2
 #@gui : sep3              = separator()
-#@gui : note = note("<small>Author: <i>Garry R. Osgood</i>.      Latest Update: <i>2024/07/01</i>.</small>")
+#@gui : note = note("<small>Author: <i>Garry R. Osgood</i>.      Latest Update: <i>2024/10/01</i>.</small>")
 #@gui : url  = link("Technical Notes",https://gmic.eu/tutorial/wheelies.html)
 
 fx_abn:
@@ -625,6 +624,7 @@ fx_abn:
    nl=1
    polyx=50
    polyy=50
+   spins=  # List of active red, green, blue and gray spinners
 
    #Relative image measure => spectral coefficients
    mat=0.02,0,-1,0,-0.02,1,0,0,1
@@ -637,10 +637,7 @@ fx_abn:
       prr:=norm2([$dnr])
       par:=rad2deg(atan2([$dnr][1],[$dnr][0]))
       nl+=1
-   -else
-      dnr=0,0
-      prr=0
-      par=0
+      spins=$prr,$par,$fr
    -fi
    -if !isnan(sum($xg,$yg))
       txg:=$xg>100?100:($xg<0?0:$xg)
@@ -651,10 +648,7 @@ fx_abn:
       prg:=norm2([[$dng][0]-[$dnr][0],[$dng][1]-[$dnr][1]])
       pag:=rad2deg(atan2([$dng][1]-[$dnr][1],[$dng][0]-[$dnr][0]))-$par
       nl+=1
-   -else
-      dng=0,0
-      prg=0
-      pag=0
+      spins=$spins,$prg,$pag,$fg
    -fi
    -if !isnan(sum($xb,$yb))
       txb={$xb>100?100:($xb<0?0:$xb)}
@@ -663,12 +657,9 @@ fx_abn:
       polyy=$polyy,$tyb
       dnb:=([$mat]*[$txb,$tyb,1])[0,2]
       prb:=norm2([[$dnb][0]-[$dng][0],[$dnb][1]-[$dng][1]])
-      pab:=rad2deg(atan2([$dnb][1]-[$dng][1],[$dnb][0]-[$dng][0]))-$pag
+      pab:=rad2deg(atan2([$dnb][1]-[$dng][1],[$dnb][0]-[$dng][0]))-($par+$pag)
       nl+=1
-   -else
-      dnb=0,0
-      prb=0
-      pab=0
+      spins=$spins,$prb,$pab,$fb
    -fi
    -if !isnan(sum($xz,$yz))
       txz={$xz>100?100:($xz<0?0:$xz)}
@@ -677,12 +668,9 @@ fx_abn:
       polyy=$polyy,$tyz
       dnz:=([$mat]*[$txz,$tyz,1])[0,2]
       prz:=norm2([[$dnz][0]-[$dnb][0],[$dnz][1]-[$dnb][1]])
-      paz:=rad2deg(atan2([$dnz][1]-[$dnb][1],[$dnz][0]-[$dnb][0]))-$pab
+      paz:=rad2deg(atan2([$dnz][1]-[$dnb][1],[$dnz][0]-[$dnb][0]))-($par+$pag+$pab)
       nl+=1
-   -else
-      dnz=0,0
-      prz=0
-      paz=0
+      spins=$spins,$prz,$paz,$fz
    -fi
 
    -if $nl<2
@@ -722,7 +710,7 @@ fx_abn:
       -polygon. {2*$nl},$rpoly,1,0xffffffff,200,60,0
 
       # Derive plot points from spinner positions, lengths, orientations and rates of spin
-      -_pvt_mkspectral[0] $iw,$prr,$par,$fr,$prg,$pag,$fg,$prb,$pab,$fb,$prz,$paz,$fz
+      -_pvt_mkspectral[0] $iw,$spins
       -split[-1] c
       -ifft[-2,-1]
       -append[-2,-1] c
@@ -746,10 +734,11 @@ fx_abn:
       -input {$minw},{$minw},1,4,0,0,0,0
       -name. target
 
-      # Get image of spectral coefficients
-      -_pvt_mkspectral[target] {w#$target},$prr,$par,$fr,$prg,$pag,$fg,$prb,$pab,$fb,$prz,$paz,$fz
+      # Get image of spectral coefficients.
+      -_pvt_mkspectral[target] {w#$target},$spins
 
-      # Spectral coefficients => temporal plots via inverse fast fourier transform.
+      # Spectral coefficients => temporal plots
+      # via inverse fast fourier transform.
       -split[-1] c
       -ifft[-2,-1]
       -append[-2,-1] c
