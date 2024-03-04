@@ -50,7 +50,7 @@
 
 mc_film_grain :
   __mc_film_grain 0,{max(w,h)},{min(w,h)},$"*"
-    
+
 mc_film_grain_preview :
   long_side={max(w,h)}
   short_side={min(w,h)}
@@ -58,105 +58,105 @@ mc_film_grain_preview :
   gui_crop_preview
   __mc_film_grain 1,$long_side,$short_side,$"*"
 
-__mc_film_grain_usage :  
+__mc_film_grain_usage :
 
   msg.="1.Load a grain pattern file with sample grain to be added to an image\n"
-#  msg.="\n"  
+#  msg.="\n"
   msg.="2.A grain file can be either a crop (usually 1000x1000 px) of a digitised 24Mp\n"
   msg.="   35mm film frame, or the whole full 35mm frame digitised at any resolution\n"
-  msg.="   if the file is at least 6Mp (3000x2000 px).\n"  
-#  msg.="\n"  
+  msg.="   if the file is at least 6Mp (3000x2000 px).\n"
+#  msg.="\n"
   msg.="3.Select desired blend options (tip: grain merge usually gives better results).\n"
-#  msg.="\n"  
+#  msg.="\n"
   msg.="4.Select grain size options:\n"
-  msg.="- \"Film Format\" may shrink or enlarge the grain to better emulate the look of\n"  
+  msg.="- \"Film Format\" may shrink or enlarge the grain to better emulate the look of\n"
   msg.="   film grain at the chosen format\n"
   msg.="- \"Scale\" allows further tuning of grain size on top of the selected Film Format.\n"
   msg.="- \"Micrograin\" attempts to add a little bit of small-sized grain to the mix for\n"
-  msg.="   better-looking texture at larger grain sizes.\n"  
+  msg.="   better-looking texture at larger grain sizes.\n"
 #  msg.="\n"
-  msg.="5.Change grain appearance to taste by altering the grain sharpness, contrast \n"  
-  msg.="   and gamma.\n" 
-#  msg.="\n"  
+  msg.="5.Change grain appearance to taste by altering the grain sharpness, contrast \n"
+  msg.="   and gamma.\n"
+#  msg.="\n"
   msg.="6.Normalisation will fit the grain pixel values between a range of low and high\n"
   msg.="   values. This affects the grain blending result, and can be used to bring more\n"
   msg.="   grain into the highlights, change the overal blending effect, etc.\n"
-#  msg.="\n"  
-  msg.="7.Adjust a couple of properties of the input image:\n"  
+#  msg.="\n"
+  msg.="7.Adjust a couple of properties of the input image:\n"
   msg.="- \"Blur/Sharpen\" can affect the interplay of image details and the applied grain.\n"
-  msg.="   Film grain may sometimes look more natural when applied to a softer image.\n"        
-  msg.="- \"Highlight Compression\" will bring down the highlights, including blown-out\n"  
+  msg.="   Film grain may sometimes look more natural when applied to a softer image.\n"
+  msg.="- \"Highlight Compression\" will bring down the highlights, including blown-out\n"
   msg.="   areas, making some more grain visible in the highlights.\n"
 #  msg.="\n"
   msg.="8.You can enable the preview of the grain alone to better assess the effect of\n"
-  msg.="   the above filter parameters on the grain.\n"      
-  msg.="\n"    
-  
+  msg.="   the above filter parameters on the grain.\n"
+  msg.="\n"
+
   msg.="$1"
-  
-  gui_print_preview "Usage:",,$msg 
-  
-#      
+
+  gui_print_preview "Usage:",,$msg
+
+#
 # Internal command for the "Film Grain" filter
 #
 __mc_film_grain :
 
   # For easier maintenance and code docummentation, define named variables for each positional command argument
-  
+
   is_preview,\
   img_long_side,img_short_side,\
   grain_file_path,texture_type,\
   blend_mode_opt,blend_opacity,\
-  film_fmt_opt,\  
+  film_fmt_opt,\
   scale_pct,\
   micrograin,\
   gr_sharpness,\
   gr_contrast,gr_gamma,\
   gr_norm_opt,gr_norm_low,gr_norm_high,\
-  img_sharpness,img_highl_compress,\  
+  img_sharpness,img_highl_compress,\
   preview_opt,\
   show_usage=$"*"
-  
+
   print_debug={$preview_opt>1}
   preview_grain={{$preview_opt==1}||{$preview_opt==3}}
 
   # Blend modes: must follow the same order declared in the "Blend Mode" filter argument
-  
-  blend_modes=alpha,grainmerge,overlay,softlight,hardlight,alpha 
-  
+
+  blend_modes=alpha,grainmerge,overlay,softlight,hardlight,alpha
+
   # Load selected grain pattern image
-   
+
   local {
     input $grain_file_path
-    normalize. 0,255         
+    normalize. 0,255
   onfail
     if $is_preview
       __mc_film_grain_usage "(Error loading grain pattern file)"
     fi
-    return    
+    return
   }
 
-  # Show usage tips 
+  # Show usage tips
   if "$is_preview && $show_usage"
     __mc_film_grain_usage "(Click anywhere to dismiss usage tips...)"
     return
-  fi 
-     
-  debug_msg.="Image size: "{$img_long_side}"x"{$img_short_side}" ("{f2ui($img_long_side*$img_short_side/1000000)}"Mp)\n" 
-  debug_msg.="Preview size: "{$_preview_width}"x"{$_preview_height}"\n"    
+  fi
+
+  debug_msg.="Image size: "{$img_long_side}"x"{$img_short_side}" ("{f2ui($img_long_side*$img_short_side/1000000)}"Mp)\n"
+  debug_msg.="Preview size: "{$_preview_width}"x"{$_preview_height}"\n"
   debug_msg.="Grain sample file: "$grain_file_path"\n"
-   
-    
+
+
   # Adjust scale factor based on desired output film format choice
-  # notes: 
+  # notes:
   # - these are just some quick-and-dirty calculations to get grain size in the righ ballpark
-  # - we don't really care about the aspect ratio except for MF & APS, where some heuristics 
+  # - we don't really care about the aspect ratio except for MF & APS, where some heuristics
   #   are applied to select the best scale divider depending on the current image proportions
-   
+
   aspect={$img_long_side/$img_short_side}     # image aspect ratio
   if $film_fmt_opt==1 scale_pct/=0.75       # 135 half-frame
   elif $film_fmt_opt==2 scale_pct/=0.54     # 110 Pocket Instamatic
-  elif $film_fmt_opt==3                     # 120 MF film (6x45, 6×6, 6x7, ...) 
+  elif $film_fmt_opt==3                     # 120 MF film (6x45, 6×6, 6x7, ...)
     if "$aspect<1.355 && $aspect>1.34"      # - 6x45: aspect 1:1.35 => check with tollerance for sloppy crop
         scale_pct/=1.77                     #   scale = 41.5mm/24mm
     else
@@ -167,13 +167,13 @@ __mc_film_grain :
         scale_pct/=0.3958                   #   scale = 9.5mm/24mm
     else
         scale_pct/=0.6958                   # - all other APS frame sizes assume scale = 16.7mm/24mm
-    fi    
-  fi 
-    
+    fi
+  fi
+
   # Original grain scan width assumed to be 6000px (35mm frame at 24MP=6000x4000px)
   ref_frame_long=6000
   ref_frame_short=4000
-    
+
   # If grain pattern image is large enough (at least 6MP), assume it's a full-frame scan
   # => set reference width for scaling, and crop image so the remaing of the code runs unchanged
   if "max(w,h) > 3000 && min(w,h) > 2000"
@@ -184,45 +184,45 @@ __mc_film_grain :
   else
     debug_msg.="Grain file as: Crop\n"
   fi
-  debug_msg.="Grain full-frame size: "{$ref_frame_long}"x"{$ref_frame_short}" ("{f2ui($ref_frame_long*$ref_frame_short/1000000)}"Mp)\n"  
+  debug_msg.="Grain full-frame size: "{$ref_frame_long}"x"{$ref_frame_short}" ("{f2ui($ref_frame_long*$ref_frame_short/1000000)}"Mp)\n"
   debug_msg.="Grain patch size: "{-1,w}"x"{-1,h}"\n"
-       
+
   foreach[^-1] {
     split_opacity
     pass. 0
-    
-    # Resize pattern for proper grain size  
+
+    # Resize pattern for proper grain size
     total_scale_pct={_$scale_pct*$img_short_side/$ref_frame_short}
-    resize2dx. {w*$total_scale_pct/100.0},5
-    debug_msg.="Total grain scaling: "{f2ui($total_scale_pct)}"%\n"    
+    rs. {w*$total_scale_pct/100.0},,5
+    debug_msg.="Total grain scaling: "{f2ui($total_scale_pct)}"%\n"
     debug_msg.="Scaled grain patch size: "{-1,w}"x"{-1,h}"\n"
 
-    # If possible/desirable, add some micrograin to improve texture 
+    # If possible/desirable, add some micrograin to improve texture
     if "$total_scale_pct>66 && $micrograin"
       debug_msg.="Micrograin: enabled (intensity="{$micrograin}")"
-      +resize2dx. {w/3},5
+      +rs. {w/3},,5
       syntexturize. {-2,w},{-2,h}
       blend[-1,-2] overlay,{0.2+0.8*$micrograin/10}
     fi
-    
+
     # Generate grain texture image
     if $texture_type==0
       +syntexturize. {0,max(10,w)},{0,max(10,h)}
     else
       +syntexturize_matchpatch. {0,max(10,w)},{0,max(10,h)}
-    fi     
-    
+    fi
+
     # We use the same variable to sharpen (positive) or blur (negative)
     # as there's not much point in having sharpen & blur active simultaneously
     if $gr_sharpness>0
-      sharpen. {$gr_sharpness*10},1 
+      sharpen. {$gr_sharpness*10},1
     elif $gr_sharpness<0
-      blur. {-1*$gr_sharpness/4}      
-    fi          
+      blur. {-1*$gr_sharpness/4}
+    fi
 
     # Adjust contrast and gamma to taste
-    adjust_colors. 0,$gr_contrast,$gr_gamma,0,0 c. 0,255                                                 
-    
+    adjust_colors. 0,$gr_contrast,$gr_gamma,0,0 c. 0,255
+
     # Grain normalisation, ajusting range low and high values (shift min/max grain values)
     # => affects result in different ways depending on blend mode
     if $gr_norm_opt==1
@@ -230,50 +230,50 @@ __mc_film_grain :
     elif $gr_norm_opt==2
       cut. $gr_norm_low,$gr_norm_high
     fi
-    
+
     # Resize grain pattern to image size before blending
     resize {0,w},{0,h},1,100%,5 c. 0,255
-   
-    # Show only the grain layer, or apply filter result     
-    if "$preview_grain && $is_preview"        
-      keep[0,-1] 
+
+    # Show only the grain layer, or apply filter result
+    if "$preview_grain && $is_preview"
+      keep[0,-1]
       reverse
     else
       # Adjust image sharpness/blur before blending
-      # note: 
+      # note:
       #   the idea is to just fine-tune the overall image sharpness,
       #   the control range (-10,+10) is empirically adjusted (divided or multiplied)
-      #   so as to allow some useful degree of change within theese arbitrary values        
+      #   so as to allow some useful degree of change within theese arbitrary values
       if $img_sharpness>0
-        sharpen[0] {$img_sharpness*10} 
+        sharpen[0] {$img_sharpness*10}
       elif $img_sharpness<0
-        blur[0] {-1*$img_sharpness/5}      
-      fi     
+        blur[0] {-1*$img_sharpness/5}
+      fi
 
-      # A little highlighting compression before blending can help if more grain 
+      # A little highlighting compression before blending can help if more grain
       # is desired in the highlights, so we apply a gentle curve at the shoulder
       if $img_highl_compress
         apply_curve[0] 0.4,0,0,192,{192-3*$img_highl_compress/4},255,{255-3*$img_highl_compress}
       fi
-       
+
       blend[0,-1] ${arg\ {$blend_mode_opt+1},$blend_modes},{if($blend_mode_opt>0,$blend_opacity/100,1)}
-      
+
       # We really only want to get a little more grain visible in the highlights, not
       # change the original image that much, so we "un-apply" most of the curve effect
       # after blending the grain into the image.
       if $img_highl_compress
         apply_curve[0] 0.4,0,0,192,{192+2*$img_highl_compress/4},255,{255+2*$img_highl_compress}
-      fi      
+      fi
     fi
-    
+
     # debug
-    if "$is_preview && $print_debug" 
-      text_outline $debug_msg,2,2,20,2,1,255,255,0        
+    if "$is_preview && $print_debug"
+      text_outline $debug_msg,2,2,20,2,1,255,255,0
     fi
-    
-    append[^-1] c 
+
+    append[^-1] c
     remove.
-  }  
+  }
   remove.
 
 # Local Variables:
