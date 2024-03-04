@@ -3271,8 +3271,6 @@ _display3d :
   if narg($disp_normalization) w[] -1,-1,$disp_normalization else w[] 0 fi
   v -1 d[]
 
-
-
 #@cli lezoray3d : out_filename.png,nb_frames>0
 #@cli : Generate a 3D animation from a set of two 3D meshes.
 #@cli : Output frames are 1024x512 RGBA images.
@@ -3383,6 +3381,34 @@ rand_pdf : check ${"is_image_arg $1"}" && isnum(${2=-1}) && isnum(${3=1}) && ${4
 
   # Sample random numbers according to given pdf.
   f[^-1] "ind = lerp(0,w#-1,u); i[#-1,ind,2]" rm.
+
+#@cli r2dx : eq. to 'resize2dx'.
+r2dx :
+  _gmic_s="$?" v + _resize2dx $*
+
+#@cli resize2dx : width[%]>0,_interpolation,_boundary_conditions,_ax,_ay,_az,_ac
+#@cli : Resize selected images along the x-axis, while preserving 2D ratio.
+#@cli : (eq. to 'r2dx').\n
+#@cli : 'interpolation' can be { -1:none (memory content) | 0:none | 1:nearest | 2:average | 3:linear | \
+# 4:grid | 5:bicubic | 6:lanczos }.
+#@cli : 'boundary_conditions' has different meanings, according to the chosen 'interpolation' mode :
+#@cli : . When 'interpolation=={ -1 | 1 | 2 | 4 }', 'boundary_conditions' is meaningless.
+#@cli : . When 'interpolation==0', 'boundary_conditions' can be { 0:dirichlet | 1:neumann | 2:periodic | 3:mirror }.
+#@cli : . When 'interpolation=={ 3 | 5 | 6 }', 'boundary_conditions' can be { 0:none | 1:neumann }.
+#@cli : 'ax,ay,az,ac' set the centering along each axis when 'interpolation=0'
+#@cli : (set to '0' by default, must be defined in range [0,1]).
+#@cli : Default values: 'interpolation=3', 'boundary_conditions=0' and 'ax=ay=az=ac=0'.
+#@cli : $ image.jpg +resize2dx 100,2 append x
+resize2dx :
+  _gmic_s="$?" v + _$0 $*
+
+_resize2dx : check "$1>0 && ${2=3}>=0 && $2<=6 && ${3=0}>=0 && $3<=3 && ${4=0}>=0 && $4<=1 && ${5=0}>=0 && $5<=1 &&
+                    ${6=0}>=0 && $6<=1 && ${7=0}>=0 && $7<=1"
+  e[0--3] "Resize 2D image"$_gmic_s" to $1 pixels along the x-axis, while preserving 2D ratio."
+  foreach {
+    size:=ispercentage($1)?$1*w:$1
+    r {max(1,$size)},{max(1,h*$size/w)},100%,100%,${2-7}
+  }
 
 # Local Variables:
 # mode: sh
