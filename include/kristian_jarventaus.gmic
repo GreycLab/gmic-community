@@ -3,11 +3,11 @@
 #  File        : kristian_jarventaus.gmic
 #                ( G'MIC commands file )
 #
-#  Description : Community G'MIC filters, by Kristian Järventaus.
+#  Description : Community filters, written by Kristian Järventaus.
 #                (Category 'Map Projection').
 #
 #  Author   : Kristian Järventaus.
-#             (slightly modified by David Tschumperlé).
+#             (slight modifications by David Tschumperlé).
 #
 #  License     : CeCILL v2.0
 #                ( http://cecill.info/licences/Licence_CeCILL_V2-en.html )
@@ -59,11 +59,7 @@
 #@gui : note = note("<small>Author: <i><a href="https://www.cartographersguild.com/showthread.php?t=47591">\
 # Kristian Järventaus</a></i>.      Latest Update: <i>2024/03/05</i>.</small>")
 rotate_equirectangular_map : skip ${1=0},${2=0},${3=0},${4=0} # Default to 0 degrees
-  # Create new image, the ""-block is the mathematical 'function' that
-  # determines the value of the output pixel wherever we are iterating
   f "
-    # Command parameters from the command line or the sliders.
-    # Variables from outside the ""-block have to be outside the ""s.
     const roll = $1;
     const pitch = $2;
     const yaw = $3;
@@ -172,9 +168,6 @@ sinusoidal_map : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6=0},${7=100} check $
     # Slice the rotated map image into vertical sections
     split x,$slices
 
-    # No keyword: create an image. The ""-block is the mathematical function
-    # whose result/return value at the end determines the value of the pixel
-    # x, y we are iterating over.
     f "begin(bgcolor = [ ${4-6},$7*255% ]);
 
       # Half-accidental magical formula. Half-sin is used to center the coordinates somehow??
@@ -185,8 +178,7 @@ sinusoidal_map : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6=0},${7=100} check $
       # Check whether we're coloring inside or outside the sinusoidal shape
       x>=w/2 - halfsin && x<=w/2 + halfsin?I(x2,y,0,2,0):bgcolor"
 
-    # Join all the rest (new) slices together in order on the x axis
-    append x
+    append x # Join all the rest (new) slices together in order on the x axis
   }
 
 #######################
@@ -263,12 +255,11 @@ triangular_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6=0},${7=100} 
 # Kristian Järventaus</a></i>.      Latest Update: <i>2024/03/05</i>.</small>")
 cylindrical_equal_area : skip ${1=0},${2=0},${3=0} -check ${4=45}<=80 # $1-3 Default to 0 degrees
 
-  # Give input alpha-channel to prevent errors with transparency
-  to_rgba
-
-  # Standard parallells custom
   phi_input=$4
   phi0:=arg0($5,$phi_input°,0,30°,acos(sqrt(2/pi)),37.4°,37.5°,45°,50°,acos(sqrt(1/pi)),"$6")
+
+  # Give input alpha-channel to prevent errors with transparency
+  to_rgba
 
   # First rotate the map(s) with the appropriate custom command
   if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
@@ -280,9 +271,6 @@ cylindrical_equal_area : skip ${1=0},${2=0},${3=0} -check ${4=45}<=80 # $1-3 Def
     # w:h = pi*(cos phi_0)²
     W,H:=w*pi*cos($phi0)^2,w
 
-    # Initialize the image using the above precalculated width and height
-    # The "" block contains the mathematical 'formula' that determines
-    # what each x,y pixel is.
     $W,$H,1,4,"begin(bgcolor = [ 0,0,0,0 ]);
       const phi0 = $phi0;
       const pi2 = 2*pi;
@@ -376,9 +364,6 @@ lambert_azimuthal_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6=180} 
   if $5!=0 rotate_equirectangular_map 0,{-$5},0 fi
 
   foreach {
-    # Initialize the image using the above precalculated width and height
-    # The "" block contains the mathematical 'formula' that determines
-    # what each x,y pixel is.
     {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
       # Inside the ""-block it's easier to pre-translate dollar-variables
       const phi0 = $phi0;
@@ -428,17 +413,6 @@ lambert_azimuthal_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6=180} 
       # Check whether the pixel's geographical nX, nY coordinates
       # are within the normal range AND inside the deltaS cutoff
       nX>=-pi && nX<=pi && nY>=-pi/2 && nY<=pi/2 && abs(deltaS)<=cutoff?I(#0,X,Y,0,2,0):bgcolor"
-
-    # New trick: if you can't calculate the width and height of the image
-    # in advance, doing it on a "blank" square image can work as well.
-    # In the ""-block of the -input above the last pixel assignment
-    # checks if the geographical coordinates we're looking for make
-    # any sense, that is, no weird values above or below plus-minus 180 or
-    # 90 degrees. If the pixel x,y coordinates would result in something
-    # nonsensical, output a transparent pixel. This is necessary, because it's
-    # not automatic: you get weird blocks of white *and* transparent
-    # lines. Then you can use autocrop from g'mic to do some magic and remove
-    # the transparent areas.
     k. autocrop
   }
 
@@ -476,9 +450,6 @@ mollweide_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0} # $1-3 Default to
   if $5!=0 rotate_equirectangular_map 0,{-$5},0 fi
 
   foreach {
-    # Initialize the image using the above precalculated width and height
-    # The "" block contains the mathematical 'formula' that determines
-    # what each x,y pixel is.
     {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
       # inside the ""-block it's easier to pre-translate dollar-variables
       const pi2 = 2*pi;
@@ -518,17 +489,6 @@ mollweide_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0} # $1-3 Default to
       # Check whether the pixel's geographical nX, nY coordinates
       # are within the normal range
       nX>=-pi && nX<=pi && nY>=-pi/2 && nY<=pi/2?I(#0,X,Y,0,2,0):bgcolor"
-
-    # New trick: if you can't calculate the width and height of the image
-    # in advance, doing it on a "blank" square image can work as well.
-    # In the ""-block of the -input above the last pixel assignment
-    # checks if the geographical coordinates we're looking for make
-    # any sense, that is, no weird values above or below plus-minus 180 or
-    # 90 degrees. If the pixel x,y coordinates would result in something
-    # nonsensical, output a transparent pixel. This is necessary, because it's
-    # not automatic: you get weird blocks of white *and* transparent
-    # lines. Then you can use autocrop from g'mic to do some magic and remove
-    # the transparent areas.
     k. autocrop
   }
 
@@ -566,9 +526,6 @@ orthographic_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0} # $1-3 Default
   if $5!=0 rotate_equirectangular_map 0,{-$5},0 fi
 
   foreach {
-    # Initialize the image using the above precalculated width and height
-    # The "" block contains the mathematical 'formula' that determines
-    # what each x,y pixel is.
     {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
       # Inside the ""-block it's easier to pre-translate dollar-variables
       const pi2 = 2*pi;
@@ -615,17 +572,6 @@ orthographic_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0} # $1-3 Default
       # are within the normal range
       # Why does this break if the condition is set to true manually???
       nX>-pi && nX<pi && nY>-pi/2 && nY<pi/2?I(#0,X,Y,0,2,0):bgcolor"
-
-    # New trick: if you can't calculate the width and height of the image
-    # in advance, doing it on a "blank" square image can work as well.
-    # In the ""-block of the -input above the last pixel assignment
-    # checks if the geographical coordinates we're looking for make
-    # any sense, that is, no weird values above or below plus-minus 180 or
-    # 90 degrees. If the pixel x,y coordinates would result in something
-    # nonsensical, output a transparent pixel. This is necessary, because it's
-    # not automatic: you get weird blocks of white *and* transparent
-    # lines. Then you can use autocrop from g'mic to do some magic and remove
-    # the transparent areas.
     k. autocrop
   }
 
@@ -665,9 +611,6 @@ azimuthal_equidistant_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6=1
   if $5!=0 rotate_equirectangular_map 0,{-$5},0 fi
 
   foreach {
-    # Initialize the image using the above precalculated width and height
-    # The "" block contains the mathematical 'formula' that determines
-    # what each x,y pixel is.
     {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
       # Inside the ""-block it's easier to pre-translate dollar-variables
       const pi2 = 2*pi;
@@ -722,17 +665,6 @@ azimuthal_equidistant_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6=1
     100%,100%,1,4,0 fc. 0,0,0,0
     shape_circle {w} n. 0,255 negate.
     +blend_fade[-2,-3] .
-
-    # New trick: if you can't calculate the width and height of the image
-    # in advance, doing it on a "blank" square image can work as well.
-    # In the ""-block of the -input above the last pixel assignment
-    # checks if the geographical coordinates we're looking for make
-    # any sense, that is, no weird values above or below plus-minus 180 or
-    # 90 degrees. If the pixel x,y coordinates would result in something
-    # nonsensical, output a transparent pixel. This is necessary, because it's
-    # not automatic: you get weird blocks of white *and* transparent
-    # lines. Then you can use autocrop from g'mic to do some magic and remove
-    # the transparent areas.
     k. autocrop
   }
 
@@ -774,9 +706,6 @@ conic_equidistant_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6=20},$
   # if $5!=0 rotate_equirectangular_map 0,{-$5},0 fi
 
   foreach {
-    # Initialize the image using the above precalculated width and height
-    # The "" block contains the mathematical 'formula' that determines
-    # what each x,y pixel is.
     {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
       # Inside the ""-block it's easier to pre-translate dollar-variables
       const pi2 = 2*pi;
@@ -827,17 +756,6 @@ conic_equidistant_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6=20},$
       L = nX - l0;
       P = nY - phi0;
       L>=-pi && L<=pi && P>=-pi/2 && P<=pi/2?I(#0,X%ow,Y,0,2,0):bgcolor"
-
-    # New trick: if you can't calculate the width and height of the image
-    # in advance, doing it on a "blank" square image can work as well.
-    # In the ""-block of the -input above the last pixel assignment
-    # checks if the geographical coordinates we're looking for make
-    # any sense, that is, no weird values above or below plus-minus 180 or
-    # 90 degrees. If the pixel x,y coordinates would result in something
-    # nonsensical, output a transparent pixel. This is necessary, because it's
-    # not automatic: you get weird blocks of white *and* transparent
-    # lines. Then you can use autocrop from g'mic to do some magic and remove
-    # the transparent areas.
     k. autocrop
   }
 
@@ -875,9 +793,6 @@ lambert_conformal_conic_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6
   if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
 
   foreach {
-    # Initialize the image using the above precalculated width and height
-    # The "" block contains the mathematical 'formula' that determines
-    # what each x,y pixel is.
     {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
       # Inside the ""-block it's easier to pre-translate dollar-variables
       const pi2 = 2*pi;
@@ -937,17 +852,6 @@ lambert_conformal_conic_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6
     # we've flipped the projection. Here we need to further rotate
     # the image so it's not upside down.
     if $phi0<0 rotate. 180 fi
-
-    # New trick: if you can't calculate the width and height of the image
-    # in advance, doing it on a "blank" square image can work as well.
-    # In the ""-block of the -input above the last pixel assignment
-    # checks if the geographical coordinates we're looking for make
-    # any sense, that is, no weird values above or below plus-minus 180 or
-    # 90 degrees. If the pixel x,y coordinates would result in something
-    # nonsensical, output a transparent pixel. This is necessary, because it's
-    # not automatic: you get weird blocks of white *and* transparent
-    # lines. Then you can use autocrop from g'mic to do some magic and remove
-    # the transparent areas.
     k. autocrop
   }
 
@@ -980,9 +884,6 @@ mercator : skip ${1=0},${2=0},${3=0},${4=0},${5=85} # $1-3 Default to 0 degrees
   if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
 
   foreach {
-    # Initialize the image using the above precalculated width and height
-    # The "" block contains the mathematical 'formula' that determines
-    # what each x,y pixel is.
     {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
       # Inside the ""-block it's easier to pre-translate dollar-variables
       const pi2 = 2*pi;
@@ -1058,9 +959,6 @@ albers_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6=20},${7=60},${8=
   if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
 
   foreach {
-    # Initialize the image using the above precalculated width and height
-    # The "" block contains the mathematical 'formula' that determines
-    # what each x,y pixel is.
     {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
       # Inside the ""-block it's easier to pre-translate dollar-variables
       const pi2 = 2*pi;
@@ -1120,17 +1018,6 @@ albers_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6=20},${7=60},${8=
     # we've flipped the projection. Here we need to further rotate
     # the image so it's not upside down.
     if $phi0<0 rotate. 180 fi
-
-    # New trick: if you can't calculate the width and height of the image
-    # in advance, doing it on a "blank" square image can work as well.
-    # In the ""-block of the -input above the last pixel assignment
-    # checks if the geographical coordinates we're looking for make
-    # any sense, that is, no weird values above or below plus-minus 180 or
-    # 90 degrees. If the pixel x,y coordinates would result in something
-    # nonsensical, output a transparent pixel. This is necessary, because it's
-    # not automatic: you get weird blocks of white *and* transparent
-    # lines. Then you can use autocrop from g'mic to do some magic and remove
-    # the transparent areas.
     k. autocrop
   }
 
@@ -1161,9 +1048,6 @@ eckert_iv_projection : skip ${1=0},${2=0},${3=0},${4=0} # $1-3 Default to 0 degr
   if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
 
   foreach {
-    # Initialize the image using the above precalculated width and height
-    # The "" block contains the mathematical 'formula' that determines
-    # what each x,y pixel is.
     {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
       # Inside the ""-block it's easier to pre-translate dollar-variables
       const pi2 = 2*pi;
@@ -1210,17 +1094,6 @@ eckert_iv_projection : skip ${1=0},${2=0},${3=0},${4=0} # $1-3 Default to 0 degr
     # we've flipped the projection. Here we need to further rotate
     # the image so it's not upside down.
     if $phi0<0 rotate. 180 fi
-
-    # New trick: if you can't calculate the width and height of the image
-    # in advance, doing it on a "blank" square image can work as well.
-    # In the ""-block of the -input above the last pixel assignment
-    # checks if the geographical coordinates we're looking for make
-    # any sense, that is, no weird values above or below plus-minus 180 or
-    # 90 degrees. If the pixel x,y coordinates would result in something
-    # nonsensical, output a transparent pixel. This is necessary, because it's
-    # not automatic: you get weird blocks of white *and* transparent
-    # lines. Then you can use autocrop from g'mic to do some magic and remove
-    # the transparent areas.
     k. autocrop
   }
 
@@ -1251,9 +1124,6 @@ eckert_vi_projection : skip ${1=0},${2=0},${3=0},${4=0} # $1-3 Default to 0 degr
   if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
 
   foreach {
-    # Initialize the image using the above precalculated width and height
-    # The "" block contains the mathematical 'formula' that determines
-    # what each x,y pixel is.
     {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
       # Inside the ""-block it's easier to pre-translate dollar-variables
       const pi2 = 2*pi;
@@ -1300,17 +1170,6 @@ eckert_vi_projection : skip ${1=0},${2=0},${3=0},${4=0} # $1-3 Default to 0 degr
     # we've flipped the projection. Here we need to further rotate
     # the image so it's not upside down.
     if $phi0<0 rotate. 180 fi
-
-    # New trick: if you can't calculate the width and height of the image
-    # in advance, doing it on a "blank" square image can work as well.
-    # In the ""-block of the -input above the last pixel assignment
-    # checks if the geographical coordinates we're looking for make
-    # any sense, that is, no weird values above or below plus-minus 180 or
-    # 90 degrees. If the pixel x,y coordinates would result in something
-    # nonsensical, output a transparent pixel. This is necessary, because it's
-    # not automatic: you get weird blocks of white *and* transparent
-    # lines. Then you can use autocrop from g'mic to do some magic and remove
-    # the transparent areas.
     k. autocrop
   }
 
