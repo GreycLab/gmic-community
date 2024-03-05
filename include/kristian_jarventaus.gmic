@@ -1,0 +1,1321 @@
+#@gmic
+#
+#  File        : kristian_jarventaus.gmic
+#                ( G'MIC commands file )
+#
+#  Description : Community G'MIC filters, by Kristian Järventaus.
+#                (Category 'Map Projection').
+#
+#  Author   : Kristian Järventaus.
+#             (slightly modified by David Tschumperlé).
+#
+#  License     : CeCILL v2.0
+#                ( http://cecill.info/licences/Licence_CeCILL_V2-en.html )
+#
+#  This software is governed by the CeCILL  license under French law and
+#  abiding by the rules of distribution of free software.  You can  use,
+#  modify and/ or redistribute the software under the terms of the CeCILL
+#  license as circulated by CEA, CNRS and INRIA at the following URL
+#  "http://cecill.info".
+#
+#  As a counterpart to the access to the source code and  rights to copy,
+#  modify and redistribute granted by the license, users are provided only
+#  with a limited warranty  and the software's author,  the holder of the
+#  economic rights,  and the successive licensors  have only  limited
+#  liability.
+#
+#  In this respect, the user's attention is drawn to the risks associated
+#  with loading,  using,  modifying and/or developing or reproducing the
+#  software by the user in light of its specific status of free software,
+#  that may mean  that it is complicated to manipulate,  and  that  also
+#  therefore means  that it is reserved for developers  and  experienced
+#  professionals having in-depth computer knowledge. Users are therefore
+#  encouraged to load and test the software's suitability as regards their
+#  requirements in conditions enabling the security of their systems and/or
+#  data to be ensured and,  more generally, to use and operate it in the
+#  same conditions as regards security.
+#
+#  The fact that you are presently reading this means that you have had
+#  knowledge of the CeCILL license and that you accept its terms.
+#
+
+#@gui ____<b>Map Projection</b>
+#-----------------------------
+
+############################
+## EQUIRECTANGULAR ROTATION
+#@cli rotate_equirectangular_map : roll angle, pitch angle, yaw angle, revert bool
+#@cli : Take a map or equirectangular panorama
+#@cli : and rotate it around three axises
+
+#@gui Rotate Equirectangular Map : rotate_equirectangular_map
+#@gui : note = note("Rotate an equirectangular map or panorama around three axises in order in degrees.")
+#@gui : sep = separator()
+#@gui : Roll = float(0,-360,360)
+#@gui : Pitch ("north and south") = float(0,-360,360)
+#@gui : Yaw ("east and west") = float(0,-360,360)
+#@gui : Revert rotations = bool(false)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i><a href="https://www.cartographersguild.com/showthread.php?t=47591">\
+# Kristian Järventaus</a></i>.      Latest Update: <i>2024/03/05</i>.</small>")
+rotate_equirectangular_map : skip ${1=0},${2=0},${3=0},${4=0} # Default to 0 degrees
+  # Create new image, the ""-block is the mathematical 'function' that
+  # determines the value of the output pixel wherever we are iterating
+  f "
+    # Command parameters from the command line or the sliders.
+    # Variables from outside the ""-block have to be outside the ""s.
+    const roll = $1;
+    const pitch = $2;
+    const yaw = $3;
+    const revert = $4;
+
+    # Converting degrees into radians for the matrices later
+    # Those minus signs are just a direction correction.
+    const alpha = -roll°;
+    const beta = -pitch°;
+    const gamma = -yaw°;
+
+    # Equirectangular coordinates into spherical radians coordinates
+    # phi <- height
+    # theta <- width
+    # radius rho=1, we are always working with a unit sphere / globe with radius 1
+    # The extra pi in "otheta=PI..." is to offset the axis towards the center of the image
+    otheta = pi + (x/w)*2*pi;
+    ophi = (y/h)*pi;
+    const rho = 1;
+
+    # Convert to Cartesian x, y, z, we can leave out rho=1
+    #    cx=rho*sin(ophi)*cos(otheta);
+    #    cy=rho*sin(ophi)*sin(otheta);
+    #    cz=rho*cos(ophi);
+    cx = sin(ophi)*cos(otheta);
+    cy = sin(ophi)*sin(otheta);
+    cz = cos(ophi);
+
+    # Do the transformation in Cartesian using rotation matrix maths magic
+    if (!revert,
+      rotz = cz*cos(alpha)*cos(beta) +
+             cy*(cos(alpha)*sin(beta)*sin(gamma) - sin(alpha)*cos(gamma)) +
+             cx*(cos(alpha)*sin(beta)*cos(gamma) + sin(alpha)*sin(gamma));
+      roty = cz*sin(alpha)*cos(beta) +
+             cy*(sin(alpha)*sin(beta)*sin(gamma) + cos(alpha)*cos(gamma)) +
+             cx*(sin(alpha)*sin(beta)*cos(gamma) - cos(alpha)*sin(gamma));
+      rotx = cz*-sin(beta) +
+             cy*cos(beta)*sin(gamma) +
+             cx*cos(beta)*cos(gamma);
+    ,_(else)
+
+      # !!!!!!!!!!!!!!!! Reversion matrix??
+      # small letter x = cos(x)
+      # capital letter X = sin(x)
+      # {{    a*b,         -A*b,          B       }
+      # {     B*G*a+A*g,   -A*B*G+a*g,    -G*b    }
+      # {     A*G-B*a*g,   G*a+A*B*g,     b*g     }}
+
+      ## Testing reversion
+      rotz = cz*cos(-alpha)*cos(-beta) +
+             cy*-sin(-alpha)*cos(-beta) +
+             cx*sin(-beta);
+      roty = cz*(sin(-beta)*sin(-gamma)*cos(-alpha) + sin(-alpha)*cos(-gamma)) +
+             cy*(-sin(-alpha)*sin(-beta)*sin(-gamma) + cos(-alpha)*cos(-gamma)) +
+             cx*-sin(-gamma)*cos(-beta);
+      rotx = cz*(sin(-alpha)*sin(-gamma) - sin(-beta)*cos(-alpha)*cos(-gamma)) +
+             cy*(sin(-gamma)*cos(-alpha) + sin(-alpha)*sin(-beta)*cos(-gamma)) +
+             cx*(cos(-beta)*cos(-gamma));
+    );
+
+    # Convert the rotated point BACK into spherical coordinates
+    # Atan2 is a special programming thing to do arctan, except better
+    # It's got its own Wikipedia page
+    ntheta = atan2(roty,rotx);
+    nphi = acos(rotz/sqrt(rotx*rotx + roty*roty + rotz*rotz));
+
+    # Convert spherical coordinates almost straight back into
+    # equirectangular pixel coordinates.
+    x2 = (ntheta/pi/2)*w + w/2;
+    y2 = nphi/pi*h;
+
+    # I: from image #0 take the vector(pixel value) of x2,y2,z(=0)
+    # 2: Cubic interpolation of pixels
+    # 0: Boundary condition: if you hit 'nothing', what do you do? N/A here.
+    cut(I(x2,y2,0,2,1),0,255)"
+
+########################
+## SINUSOIDAL
+#@cli sinusoidal_map : yaw angle, pitch angle, roll angle, bgred, bggreen, bgblue, slices
+#@cli : Take a map or equirectangular panorama
+#@cli : and rotate it around z, y and x angles,
+#@cli : then project it as a sliced sinusoidal map
+
+#@gui Sinusoidal Map : sinusoidal_map
+#@gui : note = note("Rotate an equirectangular map or panorama around three axises in order and output it as a sinusoidal projection.")
+#@gui : sep = separator()
+#@gui : Roll = float(0,-360,360)
+#@gui : Pitch ("north and south") = float(0,-360,360)
+#@gui : Yaw ("east and west") = float(0,-360,360)
+#@gui : Background color = color(128,128,128)
+#@gui : Background opacity (%) = float(100,0,100)
+#@gui : Slices = int(1,1,72)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i><a href="https://www.cartographersguild.com/showthread.php?t=47591">\
+# Kristian Järventaus</a></i>.      Latest Update: <i>2024/03/05</i>.</small>")
+sinusoidal_map : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6=0},${7=100} check ${8=1}>=1
+  # $1-3 Default to 0 degrees
+  # $4-6 color(r,g,b) gives you three separate parameters instead of, say, a vector
+  slices=$8
+  to_rgba # Give input alpha-channel to prevent errors with transparency
+
+  # First rotate the map(s) with the appropriate custom command
+  if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
+
+  foreach {
+    # Slice the rotated map image into vertical sections
+    split x,$slices
+
+    # No keyword: create an image. The ""-block is the mathematical function
+    # whose result/return value at the end determines the value of the pixel
+    # x, y we are iterating over.
+    f "begin(bgcolor = [ ${4-6},$7*255% ]);
+
+      # Half-accidental magical formula. Half-sin is used to center the coordinates somehow??
+      halfsin = sin(y/h*pi)*w/2;
+      x2 = (x + halfsin - w/2)/max(1,sin(y/h*pi));
+      # y = y in this case, just use original y.
+
+      # Check whether we're coloring inside or outside the sinusoidal shape
+      x>=w/2 - halfsin && x<=w/2 + halfsin?I(x2,y,0,2,0):bgcolor"
+
+    # Join all the rest (new) slices together in order on the x axis
+    append x
+  }
+
+#######################
+## TRIANGULAR
+#@cli triangular_projection : yaw angle, pitch angle, roll angle, bgred, bggreen, bgblue, slices
+#@cli : Take a map or equirectangular panorama
+#@cli : and rotate it around z, y and x angles,
+#@cli : then project it as a sliced triangular map.
+#@cli : This is not the Collignon projection.
+#@cli : It's a naive triangular interpolation.
+
+#@gui Triangular projection : triangular_projection
+#@gui : note = note("Rotate an equirectangular map or panorama around three axises in order and output it as a naive rectilinear projection. This is not a Collignon projection, but a naive linear interpolation.")
+#@gui : note = note("When the width at the poles is 50%, this becomes the Eckert I projection. These projections are not equal-area nor do they have any other useful cartographical property.")
+#@gui : sep = separator()
+#@gui : Roll = float(0,-360,360)
+#@gui : Pitch ("north and south") = float(0,-360,360)
+#@gui : Yaw ("east and west") = float(0,-360,360)
+#@gui : Background color = color(128,128,128)
+#@gui : Background opacity (%) = float(100,0,100)
+#@gui : Slices = int(1,1,72)
+#@gui : Width at the poles % = float(50,0,100)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i><a href="https://www.cartographersguild.com/showthread.php?t=47591">\
+# Kristian Järventaus</a></i>.      Latest Update: <i>2024/03/05</i>.</small>")
+triangular_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6=0},${7=100} check ${8=1}>=1" && "${9=5}>=0
+  # $1-3 Default to 0 degrees
+  # $4-7 color(r,g,b) gives you three separate parameters instead of, say, a vector
+  slices,magic=$8,$9
+
+  # Give input alpha-channel to prevent errors with transparency
+  to_a
+
+  # First rotate the map(s) with the appropriate custom command
+  if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
+
+  foreach {
+    # Slice the rotated map image into vertical sections
+    split x,$slices
+    100%,100%,1,2,"
+      const startwidth = $magic;
+      const sc = startwidth%;
+      my = y<=h/2?y:h - y;
+      squish = w/lerp(w*sc,w,my/(h/2));
+      shift = (w - squish*w)/2;
+      X = squish*x + shift;
+      Y = y;
+      [ X,Y ]"
+    warp[^-1] .,0,2,0 rm. a x
+
+    # Generate blank image, then fill_color with bg-color
+    100%,100%,1,4,0 fill_color. ${4-6},{$7*255%}
+    rv blend alpha
+  }
+
+##########################
+## CYLINDRICAL EQUAL AREA
+#@cli cylindrical_equal_area : yaw angle, pitch angle, roll angle, standard_parallel angle
+#@cli : Take a map or equirectangular panorama
+#@cli : and rotate it around z, y and x angles,
+#@cli : then project it as a cylindrical equal area map.
+
+#@gui Cylindrical equal-area projection : cylindrical_equal_area
+#@gui : note = note("Rotate an equirectangular map or panorama around three axises in order and output it as a cylindrical equal-area projection.")
+#@gui : sep = separator()
+#@gui : Roll = float(0,-360,360)
+#@gui : Pitch ("north and south") = float(0,-360,360)
+#@gui : Yaw ("east and west") = float(0,-360,360)
+#@gui : Standard parallels = float(45,0,80)
+#@gui : Named specializations = choice("[Standard parallels ↑]","Lambert 0° π:1","Behrmann 30°","Smyth/Craster ≈37°04\′17\″ 2:1","Trystan Edwards 37°24\′","Hobo-Dyer 37°30\′","Gall-Peters 45°","Balthasar 50°","Tobler ≈55°39\′14\″ 1:1","[Custom formula ↓]")
+#@gui : Custom formula = text{"acos(sqrt(1/pi))"}
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i><a href="https://www.cartographersguild.com/showthread.php?t=47591">\
+# Kristian Järventaus</a></i>.      Latest Update: <i>2024/03/05</i>.</small>")
+cylindrical_equal_area : skip ${1=0},${2=0},${3=0} -check ${4=45}<=80 # $1-3 Default to 0 degrees
+
+  # Give input alpha-channel to prevent errors with transparency
+  to_rgba
+
+  # Standard parallells custom
+  phi_input=$4
+  phi0:=arg0($5,$phi_input°,0,30°,acos(sqrt(2/pi)),37.4°,37.5°,45°,50°,acos(sqrt(1/pi)),"$6")
+
+  # First rotate the map(s) with the appropriate custom command
+  if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
+
+  foreach {
+    # Determine the dimensions of the output projection by using
+    # the ratio of w:h as give by Wikipedia
+    # https://en.wikipedia.org/wiki/Cylindrical_equal-area_projection
+    # w:h = pi*(cos phi_0)²
+    W,H:=w*pi*cos($phi0)^2,w
+
+    # Initialize the image using the above precalculated width and height
+    # The "" block contains the mathematical 'formula' that determines
+    # what each x,y pixel is.
+    $W,$H,1,4,"begin(bgcolor = [ 0,0,0,0 ]);
+      const phi0 = $phi0;
+      const pi2 = 2*pi;
+
+      # Use centered coordinates. 0,0 is in the middle of the projection
+      cx = x - w/2;
+      cy = y - h/2;
+
+      # Turn them into radians??
+      cx*=pi2/w;
+      cy*=pi2/w;
+
+      # Somehow I cancelled out the formula for nX, it's
+      # now part of the output image width formula above????
+      nX = cx;
+      # I don't know! I don't know! But this formula works!!
+      nY = asin(cy*cos(phi0)^2);
+
+      # Here's the magic trick: the X and Y coordinates we are
+      # calculating are not about where something goes, it's about
+      # where something COMES FROM. Because of the way G'mic makes
+      # you think about 'filters', you have to invert the transformation
+      # direction: you look at the OUTPUT images' x and y coordinates,
+      # then figure out where *from* that values has to come from.
+      # Basically, we're taking the output and calculating it in reverse,
+      # so that we get equirectangular (=spherical) coordinates back.
+      # That's why instead of calculating with SINE, which is the way you
+      # do it forward, we calculate with ARCSINE, which is backwards.
+      # This is the number one reason why doing this stuff in G'mic is torture.
+      # Check out the formulas in
+      # https://mathworld.wolfram.com/CylindricalEqual-AreaProjection.html
+
+      # EQUIRECTANGULAR COORDINATES
+      # Get the width and height of the original equirectangular input
+      const ow = w#0;
+      const oh = h#0;
+
+      # Pretty simply translate radians coordinates straight into
+      # equirectangular pixel coordinates.
+      X = ow/2 + ow*nX/pi2;
+      Y = oh/2 + oh*nY/pi;
+
+      nX>=-pi && nX<=pi && nY>=-pi/2 && nY<=pi/2?I(#0,X%ow,Y,0,2,0):bgcolor"
+    k. autocrop
+  }
+
+#######################
+## LAMBERT AZIMUTHAL
+#@cli lambert_azimuthal_projection : yaw angle, pitch angle, roll angle
+#@cli : Take a map or equirectangular panorama
+#@cli : and rotate it around z, y and x angles,
+#@cli : then project it as a Lambert azimuthal equal area map.
+
+#@gui Lambert Azimuthal Equal-Area : lambert_azimuthal_projection
+#@gui : note = note("Rotate an equirectangular map or panorama around three axises in order and output it as a Lambert Azimuthal Equal-Area map.")
+#@gui : sep = separator()
+#@gui : Roll = float(0,-360,360)
+#@gui : Pitch = float(0,-360,360)
+#@gui : Yaw = float(0,-360,360)
+#@gui : Central longitude = float(0,-180,180)
+#@gui : Standard parallel = float(0,-90,90)
+#@gui : Cut-off at = float(180,0,180)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i><a href="https://www.cartographersguild.com/showthread.php?t=47591">\
+# Kristian Järventaus</a></i>.      Latest Update: <i>2024/03/05</i>.</small>")
+lambert_azimuthal_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6=180} # $1-3 Default to 0 degrees
+  phi0,cutoff:=0°,$6°
+
+  # Give input alpha-channel to prevent errors with transparency
+  to_rgba
+
+  # First rotate the map(s) with the appropriate custom command
+  if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
+
+  # There is a bug in the naive formulas I put into this
+  # script. Changing phi0 causes the map to get a literal
+  # rip hole into it. If that was the only way for me to
+  # change the angle of the globe view, this script
+  # would be basically pretty useless and would only make
+  # maps in one orientation. Happily, you can subsitute
+  # those calculations with the usual equirectangular
+  # rotation command. In this case, the two below are
+  # needed to make "parallel" and "longitude" make sense.
+  # The equirectangular_projection command applies the
+  # rotations in a specific order. If you try to use it
+  # *like* longitudes and parallels, you have to find the
+  # equivalent values somehow. Below, to easily get the
+  # "right" orientation,  first East-West movement is
+  # applied, then North-South.
+  if $4!=0 rotate_equirectangular_map 0,0,$4 fi
+  if $5!=0 rotate_equirectangular_map 0,{-$5},0 fi
+
+  foreach {
+    # Initialize the image using the above precalculated width and height
+    # The "" block contains the mathematical 'formula' that determines
+    # what each x,y pixel is.
+    {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
+      # Inside the ""-block it's easier to pre-translate dollar-variables
+      const phi0 = $phi0;
+      const cutoff = $cutoff;
+      const pi2 = 2*pi;
+
+      # Use centered coordinates. 0,0 is in the middle of the projection
+      cx = x - w/2;
+      cy = y - h/2;
+
+      # Turn them into radians??
+      cx*=pi2/w;
+      cy*=pi2/w;
+
+      # For convenience sake. Rho is obviously, in retrospect
+      # distance (from center)... At rho==sqrt/2 is where the
+      # switch in the atan-function should happen.
+      # These are from
+      # https://mathworld.wolfram.com/LambertAzimuthalEqual-AreaProjection.html
+      rho = sqrt(cx^2 + cy^2);
+      C = 2*asin(1/2*rho);
+
+      # atan2 can be used here! The formula looks complicated, but just
+      # take the parts of the fraction and replace the / with , for the function
+      nX = atan2(cx*sin(C),rho*cos(phi0)*cos(C) - cy*sin(phi0)*sin(C));
+      nY = asin(cos(C)*sin(phi0) + cy*sin(C)*cos(phi0)/rho);
+      # the sin(phi0)'s cancel out with multiplying by zero, should remove...
+
+      # For the logic behind inverting the formula, check out the
+      # Cylindrical Equal-Area filter for a rant
+
+      # EQUIRECTANGULAR COORDINATES
+      # Get the width and height of the original equirectangular input
+      const ow = w#0;
+      const oh = h#0;
+
+      # Pretty simply translate radians coordinates straight into
+      # equirectangular pixel coordinates.
+      X = ow/2 + ow*nX/pi2;
+      Y = oh/2 + oh*nY/pi;
+
+      # Calculate the map's rendering radius based on user's cutoff angle
+      # This is a simplified Great Circle distance formula
+      # where half the formula disappears because sin(0)=0
+      deltaS = acos(cos(nY)*cos(nX));
+
+      # Check whether the pixel's geographical nX, nY coordinates
+      # are within the normal range AND inside the deltaS cutoff
+      nX>=-pi && nX<=pi && nY>=-pi/2 && nY<=pi/2 && abs(deltaS)<=cutoff?I(#0,X,Y,0,2,0):bgcolor"
+
+    # New trick: if you can't calculate the width and height of the image
+    # in advance, doing it on a "blank" square image can work as well.
+    # In the ""-block of the -input above the last pixel assignment
+    # checks if the geographical coordinates we're looking for make
+    # any sense, that is, no weird values above or below plus-minus 180 or
+    # 90 degrees. If the pixel x,y coordinates would result in something
+    # nonsensical, output a transparent pixel. This is necessary, because it's
+    # not automatic: you get weird blocks of white *and* transparent
+    # lines. Then you can use autocrop from g'mic to do some magic and remove
+    # the transparent areas.
+    k. autocrop
+  }
+
+#############
+## MOLLWEIDE
+#@cli mollweide_projection : yaw angle, pitch angle, roll angle, central_longitude angle, standard_parallel angle
+#@cli : Take a map or equirectangular panorama
+#@cli : and rotate it around z, y and x angles,
+#@cli : then project it as a Mollweide projection map.
+
+#@gui Mollweide : mollweide_projection
+#@gui : note = note("Rotate an equirectangular map or panorama around three axises in order and output it as a Mollweide equal-area pseudocylindrical map.")
+#@gui : sep = separator()
+#@gui : Roll = float(0,-360,360)
+#@gui : Pitch = float(0,-360,360)
+#@gui : Yaw = float(0,-360,360)
+#@gui : Central longitude = float(0,-180,180)
+#@gui : Standard parallel = float(0,-90,90)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i><a href="https://www.cartographersguild.com/showthread.php?t=47591">\
+# Kristian Järventaus</a></i>.      Latest Update: <i>2024/03/05</i>.</small>")
+mollweide_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0} # $1-3 Default to 0 degrees
+
+  # Give input alpha-channel to prevent errors with transparency
+  to_rgba
+
+  # First rotate the map(s) with the appropriate custom command
+  if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
+
+  # To apply more standard "longitude" and "standard parallel
+  # translations, use the same rotate command, except in an order
+  # where longitude (yaw) is applied first and latitude (pitch)
+  # is applied second, in two different operations.
+  if $4!=0 rotate_equirectangular_map 0,0,$4 fi
+  if $5!=0 rotate_equirectangular_map 0,{-$5},0 fi
+
+  foreach {
+    # Initialize the image using the above precalculated width and height
+    # The "" block contains the mathematical 'formula' that determines
+    # what each x,y pixel is.
+    {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
+      # inside the ""-block it's easier to pre-translate dollar-variables
+      const pi2 = 2*pi;
+
+      # Use centered coordinates. 0,0 is in the middle of the projection
+      cx = x - w/2;
+      cy = y - h/2;
+
+      # Turn them into radians
+      cx*=pi2/w;
+      cy*=pi2/w;
+
+      # constants for the formulas. R=1 is the Radius of the globe,
+      # I've put 1 here just because i couldn't find a convenient
+      # fraction of pi, and it doesn't change the shape, just scale.
+      # Theta is separated as a constant following the example of
+      # the mathworld equations I found:
+      # https://mathworld.wolfram.com/MollweideProjection.html
+      const R = 1;
+      theta = asin(cy/(sqrt(2)*R));
+      nX = pi*cx/(2*R*sqrt(2)*cos(theta));
+      nY = asin((2*theta + sin(2*theta))/pi);
+
+      # For the logic why I'm inverting the formula, check out the
+      # Cylindrical Equal-Area filter for a rant
+
+      # EQUIRECTANGULAR COORDINATES
+      # Get the width and height of the original equirectangular input
+      const ow = w#0;
+      const oh = h#0;
+
+      # Pretty simply translate radians coordinates straight into
+      # equirectangular pixel coordinates.
+      X = ow/2 + ow*nX/pi2;
+      Y = oh/2 + oh*nY/pi;
+
+      # Check whether the pixel's geographical nX, nY coordinates
+      # are within the normal range
+      nX>=-pi && nX<=pi && nY>=-pi/2 && nY<=pi/2?I(#0,X,Y,0,2,0):bgcolor"
+
+    # New trick: if you can't calculate the width and height of the image
+    # in advance, doing it on a "blank" square image can work as well.
+    # In the ""-block of the -input above the last pixel assignment
+    # checks if the geographical coordinates we're looking for make
+    # any sense, that is, no weird values above or below plus-minus 180 or
+    # 90 degrees. If the pixel x,y coordinates would result in something
+    # nonsensical, output a transparent pixel. This is necessary, because it's
+    # not automatic: you get weird blocks of white *and* transparent
+    # lines. Then you can use autocrop from g'mic to do some magic and remove
+    # the transparent areas.
+    k. autocrop
+  }
+
+#################
+## ORTHOGRAPHIC
+#@cli orthographic_projection : yaw angle, pitch angle, roll angle, central_longitude angle, standard_parallel angle
+#@cli : Take a map or equirectangular panorama
+#@cli : and rotate it around z, y and x angles,
+#@cli : then project it as an orthographic projection map.
+
+#@gui Orthographic : orthographic_projection
+#@gui : note = note("Rotate an equirectangular map or panorama around three axises in order and output it as an orthographic hemisphere map. This map projection is basically the view you'd get if you looked at earth from an infinite distance.")
+#@gui : sep = separator()
+#@gui : Roll = float(0,-360,360)
+#@gui : Pitch = float(0,-360,360)
+#@gui : Yaw = float(0,-360,360)
+#@gui : Central longitude = float(0,-180,180)
+#@gui : Standard parallel = float(0,-90,90)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i><a href="https://www.cartographersguild.com/showthread.php?t=47591">\
+# Kristian Järventaus</a></i>.      Latest Update: <i>2024/03/05</i>.</small>")
+orthographic_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0} # $1-3 Default to 0 degrees
+
+  # Give input alpha-channel to prevent errors with transparency
+  to_rgba
+
+  # First rotate the map(s) with the appropriate custom command
+  if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
+
+  # To apply more standard "longitude" and "standard parallel
+  # translations, use the same rotate command, except in an order
+  # where longitude (yaw) is applied first and latitude (pitch)
+  # is applied second, in two different operations.
+  if $4!=0 rotate_equirectangular_map 0,0,$4 fi
+  if $5!=0 rotate_equirectangular_map 0,{-$5},0 fi
+
+  foreach {
+    # Initialize the image using the above precalculated width and height
+    # The "" block contains the mathematical 'formula' that determines
+    # what each x,y pixel is.
+    {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
+      # Inside the ""-block it's easier to pre-translate dollar-variables
+      const pi2 = 2*pi;
+
+      # Use centered coordinates. 0,0 is in the middle of the projection
+      cx = x - w/2;
+      cy = y - h/2;
+
+      # Turn them into radians
+      cx*=pi2/w;
+      cy*=pi2/w;
+
+      # Formulas and constants:
+      # https://en.wikipedia.org/wiki/Orthographic_projection_in_cartography
+      # R, radius of globe seems to work best with R=pi/2
+      const R = pi/2;
+      const phi0 = 0;
+      const l0 = 0;
+      rho = sqrt(cx^2 + cy^2);
+      C = asin(rho/R);
+
+      # the formulas are simplified a bit because this script uses
+      # phi0=0 and l0=0, leading to anything with sin(phi0) to
+      # multiply with 0. The standard parallel and central longitude
+      # are calculated earlier with actual global rotations.
+      # Happily, here we can use atan2.
+      nY = asin(cy*sin(C)*cos(phi0)/rho);
+      nX = atan2(cx*sin(C),rho*cos(C)*cos(phi0));
+
+      # For the logic why I'm inverting the formula, check out the
+      # Cylindrical Equal-Area filter for a rant
+
+      # EQUIRECTANGULAR COORDINATES
+      # Get the width and height of the original equirectangular input
+      const ow = w#0;
+      const oh = h#0;
+
+      # Pretty simply translate radians coordinates straight into
+      # equirectangular pixel coordinates.
+      X = ow/2 + ow*nX/pi2;
+      Y = oh/2 + oh*nY/pi;
+
+      # Check whether the pixel's geographical nX, nY coordinates
+      # are within the normal range
+      # Why does this break if the condition is set to true manually???
+      nX>-pi && nX<pi && nY>-pi/2 && nY<pi/2?I(#0,X,Y,0,2,0):bgcolor"
+
+    # New trick: if you can't calculate the width and height of the image
+    # in advance, doing it on a "blank" square image can work as well.
+    # In the ""-block of the -input above the last pixel assignment
+    # checks if the geographical coordinates we're looking for make
+    # any sense, that is, no weird values above or below plus-minus 180 or
+    # 90 degrees. If the pixel x,y coordinates would result in something
+    # nonsensical, output a transparent pixel. This is necessary, because it's
+    # not automatic: you get weird blocks of white *and* transparent
+    # lines. Then you can use autocrop from g'mic to do some magic and remove
+    # the transparent areas.
+    k. autocrop
+  }
+
+#########################
+## AZIMUTHAL EQUIDISTANT
+#@cli azimuthal_equidistant_projection : yaw angle, pitch angle, roll angle, central_longitude angle, standard_parallel angle
+#@cli : Take a map or equirectangular panorama
+#@cli : and rotate it around z, y and x angles,
+#@cli : then project it as an azimuthal equidistant map.
+
+#@gui Azimuthal equidistant : azimuthal_equidistant_projection
+#@gui : note = note("Rotate an equirectangular map or panorama around three axises in order and output it as an azimuthal equidistant map. All points on the map are at proportionally correct distances from the center point, and that all points on the map are at the correct azimuth (direction) from the center point.")
+#@gui : sep = separator()
+#@gui : Roll = float(0,-360,360)
+#@gui : Pitch = float(0,-360,360)
+#@gui : Yaw = float(0,-360,360)
+#@gui : Central longitude = float(0,-180,180)
+#@gui : Standard parallel = float(0,-90,90)
+#@gui : Cut-off at = float(180,0,180)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i><a href="https://www.cartographersguild.com/showthread.php?t=47591">\
+# Kristian Järventaus</a></i>.      Latest Update: <i>2024/03/05</i>.</small>")
+azimuthal_equidistant_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6=180} # $1-3 Default to 0 degrees
+
+  # Give input alpha-channel to prevent errors with transparency
+  to_rgba
+  cutoff:=$6°
+
+  # First rotate the map(s) with the appropriate custom command
+  if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
+
+  # To apply more standard "longitude" and "standard parallel
+  # translations, use the same rotate command, except in an order
+  # where longitude (yaw) is applied first and latitude (pitch)
+  # is applied second, in two different operations.
+  if $4!=0 rotate_equirectangular_map 0,0,$4 fi
+  if $5!=0 rotate_equirectangular_map 0,{-$5},0 fi
+
+  foreach {
+    # Initialize the image using the above precalculated width and height
+    # The "" block contains the mathematical 'formula' that determines
+    # what each x,y pixel is.
+    {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
+      # Inside the ""-block it's easier to pre-translate dollar-variables
+      const pi2 = 2*pi;
+      const cutoff = $cutoff;
+
+      # Use centered coordinates. 0,0 is in the middle of the projection
+      cx = x - w/2 + 1;
+      cy = y - h/2 + 1;
+
+      # Turn them into radians
+      cx*=pi2/w;
+      cy*=pi2/w;
+
+      # Formulas and constants:
+      # https://en.wikipedia.org/wiki/Orthographic_projection_in_cartography
+      # R, radius of globe seems to work best with R=pi/2
+      const phi0 = 0;
+      const l0 = 0;
+      C = sqrt(cx^2 + cy^2);
+
+      # the formulas are simplified a bit because this script uses
+      # phi0=0 and l0=0, leading to anything with sin(phi0) to
+      # multiply with 0. The standard parallel and central longitude
+      # are calculated earlier with actual global rotations.
+      # Happily, here we can use atan2.
+      nY = asin(cy*sin(C)/C);
+      nX = atan2(cx*sin(C),C*cos(C));
+
+      # For the logic why I'm inverting the formula, check out the
+      # Cylindrical Equal-Area filter for a rant
+
+      # EQUIRECTANGULAR COORDINATES
+      # Get the width and height of the original equirectangular input
+      const ow = w#0;
+      const oh = h#0;
+
+      # Pretty simply translate radians coordinates straight into
+      # equirectangular pixel coordinates.
+      X = ow/2 + ow*nX/pi2;
+      Y = oh/2 + oh*nY/pi;
+
+      # Calculate the map's rendering radius based on user's cutoff angle
+      # This is a simplified Great Circle distance formula
+      # where half the formula disappears because sin(0)=0
+      deltaS = acos(cos(nY)*cos(nX));
+
+      # Check whether the pixel's geographical nX, nY coordinates
+      # are within the normal range AND inside the deltaS cutoff
+      nX>=-pi && nX<=pi && nY>=-pi/2 && nY<=pi/2 && abs(deltaS)<=cutoff?I(#0,X,Y,0,2,0):bgcolor"
+
+    # Generate blank image, then fill_color with bg-color
+    100%,100%,1,4,0 fc. 0,0,0,0
+    shape_circle {w} n. 0,255 negate.
+    +blend_fade[-2,-3] .
+
+    # New trick: if you can't calculate the width and height of the image
+    # in advance, doing it on a "blank" square image can work as well.
+    # In the ""-block of the -input above the last pixel assignment
+    # checks if the geographical coordinates we're looking for make
+    # any sense, that is, no weird values above or below plus-minus 180 or
+    # 90 degrees. If the pixel x,y coordinates would result in something
+    # nonsensical, output a transparent pixel. This is necessary, because it's
+    # not automatic: you get weird blocks of white *and* transparent
+    # lines. Then you can use autocrop from g'mic to do some magic and remove
+    # the transparent areas.
+    k. autocrop
+  }
+
+######################
+## CONIC EQUIDISTANT
+#@cli conic_equidistant_projection : yaw angle, pitch angle, roll angle, central_longitude angle, reference_parallel angle, standard_parallel1 angle, standard_parallel2 angle
+#@cli : Take a map or equirectangular panorama
+#@cli : and rotate it around z, y and x angles,
+#@cli : then project it as a conic equidistant map.
+
+#@gui Conic equidistant : conic_equidistant_projection
+#@gui : note = note("Rotate an equirectangular map or panorama around three axises in order and output it as a conic equidistant map. Neither equal-area or conformal.")
+#@gui : sep = separator()
+#@gui : Roll = float(0,-360,360)
+#@gui : Pitch = float(0,-360,360)
+#@gui : Yaw = float(0,-360,360)
+#@gui : Central longitude = float(0,-180,180)
+#@gui : Reference parallel = float(0,-90,90)
+#@gui : Standard parallel #1 = float(20,-90,90)
+#@gui : Standard parallel #2 = float(60,-90,90)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i><a href="https://www.cartographersguild.com/showthread.php?t=47591">\
+# Kristian Järventaus</a></i>.      Latest Update: <i>2024/03/05</i>.</small>")
+conic_equidistant_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6=20},${7=60} # $1-3 Default to 0 degrees
+  cutoff:=$6°
+  l0,phi0,phi1,phi2=${4-7}
+
+  # Give input alpha-channel to prevent errors with transparency
+  to_rgba
+
+  # First rotate the map(s) with the appropriate custom command
+  if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
+
+  # To apply more standard "longitude" and "standard parallel
+  # translations, use the same rotate command, except in an order
+  # where longitude (yaw) is applied first and latitude (pitch)
+  # is applied second, in two different operations.
+  # if $4!=0 rotate_equirectangular_map 0,0,$4 fi
+  # if $5!=0 rotate_equirectangular_map 0,{-$5},0 fi
+
+  foreach {
+    # Initialize the image using the above precalculated width and height
+    # The "" block contains the mathematical 'formula' that determines
+    # what each x,y pixel is.
+    {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
+      # Inside the ""-block it's easier to pre-translate dollar-variables
+      const pi2 = 2*pi;
+      const phi0 = $phi0°;
+      const l0 = $l0°;
+      const phi1 = $phi1°;
+      const phi2 = $phi2°;
+
+      # Use centered coordinates. 0,0 is in the middle of the projection
+      cx = x - w/2 + 1;
+      cy = y - h/2 + 1;
+
+      # Turn them into radians
+      cx = cx/w*pi2*4/3;
+      cy = -cy/w*pi2*4/3;
+
+      # Formulas and constants:
+      # https://mathworld.wolfram.com/ConicEquidistantProjection.html
+      const n = phi1==phi2?sin(phi1):(cos(phi1) - cos(phi2))/(phi2 - phi1);
+      const G = cos(phi1)/n + phi1;
+      const rho0 = G - phi0;
+      rho = sign(n)*sqrt(cx^2 + (rho0 - cy)^2);
+
+      # https://epic.awi.de/id/eprint/39585/1/USGS_Bulletin_1532.pdf
+      # page 114, if using ATAN2, the signs must be reversed.
+      # I KNEW THERE WAS SOMETHING WRONG WITH THE FORMULA
+      # I had to dig deep.
+      theta = n>0?atan2(cx,rho0 - cy):atan2(-cx,-rho0 + cy);
+      nY = G-rho;
+      nX = l0 + theta/n;
+
+      # For the logic why I'm inverting the formula, check out the
+      # Cylindrical Equal-Area filter for a rant
+
+      # EQUIRECTANGULAR COORDINATES
+      # Get the width and height of the original equirectangular input
+      const ow = w#0;
+      const oh = h#0;
+
+      # Pretty simply translate radians coordinates straight into
+      # equirectangular pixel coordinates.
+      X = ow/2 + ow*nX/pi2;
+      Y = oh/2 + oh*-nY/pi;
+
+      # Check whether the pixel's geographical nX, nY coordinates
+      # are within the normal range, here adjusted for l0 and phi0
+      # which are kind of superfluous here, they don't do much anything.
+      L = nX - l0;
+      P = nY - phi0;
+      L>=-pi && L<=pi && P>=-pi/2 && P<=pi/2?I(#0,X%ow,Y,0,2,0):bgcolor"
+
+    # New trick: if you can't calculate the width and height of the image
+    # in advance, doing it on a "blank" square image can work as well.
+    # In the ""-block of the -input above the last pixel assignment
+    # checks if the geographical coordinates we're looking for make
+    # any sense, that is, no weird values above or below plus-minus 180 or
+    # 90 degrees. If the pixel x,y coordinates would result in something
+    # nonsensical, output a transparent pixel. This is necessary, because it's
+    # not automatic: you get weird blocks of white *and* transparent
+    # lines. Then you can use autocrop from g'mic to do some magic and remove
+    # the transparent areas.
+    k. autocrop
+  }
+
+############################
+## LAMBERT CONFORMAL CONIC
+#@cli lambert_conformal_conic_projection : yaw angle, pitch angle, roll angle, central_longitude angle, reference_parallel angle, standard_parallel1 angle, standard_parallel2 angle, latcutoff angle, longcutoff angle
+#@cli : Take a map or equirectangular panorama
+#@cli : and rotate it around z, y and x angles,
+#@cli : then project it as a Lambert conic conformal map.
+
+#@gui Lambert Conformal Conic : lambert_conformal_conic_projection
+#@gui : note = note("Rotate an equirectangular map or panorama around three axises in order and output it as a Lambert conic conformal map.")
+#@gui : sep = separator()
+#@gui : Roll = float(0,-360,360)
+#@gui : Pitch = float(0,-360,360)
+#@gui : Yaw = float(0,-360,360)
+#@gui : Central longitude = float(0,-180,180)
+#@gui : Reference parallel = float(0,-90,90)
+#@gui : Standard parallel #1 = float(20,-90,90)
+#@gui : Standard parallel #2 = float(60,-90,90)
+#@gui : Crop latitude to = float(180,0,180)
+#@gui : Crop longitude to = float(360,0,360)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i><a href="https://www.cartographersguild.com/showthread.php?t=47591">\
+# Kristian Järventaus</a></i>.      Latest Update: <i>2024/03/05</i>.</small>")
+lambert_conformal_conic_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6=20},${7=60},${8=180},${9=360} # $1-3 Default to 0 degrees
+  latcutoff:=$8°
+  longcutoff:=$9°
+  l0,phi0,phi1,phi2=${4-7}
+
+  # Give input alpha-channel to prevent errors with transparency
+  to_rgba
+
+  # First rotate the map(s) with the appropriate custom command
+  if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
+
+  foreach {
+    # Initialize the image using the above precalculated width and height
+    # The "" block contains the mathematical 'formula' that determines
+    # what each x,y pixel is.
+    {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
+      # Inside the ""-block it's easier to pre-translate dollar-variables
+      const pi2 = 2*pi;
+      const phi0 = $phi0°;
+      const l0 = $l0°;
+      const phi1 = $phi1°;
+      const phi2 = $phi2°;
+      const latcutoff = $latcutoff;
+      const longcutoff = $longcutoff;
+
+      # Use centered coordinates. 0,0 is in the middle of the projection
+      cx = x - w/2 + 1;
+      cy = y - h/2 + 1;
+
+      # Turn them into radians
+      cx = cx/w*pi2*pi/2;
+      cy = -cy/w*pi2*pi/2;
+
+      # Formulas and constants:
+      # https://epic.awi.de/id/eprint/39585/1/USGS_Bulletin_1532.pdf
+      const n = phi1==phi2?sin(phi1):log(cos(phi1)/cos(phi2))/log(tan(1/4*pi + 1/2*phi2)/tan(1/4*pi + 1/2*phi1));
+      const F = (cos(phi1)*tan(1/4*pi + 1/2*phi1)^n)/n;
+      const rho0 = F/tan(1/4*pi + 1/2*phi0)^n;
+      rho = sign(n)*sqrt(cx^2 + (rho0 - cy)^2);
+
+      # https://epic.awi.de/id/eprint/39585/1/USGS_Bulletin_1532.pdf
+      # page 114, if using ATAN2, the signs must be reversed.
+      theta = n>0?atan2(cx,rho0-cy):atan2(-cx,-rho0 + cy);
+
+      # When the reference parallel is in the southern hemisphere,
+      # flip the projection and map
+      phi0<0?(n*=-1);
+      nY = rho==0?sign(n)*90°:2*atan((F/rho)^(1/n)) - 1/2*pi;
+      nX = l0 + theta/n;
+
+      # For the logic why I'm using inverse formulas, check out the
+      # Cylindrical Equal-Area filter
+
+      # EQUIRECTANGULAR COORDINATES
+      # Get the width and height of the original equirectangular input
+      const ow = w#0;
+      const oh = h#0;
+
+      # Pretty simply translate radians coordinates straight into
+      # equirectangular pixel coordinates.
+      X = ow/2 + ow*nX/pi2;
+      Y = oh/2 + oh*-nY/pi;
+
+      # Check whether the pixel's geographical nX, nY coordinates
+      # are within the normal range, then further crop to the angles
+      # given by the crop values.
+      L = nX;
+      P = nY;
+      L>=l0 - longcutoff/2 && L<=l0 + longcutoff/2 && P>=phi0 - latcutoff/2 && P<=phi0 + latcutoff/2?I(#0,X%ow,Y,0,2,0):bgcolor"
+
+    # If the reference parallel is in the southern hemisphere,
+    # we've flipped the projection. Here we need to further rotate
+    # the image so it's not upside down.
+    if $phi0<0 rotate. 180 fi
+
+    # New trick: if you can't calculate the width and height of the image
+    # in advance, doing it on a "blank" square image can work as well.
+    # In the ""-block of the -input above the last pixel assignment
+    # checks if the geographical coordinates we're looking for make
+    # any sense, that is, no weird values above or below plus-minus 180 or
+    # 90 degrees. If the pixel x,y coordinates would result in something
+    # nonsensical, output a transparent pixel. This is necessary, because it's
+    # not automatic: you get weird blocks of white *and* transparent
+    # lines. Then you can use autocrop from g'mic to do some magic and remove
+    # the transparent areas.
+    k. autocrop
+  }
+
+#############
+## MERCATOR
+#@cli mercator : yaw angle, pitch angle, roll angle, central_longitude angle, reference_parallel angle, standard_parallel1 angle, standard_parallel2 angle, latcutoff angle, longcutoff angle
+#@cli : Take a map or equirectangular panorama
+#@cli : and rotate it around z, y and x angles,
+#@cli : then project it as a Mercator projection.
+
+#@gui Mercator projection : mercator
+#@gui : note = note("Rotate an equirectangular map or panorama around three axises in order and output it as a Mercator projection. You can get a Transverse Mercator by rolling the globe by 90")
+#@gui : sep = separator()
+#@gui : Roll = float(0,-360,360)
+#@gui : Pitch = float(0,-360,360)
+#@gui : Yaw = float(0,-360,360)
+#@gui : Central longitude = float(0,-180,180)
+#@gui : Crop latitude to = float(85,0,85)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i><a href="https://www.cartographersguild.com/showthread.php?t=47591">\
+# Kristian Järventaus</a></i>.      Latest Update: <i>2024/03/05</i>.</small>")
+mercator : skip ${1=0},${2=0},${3=0},${4=0},${5=85} # $1-3 Default to 0 degrees
+  latcutoff:=$5°
+  l0=$4
+
+  # Give input alpha-channel to prevent errors with transparency
+  to_rgba
+
+  # First rotate the map(s) with the appropriate custom command
+  if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
+
+  foreach {
+    # Initialize the image using the above precalculated width and height
+    # The "" block contains the mathematical 'formula' that determines
+    # what each x,y pixel is.
+    {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
+      # Inside the ""-block it's easier to pre-translate dollar-variables
+      const pi2 = 2*pi;
+      const l0 = $l0°;
+      const latcutoff = $latcutoff;
+
+      # Use centered coordinates. 0,0 is in the middle of the projection
+      cx = x - w/2 + 1;
+      cy = y - h/2 + 1;
+
+      # Turn them into radians
+      cx = cx/w*pi2;
+      cy = -cy/w*pi2;
+
+      # Formulas and constants:
+      # https://epic.awi.de/id/eprint/39585/1/USGS_Bulletin_1532.pdf
+      nY = atan(sinh(cy));
+      nX = l0 + cx;
+
+      # For the logic why I'm using inverse formulas, check out the
+      # Cylindrical Equal-Area filter
+
+      # EQUIRECTANGULAR COORDINATES
+      # Get the width and height of the original equirectangular input
+      const ow = w#0;
+      const oh = h#0;
+
+      # Pretty simply translate radians coordinates straight into
+      # equirectangular pixel coordinates.
+      X = ow/2 + ow*nX/pi2;
+      Y = oh/2 + oh*-nY/pi;
+
+      # Check whether the pixel's geographical nX, nY coordinates
+      # are within the normal range, then further crop to the angles
+      # given by the crop values.
+      L = nX - l0;
+      P = nY;
+      L>=-pi && L<=pi && P>=-latcutoff && P<=+latcutoff?I(#0,X%ow,Y,0,2,0):bgcolor"
+    k. autocrop
+  }
+
+#######################
+## ALBERS EQUAL AREA CONIC
+#@cli alberts_projection : yaw angle, pitch angle, roll angle, central_longitude angle, reference_parallel angle, standard_parallel1 angle, standard_parallel2 angle, latcutoff angle, longcutoff angle
+#@cli : Take a map or equirectangular panorama
+#@cli : and rotate it around z, y and x angles,
+#@cli : then project it as an Albers equal area conic map.
+
+#@gui Albers Equal Area Conic : albers_projection
+#@gui : note = note("Rotate an equirectangular map or panorama around three axises in order and output it as an Albers equal area conic projection.")
+#@gui : sep = separator()
+#@gui : Roll = float(0,-360,360)
+#@gui : Pitch = float(0,-360,360)
+#@gui : Yaw = float(0,-360,360)
+#@gui : Central longitude = float(0,-180,180)
+#@gui : Reference parallel = float(0,-90,90)
+#@gui : Standard parallel #1 = float(20,-90,90)
+#@gui : Standard parallel #2 = float(60,-90,90)
+#@gui : Crop latitude to = float(180,0,180)
+#@gui : Crop longitude to = float(360,0,360)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i><a href="https://www.cartographersguild.com/showthread.php?t=47591">\
+# Kristian Järventaus</a></i>.      Latest Update: <i>2024/03/05</i>.</small>")
+albers_projection : skip ${1=0},${2=0},${3=0},${4=0},${5=0},${6=20},${7=60},${8=180},${9=360} # $1-3 Default to 0 degrees
+  latcutoff:=$8°
+  longcutoff:=$9°
+  l0,phi0,phi1,phi2=${4-7}
+
+  # Give input alpha-channel to prevent errors with transparency
+  to_rgba
+
+  # First rotate the map(s) with the appropriate custom command
+  if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
+
+  foreach {
+    # Initialize the image using the above precalculated width and height
+    # The "" block contains the mathematical 'formula' that determines
+    # what each x,y pixel is.
+    {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
+      # Inside the ""-block it's easier to pre-translate dollar-variables
+      const pi2 = 2*pi;
+      const phi0 = $phi0°;
+      const l0 = $l0°;
+      const phi1 = $phi1°;
+      const phi2 = $phi2°;
+      const latcutoff = $latcutoff;
+      const longcutoff = $longcutoff;
+
+      # Use centered coordinates. 0,0 is in the middle of the projection
+      cx = x - w/2 + 1;
+      cy = y - h/2 + 1;
+
+      # Turn them into radians
+      cx = cx/w*pi2*8/7;
+      cy = -cy/w*pi2*8/7;
+
+      # Formulas and constants:
+      # https://epic.awi.de/id/eprint/39585/1/USGS_Bulletin_1532.pdf
+      const n = phi1==phi2?sin(phi1):(sin(phi1) + sin(phi2))/2;
+      const C = cos(phi1)^2 + 2*n*sin(phi1);
+      const rho0 = sqrt(C - 2*n*sin(phi0))/n;
+      rho = sqrt(cx^2 + (rho0 - cy)^2);
+
+      # https://epic.awi.de/id/eprint/39585/1/USGS_Bulletin_1532.pdf
+      # page 114, if using ATAN2, the signs must be reversed.
+      theta = n>0?atan2(cx,rho0 - cy):atan2(-cx,-rho0+cy);
+
+      # When the reference parallel is in the southern hemisphere,
+      # flip the projection and map
+      phi0<0?(n*=-1);
+      nY = rho==0?asin((C - (rho*n)^2)/(2*n)):asin((C - (rho*n)^2)/(2*n));
+      nX = l0 + theta/n;
+
+      # For the logic why I'm using inverse formulas, check out the
+      # Cylindrical Equal-Area filter
+
+      # EQUIRECTANGULAR COORDINATES
+      # Get the width and height of the original equirectangular input
+      const ow = w#0;
+      const oh = h#0;
+
+      # Pretty simply translate radians coordinates straight into
+      # equirectangular pixel coordinates.
+      X = ow/2 + ow*nX/pi2;
+      Y = oh/2 + oh*-nY/pi;
+
+      # Check whether the pixel's geographical nX, nY coordinates
+      # are within the normal range, then further crop to the angles
+      # given by the crop values.
+      L = nX;
+      P = nY;
+      L>=l0-longcutoff/2 && L<=l0+longcutoff/2 && P>=phi0-latcutoff/2 && P<=phi0+latcutoff/2?I(#0,X%ow,Y,0,2,0):bgcolor"
+
+    # If the reference parallel is in the southern hemisphere,
+    # we've flipped the projection. Here we need to further rotate
+    # the image so it's not upside down.
+    if $phi0<0 rotate. 180 fi
+
+    # New trick: if you can't calculate the width and height of the image
+    # in advance, doing it on a "blank" square image can work as well.
+    # In the ""-block of the -input above the last pixel assignment
+    # checks if the geographical coordinates we're looking for make
+    # any sense, that is, no weird values above or below plus-minus 180 or
+    # 90 degrees. If the pixel x,y coordinates would result in something
+    # nonsensical, output a transparent pixel. This is necessary, because it's
+    # not automatic: you get weird blocks of white *and* transparent
+    # lines. Then you can use autocrop from g'mic to do some magic and remove
+    # the transparent areas.
+    k. autocrop
+  }
+
+##############
+## ECKERT IV
+#@cli eckert_iv_projection : yaw angle, pitch angle, roll angle, central_longitude angle, reference_parallel angle, standard_parallel1 angle, standard_parallel2 angle, latcutoff angle, longcutoff angle
+#@cli : Take a map or equirectangular panorama
+#@cli : and rotate it around z, y and x angles,
+#@cli : then project it as an Eckert IV map.
+
+#@gui Eckert IV : eckert_iv_projection
+#@gui : note = note("Rotate an equirectangular map or panorama around three axises in order and output it as an Eckert IV projection.")
+#@gui : sep = separator()
+#@gui : Roll = float(0,-360,360)
+#@gui : Pitch = float(0,-360,360)
+#@gui : Yaw = float(0,-360,360)
+#@gui : Central longitude = float(0,-180,180)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i><a href="https://www.cartographersguild.com/showthread.php?t=47591">\
+# Kristian Järventaus</a></i>.      Latest Update: <i>2024/03/05</i>.</small>")
+eckert_iv_projection : skip ${1=0},${2=0},${3=0},${4=0} # $1-3 Default to 0 degrees
+  l0=$4
+
+  # Give input alpha-channel to prevent errors with transparency
+  to_rgba
+
+  # First rotate the map(s) with the appropriate custom command
+  if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
+
+  foreach {
+    # Initialize the image using the above precalculated width and height
+    # The "" block contains the mathematical 'formula' that determines
+    # what each x,y pixel is.
+    {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
+      # Inside the ""-block it's easier to pre-translate dollar-variables
+      const pi2 = 2*pi;
+      const l0 = $l0°;
+
+      # Use centered coordinates. 0,0 is in the middle of the projection
+      cx = x - w/2 + 1;
+      cy = y - h/2 + 1;
+
+      # Turn them into radians
+      cx = cx/w*pi*sqrt(3);
+      cy = -cy/w*pi*sqrt(3);
+
+      # Formulas and constants:
+      # https://epic.awi.de/id/eprint/39585/1/USGS_Bulletin_1532.pdf
+      theta = asin(cy*sqrt(4 + pi)/(2*sqrt(pi)));
+
+      # When the reference parallel is in the southern hemisphere,
+      # flip the projection and map
+      nY = asin((theta + sin(theta)*cos(theta) + 2*sin(theta))/(2 + pi/2));
+      nX = l0 + sqrt(pi*(4 + pi))*cx/(2*(1 + cos(theta)));
+
+      # For the logic why I'm using inverse formulas, check out the
+      # Cylindrical Equal-Area filter
+
+      # EQUIRECTANGULAR COORDINATES
+      # Get the width and height of the original equirectangular input
+      const ow = w#0;
+      const oh = h#0;
+
+      # Pretty simply translate radians coordinates straight into
+      # equirectangular pixel coordinates.
+      X = ow/2 + ow*nX/pi2;
+      Y = oh/2 + oh*-nY/pi;
+
+      # Check whether the pixel's geographical nX, nY coordinates
+      # are within the normal range, then further crop to the angles
+      # given by the crop values.
+      L = nX;
+      P = nY;
+      L>=l0-pi && L<=l0+pi && P>=-pi/2 && P<=pi/2?I(#0,X%ow,Y,0,2,0):bgcolor"
+
+    # If the reference parallel is in the southern hemisphere,
+    # we've flipped the projection. Here we need to further rotate
+    # the image so it's not upside down.
+    if $phi0<0 rotate. 180 fi
+
+    # New trick: if you can't calculate the width and height of the image
+    # in advance, doing it on a "blank" square image can work as well.
+    # In the ""-block of the -input above the last pixel assignment
+    # checks if the geographical coordinates we're looking for make
+    # any sense, that is, no weird values above or below plus-minus 180 or
+    # 90 degrees. If the pixel x,y coordinates would result in something
+    # nonsensical, output a transparent pixel. This is necessary, because it's
+    # not automatic: you get weird blocks of white *and* transparent
+    # lines. Then you can use autocrop from g'mic to do some magic and remove
+    # the transparent areas.
+    k. autocrop
+  }
+
+##############
+## ECKERT VI
+#@cli eckert_vi_projection : yaw angle, pitch angle, roll angle, central_longitude angle, reference_parallel angle, standard_parallel1 angle, standard_parallel2 angle, latcutoff angle, longcutoff angle
+#@cli : Take a map or equirectangular panorama
+#@cli : and rotate it around z, y and x angles,
+#@cli : then project it as an Eckert VI map.
+
+#@gui Eckert VI : eckert_vi_projection
+#@gui : note = note("Rotate an equirectangular map or panorama around three axises in order and output it as an Eckert VI projection.")
+#@gui : sep = separator()
+#@gui : Roll = float(0,-360,360)
+#@gui : Pitch = float(0,-360,360)
+#@gui : Yaw = float(0,-360,360)
+#@gui : Central longitude = float(0,-180,180)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i><a href="https://www.cartographersguild.com/showthread.php?t=47591">\
+# Kristian Järventaus</a></i>.      Latest Update: <i>2024/03/05</i>.</small>")
+eckert_vi_projection : skip ${1=0},${2=0},${3=0},${4=0} # $1-3 Default to 0 degrees
+  l0=$4
+
+  # Give input alpha-channel to prevent errors with transparency
+  to_rgba
+
+  # First rotate the map(s) with the appropriate custom command
+  if $1!=0" || "$2!=0" || "$3!=0 rotate_equirectangular_map $1,$2,$3 fi
+
+  foreach {
+    # Initialize the image using the above precalculated width and height
+    # The "" block contains the mathematical 'formula' that determines
+    # what each x,y pixel is.
+    {[w,w]+1},1,4,"begin(bgcolor = [ 0,0,0,0 ]);
+      # Inside the ""-block it's easier to pre-translate dollar-variables
+      const pi2 = 2*pi;
+      const l0 = $l0°;
+
+      # Use centered coordinates. 0,0 is in the middle of the projection
+      cx = x - w/2 + 1;
+      cy = y - h/2 + 1;
+
+      # Turn them into radians
+      cx = cx/w*pi*2;
+      cy = -cy/w*pi*2;
+
+      # Formulas and constants:
+      # https://epic.awi.de/id/eprint/39585/1/USGS_Bulletin_1532.pdf
+      theta = sqrt(2 + pi)*cy/2;
+
+      # When the reference parallel is in the southern hemisphere,
+      # flip the projection and map
+      nY = asin((theta + sin(theta))/(1+pi/2));
+      nX = l0 + sqrt(2 + pi)*cx/(1 + cos(theta));
+
+      # For the logic why I'm using inverse formulas, check out the
+      # Cylindrical Equal-Area filter
+
+      # EQUIRECTANGULAR COORDINATES
+      # Get the width and height of the original equirectangular input
+      const ow = w#0;
+      const oh = h#0;
+
+      # Pretty simply translate radians coordinates straight into
+      # equirectangular pixel coordinates.
+      X = ow/2 + ow*nX/pi2;
+      Y = oh/2 + oh*-nY/pi;
+
+      # Check whether the pixel's geographical nX, nY coordinates
+      # are within the normal range, then further crop to the angles
+      # given by the crop values.
+      L = nX;
+      P = nY;
+      L>=l0-pi && L<=l0+pi && P>=-pi/2 && P<=pi/2?I(#0,X%ow,Y,0,2,0):bgcolor"
+
+    # If the reference parallel is in the southern hemisphere,
+    # we've flipped the projection. Here we need to further rotate
+    # the image so it's not upside down.
+    if $phi0<0 rotate. 180 fi
+
+    # New trick: if you can't calculate the width and height of the image
+    # in advance, doing it on a "blank" square image can work as well.
+    # In the ""-block of the -input above the last pixel assignment
+    # checks if the geographical coordinates we're looking for make
+    # any sense, that is, no weird values above or below plus-minus 180 or
+    # 90 degrees. If the pixel x,y coordinates would result in something
+    # nonsensical, output a transparent pixel. This is necessary, because it's
+    # not automatic: you get weird blocks of white *and* transparent
+    # lines. Then you can use autocrop from g'mic to do some magic and remove
+    # the transparent areas.
+    k. autocrop
+  }
+
+# Local Variables:
+# mode: sh
+# End:
+#
+# (End of G'MIC custom commands)
