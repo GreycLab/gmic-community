@@ -2175,7 +2175,7 @@ fx_blur_quad :
       I(#0,xc,yc)"
 
     f.. "B?[ R,G,0 ]/B:[ -1,-1,0 ]" channels.. 0,1
-    blur_xy. $1%,$2%
+    b. x,1% b. y,2%
     adjust_colors. ${3-5},0,0,0,255
 
     to_a.
@@ -2338,8 +2338,42 @@ view_surfels3d :
   while {*}" && "!{*,ESC}
   rm
 
+#@cli lezoray3d : out_filename.png,nb_frames>0
+#@cli : Generate a 3D animation from a set of two 3D meshes.
+#@cli : Output frames are 1024x512 RGBA images.
+#@cli : $ gmic mesh1.obj mesh2.obj lezoray3d out.png,180 (silent mode)
+#@cli : $ gmic mesh1.obj mesh2.obj w[] lezoray3d out.png,180 (with display).
+lezoray3d : check "isint(${2=180}) && $2>0" skip "${1=out.png}"
+  basename {0,n} nm0=${}
+  basename {1,n} nm1=${}
+  e[^-1] "Generate 3D animation of 3D meshes '"$nm0"' and '"$nm1"', with output filename '$1' and $2 frames.\n"
 
-# Keep an old version of 'display2d' and 'display_parallel'.
+  # Normalize objects.
+  c3d n3d *3d 400
+  if {*} w[] ${"fitscreen 1024,512"},0 fi
+
+  # Generate animation.
+  repeat $2 {
+    e "\r - Frame \#"{$>+1}/$2
+    +r3d[0,1] 0,1,0,{$>*360/$2}
+    1024,512,1,3,-1
+    j3d. ...,25%,50%,0,1,4,1,1
+    j3d. ..,75%,50%,0,1,4,1,1
+    to_rgba. replace_color. 0,0,-1,-1,-1,255,0,0,0,0
+    filename $1,$> file=${}
+    o. $file
+    if {*} drgba. to. "Frame \#"{$>+1}/$2,0,0,5% w. fi
+    k[0,1]
+  }
+  rm
+  e "\r  - Done!               "
+
+#--------------------------------------------------
+#
+#  Deprecated commands.
+#
+#--------------------------------------------------
+
 d2d :
   _gmic_s="$?" v + _display2d 0,1
 
@@ -2913,17 +2947,17 @@ display_parallel0 :
 default_display :
   _gmic_s="$?" v + _display "",1,$[]
 
-#@cli d3d : eq. to 'display3d'.
+# d3d : eq. to 'display3d'.
 d3d : skip "${1=},${2=0}"
   l[] { is_image_arg=${"is_image_arg $1"} is_arg={$is_image_arg" || isnum($1)"} onfail is_arg=0 }
   if $is_arg arg=$is_image_arg,$2 if $is_image_arg pass$1 1 _d3d_wh={[w,h]} store. _d3d_background fi
   else arg=0,0 noarg fi
   v + _display3d $arg
 
-#@cli display3d : _[background_image],_exit_on_anykey={ 0 | 1 } : _exit_on_anykey={ 0 | 1 }
-#@cli : Display selected 3D objects in an interactive viewer (use the instant display window [0] if opened).
-#@cli : (eq. to 'd3d').
-#@cli : Default values: '[background_image]=(default)' and 'exit_on_anykey=0'.
+# display3d : _[background_image],_exit_on_anykey={ 0 | 1 } : _exit_on_anykey={ 0 | 1 }
+# : Display selected 3D objects in an interactive viewer (use the instant display window [0] if opened).
+# : (eq. to 'd3d').
+# : Default values: '[background_image]=(default)' and 'exit_on_anykey=0'.
 display3d : skip "${1=},${2=0}"
   l[] { is_image_arg=${"is_image_arg $1"} is_arg={$is_image_arg" || isnum($1)"} onfail is_arg=0 }
   if $is_arg arg=$is_image_arg,$2 if $is_image_arg pass$1 1 _d3d_wh={[w,h]} store. _d3d_background fi
@@ -3270,36 +3304,6 @@ _display3d :
   }
   if narg($disp_normalization) w[] -1,-1,$disp_normalization else w[] 0 fi
   v -1 d[]
-
-#@cli lezoray3d : out_filename.png,nb_frames>0
-#@cli : Generate a 3D animation from a set of two 3D meshes.
-#@cli : Output frames are 1024x512 RGBA images.
-#@cli : $ gmic mesh1.obj mesh2.obj lezoray3d out.png,180 (silent mode)
-#@cli : $ gmic mesh1.obj mesh2.obj w[] lezoray3d out.png,180 (with display).
-lezoray3d : check "isint(${2=180}) && $2>0" skip "${1=out.png}"
-  basename {0,n} nm0=${}
-  basename {1,n} nm1=${}
-  e[^-1] "Generate 3D animation of 3D meshes '"$nm0"' and '"$nm1"', with output filename '$1' and $2 frames.\n"
-
-  # Normalize objects.
-  c3d n3d *3d 400
-  if {*} w[] ${"fitscreen 1024,512"},0 fi
-
-  # Generate animation.
-  repeat $2 {
-    e "\r - Frame \#"{$>+1}/$2
-    +r3d[0,1] 0,1,0,{$>*360/$2}
-    1024,512,1,3,-1
-    j3d. ...,25%,50%,0,1,4,1,1
-    j3d. ..,75%,50%,0,1,4,1,1
-    to_rgba. replace_color. 0,0,-1,-1,-1,255,0,0,0,0
-    filename $1,$> file=${}
-    o. $file
-    if {*} drgba. to. "Frame \#"{$>+1}/$2,0,0,5% w. fi
-    k[0,1]
-  }
-  rm
-  e "\r  - Done!               "
 
 is_percent :
   u {"s=['$1'];s[size(s)-1]==_'%'"}
@@ -3734,6 +3738,51 @@ shrink_y : check "isint($1)"
 shrink_z : check "isint($1)"
   e[^-1] "Shrink image$? along the z-axis with size $1."
   expand_z {$-1}
+
+# blur_xy : amplitude_x[%],amplitude_y[%],_boundary_conditions={ 0:dirichlet | 1:neumann | 2:periodic | 3:mirror }
+# : Blur selected images along the X and Y axes.
+# : Default value: 'boundary_conditions=1'.
+# : $ image.jpg +blur_xy 6
+# : $$ https://gmic.eu/oldtutorial/_blur_y
+blur_xy : skip ${2=$1} check "isint(${3=1},0,3)"
+  e[^-1] "Blur image$? along the xy-axes, with sigma $1 and "${arg0\ !$2,neumann,dirichlet}" boundary conditions."
+  deriche $1,0,x,$3 deriche $2,0,y,$3
+
+# blur_x : amplitude[%]>=0,_boundary_conditions={ 0:dirichlet | 1:neumann | 2:periodic | 3:mirror }
+# : Blur selected images along the x-axis.
+# : Default value: 'boundary_conditions=1'.
+# : $ image.jpg +blur_x 6
+# : $$ https://gmic.eu/oldtutorial/_blur_x
+blur_x : check "isint(${2=1},0,3)"
+  e[^-1] "Blur image$? along the x-axis, with sigma $1 and "${arg0\ !$2,neumann,dirichlet}" boundary conditions."
+  deriche $1,0,x,$2
+
+# blur_xyz : amplitude_x[%],amplitude_y[%],amplitude_z,\
+# _boundary_conditions={ 0:dirichlet | 1:neumann | 2:periodic | 3:mirror }
+# : Blur selected images along the X, Y and Z axes.
+# : Default value: 'boundary_conditions=1'.
+# : $$ https://gmic.eu/oldtutorial/_blur_xyz
+blur_xyz : skip ${2=$1},${3=$1} check "isint(${4=1},0,3)"
+  e[^-1] "Blur image$? along the xyz-axes, with sigma $1 and "${arg0\ !$2,neumann,dirichlet}" boundary conditions."
+  deriche $1,0,x,$4 deriche $2,0,y,$4 deriche $3,0,z,$4
+
+# blur_y : amplitude[%]>=0,_boundary_conditions={ 0:dirichlet | 1:neumann | 2:periodic | 3:mirror }
+# : Blur selected images along the y-axis.
+# : Default value: 'boundary_conditions=1'.
+# : $ image.jpg +blur_y 6
+# : $$ https://gmic.eu/oldtutorial/_blur_y
+blur_y : check "isint(${2=1},0,3)"
+  e[^-1] "Blur image$? along the y-axis, with sigma $1 and "${arg0\ !$2,neumann,dirichlet}" boundary conditions."
+  deriche $1,0,y,$2
+
+# blur_z : amplitude[%]>=0,_boundary_conditions={ 0:dirichlet | 1:neumann | 2:periodic | 3:mirror }
+# : Blur selected images along the z-axis.
+# : Default value: 'boundary_conditions=1'.
+# : $$ https://gmic.eu/oldtutorial/_blur_z
+blur_z : check "isint(${2=1},0,3)"
+  e[^-1] "Blur image$? along the z-axis, with sigma $1 and "${arg0\ !$2,neumann,dirichlet}" boundary conditions."
+  deriche $1,0,z,$2
+
 
 # Local Variables:
 # mode: sh
