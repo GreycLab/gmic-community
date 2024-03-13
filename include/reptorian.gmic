@@ -526,8 +526,9 @@ repeat $! {
                      "`}) # Code taken from print in G'MIC STDLIB
 }
 #@cli rep_cin: '_message'
-#@cli : Allows users to input into status. Only numbers, A-Z english letters, comma, period, minus sign, and space are accepted! Maximum string length is 1024!
+#@cli : Allows users to input into status. Maximum string length is 1024!
 #@cli : Default values: '_message=G'MIC rep_cin output:'
+#@cli : $ echo ${-rep_cin}
 #@cli : $ rep_cin , echo "Output: "${}
 #@cli : $ rep_cin "Input: " echo "Output: "${}
 #@cli : $ m=${rep_cin\ {'"Test A: "'}} echo $m
@@ -538,6 +539,8 @@ screen_h>>=1
 started,stack_point=0
 current_str_0=""
 max_stack_size:=(1<<10)+1
+case:='A'-'a'
+n0:='0'
 
 if $#>1
  message={`[$*]`}
@@ -560,18 +563,35 @@ do
   fi
 
   w[] $screen_w,1,0,0,$message$o
-  wait 250
+  wait 100
  elif {*,ENTER}" || "{*,ESC}
   break
  else
+  shift_pressed:=({*,SHIFTLEFT}||{*,SHIFTRIGHT})
+  use_capitalization:=!$shift_pressed
   key={*,k}
-  in_char_set:=inrange($key,188,190,1,1)
 
-  if $stack_point<$max_stack_size?(inrange($key,_'0',_'9',1,1)||inrange($key,_'A',_'Z',1,1)||$key==_'\ '||$in_char_set)
+  in_char_set_1,in_char_set_2,is_letter,is_num_range,is_space={[inrange($key,186,192,1,1),inrange($key,219,222,1,1),inrange($key,_'A',_'Z',1,1),inrange($key,_'0',_'9',1,1),$key==_'\ ']}
+  if $is_space shift_pressed=0 fi
+
+  if $stack_point<$max_stack_size?($in_char_set_1||$in_char_set_2||$is_letter||$is_num_range||$is_space)
    stack_point+=1
-
-   if $in_char_set o.={`(',-.')[$key-188]`}
-   else            o.={`$key`}
+   
+   if $shift_pressed
+    if $in_char_set_1   o.={`(':+<_>?~')[$key-186]`}
+    elif $in_char_set_2 o.={`('\{|\}\"')[$key-219]`}
+    elif $is_num_range  o.={`('\)!@#$%^&*\(')[$key-$n0]`}
+    else                o.={`$key`}
+    fi
+   else
+    if $in_char_set_1   o.={`(';=,-./\`')[$key-186]`}
+    elif $in_char_set_2
+     if $key==220 o.=\\
+     else o.={`('[\\]\'')[$key-219]`}
+     fi
+    elif $is_letter     o.={`$key-$case`}
+    else                o.={`$key`}
+    fi
    fi
 
    current_str_$stack_point=$o
@@ -588,6 +608,10 @@ do
 
  wait
 while {*}
+
+# Below is the reference I used to help create the above code:
+# ;=,-./` [\]'
+# 186,187,188,189,190,191,192,219,220,221,222
 
 status $o wait
 #@cli rep_closest_number_in_ordered_list_of_numbers: number_to_search,number_a,number_b....
@@ -3781,7 +3805,7 @@ rep_contains_wave_at_end: skip "${1=}" if narg($1) u {a=['$1'];(a)[size(a)-1]==_
 #@cli : Return randomly generated string of bits.
 #@cli :
 #@cli : Author : Reptorian.
-rep_random_bits: u {`[expr('v(_'0',_'1')',$1)]`}
+rep_random_bits: check "$1>0" u {`expr('v(_'0',_'1')',$1)`}
 #@cli rep_sym_xy: eq. to 'rep_symmetrize_xy'.
 rep_sym_xy: rep_symmetrize_xy $1
 #@cli rep_symmetrize_xy: 0<=mode<=3
