@@ -972,13 +972,16 @@ I={$!}
 repeat $# { p:=$>+1 ('${arg$p}') }
 rep_binimg2dec_base[$I--1] 1
 #@cli rep_binimg2dec_base: '_mode_unicode={ 0=false | 1=true }','_preserve_base10M_dynamic_array={ 0=false | 1=true },'_unicode_img_out={ 0=false | 1=true }
-#@cli : Used as base command to process binary-value images and to output decimal or base-10M images. Schönhage-Strassen multiplication was used as basis for multiplication part of the binary to decimal, in addition to using base 10M for easy output of decimal image.
+#@cli : Used as base command to process binary-value images and to output decimal or base-10M images. 
+#@cli : Schönhage-Strassen multiplication was used as basis for multiplication part of the binary to decimal, in addition to using base 10M for easy output of decimal image.
+#@cli : In addition, chqrlie's code in StackOverflow has been used as part of this code - https://stackoverflow.com/questions/55385984/how-can-i-calculate-2n-for-large-n
 #@cli : Note : Arguments can also be strings such as true,false,TRUE,FALSE. In addition, 'int','unicode','dec','decimal','integer' can be used as argument for $1 and $3.
 #@cli : Default values: '_mode_unicode=0','_preserve_base10M_dynamic_array=0','_unicode_img_out=_mode_unicode'
 #@cli : Author : Reptorian.
 rep_binimg2dec_base:
 skip ${2=0}
 
+Ldb:=log10(2)
 false,true,FALSE,TRUE={expr('x&1',4)}
 unicode=1
 dec,decimal,int,integer=0
@@ -1059,90 +1062,160 @@ foreach {
 
     if w>53
 
-        {ceil(w/24)},1,1,1,"begin(
-                const max_x = w#-1-1;
-                const bits = 24;
+        num_of_binaries={whd#-1}
+
+        1,{ceil(w/24)},1,2,"begin(
+                const max_ind = whd#-1-1 ;
+                const bits = 24 ;
                 const mode_unicode=$mode_unicode;
                 mode_unicode?(
                    is_one()=i[#-1,ind]==$n1;
                 ):(is_one()=i[#-1,ind];);
             );
-            start_point = max_x-(x*bits);
-            end_block = max(-1,start_point-bits);
-            bitshift_factor = output_value = 0;
-            for(ind = start_point, ind>end_block, --ind,
-                output_value |= is_one() << bitshift_factor;
+            start_point = max_ind - ( y * bits ) ;
+            end_block= max( -1 , start_point - bits ) ;
+            bitshift_factor = output_value = 0 ;
+    
+            for ( ind = start_point , ind > end_block , --ind ,
+                output_value |= is_one() << bitshift_factor ;
                 bitshift_factor++;
             );
-            output_value;" => base_float_ref_img
+    
+            [ output_value , y ] ;"
+          
+        rm.. 
+        start_value:=i[#-1,0]
+        crop 0,1,0,100%
+        ({h}) append[-2,-1] y 
+        ref_img:=$!-1
+        
+        eval "
+            current_ind=da_size(#-1);
+            while(current_ind>=0,
+                if( !i[#-1,current_ind], da_remove(#-1,current_ind); );
+                --current_ind;
+            );
+            da_freeze(#-1);"
 
-        remove[binary_image]
+        number_of_resulting_decimals:=ceil($num_of_binaries*$Ldb)
+        
+        multithreading={h>1024}
 
-        bool_v10M={i[#-1,0]>=1e7}
-        1,1,1,{2+$bool_v10M},v=i[#-1,0];$bool_v10M?[1,v%1e7,2]:[v,1]; permute. xcyz => bin2dec_result_img
-        crop[base_float_ref_img] 1,100%
-        (1;6777216;2) => mult_ref
-
-        eval[base_float_ref_img] >"
+        if $multithreading
+            symbol_to_use=:
+            num_of_chans=$_cpus
+        else
+            symbol_to_use=>
+            num_of_chans=1
+        fi
+        
+        2,{ceil(ceil((i(#$ref_img,0,h#$ref_img-1,0,1)*24-1)*$Ldb)/7)},1,$num_of_chans  # Decimal conversion of power of 24*n
+        1,{ceil($number_of_resulting_decimals/7)},1,$num_of_chans                      # Result conversion of binary to decimal conversion
+        set[-1] $start_value,0,100%,0,100%
+        
+        eval[-3] $symbol_to_use"
             begin(
                 const base_10M = 1e7;
-                const multiplier_reference = $mult_ref;
-                const bin2dec_result_img = $bin2dec_result_img;
-                const second_digit = 6777216;
-                const mx = w-1;
-            );
-            if(i,
-                current_second_digit = i%base_10M;
-                use_first_digit = i>=base_10M;
-                result_remainder = remainder = old_value = t_old_value = 0;
-                repeat_factor = da_size(#multiplier_reference);
-                result_digit_pos = da_size(#bin2dec_result_img)-1;
-                while( repeat_factor--,
-                    t_old_value = i[#multiplier_reference, repeat_factor];
-                    reference_value =  t_old_value*current_second_digit+old_value+remainder;
-                    target_value = ( reference_value % base_10M ) + result_remainder + i[#bin2dec_result_img,result_digit_pos] ;
-                    if(result_digit_pos>-1
-                    ,i[#bin2dec_result_img,result_digit_pos--] = target_value % base_10M ;
-                    ,da_insert(#bin2dec_result_img,0,target_value % base_10M);
+                const power_24_second_digit = ( 1 << 24 ) % base_10M;
+                const log_10_2 = log10(2);
+                const end_ind = h#-1-1;
+                number_of_decimals = old_power = started = 0;
+                calc_min_decimal_length(binary_digits_count) = ceil( (binary_digits_count-1) * log_10_2 );
+                convert_power_of_24_into_decimal(n)=(
+                    blen = n + 1;
+                    number_of_decimals = ceil( calc_min_decimal_length( n*24+1 ) / 7 );
+                    i(#-2,1,n,0,t) = 1;
+                    insert_pos=0;
+                    while( blen,
+                        num=0;process_bin=blen+1;
+                        while( process_bin--,
+                            num = (num << 24 ) | i(#-2,1,process_bin,0,t);
+                            i(#-2,1,process_bin,0,t) = int( num / base_10M );
+                            num %= base_10M;
+                        );
+                        i(#-2,0,insert_pos++,0,t) = num;
+                        while( blen && !i(#-2,1,blen-1,0,t) , 
+                            blen--; 
+                        );
                     );
-                    if(use_first_digit , old_value = t_old_value );
-                    result_remainder = int ( target_value / base_10M );
-                    remainder        = int ( reference_value / base_10M ) ;
-                );
-                result_remainder+=remainder;
-                if(use_first_digit, result_remainder+= old_value);
-                while(result_remainder,
-                    da_insert(#bin2dec_result_img,0, (result_remainder ) % base_10M );
-                    result_remainder = int ( result_remainder / base_10M );
                 );
             );
-            if(x<mx,
-                remainder=old_value=0;
-                repeat_factor = da_size(#multiplier_reference);
-                while( repeat_factor--,
-                    t_old_value = i[#multiplier_reference,repeat_factor];
-                    result = t_old_value*second_digit+old_value+remainder;
-                    i[#multiplier_reference,repeat_factor] = result % base_10M;
-                    remainder = int( result / base_10M );
-                    old_value = t_old_value;
-                );
-                remainder+=old_value;
-                while( remainder,
-                    da_insert(#multiplier_reference,0,remainder%base_10M);
-                    remainder = int ( remainder / base_10M );
-                );
-            );"
 
-            keep[bin2dec_result_img]
+            if( !started || ( i1-old_power>1 ),
+                convert_power_of_24_into_decimal(i1);
+            );
+    
+            old_copy_power_24_decimal = remainder_new_power_24 = remainder_bin2dec_digit = remainder_result_bin2dec = 0;
+    
+            use_first_digit = i0 >= base_10M;
+            M=use_first_digit? i0 % base_10M : i0;
+    
+            repeat( number_of_decimals, pos,
+                result_pos = end_ind - pos ;
+                power_24_result_digit = i(#-2,0,pos,0,t);
+                product_new_power_24_digit = power_24_result_digit * power_24_second_digit + old_copy_power_24_decimal + remainder_new_power_24;
+                product_bin2dec = power_24_result_digit * M + ( use_first_digit ? old_copy_power_24_decimal ) + remainder_bin2dec_digit; 
+                result_bin2dec = i(#-1,0,result_pos,0,t) + (product_bin2dec % base_10M) + remainder_result_bin2dec;
+                i(#-1,0,result_pos,0,t) = result_bin2dec % base_10M;
+                remainder_result_bin2dec = int( result_bin2dec / base_10M );
+                remainder_bin2dec_digit = int( product_bin2dec / base_10M );
+                old_copy_power_24_decimal = power_24_result_digit; 
+                remainder_new_power_24 = int( product_new_power_24_digit / base_10M );
+                i(#-2,0,pos,0,t) = product_new_power_24_digit % base_10M;
+            );
+    
+            result_bin2dec = remainder_result_bin2dec + remainder_bin2dec_digit + ( use_first_digit ? old_copy_power_24_decimal );
+            remainder_result_bin2dec = int( result_bin2dec / base_10M );
+            i(#-1,0,result_pos-1,0,t) = result_bin2dec % base_10M;
+            if( remainder_bin2dec_digit,
+                i(#-1,0,result_pos-2,0,t) = remainder_result_bin2dec;
+            );
+    
+            product_new_power_24_digit = remainder_new_power_24 + old_copy_power_24_decimal ; 
+            remainder_new_power_24 = int( product_new_power_24_digit / base_10M );
+            i(#-2,0,pos++,0,t) = product_new_power_24_digit % base_10M;
+            if( remainder_new_power_24,
+                i(#-2,0,pos++,0,t) = remainder_new_power_24 ;
+            );
+    
+            number_of_decimals=pos; 
+            old_power=i1;
+            started=1;
+            I;
+            "
 
-            if !$preserve_base10_dynamic_array_image
-                _$0 $unicode_out
-                if $unicode_out
-                    res.=$sep{t} rm.
-                    sep=,
-                fi
-            else name[-1] bin2dec_result_img_base_10M
+        remove[-3,-2]
+        
+        if $multithreading
+
+            100%,100%,100%,1
+ 
+            eval.. <"begin(
+                    const base_10M = 1e7;
+                    remainder = 0;
+                );
+                total_value = sum(I) + remainder;
+                    i(#-1,0,y,0,0) = total_value % base_10M;
+                remainder = int( total_value / base_10M );
+                I;"
+            rm..
+    
+        fi
+        
+        if !i[#-1,0] crop. 0,1,0,100% fi
+        
+        ({h}) append[-2,-1] y => bin2dec_result_img
+        
+        if !$preserve_base10_dynamic_array_image
+            
+            _$0 $unicode_out
+            if $unicode_out
+                res.=$sep{t} rm.
+                sep=,
             fi
+        else name[-1] bin2dec_result_img_base_10M
+        fi
+        
     else
 
         eval 0b{$bin}
