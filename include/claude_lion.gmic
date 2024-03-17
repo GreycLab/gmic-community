@@ -742,3 +742,75 @@ cl_tangentialCircle:
 
 	mv[-1] 0
 	if $dime==3 resize[0] {min(w,h)/3}%,{min(w,h)/3}%,1,$chanNumb,5 fi
+
+#@gui Color Wheel: cl_colorWheel, cl_colorWheel(0)
+#@gui : note = note("Warning: This is an enormously gross approximation of the color models.")
+#@gui : note = note("<b>Dimension:</b>")
+#@gui : External Circle Radius = float(200, 10, 1000)
+#@gui : Internal Circle Radius Percentage = float(80, 1, 99)
+#@gui : Parts = choice[0, "x1", "x2", "x3", "x4", "Continuous"]
+#@gui : sep = separator()
+#@gui : note = note("<b>Colors:</b>")
+#@gui : Type = choice[0, "Red-Green-Blue Model", "Red-Yellow-Blue Model", "Opponent Model"]
+#@gui : sep = separator()
+#@gui : note = note("<b>Rotation:</b>")
+#@gui : Inverse Order = bool(0)
+#@gui : Rotation = float(0, 0, 360)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i>Claude Lion</i>. Latest Update: <i>2024/01/23</i>.</small>")
+
+cl_colorWheel:
+	
+	extCircle,intCirclePercent,parts,type,invert,rot=$*
+	
+	wid={$extCircle*2.5}
+	hig=$wid
+	intCircle={$extCircle*$intCirclePercent/100}
+	
+	if $type==2
+		base=2
+	else
+		base=3
+	fi
+	
+	if $parts<=3
+		mult={$parts+1}
+	else
+		mult=60
+	fi
+	
+	nbParts={$base*$mult}
+
+	if $type==0
+		formula="ang"
+	elif $type==1
+		formula="if(ang<120,ang/2,if(ang<180,ang-60,if(ang<240,ang*2-240,ang)))"
+	elif $type==2
+		formula="if(ang<180,ang*2/3,ang*4/3-120)"
+	fi
+
+	$wid,$hig,1,1
+	
+	local.
+		fill. "r = sqrt((x-w/2)^2+ (y-h/2)^2);
+			ang=atan2(y-h/2,x-w/2);
+			"angd=((1-2*$invert)*ang-$rot*pi/180+pi);"
+			"ang=(angd/2/pi-floor(angd/2/pi))*2*pi-pi;"
+			"angp=$nbParts*ang/pi+0.5;"
+			"rnd=floor(angp);"
+			"frc=angp-rnd;"
+			"ang=(rnd-1+cut(frc*r*pi/$nbParts,0,1))*pi/$nbParts;"
+			ang=180*ang/pi+180;
+			"ang=$formula;"
+			"($intCircle<r&&r<$extCircle)*ang"
+		"
+		$wid,$hig,1,1,1
+		$wid,$hig,1,1,1
+		$wid,$hig,1,1,1
+		fill. "r = sqrt((x-w/2)^2+ (y-h/2)^2);
+			"cut(r-$intCircle,0,1)*cut($extCircle-r,0,1)*255"
+		"
+		a c
+		hsv2rgb.
+	done
+	mv[-1] 0
