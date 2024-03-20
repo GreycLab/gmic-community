@@ -1049,32 +1049,43 @@ foreach {
             num_of_chans=1
         fi
         
-        2,{ceil(ceil((i(#$ref_img,0,h#$ref_img-1,0,1)*24-1)*$Ldb)/7)},1,$num_of_chans  # Decimal conversion of power of 24*n
-        1,{ceil($number_of_resulting_decimals/7)},1,$num_of_chans                      # Result conversion of binary to decimal conversion
+        decimal_conversion_array_size,result_conversion_array_size:=[ceil(ceil((i(#$ref_img,0,h#$ref_img-1,0,1)*24-1)*$Ldb)/7),ceil($number_of_resulting_decimals/7)]
+        
+        1,$result_conversion_array_size,1,$num_of_chans                      # Result conversion of binary to decimal conversion
         set[-1] $start_value,0,100%,0,100%
         
-        eval[-3] $symbol_to_use"
+        eval[-2] $symbol_to_use"
             begin(
                 const base_10M = 1e7;
-                const power_24_second_digit = ( 1 << 24 ) % base_10M;
+                const power_24_second_digit = - ( ( 1 << 24 ) % base_10M );
                 const log_10_2 = log10(2);
                 const end_ind = h#-1-1;
+                const result_conversion_size = $result_conversion_array_size;
+                const two_to_the_power_of_24_n_array_size = $decimal_conversion_array_size ;
+                const dec_two_to_the_power_of_24_n_array_size = two_to_the_power_of_24_n_array_size - 1;
                 number_of_decimals = old_power = started = 0;
                 calc_min_decimal_length(binary_digits_count) = ceil( (binary_digits_count-1) * log_10_2 );
+                
+                destination_two_to_the_power_24_n_array = vector(#two_to_the_power_of_24_n_array_size,0);
+                source_two_to_the_power_24_n_array = destination_two_to_the_power_24_n_array;
+                auxillary_two_to_the_power_24_n_array = source_two_to_the_power_24_n_array;
+                empty_result_conversion_array = vector(#result_conversion_size,0);
+                result_conversion_array = empty_result_conversion_array;
+                
                 convert_power_of_24_into_decimal(n)=(
                     blen = n + 1;
                     number_of_decimals = ceil( calc_min_decimal_length( n*24+1 ) / 7 );
-                    i(#-2,1,n,0,t) = 1;
+                    source_two_to_the_power_24_n_array[n] = 1;
                     insert_pos=0;
                     while( blen,
                         num=0;process_bin=blen+1;
                         while( process_bin--,
-                            num = (num << 24 ) | i(#-2,1,process_bin,0,t);
-                            i(#-2,1,process_bin,0,t) = int( num / base_10M );
+                            num = (num << 24 ) | source_two_to_the_power_24_n_array[process_bin];
+                            source_two_to_the_power_24_n_array[process_bin] = int( num / base_10M );
                             num %= base_10M;
                         );
-                        i(#-2,0,insert_pos++,0,t) = num;
-                        while( blen && !i(#-2,1,blen-1,0,t) , 
+                        destination_two_to_the_power_24_n_array[insert_pos++] = num;
+                        while( blen && !source_two_to_the_power_24_n_array[blen-1] , 
                             blen--; 
                         );
                     );
@@ -1084,47 +1095,55 @@ foreach {
             if( !started || ( i1-old_power>1 ),
                 convert_power_of_24_into_decimal(i1);
             );
-    
-            old_copy_power_24_decimal = remainder_new_power_24 = remainder_bin2dec_digit = remainder_result_bin2dec = 0;
-    
-            use_first_digit = i0 >= base_10M;
-            M=use_first_digit? i0 % base_10M : i0;
-    
-            repeat( number_of_decimals, pos,
-                result_pos = end_ind - pos ;
-                power_24_result_digit = i(#-2,0,pos,0,t);
-                product_new_power_24_digit = power_24_result_digit * power_24_second_digit + old_copy_power_24_decimal + remainder_new_power_24;
-                product_bin2dec = power_24_result_digit * M + ( use_first_digit ? old_copy_power_24_decimal ) + remainder_bin2dec_digit; 
-                result_bin2dec = i(#-1,0,result_pos,0,t) + (product_bin2dec % base_10M) + remainder_result_bin2dec;
-                i(#-1,0,result_pos,0,t) = result_bin2dec % base_10M;
-                remainder_result_bin2dec = int( result_bin2dec / base_10M );
-                remainder_bin2dec_digit = int( product_bin2dec / base_10M );
-                old_copy_power_24_decimal = power_24_result_digit; 
-                remainder_new_power_24 = int( product_new_power_24_digit / base_10M );
-                i(#-2,0,pos,0,t) = product_new_power_24_digit % base_10M;
+            
+            remainder_new_power_24 = remainder_value_of_bin2dec = 0;
+            
+            min_copy_count = min(number_of_decimals,dec_two_to_the_power_of_24_n_array_size);
+            auxillary_two_to_the_power_24_n_array[0] = 0;
+            copy(auxillary_two_to_the_power_24_n_array[1],destination_two_to_the_power_24_n_array[0],min_copy_count,1,1);
+            
+            if(i0>=base_10M
+            ,result_conversion_array[0]=0;copy(result_conversion_array[1],destination_two_to_the_power_24_n_array[0],number_of_decimals,1,1);
+            ,result_conversion_array = empty_result_conversion_array;0;
             );
-    
-            result_bin2dec = remainder_result_bin2dec + remainder_bin2dec_digit + ( use_first_digit ? old_copy_power_24_decimal );
-            remainder_result_bin2dec = int( result_bin2dec / base_10M );
-            i(#-1,0,result_pos-1,0,t) = result_bin2dec % base_10M;
-            if( remainder_bin2dec_digit,
-                i(#-1,0,result_pos-2,0,t) = remainder_result_bin2dec;
+            
+            multiplicant = - ( i0 % base_10M );
+            if(multiplicant,
+                copy(result_conversion_array[0],destination_two_to_the_power_24_n_array[0],number_of_decimals,1,1,multiplicant);
             );
-    
-            product_new_power_24_digit = remainder_new_power_24 + old_copy_power_24_decimal ; 
-            remainder_new_power_24 = int( product_new_power_24_digit / base_10M );
-            i(#-2,0,pos++,0,t) = product_new_power_24_digit % base_10M;
+            copy(auxillary_two_to_the_power_24_n_array[0],destination_two_to_the_power_24_n_array[0],number_of_decimals,1,1,power_24_second_digit);
+            
+            
+            repeat(number_of_decimals,pos,
+                result_pos = end_ind - pos;
+                value_of_bin2dec = i(#-1,0,result_pos,0,t) + result_conversion_array[pos] + remainder_value_of_bin2dec ;
+                value_of_new_power_24_n = auxillary_two_to_the_power_24_n_array[pos] + remainder_new_power_24 ;
+                remainder_new_power_24 = int ( value_of_new_power_24_n / base_10M );
+                remainder_value_of_bin2dec = int ( value_of_bin2dec / base_10M );
+                destination_two_to_the_power_24_n_array[pos] = value_of_new_power_24_n % base_10M ;
+                i(#-1,0,result_pos,0,t) = value_of_bin2dec % base_10M ;   
+            );
+            
+            value_of_bin2dec = remainder_value_of_bin2dec + result_conversion_array[pos];
+            remainder_bin2dec = int ( value_of_bin2dec / base_10M );
+            i(#-1,0,result_pos - 1,0,t) = value_of_bin2dec % base_10M;
+            if( remainder_bin2dec ,
+                i(#-1,0,result_pos - 2,0,t) = remainder_bin2dec;
+            );
+            
+            value_of_new_power_24_n = remainder_new_power_24 + ( number_of_decimals < two_to_the_power_of_24_n_array_size ? auxillary_two_to_the_power_24_n_array[number_of_decimals] );
+            remainder_new_power_24 = int( value_of_new_power_24_n / base_10M );
+            destination_two_to_the_power_24_n_array[number_of_decimals++] = value_of_new_power_24_n % base_10M;
             if( remainder_new_power_24,
-                i(#-2,0,pos++,0,t) = remainder_new_power_24 ;
+                destination_two_to_the_power_24_n_array[number_of_decimals++] = remainder_new_power_24;
             );
-    
-            number_of_decimals=pos; 
+            
             old_power=i1;
             started=1;
             I;
             "
 
-        remove[-3,-2]
+        remove[-2]
         
         if $multithreading
 
@@ -1135,7 +1154,7 @@ foreach {
                     remainder = 0;
                 );
                 total_value = sum(I) + remainder;
-                    i(#-1,0,y,0,0) = total_value % base_10M;
+                i(#-1,0,y,0,0) = total_value % base_10M;
                 remainder = int( total_value / base_10M );
                 I;"
             rm..
@@ -1144,7 +1163,7 @@ foreach {
         
         if !i[#-1,0] crop. 0,1,0,100% fi
         
-        ({h}) append[-2,-1] y => bin2dec_result_img
+        name[-1] bin2dec_result_img
         
         if !$preserve_base10_dynamic_array_image
             
@@ -1153,7 +1172,10 @@ foreach {
                 res.=$sep{t} rm.
                 sep=,
             fi
-        else name[-1] bin2dec_result_img_base_10M
+        else 
+            ({h}) 
+            append[-2,-1] y
+            name[-1] bin2dec_result_img_base_10M
         fi
         
     else
@@ -1191,7 +1213,6 @@ if !$preserve_base10_dynamic_array_image?$unicode_out
     status $res
 fi
 _rep_binimg2dec_base:
-da_freeze[-1]
 number_of_digits_for_first_digit={int(log10(i[#-1,0]))+1}
 name={n}
 
