@@ -123,7 +123,7 @@ m $0_process_individual_channel_section:"
 cmyk_mode,max_col_spec_size={m='$-1'=='cmyk';[m,3+(m?1)]}
 user_cmyk_mode=$cmyk_mode
 
-if same('$_host','cli')
+if same('$_host','cli')&&!narg($_pasted_from_gui)
 
  do
 
@@ -20873,7 +20873,11 @@ u "{$1}"\
 #@gui:Previous Image Display=int(0,0,3)_0
 fx_rep_cbsoo:
 skip $*
-rm $_persistent keep[filtered]
+if same('$_host','cli')
+ _pasted_from_gui=1
+ fx_rep_cbsoo_preview $*
+else rm $_persistent keep[filtered]
+fi
 fx_rep_cbsoo_preview:
 skip $*
 
@@ -21490,167 +21494,198 @@ fi
 
 if $_gui_analysis_color?$cmyk_mode?$include_k filter_args.=,cmyk fi
 
-if !$contain_persistent||$color_space_switched||!same('$filter_args','$stored_variables')
- rmn filtered
- 
- if $cs_choice
- 
-  if $cmyk_mode
-   +foreach {
-    if s<3 continue fi
-    s c,-3
-    rgb2cmyk[0]
-    append c
+if same('$_host','cli')
+
+ if $_gui_analysis_color
+  if $cmyk_mode&&$include_k
+   foreach[$list_of_color_images] {
+     s c,-3
+     rgb2cmyk[0]
+     append c
    }
   else
-   +foreach {
-    if s<3 continue fi
-    $convert_colors_fwd
-   }
+   $convert_colors_fwd[$list_of_color_images]
   fi
-  
-  rep_channels_blur_sharpen_overblur_overline[$num_of_imgs--1] $filter_args
-  
-  if $cmyk_mode
-   foreach[$num_of_imgs--1] {
-    if s<4 continue fi
-    s c,-4
-    cmyk2rgb[0]
-    append c
-   }
-  else
-   foreach[$num_of_imgs--1] {
-    if s<3 continue fi
-    $convert_colors_bwd
-   }
-  fi
-  
- else
-  +rep_channels_blur_sharpen_overblur_overline $filter_args 
  fi
  
- name[$num_of_imgs--1] filtered
- +store _persistent
-fi
+ rep_channels_blur_sharpen_overblur_overline[$num_of_imgs--1] $filter_args
+ 
+ if $_gui_analysis_color
+  if $cmyk_mode&&$include_k
+   foreach[$list_of_color_images] {
+     s c,-4
+     cmyk2rgb[0]
+     append c
+   }
+  else
+   $convert_colors_bwd[$list_of_color_images]
+  fi
+ fi
+ 
+else
 
-if $use_section&&($!>2)
- if $previous_image_preview&1
-  if $use_only_alpha_to_preview
-   keep[{$num_of_imgs+$only_alpha_to_preview}]
+ if !$contain_persistent||$color_space_switched||!same('$filter_args','$stored_variables')
+  rmn filtered
+  
+  if $cs_choice
+  
+   if $cmyk_mode
+    +foreach {
+     if s<3 continue fi
+     s c,-3
+     rgb2cmyk[0]
+     append c
+    }
+   else
+    +foreach {
+     if s<3 continue fi
+     $convert_colors_fwd
+    }
+   fi
+   
+   rep_channels_blur_sharpen_overblur_overline[$num_of_imgs--1] $filter_args
+   
+   if $cmyk_mode
+    foreach[$num_of_imgs--1] {
+     if s<4 continue fi
+     s c,-4
+     cmyk2rgb[0]
+     append c
+    }
+   else
+    foreach[$num_of_imgs--1] {
+     if s<3 continue fi
+     $convert_colors_bwd
+    }
+   fi
+   
+  else
+   +rep_channels_blur_sharpen_overblur_overline $filter_args 
+  fi
+  
+  name[$num_of_imgs--1] filtered
+  +store _persistent
+ fi
+
+ if $use_section&&($!>2)
+  if $previous_image_preview&1
+   if $use_only_alpha_to_preview
+    keep[{$num_of_imgs+$only_alpha_to_preview}]
+   else
+    if $previous_image_preview<2
+     keep[{$num_of_imgs+$gray_alpha_preview}]
+    else
+     keep[{$num_of_imgs+$color_alpha_preview}]
+    fi
+   fi
   else
    if $previous_image_preview<2
-    keep[{$num_of_imgs+$gray_alpha_preview}]
+    keep[{$num_of_imgs+$gray_preview}]
    else
-    keep[{$num_of_imgs+$color_alpha_preview}]
+    keep[{$num_of_imgs+$color_preview}]
    fi
   fi
  else
-  if $previous_image_preview<2
-   keep[{$num_of_imgs+$gray_preview}]
+  if $!==2 keep[filtered]
   else
-   keep[{$num_of_imgs+$color_preview}]
+   if $_gui_analysis_gray keep[{$num_of_imgs+$gray_preview}]
+   else                   keep[{$num_of_imgs+$color_preview}]
+   fi
   fi
  fi
-else
- if $!==2 keep[filtered]
- else
-  if $_gui_analysis_gray keep[{$num_of_imgs+$gray_preview}]
-  else                   keep[{$num_of_imgs+$color_preview}]
-  fi
+
+ if !isnan($80)
+  upper_left_crop_points:=vmax([(w-1-($_preview_area_width-1))*($80%),(h-1-($_preview_area_height))*($81%)],[0,0])
+  bottom_right_crop_points:=vmin([$upper_left_crop_points]+[$_preview_area_width,$_preview_area_height],[w-1,h-1])
+  crop $upper_left_crop_points,$bottom_right_crop_points
  fi
-fi
 
-if !isnan($80)
- upper_left_crop_points:=vmax([(w-1-($_preview_area_width-1))*($80%),(h-1-($_preview_area_height))*($81%)],[0,0])
- bottom_right_crop_points:=vmin([$upper_left_crop_points]+[$_preview_area_width,$_preview_area_height],[w-1,h-1])
- crop $upper_left_crop_points,$bottom_right_crop_points
+ u "{$1}"_$display_color_space_options\
+ "{$2}"_$k_display_mode\
+ "{"$_gui_analysis_gray"}"\
+ "{"$_gui_analysis_color"}"\
+ "{"$_gui_analysis_alpha"}"\
+ "{"$list_of_color_images"}"\
+ "{"$gray_preview"}"\
+ "{"$gray_alpha_preview"}"\
+ "{"$color_preview"}"\
+ "{"$color_alpha_preview"}"\
+ "{"$only_alpha_to_preview"}"\
+ "{"$use_only_alpha_to_preview"}"\
+ "{$13}"_$section_0_visibility\
+ "{$14}"_$section_1_visibility\
+ "{$15}"_$section_2_visibility\
+ "{$16}"_$section_3_visibility\
+ "{$17}"_$section_4_visibility\
+ "{$18}"_$section_5_visibility\
+ "{$19}"_$section_6_visibility\
+ "{$20}"_$section_7_visibility\
+ "{$21}"_$section_8_visibility\
+ "{$22}"_$section_9_visibility\
+ "{"$use_section"}"\
+ "{"$section_variable"}"\
+ "{$25}"_$color_3_channels_box_visibility\
+ "{$26}"_$color_4_channels_box_visibility\
+ "{"$link_method"}"_$link_visibility\
+ "{"$link_effect"}"_$link_effect_visibility\
+ "{"$link_multiplication"}"_$link_visibility\
+ "{"$link_blend"}"_$link_visibility\
+ "{"$link_opacity"}"_$link_visibility\
+ "{"$gray_method"}"_$gray_visibility\
+ "{"$gray_effect"}"_$gray_effect_visibility\
+ "{"$gray_multiplication"}"_$gray_visibility\
+ "{"$gray_blend"}"_$gray_visibility\
+ "{"$gray_opacity"}"_$gray_visibility\
+ "{$37}"_$display_gray_checkbox\
+ "{"$channel_0_method"}"_$channel_0_visibility\
+ "{"$channel_0_effect"}"_$channel_0_effect_visibility\
+ "{"$channel_0_multiplication"}"_$channel_0_visibility\
+ "{"$channel_0_blend"}"_$channel_0_visibility\
+ "{"$channel_0_opacity"}"_$channel_0_visibility\
+ "{$43}"_$display_channel_0_checkbox\
+ "{$44}"_$display_cyan_checkbox\
+ "{"$channel_1_method"}"_$channel_1_visibility\
+ "{"$channel_1_effect"}"_$channel_1_effect_visibility\
+ "{"$channel_1_multiplication"}"_$channel_1_visibility\
+ "{"$channel_1_blend"}"_$channel_1_visibility\
+ "{"$channel_1_opacity"}"_$channel_1_visibility\
+ "{$50}"_$display_channel_1_checkbox\
+ "{$51}"_$display_magenta_checkbox\
+ "{"$channel_2_method"}"_$channel_2_visibility\
+ "{"$channel_2_effect"}"_$channel_2_effect_visibility\
+ "{"$channel_2_multiplication"}"_$channel_2_visibility\
+ "{"$channel_2_blend"}"_$channel_2_visibility\
+ "{"$channel_2_opacity"}"_$channel_2_visibility\
+ "{$57}"_$display_channel_2_checkbox\
+ "{$58}"_$display_yellow_checkbox\
+ "{"$channel_3_method"}"_$channel_3_visibility\
+ "{"$channel_3_effect"}"_$channel_3_effect_visibility\
+ "{"$channel_3_multiplication"}"_$channel_3_visibility\
+ "{"$channel_3_blend"}"_$channel_3_visibility\
+ "{"$channel_3_opacity"}"_$channel_3_visibility\
+ "{$64}"_$display_black_checkbox\
+ "{"$alpha_method"}"_$alpha_visibility\
+ "{"$alpha_effect"}"_$alpha_effect_visibility\
+ "{"$alpha_multiplication"}"_$alpha_visibility\
+ "{"$alpha_blend"}"_$alpha_visibility\
+ "{"$alpha_opacity"}"_$alpha_visibility\
+ "{$70}"_$display_alpha_checkbox\
+ "{0}"\
+ "{0}"_$display_make_same_vars_button\
+ "{0}"_$display_make_same_vars_button\
+ "{"$use_link"}"_$display_link_checkbox\
+ "{"$display_link_checkbox"}"\
+ "{$1}"\
+ "{$2}"\
+ "{"$use_link"}"\
+ "{"$display_color_space_options"}"\
+ "{$80,$81}"\
+ "{"$temp_check_count_bools"}"\
+ "{"$last_visible_option"}"\
+ "{1}"\
+ "{"$filter_args"}"\
+ "{"$previous_image_preview"}"
 fi
-
-u "{$1}"_$display_color_space_options\
-"{$2}"_$k_display_mode\
-"{"$_gui_analysis_gray"}"\
-"{"$_gui_analysis_color"}"\
-"{"$_gui_analysis_alpha"}"\
-"{"$list_of_color_images"}"\
-"{"$gray_preview"}"\
-"{"$gray_alpha_preview"}"\
-"{"$color_preview"}"\
-"{"$color_alpha_preview"}"\
-"{"$only_alpha_to_preview"}"\
-"{"$use_only_alpha_to_preview"}"\
-"{$13}"_$section_0_visibility\
-"{$14}"_$section_1_visibility\
-"{$15}"_$section_2_visibility\
-"{$16}"_$section_3_visibility\
-"{$17}"_$section_4_visibility\
-"{$18}"_$section_5_visibility\
-"{$19}"_$section_6_visibility\
-"{$20}"_$section_7_visibility\
-"{$21}"_$section_8_visibility\
-"{$22}"_$section_9_visibility\
-"{"$use_section"}"\
-"{"$section_variable"}"\
-"{$25}"_$color_3_channels_box_visibility\
-"{$26}"_$color_4_channels_box_visibility\
-"{"$link_method"}"_$link_visibility\
-"{"$link_effect"}"_$link_effect_visibility\
-"{"$link_multiplication"}"_$link_visibility\
-"{"$link_blend"}"_$link_visibility\
-"{"$link_opacity"}"_$link_visibility\
-"{"$gray_method"}"_$gray_visibility\
-"{"$gray_effect"}"_$gray_effect_visibility\
-"{"$gray_multiplication"}"_$gray_visibility\
-"{"$gray_blend"}"_$gray_visibility\
-"{"$gray_opacity"}"_$gray_visibility\
-"{$37}"_$display_gray_checkbox\
-"{"$channel_0_method"}"_$channel_0_visibility\
-"{"$channel_0_effect"}"_$channel_0_effect_visibility\
-"{"$channel_0_multiplication"}"_$channel_0_visibility\
-"{"$channel_0_blend"}"_$channel_0_visibility\
-"{"$channel_0_opacity"}"_$channel_0_visibility\
-"{$43}"_$display_channel_0_checkbox\
-"{$44}"_$display_cyan_checkbox\
-"{"$channel_1_method"}"_$channel_1_visibility\
-"{"$channel_1_effect"}"_$channel_1_effect_visibility\
-"{"$channel_1_multiplication"}"_$channel_1_visibility\
-"{"$channel_1_blend"}"_$channel_1_visibility\
-"{"$channel_1_opacity"}"_$channel_1_visibility\
-"{$50}"_$display_channel_1_checkbox\
-"{$51}"_$display_magenta_checkbox\
-"{"$channel_2_method"}"_$channel_2_visibility\
-"{"$channel_2_effect"}"_$channel_2_effect_visibility\
-"{"$channel_2_multiplication"}"_$channel_2_visibility\
-"{"$channel_2_blend"}"_$channel_2_visibility\
-"{"$channel_2_opacity"}"_$channel_2_visibility\
-"{$57}"_$display_channel_2_checkbox\
-"{$58}"_$display_yellow_checkbox\
-"{"$channel_3_method"}"_$channel_3_visibility\
-"{"$channel_3_effect"}"_$channel_3_effect_visibility\
-"{"$channel_3_multiplication"}"_$channel_3_visibility\
-"{"$channel_3_blend"}"_$channel_3_visibility\
-"{"$channel_3_opacity"}"_$channel_3_visibility\
-"{$64}"_$display_black_checkbox\
-"{"$alpha_method"}"_$alpha_visibility\
-"{"$alpha_effect"}"_$alpha_effect_visibility\
-"{"$alpha_multiplication"}"_$alpha_visibility\
-"{"$alpha_blend"}"_$alpha_visibility\
-"{"$alpha_opacity"}"_$alpha_visibility\
-"{$70}"_$display_alpha_checkbox\
-"{0}"\
-"{0}"_$display_make_same_vars_button\
-"{0}"_$display_make_same_vars_button\
-"{"$use_link"}"_$display_link_checkbox\
-"{"$display_link_checkbox"}"\
-"{$1}"\
-"{$2}"\
-"{"$use_link"}"\
-"{"$display_color_space_options"}"\
-"{$80,$81}"\
-"{"$temp_check_count_bools"}"\
-"{"$last_visible_option"}"\
-"{1}"\
-"{"$filter_args"}"\
-"{"$previous_image_preview"}"
 #@gui Vibrato:fx_vibrato,_fx_vibrato_preview(0)
 #@gui:_=note("This is the advanced version of the Vibrato filter. If you do want to manipulate multiple channels at once, use <u>Vibrato - Basic</u> filter. <i>Note: Disable channel mulplication for non-transparent images.</i> \n\n")
 #@gui:_=note("This filter is the one of the G'MIC version of <b>MadJik's</b> <i>Paint.NET plugin</i>")
