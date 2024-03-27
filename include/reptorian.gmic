@@ -48,6 +48,395 @@
 #
 #-------------------------------
 
+#@cli rep_cbsoo: eq. to 'rep_channels_overblur_overline_blur_sharpen'.
+rep_cbsoo: rep_channels_overblur_overline_blur_sharpen $*
+#@cli rep_channels_overblur_overline_blur_sharpen: method_a={ 0=blur | 1=sharpen | 2=overblur | 3=overline },0%<_effect_factor_a[%]<=100%,_multiplication_factor>0,_blending_mode,0<_blending_opacity[%]<=100%...
+#@cli : Apply BSOO filtering over channels within images.
+#@cli : 'blending_mode' can be { add | alpha | and | average | burn | darken | difference | divide | dodge | exclusion | freeze | grainextract | grainmerge | hardlight | hardmix | interpolation | lighten | linearburn | linearlight | multiply | normal | negation | or | overlay | pinlight | reflect | screen | shapeaverage | softburn | softdodge | softlight | stamp | subtract | vividlight | xor }.
+#@cli : - Note on 3 Channels Color Spaces (RGB, HSV...) input -
+#@cli : If you want to perform the same setting on all channel at once, simply use 5 arguments.
+#@cli : If you want to perform same setting on all color channel at once, but separate for gray and alpha. Use 5*(contain_gray+contain_color+contain_alpha) arguments.
+#@cli : If you want to perform separate setting on different channels. You can use '-' to disable individual channel, or empty space to skip color channels altogether. If you have enabled support for manipulating color channel, yes, you must consider the number of arguments. 
+#@cli : Author : Reptorian.
+#@cli : Default values: '_effect_factor=100%','_multiplication_factor=100%','_blending_mode=21','_blending_opacity=100%','_effect_boundary=1'
+#@cli : $ sp lena shape_cupid 512 blur. 10 *. 255 cut. 0,255 a c sp house rep_channels_blur_sharpen_overblur_overline 2,150,1.5,normal,100%,2,100,1,xor,100%,1,50,1,grainextract,100%
+#@cli : $ sp lena shape_cupid 512 blur. 10 *. 255 cut. 0,255 a c sp house rep_channels_blur_sharpen_overblur_overline 2,150,1.5,normal,100%
+#@cli : $ sp lena shape_cupid 512 blur. 10 *. 255 cut. 0,255 a c sp house rep_channels_blur_sharpen_overblur_overline 3,150,1.5,normal,100%,2,100,1,xor,20%,3,200,2,linearlight,100%,-,1,200,1,normal,100%
+rep_channels_blur_sharpen_overblur_overline:
+skip $*
+check "!($#<5)"
+$=arg
+
+blur,sharpen,overblur,overline=0,1,2,3
+
+list_of_blending_modes=add,alpha,and,average,burn,darken,difference,divide,dodge,exclusion,freeze,grainextract,grainmerge,hardlight,hardmix,interpolation,lighten,linearburn,linearlight,multiply,normal,negation,or,overlay,pinlight,reflect,screen,shapeaverage,softburn,softdodge,softlight,stamp,subtract,vividlight,xor
+num_of_blending_modes={narg($list_of_blending_modes)}
+$list_of_blending_modes={expr('x',$num_of_blending_modes)}
+
+m $0_bsoo_edit:"
+ pos,use_char={$""1>1?[$""1-1,1]:[$""1+1,0]}
+
+ if $use_char char=+ fi
+
+ $char${arg\\ $pos,blur,sharpen} $""2 
+
+ if $""1>1
+  +-[-2,-1] abs[-1]
+  *[-1] $""3
+  rm[-2]
+  +[-2,-1]
+ fi
+ "
+ 
+m +$0_bsoo_edit:"
+ pos={$""1>1?$""1-1:$""1+1}
+ +${arg\\ $pos,blur,sharpen} $""2
+ 
+ if $""1>1
+  +-[-2,-1] abs[-1]
+  *[-1] $""3
+  rm[-2]
+  +[-1] [-2]
+ fi
+ "
+ 
+m $0_process_individual_channel_section:"
+  method,effect_factor,multiplication,opacity:=[$""{2-5}]
+  use_output=0
+  
+  blending_id=$""6
+  use_blend_str:=!isnum($blending_id)
+  
+  if $effect_factor||$opacity>0
+   use_output=1
+   if ($use_blend_str?'$blending_id'=='normal'||'$blending_id'=='alpha':$blending_id=="$normal"||$blending_id=="$alpha")&&($opacity==1)
+    m $0_process_$""1:$0_bsoo_edit\\ $method,$effect_factor,$multiplication\\ cut\\ 0,255
+   else
+    if !$use_blend_str blending_id=${arg\\ $blending_id+1,"$list_of_blending_modes"} fi
+    m $0_process_$""1:+$0_bsoo_edit\\ $method,$effect_factor,$multiplication\\ _blend_$blending_id\\ if\\ $opacity<1\\ j..\\ .,0,0,0,0,$opacity\\ rm.\\ else\\ k.\\ fi\\ cut\\ 0,255
+   fi
+  fi
+
+  status $use_output"
+
+cmyk_mode,max_col_spec_size={m='$-1'=='cmyk';[m,3+(m?1)]}
+user_cmyk_mode=$cmyk_mode
+
+if '$_host'=='$cli'
+
+ do
+
+  eval "
+   const num_of_imgs=$!;
+   const cmyk_mode=$cmyk_mode;
+   const max_col_spec_size=$max_col_spec_size;
+   contain_gray=contain_alpha=0;
+   continue_analyzing_color_space=0;
+   cmyk_mode?(
+    contain_rgb=contain_cmyk=0;
+    repeat(num_of_imgs,p,
+     current_spec_size=s#p;
+     if(current_spec_size>5,run('exc_spec_found'););
+     if(!contain_gray?current_spec_size<3,contain_gray=1;);
+     if(!contain_cmy?current_spec_size==3,contain_cmy=1;);
+     if(!contain_cmyk?current_spec_size>=4,contain_cmyk=1;);
+     if(!contain_alpha?current_spec_size==2||current_spec_size>max_col_spec_size,contain_alpha=1;);
+    );
+    set('contain_gray',contain_gray);
+    set('contain_cmy',contain_cmy);
+    set('contain_cmyk',contain_cmyk);
+    set('contain_alpha',contain_alpha);
+   ):(
+    contain_color=0;
+    repeat(num_of_imgs,p,
+     current_spec_size=s#p;
+     if(!contain_gray?current_spec_size<3,contain_gray=1;);
+     if(!contain_color?current_spec_size>2,
+      contain_color=1;
+      if(current_spec_size>4,
+       set('cmyk_mode',1);
+       set('max_col_spec_size',4);
+       continue_analyzing_color_space=1;
+       break();
+      );
+     );
+     if(!contain_alpha?current_spec_size==2||current_spec_size>max_col_spec_size,contain_alpha=1;);
+    );
+    if(!continue_analyzing_color_space,
+     set('contain_gray',contain_gray);
+     set('contain_color',contain_color);
+     set('contain_alpha',contain_alpha);
+    );
+   );
+   set('continue_analyzing_color_space',continue_analyzing_color_space);"
+
+ while $continue_analyzing_color_space
+else
+ contain_gray,contain_alpha=$_gui_analysis_gray,$_gui_analysis_alpha
+ contain_cmy=0
+ contain_color,contain_cmyk=$_gui_analysis_color
+fi
+
+############################################
+# Reference for code: Result of CMYK       #
+# [gmic]./ g0,cmy0,cmyk1,alpha0 => 1,4     #
+# [gmic]./ g0,cmy0,cmyk1,alpha1 => 2,5     #
+# [gmic]./ g0,cmy1,cmyk0,alpha0 => 1,3     #
+# [gmic]./ g0,cmy1,cmyk0,alpha1 => 2,4     #
+# [gmic]./ g0,cmy1,cmyk1,alpha0 => 2,3,5,7 #
+# [gmic]./ g0,cmy1,cmyk1,alpha1 => 3,5,6,8 #
+# [gmic]./ g1,cmy0,cmyk0,alpha0 => 1,1     #
+# [gmic]./ g1,cmy0,cmyk0,alpha1 => 2,2     #
+# [gmic]./ g1,cmy0,cmyk1,alpha0 => 2,5     #
+# [gmic]./ g1,cmy0,cmyk1,alpha1 => 3,6     #
+# [gmic]./ g1,cmy1,cmyk0,alpha0 => 2,4     #
+# [gmic]./ g1,cmy1,cmyk0,alpha1 => 3,5     #
+# [gmic]./ g1,cmy1,cmyk1,alpha0 => 3,5,6,8 #
+# [gmic]./ g1,cmy1,cmyk1,alpha1 => 4,6,7,9 #
+############################################
+
+#####################################
+# Reference for code: Result of RGB #
+# [gmic]./ g0,rgb1,alpha0 => 1,3    #
+# [gmic]./ g0,rgb1,alpha1 => 2,4    #
+# [gmic]./ g1,rgb0,alpha0 => 1,1    #
+# [gmic]./ g1,rgb0,alpha1 => 2,2    #
+# [gmic]./ g1,rgb1,alpha0 => 2,4    #
+# [gmic]./ g1,rgb1,alpha1 => 3,5    #
+#####################################
+
+var_method,var_effect_factor,var_multiplication_factor,var_blending,var_opacity:=expr('x+1',5)
+
+if $cmyk_mode
+ # Please factor in CMYK here. Find out how it should work #
+ if ($#-$user_cmyk_mode)==5
+  effect_factor,multiplication,opacity:=[${arg$var_effect_factor},${arg$var_multiplication_factor},${arg$var_opacity}]
+  
+  method=${arg$var_method}
+  if !isint($current_method)&&('$current_method'!='-') method=${$method} fi
+  
+  blending=${arg$var_blending}
+
+  if !$effect_factor||$opacity<=0 return fi
+  use_blend_str:=!isnum($blending_id)
+  if !$use_blend_str blending_id=${arg\ $blending_id+1,$list_of_blending_modes} fi
+  
+  foreach { $0_process_individual_channel_section $method,$effect_factor,$multiplication,$opacity,$blending_id }
+ else
+  use_gray,use_cmy,use_cmyk,use_alpha,use_cmy_channel_0,use_cmy_channel_1,use_cmy_channel_2,use_cmyk_channel_0,use_cmyk_channel_1,use_cmyk_channel_2,use_cmyk_channel_3=0
+  
+  if $contain_gray
+   current_method=${arg$var_method}
+   
+   if !isint($current_method)&&('$current_method'!='-') current_method=${$current_method} fi
+   
+   if narg($current_method)?'$current_method'!='-'
+     use_gray=${$0_process_individual_channel_section\ gray,$current_method,${arg$var_effect_factor},${arg$var_multiplication_factor},${arg$var_opacity},${arg$var_blending}}
+     var_method,var_effect_factor,var_multiplication_factor,var_blending,var_opacity+=5
+   else
+    var_method,var_effect_factor,var_multiplication_factor,var_blending,var_opacity+=1
+   fi
+  fi
+  
+  if $contain_cmy
+   current_method=${arg$var_method}
+   if narg($current_method)
+    repeat 3 {
+     if !isint($current_method)&&('$current_method'!='-') current_method=${$current_method} fi
+     if '$current_method'=='-'
+      var_method,var_effect_factor,var_multiplication_factor,var_blending,var_opacity+=1
+     elif narg($current_method)
+      use_cmy_channel_$>=${$0_process_individual_channel_section\ cmy_channel_$>,$current_method,${arg$var_effect_factor},${arg$var_multiplication_factor},${arg$var_opacity},${arg$var_blending}}
+      if !$use_cmy use_cmy=${use_cmy_channel_$>} fi
+      var_method,var_effect_factor,var_multiplication_factor,var_blending,var_opacity+=5
+     else error inval_arg
+     fi
+     current_method=${arg$var_method}
+    }
+   else
+    var_method,var_effect_factor,var_multiplication_factor,var_blending,var_opacity+=1
+   fi
+  fi
+
+  if $contain_cmyk
+   current_method=${arg$var_method}
+   if narg($current_method)
+    repeat 4 {
+     if !isint($current_method)&&('$current_method'!='-') current_method=${$current_method} fi
+     if '$current_method'=='-'
+      var_method,var_effect_factor,var_multiplication_factor,var_blending,var_opacity+=1
+     elif narg($current_method)
+      use_cmyk_channel_$>=${$0_process_individual_channel_section\ cmyk_channel_$>,$current_method,${arg$var_effect_factor},${arg$var_multiplication_factor},${arg$var_opacity},${arg$var_blending}}
+      if !$use_cmyk use_cmyk=${use_cmyk_channel_$>} fi
+      var_method,var_effect_factor,var_multiplication_factor,var_blending,var_opacity+=5
+     else error inval_arg
+     fi
+     current_method=${arg$var_method}
+    }
+   else
+    var_method,var_effect_factor,var_multiplication_factor,var_blending,var_opacity+=1
+   fi
+  fi
+  
+  if $contain_alpha
+   current_method=${arg$var_method}
+   if !isint($current_method)&&('$current_method'!='-') current_method=${$current_method} fi
+   if narg($current_method)?'$current_method'!='-'
+    use_alpha=${$0_process_individual_channel_section\ alpha,$current_method,${arg$var_effect_factor},${arg$var_multiplication_factor},${arg$var_opacity},${arg$var_blending}}
+   fi
+  fi
+  
+  foreach {
+   chan_count,contain_color,contain_alpha:=[s,s>2,!(s&1)]
+   
+   if $use_alpha?$contain_alpha
+    s c,-{s-1}
+    if $use_alpha $0_process_alpha[-1] fi   
+   fi
+   
+   if $contain_color
+    if s>3 
+     if $use_cmyk
+      s[0] c
+      foreach[0-3] { if ${use_cmyk_channel_$>} $0_process_cmyk_channel_$> fi }
+     fi
+    else
+     if $use_cmy
+      s[0] c
+      foreach[0-2] { if ${use_cmy_channel_$>} $0_process_cmy_channel_$> fi }
+     fi
+    fi
+   fi
+   
+   a c
+  }
+  
+ fi
+else
+ 
+ num_of_contains,num_of_set_args,gray_start={[sum($contain_gray,$contain_color,$contain_alpha),ceil($#/5)]},$contain_gray
+  
+ if $num_of_set_args!=$num_of_contains||(($#-$num_of_set_args*5)>0)
+  use_gray,use_color,use_alpha,\
+  use_channel_0,use_channel_1,use_channel_2=0
+  
+  if $contain_gray 
+   current_method=${arg$var_method}
+   if !isint($current_method)&&('$current_method'!='-') current_method=${$current_method} fi
+   if narg($current_method)?'$current_method'!='-'
+    use_gray=${$0_process_individual_channel_section\ gray,$current_method,${arg$var_effect_factor},${arg$var_multiplication_factor},${arg$var_opacity},${arg$var_blending}}
+    var_method,var_effect_factor,var_multiplication_factor,var_blending,var_opacity+=5
+   else
+    var_method,var_effect_factor,var_multiplication_factor,var_blending,var_opacity+=1
+   fi
+  fi
+  
+  if $contain_color
+   current_method=${arg$var_method}
+   if narg($current_method)
+    repeat 3 {
+     if !isint($current_method)&&('$current_method'!='-') current_method=${$current_method} fi
+     if '$current_method'=='-'
+      var_method,var_effect_factor,var_multiplication_factor,var_blending,var_opacity+=1
+     elif narg($current_method)
+      use_channel_$>=${$0_process_individual_channel_section\ channel_$>,$current_method,${arg$var_effect_factor},${arg$var_multiplication_factor},${arg$var_opacity},${arg$var_blending}}
+      if !$use_color use_color=${use_channel_$>} fi
+      var_method,var_effect_factor,var_multiplication_factor,var_blending,var_opacity+=5
+     else error inval_arg
+     fi
+     current_method=${arg$var_method}
+    }
+   else
+    var_method,var_effect_factor,var_multiplication_factor,var_blending,var_opacity+=1
+   fi
+  fi
+  
+  if $contain_alpha
+   current_method=${arg$var_method}
+   if !isint($current_method)&&('$current_method'!='-') current_method=${$current_method} fi
+   if narg($current_method)?'$current_method'!='-'
+    use_alpha=${$0_process_individual_channel_section\ alpha,$current_method,${arg$var_effect_factor},${arg$var_multiplication_factor},${arg$var_opacity},${arg$var_blending}}
+   fi
+  fi
+  
+  if !sum($use_gray,$use_color,$use_alpha) return fi
+  
+  foreach {
+   contain_color,contain_alpha:=[s>2,!(s&1)]
+   
+   if $use_alpha?$contain_alpha 
+    s c,-{s-1}
+    if $use_alpha $0_process_alpha[-1] fi
+   fi
+   
+   if $contain_color?$use_color
+    s[0] c
+    foreach[0-2] {
+     if ${use_channel_$>}
+      $0_process_channel_$>
+     fi 
+    }
+   elif $use_gray $0_process_gray[0]
+   fi
+   
+   a c
+  }
+ elif $num_of_set_args==1
+  effect_factor,multiplication,opacity:=[${arg$var_effect_factor},${arg$var_multiplication_factor},${arg$var_opacity}]
+
+  method,blending_id=${arg$var_method},${arg$var_blending}
+  
+  if !isint($method)&&('$method'!='-') method=${$method} fi
+
+  if !$effect_factor||$opacity<=0 return fi
+  use_blend_str:=!isnum($blending_id)
+  if !$use_blend_str blending_id=${arg\ $blending_id+1,$list_of_blending_modes} fi
+  
+  foreach { $0_process_individual_channel_section $method,$effect_factor,$multiplication,$opacity,$blending_id }
+ elif !$num_of_set_args
+  error needs_at_least_5_for_one_arg_set
+ else
+  if $contain_gray
+    method=${arg$var_method} if !isint($method)&&('$method'!='-') method=${$method} fi
+    use_gray=${$0_process_individual_channel_section\ gray,$method,${arg$var_effect_factor},${arg$var_multiplication_factor},${arg$var_opacity},${arg$var_blending}}
+    var_method,var_effect_factor,var_multiplication_factor,var_blending,var_opacity+=5
+  fi
+  if $contain_color
+    method=${arg$var_method} if !isint($method)&&('$method'!='-') method=${$method} fi
+    use_color=${$0_process_individual_channel_section\ color,$method,${arg$var_effect_factor},${arg$var_multiplication_factor},${arg$var_opacity},${arg$var_blending}}
+    var_method,var_effect_factor,var_multiplication_factor,var_blending,var_opacity+=5
+  fi
+  if $contain_alpha
+    method=${arg$var_method} if !isint($method)&&('$method'!='-') method=${$method} fi
+    use_alpha=${$0_process_individual_channel_section\ alpha,$method,${arg$var_effect_factor},${arg$var_multiplication_factor},${arg$var_opacity},${arg$var_blending}}
+  fi
+  
+  if !sum($use_gray,$use_color,$use_alpha) return fi
+  
+  foreach {
+   contain_color,contain_alpha:=[s>2,!(s&1)]
+   
+   if $use_alpha?$contain_alpha
+    shared[-1] {s-1}
+    $0_process_alpha[-1]
+    rm.
+   fi
+   
+   if $contain_color?$use_color
+    if $contain_alpha shared[-1] 0,{s-2} fi
+    $0_process_color[-1]
+    if $contain_alpha rm[-1] fi
+   elif $use_gray
+    if $contain_alpha shared[-1] 0,{s-2} fi
+    $0_process_gray[-1]
+    if $contain_alpha rm[-1] fi
+   fi
+  }
+ fi
+ 
+fi
+
+um $0_bsoo_edit,+$0_bsoo_edit,$0_process_individual_channel_section,$0_process_gray,$0_process_color,$0_process_channel_0,$0_process_channel_1,$0_process_channel_1,$0_process_channel_2,$0_process_cmy_channel_0,$0_process_cmy_channel_1,$0_process_cmy_channel_2,$0_process_cmyk_channel_0,$0_process_cmyk_channel_1,$0_process_cmyk_channel_2,$0_process_cmyk_channel_3,$0_process_alpha
 #@cli rep_decompose_bitplanes: _number_of_bits>0
 #@cli : Decompose images into bitplanes.
 #@cli : Default values: '_number_of_bits=8'
@@ -20354,137 +20743,873 @@ u "{$1}"\
 "{$41}_"{($2&&$contain_alpha)?2}\
 "{$42}"\
 "{$43,$44}"
-# #@gui Channel Overblur-Overline-Blur-Sharpen:fx_OOBS,_fx_OOBS_preview(0)
-# #@gui:_=separator()
-# #@gui:Color Space=choice("RGB&#47;sRGB","HSV&#47;HSV8","HSL&#47;HSL8","HSI&#47;HSI8","LCH&#47;LCH8","Lab&#47;Lab8","YCbCr&#47;YCbCrGLIC","YIQ&#47;YIQ8","YUV&#47;YUV8","XYZ&#47;XYZ8")
-# #@gui:Alt Choice=bool(0)
-# #@gui:_=separator()
-# #@gui:_=note("Configuration for OOBS filter")
-# #@gui:Use Master Editor(Manipulate Multiple Channels at Once?)=bool(1)
-# #@gui:Edit Channel #1?=bool(1)
-# #@gui:Edit Channel #2?=bool(1)
-# #@gui:Edit Channel #3?=bool(1)
-# #@gui:Edit Alpha Channel?=bool(0)
-# #@gui:_=separator()
-# #@gui:_=note("<b>Master Editor</b>")
-# #@gui:Overblur/Overline/Sharpen/Blur=choice ("Overblur","Overline","Blur","Sharpen")
-# #@gui:Effect Factor=float (1,.1,100)
-# #@gui:Multiplication Factor=float (1,.1,10)
-# #@gui:Blend Operation=choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
-# #@gui:Blending Opacity=float (100,.01,100)
-# #@gui:_=separator(),_=note("<u>Individual Channels</u>"), _=separator()
-# #@gui:_=note("<b>Channel #1</b>")
-# #@gui:Overblur/Overline/Sharpen/Blur=choice ("Overblur","Overline","Blur","Sharpen")
-# #@gui:Effect Factor=float (1,.1,10)
-# #@gui:Multiplication Factor=float (1,.1,10)
-# #@gui:Blend Operation=choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
-# #@gui:Blending Opacity=float (100,.01,100)
-# #@gui:_=separator()
-# #@gui:_=note("<b>Channel #2</b>")
-# #@gui:Overblur/Overline/Sharpen/Blur=choice ("Overblur","Overline","Blur","Sharpen")
-# #@gui:Effect Factor=float (1,.1,10)
-# #@gui:Multiplication Factor=float (1,.1,10)
-# #@gui:Blend Operation=choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
-# #@gui:Blending Opacity=float (100,.01,100)
-# #@gui:_=separator()
-# #@gui:_=note("<b>Channel #3</b>")
-# #@gui:Overblur/Overline/Sharpen/Blur=choice ("Overblur","Overline","Blur","Sharpen")
-# #@gui:Effect Factor=float (1,.1,10)
-# #@gui:Multiplication Factor=float (1,.1,10)
-# #@gui:Blend Operation=choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
-# #@gui:Blending Opacity=float (100,.01,100)
-# #@gui:_=separator()
-# #@gui:_=note("<b>Alpha Channel</b>")
-# #@gui:Overblur/Overline/Sharpen/Blur=choice ("Overblur","Overline","Blur","Sharpen")
-# #@gui:Effect Factor=float (1,.1,10)
-# #@gui:Multiplication Factor=float (1,.1,10)
-# #@gui:Blend Operation=choice (21,"add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor")
-# #@gui:Blending Opacity=float (100,.01,100)
-# #@gui:_=separator(),Preview type=choice("Full","Forward horizontal","Forward vertical","Backward horizontal","Backward vertical","Duplicate top","Duplicate left","Duplicate bottom","Duplicate right","Duplicate horizontal","Duplicate vertical","Checkered","Checkered inverse")
-# #@gui:_=separator(),_=note("<small>Author: <i>Reptorian</i> Latest update: <i>2019/01/7</i>.</small>")
-fx_OOBS:
--m "MergeChoice : $""=_mode" -MergeChoice "add","alpha","and","average","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","hardlight","hardmix","interpolation","lighten","linearburn","linearlight","multiply","normal","negation","or","overlay","pinlight","reflect","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","vividlight","xor","edges","error"
-split_opacity
-local[0]
-if $2==0
-if $1==1 rgb2hsv
-elif $1==2 rgb2hsl
-elif $1==3 rgb2hsi
-elif $1==4 rgb2lch
-elif $1==5 rgb2lab
-elif $1==6 rgb2ycbcr
-elif $1==7 rgb2yiq
-elif $1==8 rgb2yuv
-elif $1==9 rgb2xyz
+#@gui Channel Blur-Sharpen-Overblur-Overline:fx_rep_cbsoo,fx_rep_cbsoo_preview(0)*
+#@gui:_=separator(),_=note("<b>Color Space Mode</b>")
+#@gui:-Bit Color Space=choice(0,"RGB","RYB","CMY/K","HSI","HSL","HSV","LAB","LCH","YCbCr-GLIC","YIQ","YUV","YES",Ohta","Kodak-1")
+#@gui:Include K Channel=bool(1)
+#@gui:Contain Gray=bool(0)_0
+#@gui:Contain Color=bool(0)_0
+#@gui:Contain Alpha=bool(0)_0
+#@gui:List of Images with 3 or 4 channels=text("temp_text")_0
+#@gui:Gray Image To Display=int(-1,-1,999999)_0
+#@gui:Gray-Alpha Image To Display=int(-1,-1,999999)_0
+#@gui:Color Image To Display=int(-1,-1,999999)_0
+#@gui:Color-Alpha Image To Display=int(-1,-1,999999)_0
+#@gui:Only Alpha To Display=int(-1,-1,999999)_0
+#@gui:Use Only Alpha To Display=bool(0)_0
+#@gui:_=separator(),_=note("<b>Channel Processing</b>")
+#@gui:Section=choice(1,"Gray","Color")
+#@gui:Section=choice(0,"Gray","Alpha")
+#@gui:Section=choice(0,"Color","Alpha")
+#@gui:Section=choice(0,"Gray","Color","Alpha")
+#@gui:Section=choice(1,"Gray","CMY")
+#@gui:Section=choice(1,"Gray","CMYK")
+#@gui:Section=choice(0,"CMY","Alpha")
+#@gui:Section=choice(0,"CMYK","Alpha")
+#@gui:Section=choice(1,"Gray","CMY","Alpha")
+#@gui:Section=choice(1,"Gray","CMYK","Alpha")
+#@gui:Use Section=bool(0)_0
+#@gui:Section to Use=int(0,0,3)_0
+#@gui:Color Channel=choice(0,"Channel 0","Channel 1","Channel 2")
+#@gui:Color Channel=choice(0,"Channel 0","Channel 1","Channel 2","Channel 3")
+#@gui:Method (Linked)=choice(3,"Blur","Sharpen","Overblur","Overline")
+#@gui:Effect Factor (Linked)=float(100,0,1000)
+#@gui:Multiplication (Linked)=float(1,.1,10)
+#@gui:Blend Operation (Linked)=choice(21,"Add","Alpha","AND","Average","Burn","Darken","Difference","Divide","Dodge","Exclusion","Freeze","Grain Extract","Grain Merge","Hardlight","Hard Mix","Interpolation","Lighten","Linear Burn","Linear Light","Multiply","Normal","Negation","OR","Overlay","Pin Light","Reflect","Screen","Shape Average","Soft Burn","Soft Dodge","Soft Light","Stamp","Subtract","Vivid Light","XOR")
+#@gui:Blend Opacity(%) (Linked)=float(100,.1,100)
+#@gui:Method=choice(3,"Blur","Sharpen","Overblur","Overline")
+#@gui:Effect Factor=float(100,0,1000)
+#@gui:Multiplication=float(1,.1,10)
+#@gui:Blend Operation=choice(21,"Add","Alpha","AND","Average","Burn","Darken","Difference","Divide","Dodge","Exclusion","Freeze","Grain Extract","Grain Merge","Hardlight","Hard Mix","Interpolation","Lighten","Linear Burn","Linear Light","Multiply","Normal","Negation","OR","Overlay","Pin Light","Reflect","Screen","Shape Average","Soft Burn","Soft Dodge","Soft Light","Stamp","Subtract","Vivid Light","XOR")
+#@gui:Blend Opacity(%)=float(100,.1,100)
+#@gui:Enable Gray Channel=bool(1)
+#@gui:Method=choice(3,"Blur","Sharpen","Overblur","Overline")
+#@gui:Effect Factor=float(100,0,1000)
+#@gui:Multiplication=float(1,.1,10)
+#@gui:Blend Operation=choice(21,"Add","Alpha","AND","Average","Burn","Darken","Difference","Divide","Dodge","Exclusion","Freeze","Grain Extract","Grain Merge","Hardlight","Hard Mix","Interpolation","Lighten","Linear Burn","Linear Light","Multiply","Normal","Negation","OR","Overlay","Pin Light","Reflect","Screen","Shape Average","Soft Burn","Soft Dodge","Soft Light","Stamp","Subtract","Vivid Light","XOR")
+#@gui:Blend Opacity(%)=float(100,.1,100)
+#@gui:Enable Channel 0=bool(1)
+#@gui:Enable Channel Cyan=bool(1)
+#@gui:Method=choice(3,"Blur","Sharpen","Overblur","Overline")
+#@gui:Effect Factor=float(100,0,1000)
+#@gui:Multiplication=float(1,.1,10)
+#@gui:Blend Operation=choice(21,"Add","Alpha","AND","Average","Burn","Darken","Difference","Divide","Dodge","Exclusion","Freeze","Grain Extract","Grain Merge","Hardlight","Hard Mix","Interpolation","Lighten","Linear Burn","Linear Light","Multiply","Normal","Negation","OR","Overlay","Pin Light","Reflect","Screen","Shape Average","Soft Burn","Soft Dodge","Soft Light","Stamp","Subtract","Vivid Light","XOR")
+#@gui:Blend Opacity(%)=float(100,.1,100)
+#@gui:Enable Channel 1=bool(1)
+#@gui:Enable Channel Magenta=bool(1)
+#@gui:Method=choice(3,"Blur","Sharpen","Overblur","Overline")
+#@gui:Effect Factor=float(100,0,1000)
+#@gui:Multiplication=float(1,.1,10)
+#@gui:Blend Operation=choice(21,"Add","Alpha","AND","Average","Burn","Darken","Difference","Divide","Dodge","Exclusion","Freeze","Grain Extract","Grain Merge","Hardlight","Hard Mix","Interpolation","Lighten","Linear Burn","Linear Light","Multiply","Normal","Negation","OR","Overlay","Pin Light","Reflect","Screen","Shape Average","Soft Burn","Soft Dodge","Soft Light","Stamp","Subtract","Vivid Light","XOR")
+#@gui:Blend Opacity(%)=float(100,.1,100)
+#@gui:Enable Channel 2=bool(1)
+#@gui:Enable Channel Yellow=bool(1)
+#@gui:Method=choice(3,"Blur","Sharpen","Overblur","Overline")
+#@gui:Effect Factor=float(100,0,1000)
+#@gui:Multiplication=float(1,.1,10)
+#@gui:Blend Operation=choice(21,"Add","Alpha","AND","Average","Burn","Darken","Difference","Divide","Dodge","Exclusion","Freeze","Grain Extract","Grain Merge","Hardlight","Hard Mix","Interpolation","Lighten","Linear Burn","Linear Light","Multiply","Normal","Negation","OR","Overlay","Pin Light","Reflect","Screen","Shape Average","Soft Burn","Soft Dodge","Soft Light","Stamp","Subtract","Vivid Light","XOR")
+#@gui:Blend Opacity(%)=float(100,.1,100)
+#@gui:Enable Channel K=bool(1)
+#@gui:Method=choice(3,"Blur","Sharpen","Overblur","Overline")
+#@gui:Effect Factor=float(100,0,1000)
+#@gui:Multiplication=float(1,.1,10)
+#@gui:Blend Operation=choice(21,"Add","Alpha","AND","Average","Burn","Darken","Difference","Divide","Dodge","Exclusion","Freeze","Grain Extract","Grain Merge","Hardlight","Hard Mix","Interpolation","Lighten","Linear Burn","Linear Light","Multiply","Normal","Negation","OR","Overlay","Pin Light","Reflect","Screen","Shape Average","Soft Burn","Soft Dodge","Soft Light","Stamp","Subtract","Vivid Light","XOR")
+#@gui:Blend Opacity(%)=float(100,.1,100)
+#@gui:Enable Channel Alpha=bool(1)
+#@gui:Randomize Inputs=button(0)
+#@gui:Randomize Inputs (Global)=button(0)
+#@gui:Make All Channels with same inputs=button(0)
+#@gui:Link Channels=bool(0)
+#@gui:Link Checkbox Visibility=int(2,0,2)_0
+#@gui:Old Color Space=choice(0,"RGB","RYB","CMY/K","HSI","HSL","HSV","LAB","LCH","YCbCr-GLIC","YIQ","YUV","YES",Ohta","Kodak-1")_0
+#@gui:Old Include K?=bool(1)_0
+#@gui:Old Link=bool(0)_0
+#@gui:Color Space Options=int(2,0,2)_0
+#@gui:_=separator(),_=note("<b>Preview Setting</b>")
+#@gui:Cropped Viewport Point=point(50,50,1,1,255,255,255,255,1%)
+#@gui:Total Bools Available=int(1,1,5)_0
+#@gui:Last Visible Option=int(1,-1,6)_0
+#@gui:Filter Parameter Changed=bool(0)_0
+#@gui:Stored Variables=text("-1")_0
+#@gui:Previous Image Display=int(0,0,3)_0
+fx_rep_cbsoo:
+rm $_persistent keep[filtered]
+fx_rep_cbsoo_preview:
+skip $*
+
+cs_choice,include_k,num_of_imgs=$1,$2,$!
+convert_colors_fwd=${arg\ $cs_choice+1,,rgb2ryb,error,rgb2hsi8,rgb2hsl8,rgb2hsv8,rgb2lab8,rgb2lch8,rgb2ycbcrglic,rgb2yiq8,rgb2yuv8,rgb2ohta8,rgb2k18}
+convert_colors_bwd=${arg\ $cs_choice+1,,ryb2rgb,error,hsi82rgb,hsl82rgb,hsv82rgb,lab82rgb,lch82rgb,ycbcrglic2rgb,yiq82rgb,yuv82rgb,ohta82rgb,k182rgb}
+cmyk_mode,contain_persistent,filter_parameters_changed={[$cs_choice==2,narg($_persistent),$84]}
+list_of_images_to_display=gray_preview,gray_alpha_preview,color_preview,color_alpha_preview
+
+
+if $contain_persistent 
+ rm $_persistent
+else to_automode 
+ name[0--1] auto 
 fi
-elif $2==1
-if $1==0 rgb2srgb
-elif $1==1 rgb2hsv8
-elif $1==2 rgb2hsl8
-elif $1==3 rgb2hsi8
-elif $1==4 rgb2lch8
-elif $1==5 rgb2lab8
-elif $1==6 rgb2ycbcrglic
-elif $1==7 rgb2yiq8
-elif $1==8 rgb2yuv8
-elif $1==9 rgb2xyz8
-fi fi
-s c
-if $3==1
-if $4==1 local[0] +oobs_edit[0] $8,$9,$10 -blend[0,1] ${_mode{$11+1}},$12/100 done fi
-if $5==1 local[1] +oobs_edit[0] $8,$9,$10 -blend[0,1] ${_mode{$11+1}},$12/100 done fi
-if $6==1 local[2] +oobs_edit[0] $8,$9,$10 -blend[0,1] ${_mode{$11+1}},$12/100 done fi
-elif $3==0
-if $4==1 local[0] +oobs_edit[0] $13,$14,$15 -blend[0,1] ${_mode{$16+1}},$17/100 done fi
-if $5==1 local[1] +oobs_edit[0] $18,$19,$20 -blend[0,1] ${_mode{$21+1}},$22/100 done fi
-if $6==1 local[2] +oobs_edit[0] $23,$24,$25 -blend[0,1] ${_mode{$26+1}},$27/100 done fi
+
+if $contain_persistent
+ _gui_analysis_gray,_gui_analysis_color,_gui_analysis_alpha,$list_of_images_to_display,only_alpha_to_preview,use_only_alpha_to_preview=${3-5},${7-12}
+ list_of_color_images=$6
+
+ use_section,section_variable,\
+ use_link,display_link_checkbox,old_link,\
+ display_color_space_options,last_visible_option,\
+ previous_image_preview\
+ =${23-24},${74-75},$78,$79,$83,$86
+ 
+ color_space_switched={[$1,$2]!=[$76,$77]}
+
+ display_make_same_vars_button=$display_link_checkbox
+ k_display_mode:=$display_color_space_options?1+$cmyk_mode
+ stored_variables=$85
+
+ temp_check_count_bools,check_count_bools=$82
+ if $use_section
+  if $section_variable==1
+   section_space=gray,alpha
+  else
+   if $cmyk_mode
+    ct_text={`('cmyk')[0,3+$2]`}
+    if $include_k check_count_bools+=1 fi
+   else ct_text=color fi
+
+   if $section_variable==3   section_space=gray,$ct_text,alpha
+   elif $section_variable==2 section_space=$ct_text,alpha
+   else                      section_space=gray,$ct_text
+   fi
+  fi
+ fi
+
+else
+
+ $list_of_images_to_display=-1
+ list_of_color_images,color_space_switched=0
+
+ eval "
+  const num_of_imgs=$num_of_imgs;
+  contain_gray=contain_color=contain_alpha=0;
+  repeat(num_of_imgs,p,
+   current_spec_size=s#p;
+   if(!contain_gray?current_spec_size<3,contain_gray=1;);
+   if(!contain_color?current_spec_size>2,contain_color=1;);
+   if(!contain_alpha?current_spec_size==2||current_spec_size>3,contain_alpha=1;);
+   if(contain_gray&&contain_color,
+    if(contain_alpha,break(););
+   );
+  );
+  [contain_gray,contain_color,contain_alpha];
+  "
+
+ _gui_analysis_gray,_gui_analysis_color,_gui_analysis_alpha=${}
+
+ if $_gui_analysis_color
+  1
+  eval repeat($num_of_imgs,p,if(s#p>2,da_push(#-1,p);););da_freeze(#-1);
+  list_of_color_images:=crop(#-1)
+  rm.
+ fi
+
+ temp_check_count_bools,check_count_bools=1
+ use_section:=sum($_gui_analysis_gray,$_gui_analysis_color,$_gui_analysis_alpha)>1
+
+ only_alpha_to_preview,use_only_alpha_to_preview=-1,0
+ if $num_of_imgs>1
+
+  m _$0_check_variance_1:"eval da_push(#-4,[iv#$>,$>]);"
+  m _$0_check_variance_2:"l[$>,-3] { s.. c eval da_push(#-1,[iv#0*.25+iv#1*.75,$_iter]) a[^-1] c }"
+  m _$0_check_variance_3:"l[$>,-2] { s.. c eval da_push(#-1,[avg(iv#0,iv#1,iv#2),$_iter]) a[^-1] c }"
+  m _$0_check_variance_4:"l[$>,-1] { s.. c eval da_push(#-1,[avg(iv#0,iv#1,iv#2)*.25+iv#-3*.75,$_iter]) a[^-1] c }"
+
+  1,1,1,2x4 repeat $num_of_imgs { _iter=$> _$0_check_variance_{s#$>} }
+
+  repeat 4 {
+   temp_ind:=$>-4
+   if da_size(#$temp_ind)
+    da_freeze[$temp_ind]
+    ${arg\ $>+1,$list_of_images_to_display}:=(crop(#$temp_ind,0,0,0,1,1,h#$temp_ind,1,1))[argmax(crop(#$temp_ind,0,0,0,0,1,h#$temp_ind,1,1))]
+   fi
+   um _$0_check_variance_{$>+1}
+  }
+  
+  rm[-4--1]
+
+  if sum($gray_alpha_preview==-1,$color_alpha_preview==-1)==1
+   use_only_alpha_to_preview=1
+   if $gray_alpha_preview!=-1
+    only_alpha_to_preview=$gray_alpha_preview
+   else
+    only_alpha_to_preview=$color_alpha_preview
+   fi
+  fi
+
+ elif $num_of_imgs
+  ${arg\ s,$list_of_images_to_display}=0
+ else
+  error \$\!\>=1==F
+ fi
+
+ if $use_section
+  section_list=section_gray_color,section_gray_alpha,section_color_alpha,section_gray_color_alpha
+  $section_list:=expr('x',narg($section_list))
+  temp_section=section
+
+  if $_gui_analysis_gray
+   temp_section.=_gray
+  fi
+
+  if $_gui_analysis_color
+   temp_section.=_color
+  fi
+
+  if $_gui_analysis_alpha
+   temp_section.=_alpha
+  fi
+
+  section_variable=${$temp_section}
+
+  if $section_variable==1
+   section_space=gray,alpha
+   temp_check_count_bools,check_count_bools=2
+  else
+
+   if $cmyk_mode ct_text={`('cmyk')[0,3+$2]`} else ct_text=color fi
+
+   if $section_variable==3   section_space=gray,$ct_text,alpha
+   elif $section_variable==2 section_space=$ct_text,alpha
+   else                      section_space=gray,$ct_text
+   fi
+
+   temp_check_count_bools,check_count_bools={narg($section_space)+2}
+   if $cmyk_mode?$include_k check_count_bools+=1 fi
+
+  fi
+
+ fi
+
+ display_make_same_vars_button,display_link_checkbox:=($use_section||$_gui_analysis_color)<<1
+ use_link:=$display_link_checkbox?$72
+ old_link=$use_link
+ display_color_space_options:=$_gui_analysis_color<<1
+ k_display_mode:=$display_color_space_options?(1+$cmyk_mode)
+
+ last_visible_option=-1
 fi
-a c
-if $2==0
-if $1==1 hsv2rgb
-elif $1==2 hsl2rgb
-elif $1==3 hsi2rgb
-elif $1==4 lch2rgb
-elif $1==5 lab2rgb
-elif $1==6 ycbcr2rgb
-elif $1==7 yiq2rgb
-elif $1==8 yuv2rgb
-elif $1==9 xyz2rgb
+
+link_visibility,\
+link_effect_visibility,\
+gray_visibility,\
+gray_effect_visibility,\
+display_gray_checkbox,\
+channel_0_visibility,\
+channel_0_effect_visibility,\
+display_channel_0_checkbox,\
+display_cyan_checkbox,\
+channel_1_visibility,\
+channel_1_effect_visibility,\
+display_channel_1_checkbox,\
+display_magenta_checkbox,\
+channel_2_visibility,\
+channel_2_effect_visibility,\
+display_channel_2_checkbox,\
+display_yellow_checkbox,\
+channel_3_visibility,\
+channel_3_effect_visibility,\
+display_black_checkbox,\
+alpha_visibility,\
+alpha_effect_visibility,\
+display_alpha_checkbox,\
+section_0_visibility,\
+section_1_visibility,\
+section_2_visibility,\
+section_3_visibility,\
+section_4_visibility,\
+section_5_visibility,\
+section_6_visibility,\
+section_7_visibility,\
+section_8_visibility,\
+section_9_visibility,\
+color_3_channels_box_visibility,\
+color_4_channels_box_visibility,\
+display_k_box,\
+allow_link_display,apply_filter=0
+
+temp_section_variable=$section_variable
+
+if $use_section
+
+ if $section_variable!=1&&$cmyk_mode
+  selected_section:=$temp_section_variable-($section_variable>1)
+  temp_section_variable:=4+($selected_section<<1)+$2
+ fi
+
+ section_space_selection:=([${13-22}])[$temp_section_variable]+1
+ section_space=${arg\ $section_space_selection,$section_space}
+
+ if !$use_link
+  section_${temp_section_variable}_visibility=2
+  if '$section_space'=='color'||'$section_space'=='cmy'
+   color_3_channels_box_visibility=2
+  elif '$section_space'=='cmyk'
+   color_4_channels_box_visibility=2
+  fi
+ else display_make_same_vars_button=0
+ fi
+
+elif $_gui_analysis_color
+ if $use_link
+  display_make_same_vars_button=0
+ else
+  if $cmyk_mode&&$include_k
+   color_4_channels_box_visibility=2
+  else
+   color_3_channels_box_visibility=2
+  fi
+ fi
+else use_link=0
 fi
-elif $2==1
-if $1==0 srgb2rgb
-elif $1==1 hsv82rgb
-elif $1==2 hsl82rgb
-elif $1==3 hsi82rgb
-elif $1==4 lch82rgb
-elif $1==5 lab82rgb
-elif $1==6 ycbcrglic2rgb
-elif $1==7 yiq82rgb
-elif $1==8 yuv82rgb
-elif $1==9 xyz82rgb
-fi fi
-done
-local[1]
-if $3==1 if $7==1 +oobs_edit[0] $8,$9,$10 -blend[0,1] ${_mode{$11+1}},$12/100 fi
-elif $3==0 if $7==1 +oobs_edit[0] $28,$29,$30 -blend[0,1] ${_mode{$31+1}},$32/100 fi
+
+if $72||!$filter_parameters_changed
+ randomize_str=[v(0,3),round(u(0,1000),0.01),round(u(0.1,10),0.001),v(0,34),round(u(.1,100),0.01)]
+ link_method,link_effect,link_multiplication,link_blend,link_opacity={_$randomize_str}
+ gray_method,gray_effect,gray_multiplication,gray_blend,gray_opacity={_$randomize_str}
+ repeat 4 {
+  channel_$>_method,channel_$>_effect,channel_$>_multiplication,channel_$>_blend,channel_$>_opacity={_$randomize_str}
+ }
+ alpha_method,alpha_effect,alpha_multiplication,alpha_blend,alpha_opacity={_$randomize_str}
+elif $73||($use_link!=$old_link)
+ chosen_options:=([${27-31},${32-36},${38-42},${45-49},${52-56},${59-63},${65-69}])[$last_visible_option*5,5]
+ link_method,link_effect,link_multiplication,link_blend,link_opacity=$chosen_options
+ gray_method,gray_effect,gray_multiplication,gray_blend,gray_opacity=$chosen_options
+ repeat 4 {
+  channel_$>_method,channel_$>_effect,channel_$>_multiplication,channel_$>_blend,channel_$>_opacity=$chosen_options
+ }
+ alpha_method,alpha_effect,alpha_multiplication,alpha_blend,alpha_opacity=$chosen_options
+else
+ link_method,link_effect,link_multiplication,link_blend,link_opacity,\
+ gray_method,gray_effect,gray_multiplication,gray_blend,gray_opacity,\
+ channel_0_method,channel_0_effect,channel_0_multiplication,channel_0_blend,channel_0_opacity,\
+ channel_1_method,channel_1_effect,channel_1_multiplication,channel_1_blend,channel_1_opacity,\
+ channel_2_method,channel_2_effect,channel_2_multiplication,channel_2_blend,channel_2_opacity,\
+ channel_3_method,channel_3_effect,channel_3_multiplication,channel_3_blend,channel_3_opacity,\
+ alpha_method,alpha_effect,alpha_multiplication,alpha_blend,alpha_opacity\
+ =${27-31},${32-36},${38-42},${45-49},${52-56},${59-63},${65-69}
+ if $71
+  if inrange($last_visible_option,2,5,1,1)
+   channel=channel_{$last_visible_option-2}
+  else
+   choice_pos:=$last_visible_option?(bool($last_visible_option)+bool($last_visible_option-1))
+   channel=${arg\ $choice_pos+1,link,gray,alpha}
+  fi
+  ${channel}_method,${channel}_effect,${channel}_multiplication,${channel}_blend,${channel}_opacity={_[v(0,3),round(u(0,1000),0.01),round(u(0.1,10),0.001),v(0,34),round(u(.1,100),0.01)]}
+ fi
 fi
-done
-a c
-oobs_edit :
-if $1==0 -overblur_overline[0] 0,$2,$3 fi
-if $1==1 -overblur_overline[0] 1,$2,$3 fi
-if $1==2 -blur[0] {$2*$3} fi
-if $1==3 -sharpen[0] {$2*$3} fi
-overblur_overline :
-if $1==0 +blur[0] $2
-elif $1==1 +sharpen[0] $2
+
+if $use_link
+
+ at_least_one_bool,last_visible_option,checked_box=0
+ link_args=$link_method,$link_effect,$link_multiplication,$link_blend,$link_opacity%
+ sep=
+
+ if $link_effect
+  apply_filter=1
+ fi
+
+ if $_gui_analysis_gray
+  display_gray_checkbox=2
+
+  if $37
+   filter_args=$link_args
+   checked_box+=1
+  else
+   filter_args=-
+  fi
+
+  sep=,
+  
+  if !$at_least_one_bool?$37 at_least_one_bool=1 fi
+  
+ fi
+
+ if $_gui_analysis_color
+  color_channels_checkbox_count=0
+  t_filter_args,t_sep=
+
+  if $cmyk_mode
+   display_cyan_checkbox,display_magenta_checkbox,display_yellow_checkbox=2
+   display_black_checkbox:=$include_k<<1
+
+   if $44
+    t_filter_args.=$link_args
+    color_channels_checkbox_count+=1
+   else
+    t_filter_args=-
+   fi
+
+   t_sep=,
+   t_filter_args.=$t_sep
+
+   if $51
+    t_filter_args.=$link_args
+    color_channels_checkbox_count+=1
+   else
+    t_filter_args.=-
+   fi
+   
+   t_filter_args.=$t_sep
+
+   if $58
+    t_filter_args.=$link_args
+    color_channels_checkbox_count+=1
+   else
+    t_filter_args.=-
+   fi
+
+   if $include_k
+    t_filter_args.=$t_sep
+    if $64
+     t_filter_args.=$link_args
+     color_channels_checkbox_count+=1
+    else
+     t_filter_args.=-
+    fi
+   fi
+
+   if $color_channels_checkbox_count==(3+$include_k)
+    t_filter_args=$link_args
+   fi
+   
+   if !$at_least_one_bool?($44||$51||$58||$64) at_least_one_bool=1 fi
+   
+   if same('$t_filter_args',('-,-,-,-')[0,5+($include_k<<1)]) t_filter_args= fi
+
+   checked_box+=$color_channels_checkbox_count
+   filter_args.=$sep$t_filter_args
+   sep=,
+  else
+   display_channel_0_checkbox,display_channel_1_checkbox,display_channel_2_checkbox=2
+
+   if $43
+    t_filter_args.=$link_args
+    color_channels_checkbox_count+=1
+   else
+    t_filter_args=-
+   fi
+
+   t_sep=,
+   t_filter_args.=$t_sep
+   
+   if $50
+    t_filter_args.=$link_args
+    color_channels_checkbox_count+=1
+   else
+    t_filter_args.=-
+   fi
+   
+   t_filter_args.=$t_sep
+
+   if $57
+    t_filter_args.=$link_args
+    color_channels_checkbox_count+=1
+   else
+    t_filter_args.=-
+   fi
+
+   if $color_channels_checkbox_count==3
+    t_filter_args=$link_args
+   fi
+   
+   if !$at_least_one_bool?($43||$50||$57) at_least_one_bool=1 fi
+   
+   if same('$t_filter_args','-,-,-') t_filter_args= fi
+
+   checked_box+=$color_channels_checkbox_count
+   filter_args.=$sep$t_filter_args
+   sep=,
+  fi
+ fi
+
+ if $_gui_analysis_alpha
+  display_alpha_checkbox=2
+
+  if $70
+   filter_args.=$sep$link_args
+   checked_box+=1
+  else
+   filter_args.=$sep
+   filter_args.=-
+  fi
+  
+  if !$at_least_one_bool?$70 at_least_one_bool=1 fi
+
+ fi
+ 
+ link_effect_visibility:=1+$at_least_one_bool
+ link_visibility:=bool($at_least_one_bool?$link_effect)+1
+
+ if $checked_box==$check_count_bools filter_args=$link_args fi
+else
+ all_args_same=1
+ previous_args=n/a
+ sep=
+
+ if $_gui_analysis_gray
+  if $37
+   previous_args=$gray_method,$gray_effect,$gray_multiplication,$gray_blend,$gray_opacity%
+   if $gray_effect apply_filter=1 fi
+  else
+   previous_args=-
+   all_args_same=0
+  fi
+
+  gray_args=$previous_args
+  filter_args=$previous_args
+  sep=,
+
+  if $use_section?'$section_space'=='gray':1
+   gray_effect_visibility:=1+$37
+   gray_visibility:=bool($37?$gray_effect)+1
+   if $display_link_checkbox display_gray_checkbox=2 fi
+   last_visible_option=1
+   if $previous_image_preview>1
+    previous_image_preview=0
+   fi
+  fi
+ fi
+
+ if $_gui_analysis_color
+  local_all_args_same=1
+
+  if $cmyk_mode
+   if $44
+    current_args=$channel_0_method,$channel_0_effect,$channel_0_multiplication,$channel_0_blend,$channel_0_opacity%
+    if $channel_0_effect apply_filter=1 fi
+   else
+    current_args=-
+    local_all_args_same=all_args_same=0
+   fi
+
+   t_filter_args=$current_args
+   previous_args=$current_args
+
+   if $51
+    current_args=$channel_1_method,$channel_1_effect,$channel_1_multiplication,$channel_1_blend,$channel_1_opacity%
+    if $local_all_args_same local_all_args_same={same('$current_args','$previous_args')} fi
+    if $channel_1_effect apply_filter=1 fi
+   else
+    current_args=-
+    local_all_args_same=all_args_same=0
+   fi
+
+   t_filter_args.=,$current_args
+   previous_args=$current_args
+
+   if $58
+    current_args=$channel_2_method,$channel_2_effect,$channel_2_multiplication,$channel_2_blend,$channel_2_opacity%
+    if $local_all_args_same local_all_args_same={same('$current_args','$previous_args')} fi
+    if $channel_2_effect apply_filter=1 fi
+   else
+    current_args=-
+    local_all_args_same=all_args_same=0
+   fi
+
+   t_filter_args.=,$current_args
+   previous_args=$current_args
+
+   if $include_k
+    if $64
+     current_args=$channel_3_method,$channel_3_effect,$channel_3_multiplication,$channel_3_blend,$channel_3_opacity%
+     if $local_all_args_same local_all_args_same={same('$current_args','$previous_args')} fi
+     if $channel_3_effect apply_filter=1 fi
+    else
+     current_args=-
+     local_all_args_same=all_args_same=0
+    fi
+
+    t_filter_args.=,$current_args
+    previous_args=$current_args
+   fi
+
+   if $local_all_args_same
+    if $_gui_analysis_gray
+     if '$gray_args'!='$previous_args' all_args_same=0 fi
+    fi
+   else all_args_same=0
+   fi
+   
+   if same('$t_filter_args',('-,-,-,-')[0,5+($include_k<<1)]) t_filter_args= fi
+   
+   filter_args.=$sep$t_filter_args
+
+   if $use_section?'$section_space'=='cmy'||'$section_space'=='cmyk':1
+    pos_choice:=$color_4_channels_box_visibility?$26:$25
+    state_chosen_bool,state_chosen_effect:=([$44,$channel_0_effect,$51,$channel_1_effect,$58,$channel_2_effect,$64,$channel_3_effect])[$pos_choice<<1,2]
+    channel_${pos_choice}_effect_visibility:=1+$state_chosen_bool
+    channel_${pos_choice}_visibility:=bool($state_chosen_bool?$state_chosen_effect)+1
+    channel_name=${arg\ $pos_choice+1,cyan,magenta,yellow,black}
+    display_${channel_name}_checkbox=2
+    last_visible_option:=2+$pos_choice
+    if $previous_image_preview<2
+     previous_image_preview=2
+    fi
+   fi
+
+  else
+   if $43
+    current_args=$channel_0_method,$channel_0_effect,$channel_0_multiplication,$channel_0_blend,$channel_0_opacity%
+    if $channel_0_effect apply_filter=1 fi
+   else
+    current_args=-
+    local_all_args_same=all_args_same=0
+   fi
+
+   t_filter_args=$current_args
+   previous_args=$current_args
+
+   if $50
+    current_args=$channel_1_method,$channel_1_effect,$channel_1_multiplication,$channel_1_blend,$channel_1_opacity%
+    if $local_all_args_same local_all_args_same={same('$current_args','$previous_args')} fi
+    if $channel_1_effect apply_filter=1 fi
+   else
+    current_args=-
+    local_all_args_same=all_args_same=0
+   fi
+
+   t_filter_args.=,$current_args
+   previous_args=$current_args
+
+   if $57
+    current_args=$channel_2_method,$channel_2_effect,$channel_2_multiplication,$channel_2_blend,$channel_2_opacity%
+    if $local_all_args_same
+     local_all_args_same={same('$current_args','$previous_args')}
+    fi
+    if $channel_2_method apply_filter=1 fi
+   else
+    current_args=-
+    local_all_args_same=all_args_same=0
+   fi
+
+   t_filter_args.=,$current_args
+   previous_args=$current_args
+
+   if $local_all_args_same
+    if $_gui_analysis_gray
+     if '$gray_args'!='$previous_args' all_args_same=0 fi
+    fi
+    t_filter_args=$previous_args
+   else all_args_same=0
+   fi
+   
+   if same('$t_filter_args','-,-,-') t_filter_args= fi
+   
+   filter_args.=$sep$t_filter_args
+
+   if $use_section?'$section_space'=='color':1
+    state_chosen_bool,state_chosen_effect:=([$43,$channel_0_effect,$50,$channel_1_effect,$57,$channel_2_effect])[$25<<1,2]
+    channel_$25_effect_visibility:=1+$state_chosen_bool
+    channel_$25_visibility:=bool($state_chosen_bool?$state_chosen_effect)+1
+    display_channel_$25_checkbox=2
+    last_visible_option:=2+$25
+    if $previous_image_preview<2
+     previous_image_preview=2
+    fi
+   fi
+  fi
+ fi
+
+ if $_gui_analysis_alpha
+  if $70
+   current_args=$alpha_method,$alpha_effect,$alpha_multiplication,$alpha_blend,$alpha_opacity%
+   if $alpha_effect apply_filter=1 fi
+  else
+   current_args=-
+   all_args_same=0
+  fi
+
+  if '$current_args'!='$previous_args'
+   all_args_same=0
+  fi
+
+
+  filter_args.=,$current_args
+
+  if '$section_space'=='alpha'
+   alpha_effect_visibility:=1+$70
+   alpha_visibility:=bool($70?$alpha_effect)+1
+   display_alpha_checkbox=2
+   last_visible_option=6
+   if !($previous_image_preview&1)
+    previous_image_preview+=1
+   fi
+  fi
+ fi
+
+ if $all_args_same filter_args=$current_args fi
 fi
-+blend[0,1] difference
-mul[2] $3
-remove[1]
--blend[0,1] add
-_fx_OOBS_preview :
-gui_split_preview "fx_OOBS ${1--2}",$-1
+
+if !$contain_persistent||$color_space_switched||!same('$filter_args','$stored_variables')
+ rmn filtered
+ 
+ if $cs_choice
+ 
+  if $cmyk_mode
+   +foreach {
+    if s<3 continue fi
+    s c,-3
+    rgb2cmyk[0]
+    append c
+   }
+  else
+   +foreach {
+    if s<3 continue fi
+    $convert_colors_fwd
+   }
+  fi
+  
+  rep_channels_blur_sharpen_overblur_overline[$num_of_imgs--1] $filter_args
+  
+  if $cmyk_mode
+   foreach[$num_of_imgs--1] {
+    if s<4 continue fi
+    s c,-4
+    cmyk2rgb[0]
+    append c
+   }
+  else
+   foreach[$num_of_imgs--1] {
+    if s<3 continue fi
+    $convert_colors_bwd
+   }
+  fi
+  
+ else
+  +rep_channels_blur_sharpen_overblur_overline $filter_args 
+ fi
+ 
+ name[$num_of_imgs--1] filtered
+ +store _persistent
+fi
+
+if $use_section
+ if $previous_image_preview&1
+  if $use_only_alpha_to_preview
+   keep[{$num_of_imgs+$only_alpha_to_preview}]
+  else
+   if $previous_image_preview<2
+    keep[{$num_of_imgs+$gray_alpha_preview}]
+   else
+    keep[{$num_of_imgs+$color_alpha_preview}]
+   fi
+  fi
+ else
+  if $previous_image_preview<2
+   keep[{$num_of_imgs+$gray_preview}]
+  else
+   keep[{$num_of_imgs+$color_preview}]
+  fi
+ fi
+else
+ if $!==2 keep[filtered]
+ else
+  if $_gui_analysis_gray keep[{$num_of_imgs+$gray_preview}]
+  else                   keep[{$num_of_imgs+$color_preview}]
+  fi
+ fi
+fi
+
+if !isnan($80)
+ upper_left_crop_points:=vmax([(w-1-($_preview_area_width-1))*($80%),(h-1-($_preview_area_height))*($81%)],[0,0])
+ bottom_right_crop_points:=vmin([$upper_left_crop_points]+[$_preview_area_width,$_preview_area_height],[w-1,h-1])
+ crop $upper_left_crop_points,$bottom_right_crop_points
+fi
+
+u "{$1}"_$display_color_space_options\
+"{$2}"_$k_display_mode\
+"{"$_gui_analysis_gray"}"\
+"{"$_gui_analysis_color"}"\
+"{"$_gui_analysis_alpha"}"\
+"{"$list_of_color_images"}"\
+"{"$gray_preview"}"\
+"{"$gray_alpha_preview"}"\
+"{"$color_preview"}"\
+"{"$color_alpha_preview"}"\
+"{"$only_alpha_to_preview"}"\
+"{"$use_only_alpha_to_preview"}"\
+"{$13}"_$section_0_visibility\
+"{$14}"_$section_1_visibility\
+"{$15}"_$section_2_visibility\
+"{$16}"_$section_3_visibility\
+"{$17}"_$section_4_visibility\
+"{$18}"_$section_5_visibility\
+"{$19}"_$section_6_visibility\
+"{$20}"_$section_7_visibility\
+"{$21}"_$section_8_visibility\
+"{$22}"_$section_9_visibility\
+"{"$use_section"}"\
+"{"$section_variable"}"\
+"{$25}"_$color_3_channels_box_visibility\
+"{$26}"_$color_4_channels_box_visibility\
+"{"$link_method"}"_$link_visibility\
+"{"$link_effect"}"_$link_effect_visibility\
+"{"$link_multiplication"}"_$link_visibility\
+"{"$link_blend"}"_$link_visibility\
+"{"$link_opacity"}"_$link_visibility\
+"{"$gray_method"}"_$gray_visibility\
+"{"$gray_effect"}"_$gray_effect_visibility\
+"{"$gray_multiplication"}"_$gray_visibility\
+"{"$gray_blend"}"_$gray_visibility\
+"{"$gray_opacity"}"_$gray_visibility\
+"{$37}"_$display_gray_checkbox\
+"{"$channel_0_method"}"_$channel_0_visibility\
+"{"$channel_0_effect"}"_$channel_0_effect_visibility\
+"{"$channel_0_multiplication"}"_$channel_0_visibility\
+"{"$channel_0_blend"}"_$channel_0_visibility\
+"{"$channel_0_opacity"}"_$channel_0_visibility\
+"{$43}"_$display_channel_0_checkbox\
+"{$44}"_$display_cyan_checkbox\
+"{"$channel_1_method"}"_$channel_1_visibility\
+"{"$channel_1_effect"}"_$channel_1_effect_visibility\
+"{"$channel_1_multiplication"}"_$channel_1_visibility\
+"{"$channel_1_blend"}"_$channel_1_visibility\
+"{"$channel_1_opacity"}"_$channel_1_visibility\
+"{$50}"_$display_channel_1_checkbox\
+"{$51}"_$display_magenta_checkbox\
+"{"$channel_2_method"}"_$channel_2_visibility\
+"{"$channel_2_effect"}"_$channel_2_effect_visibility\
+"{"$channel_2_multiplication"}"_$channel_2_visibility\
+"{"$channel_2_blend"}"_$channel_2_visibility\
+"{"$channel_2_opacity"}"_$channel_2_visibility\
+"{$57}"_$display_channel_2_checkbox\
+"{$58}"_$display_yellow_checkbox\
+"{"$channel_3_method"}"_$channel_3_visibility\
+"{"$channel_3_effect"}"_$channel_3_effect_visibility\
+"{"$channel_3_multiplication"}"_$channel_3_visibility\
+"{"$channel_3_blend"}"_$channel_3_visibility\
+"{"$channel_3_opacity"}"_$channel_3_visibility\
+"{$64}"_$display_black_checkbox\
+"{"$alpha_method"}"_$alpha_visibility\
+"{"$alpha_effect"}"_$alpha_effect_visibility\
+"{"$alpha_multiplication"}"_$alpha_visibility\
+"{"$alpha_blend"}"_$alpha_visibility\
+"{"$alpha_opacity"}"_$alpha_visibility\
+"{$70}"_$display_alpha_checkbox\
+"{0}"\
+"{0}"_$display_make_same_vars_button\
+"{0}"_$display_make_same_vars_button\
+"{"$use_link"}"_$display_link_checkbox\
+"{"$display_link_checkbox"}"\
+"{$1}"\
+"{$2}"\
+"{"$use_link"}"\
+"{"$display_color_space_options"}"\
+"{$80,$81}"\
+"{"$temp_check_count_bools"}"\
+"{"$last_visible_option"}"\
+"{1}"\
+"{"$filter_args"}"\
+"{"$previous_image_preview"}"
 #@gui Vibrato:fx_vibrato,_fx_vibrato_preview(0)
 #@gui:_=note("This is the advanced version of the Vibrato filter. If you do want to manipulate multiple channels at once, use <u>Vibrato - Basic</u> filter. <i>Note: Disable channel mulplication for non-transparent images.</i> \n\n")
 #@gui:_=note("This filter is the one of the G'MIC version of <b>MadJik's</b> <i>Paint.NET plugin</i>")
