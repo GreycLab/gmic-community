@@ -123,7 +123,7 @@ m $0_process_individual_channel_section:"
 cmyk_mode,max_col_spec_size={m='$-1'=='cmyk';[m,3+(m?1)]}
 user_cmyk_mode=$cmyk_mode
 
-if '$_host'=='$cli'
+if same('$_host','cli')
 
  do
 
@@ -172,6 +172,8 @@ if '$_host'=='$cli'
    set('continue_analyzing_color_space',continue_analyzing_color_space);"
 
  while $continue_analyzing_color_space
+ 
+ 
 else
  contain_gray,contain_alpha=$_gui_analysis_gray,$_gui_analysis_alpha
  contain_cmy=0
@@ -212,17 +214,32 @@ if $cmyk_mode
  # Please factor in CMYK here. Find out how it should work #
  if ($#-$user_cmyk_mode)==5
   effect_factor,multiplication,opacity:=[${arg$var_effect_factor},${arg$var_multiplication_factor},${arg$var_opacity}]
+
+  method,blending_id=${arg$var_method},${arg$var_blending}
   
-  method=${arg$var_method}
-  if !isint($current_method)&&('$current_method'!='-') method=${$method} fi
-  
-  blending=${arg$var_blending}
+  if !isint($method)&&('$method'!='-') method=${$method} fi
 
   if !$effect_factor||$opacity<=0 return fi
-  use_blend_str:=!isnum($blending_id)
+  use_blend_str:=!isint($blending_id)
   if !$use_blend_str blending_id=${arg\ $blending_id+1,$list_of_blending_modes} fi
   
-  foreach { $0_process_individual_channel_section $method,$effect_factor,$multiplication,$opacity,$blending_id }
+  if $effect_factor||$opacity>0
+   if $opacity==1?(same('$blending_id','normal')||same('$blending_id','alpha'))
+    foreach {
+     $0_bsoo_edit $method,$effect_factor,$multiplication
+     cut 0,255
+    }
+   else
+    foreach {
+     +$0_bsoo_edit $method,$effect_factor,$multiplication
+     _blend_$blending_id
+     if $opacity<1 j.. .,0,0,0,0,$opacity rm.
+     else rm..
+     fi
+     cut 0,255
+    }
+   fi
+  fi
  else
   use_gray,use_cmy,use_cmyk,use_alpha,use_cmy_channel_0,use_cmy_channel_1,use_cmy_channel_2,use_cmyk_channel_0,use_cmyk_channel_1,use_cmyk_channel_2,use_cmyk_channel_3=0
   
@@ -394,10 +411,27 @@ else
   if !isint($method)&&('$method'!='-') method=${$method} fi
 
   if !$effect_factor||$opacity<=0 return fi
-  use_blend_str:=!isnum($blending_id)
+  use_blend_str:=!isint($blending_id)
   if !$use_blend_str blending_id=${arg\ $blending_id+1,$list_of_blending_modes} fi
   
-  foreach { $0_process_individual_channel_section $method,$effect_factor,$multiplication,$opacity,$blending_id }
+  if $effect_factor||$opacity>0
+   if $opacity==1?(same('$blending_id','normal')||same('$blending_id','alpha'))
+    foreach {
+     $0_bsoo_edit $method,$effect_factor,$multiplication
+     cut 0,255
+    }
+   else
+    foreach {
+     +$0_bsoo_edit $method,$effect_factor,$multiplication
+     _blend_$blending_id
+     if $opacity<1 j.. .,0,0,0,0,$opacity rm.
+     else rm..
+     fi
+     cut 0,255
+    }
+   fi
+  fi
+  
  elif !$num_of_set_args
   error needs_at_least_5_for_one_arg_set
  else
