@@ -1941,9 +1941,9 @@ skip ${1=11},${2=2},${3=01},${4=10},${5=0},${6=}
 check "$1>0&&($1==int($1))&&(isint($2)||same('-','$2'))"
 
 a6={size('$6')}
-shift,length,mode={[int(abs($5)),1<<$1,v=same('-','$2');n=isint($2)?$2:0;v?0:(n>=0?n%3+1:-((abs(n)-1)%3+1))]}
+shift,length,mode,str_code={int(abs($5))},{2^$1},{v=same('-','$2');n=isint($2)?$2:0;v?0:(n>=0?n%3+1:-((abs(n)-1)%3+1));},0
 size_of_arr={int(log2($length+$shift-1))+1}
-str_code=n=init_num()
+str_code_2=n=init_num()
 act_arr_sortclass={$mode>-1}
 
 if !$mode&&!$a6 error custom_formula_required fi
@@ -1952,69 +1952,101 @@ if $act_arr_sortclass
 
  $length,1,1,1,x
 
- +f. "begin(
-         const binary_to_search=0b$3;
-         const size_of_binary_to_search=size('$3');
-        );
-        count=0;
-        current_value=i;
-        current_number_of_binary_digits_per_value=(i?int(log2(current_value)))+1;
-        bit_mask=(1<<current_number_of_binary_digits_per_value)-1;
-        while(current_number_of_binary_digits_per_value>=size_of_binary_to_search,
-         test_section=current_value>>(current_number_of_binary_digits_per_value-size_of_binary_to_search);
-         test_section==binary_to_search?(
-          ++count;
-          bit_mask>>=size_of_binary_to_search;
-          current_number_of_binary_digits_per_value-=size_of_binary_to_search;
-         ):(
-          bit_mask>>=1;
-          --current_number_of_binary_digits_per_value;
-         );
-         current_value&=bit_mask;
-        );
-        count;
-        "
- [-1] # Create copy as we will preserve the the generated output as lookup table
- 
+ if v='$3';max(v)>49||min(v)<48 error inv_char_arg_3 fi
+
+ +f. :"begin(
+   const size_binary_arr=$size_of_arr;
+   init_bin_arr=vector(#size_binary_arr,-1);
+   bin_search_arr='$3'-47;
+   const bin_search_arr_size=size(bin_search_arr);
+   const max_pos=size_binary_arr-bin_search_arr_size+1;
+  );
+  count=p=0;
+  n=i+$shift;
+  bin_arr=init_bin_arr;
+  rf=int(log2(n))+1;
+  mk=rf-1;
+  repeat(rf,k,
+   bin_arr[mk-k]=(n>>k)&1;
+  );
+  ++bin_arr;
+  while(bin_arr[p]&&p<max_pos,
+    (bin_arr)[p,bin_search_arr_size]==bin_search_arr?(
+     ++count;
+     p+=bin_search_arr_size;
+    ):(
+     ++p;
+    );
+  );
+  count;"
+
  if $shift -. {im} fi
 
  # Pixel sort integer by count sort
 
  +histogram. 100%
- f[-1] >begin(n=0;);i?(v=n;n+=i;v;);
- f[-3] >v=i(#-1,i);++i(#-1,i);v;
- {w#-3},1,1,1
- eval[-4] i(#-1,i)=i(#-5,x);
+ f. >begin(n=0;);i?(v=n;n+=i;v;);
+ f.. >v=i(#-1,i);++i(#-1,i);v;
+ {w#-2},1,1,1
+ eval... i(#-1,i)=i(#-4,x);
+ rm[-4--2]
 
- rm[-5,-4,-2]
- a[-2,-1] c
- 
 fi
 
-if !$mode str_code..=ix=max_index-x;iy=max_index-y; fi
+if $act_arr_sortclass?(v='$4';):(v='$3';);max(v)>49||min(v)<48 error inv_char_arg_4 fi
 
-binary_set_to_search,size_of_binary:=$act_arr_sortclass?[size('$4'),0b$4]:[size('$3'),0b$3]
+if !$mode
+
+ str_code=ix=max_index-x;iy=max_index-y;int($6)
+ str_code_2..=ix=max_index-x;iy=max_index-y;
+
+ $length,$length,1,1,:"
+  begin(
+   const max_index=w-1;
+   flip(v)=xor((1<<(int(log2(v))+1))-1,v);
+   and(a,b)=a&b;
+   or(a,b)=a|b;
+   x()=i(#-1,x,0,0,0,0,2);
+   y()=i(#-1,y,0,0,0,0,2);
+   ix()=i(#-1,max_index-x,0,0,0,0,2);
+   iy()=i(#-1,max_index-y,0,0,0,0,2);
+  );
+  "$str_code";
+  "
+
+ size_of_arr={int(log2(iM#-1))+1}
+
+ rm.
+
+fi
+
+if $act_arr_sortclass bin_search_arr={'$4'-47}
+else bin_search_arr={'$3'-47}
+fi
 
 $length,$length,1,1,:"begin(
   const shift_factor=$shift;
+  const max_index=w-1;
+  const size_binary_arr=$size_of_arr;
+  init_bin_arr=vector(#size_binary_arr,-1);
+  bin_search_arr=["$bin_search_arr"];
+  const bin_search_arr_size=size(bin_search_arr);
   const mode=$mode;
-  const binary_set_to_search=$binary_set_to_search;
-  const size_of_binary_set=$size_of_binary;
   flip(v)=xor((1<<(int(log2(v))+1))-1,v);
   and(a,b)=a&b;
   or(a,b)=a|b;
-  x()=i(#-1,x,0,0,0,1);
-  y()=i(#-1,y,0,0,0,1);
-  ix()=i(#-1,max_index-x,0,0,0,1);
-  iy()=i(#-1,max_index-y,0,0,0,1);
+  x()=i(#-1,x,0,0,0,0,2);
+  y()=i(#-1,y,0,0,0,0,2);
+  ix()=i(#-1,max_index-x,0,0,0,0,2);
+  iy()=i(#-1,max_index-y,0,0,0,0,2);
   mode==3?(
-   init_num()=xor(i(#-1,x,0,0,1),i(#-1,y,0,0,1));
+   init_num()=xor(i(#-1,x,0,0),i(#-1,y,0,0));
   ):
   mode==2?(
-   init_num()=i(#-1,x,0,0,1)|i(#-1,y,0,0,1);
+   init_num()=i(#-1,x,0,0)|i(#-1,y,0,0);
   ):
   mode==1?(
-   init_num()=i(#-1,x,0,0,1)&i(#-1,y,0,0,1);
+   init_num()=i(#-1,x,0,0)&i(#-1,y,0,0);
   ):
   mode==-1?(
    shift_factor?(
@@ -2039,27 +2071,27 @@ $length,$length,1,1,:"begin(
   ):(
    init_num()=int("$6");
   );
+  const max_pos=size_binary_arr-bin_search_arr_size+1;
  );
- count=0;
- "$str_code";
-  count=0;
-  n=abs(n);
-  num_of_binary_digits_of_n=(n?int(log2(n)))+1;
-  bit_mask=(1<<num_of_binary_digits_of_n)-1;
-  while(num_of_binary_digits_of_n>=size_of_binary_set,
-   test_section=n>>(num_of_binary_digits_of_n-size_of_binary_set);
-   test_section==binary_set_to_search?(
+ count=p=0;
+ "$str_code_2";
+ bin_arr=init_bin_arr;
+ rf=int(log2(n))+1;
+ mk=rf-1;
+ repeat(rf,k,
+  bin_arr[mk-k]=(n>>k)&1;
+ );
+ ++bin_arr;
+ while(bin_arr[p]&&p<max_pos,
+   (bin_arr)[p,bin_search_arr_size]==bin_search_arr?(
     ++count;
-    bit_mask>>=size_of_binary_set;
-    num_of_binary_digits_of_n-=size_of_binary_set;
+    p+=bin_search_arr_size;
    ):(
-    bit_mask>>=1;
-    --num_of_binary_digits_of_n;
+    ++p;
    );
-   n&=bit_mask;
-  );
-  count;"
- 
+ );
+ count;"
+
 if $act_arr_sortclass rm..
 else
  if $shift -. {im} fi
