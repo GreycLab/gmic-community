@@ -47,7 +47,97 @@
 #@cli :: Reptorian's CLI Commands
 #
 #-------------------------------
+#@cli rep_blend_by_statistical_mode_8bit_layers:
+#@cli: Blend Layers via statistical mode of colors. Optimized and coded with 8-bit images in mind.
+rep_blend_by_statistical_mode_8bit_layers:
+if $!<=1 return fi
 
+all_values_in_ranges,dimension_valid={"
+ v=[w#0,h#0,d#0,s#0];
+ all_values_in_ranges=1;
+ dimension_valid=1;
+ !same(v[0,3],[0,0,0])?(
+  for(p=1,p<$!,++p,
+   nv=[w#p,h#p,d#p,s#p];
+   if(!inrange(im#p,0,255,1,1),all_values_in_ranges=0;break(););
+   if(!inrange(iM#p,0,255,1,1),all_values_in_ranges=0;break(););
+   if(same(v[0,3],[0,0,0]),dimension_valid=0;break(););
+   if(!same(nv,v),dimension_valid=0;break(););
+   );
+ ):(
+  p=dimension_valid=0;
+ );
+ set('img_checked',p);
+ [all_values_in_ranges,dimension_valid]"}
+ 
+if !$all_values_in_ranges error exc_val_det@[\$img_checked]
+elif !$dimension_valid    error inv_dim_det@[\$img_checked]
+fi
+
+if $!==2 100%,100%,100%,100%,I#-2==I#-1?I#-1:vector(#s,nan) rm[-3,-2] return fi
+
+if s>7 error exc_chans fi
+
+round
+spectrum_size,number_of_images:=s,$!
+append c
+
+100%,100%,100%,$spectrum_size,"begin(
+  const number_of_images=$number_of_images;
+  const spec_ref_img=s#-1;
+  nan_vector=vector(#s,nan);
+  
+  bitshift_factors=expr('x?1<<(2+x)',s);
+  convert_color2int(color_values)=sum(color_values<<bitshift_factors);
+  convert_int2color(integer_numb)=(integer_numb>>bitshift_factors)&0b11111111;
+ );
+ 
+ values_of_colors=I#-1;
+ occurences=vector(#number_of_images,nan);
+ list_of_colors=positions=occurences;
+ old_colors=nan_vector;
+ 
+ repeat(number_of_images,p,list_of_colors[p]=convert_color2int((values_of_colors)[p*s,s]););
+ list_of_colors=sort(list_of_colors);
+ 
+ uniques=0;
+ maximum_count=0;
+ maximum_position=nan;
+ 
+ repeat(number_of_images,p,
+  new_colors=list_of_colors[p];
+  
+  new_colors!=old_colors?(
+   insertion_pos=uniques++;
+   occurences[insertion_pos]=1;
+   positions[insertion_pos]=p;
+   
+   if(1>maximum_count,
+    maximum_count=1;
+    maximum_position=p;
+   );
+  ):(
+   temp=++occurences[insertion_pos];
+   if(temp>maximum_count,
+    maximum_count=temp;
+    maximum_position=p;
+   );
+  );
+  
+  old_colors=new_colors;
+ );
+ 
+ if(maximum_count==1,nan_vector,
+  number_of_counts_of_maximum_count=0;
+  repeat(uniques,p,
+   if(occurences[p]==maximum_count,number_of_counts_of_maximum_count++;);
+   if(number_of_counts_of_maximum_count==2,break(););
+  );
+  
+  number_of_counts_of_maximum_count==2?nan_vector:convert_int2color(list_of_colors[maximum_position]);
+ );
+ "
+rm..
 #@cli rep_extract_unique_values_and_count:
 #@cli : Extract Unique values from a image starting from 0,0,0,0, and then outputs unique values only with the count.
 rep_extract_unique_values_and_count:
