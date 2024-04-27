@@ -50,6 +50,7 @@
 
 #@cli rep_mode_type_int: _use_16_bit_mode={ 0=false | 1= true },_fill_with_mode_color={ 0=false | 1=true }
 #@cli : Finds mode color of 8-bit images.
+#@cli : Note: You can use 8 or 16 as first argument to reflect the number of bits to use instead of 0,1 for self-documentation purpose.
 #@cli : Default values: '_use_16_bit_mode=0','_fill_with_mode_color=0'
 #@cli : Author : Reptorian.
 rep_mode_type_int:
@@ -57,18 +58,19 @@ skip ${1=0},${2=0}
 
 original_status=${}
 
-max_value:=(1<<($1?16:8))-1
+use_16_bit:=$1==16?1:$1?$1!=8
+max_value,max_spec_size:=mv=(1<<($use_16_bit?(ms=4;16):(ms=7;8)))-1;[mv,ms]
 
 foreach {
  if im<0||iM>$max_value error exc_val_det@[$>] fi
- if s>($1?4:7) error exc_chans fi
+ if s>$max_spec_size error exc_chans fi
  
  if $2 od:=w,h,d,s 
  else  od=1,1,1,{s}
  fi
  
  eval[-1] >"begin(
-   if($1
+   if($use_16_bit
    ,bitshift_factors=expr('16*x',s);
    ,bitshift_factors=expr('8*x',s);
    );
@@ -138,15 +140,17 @@ foreach {
 status $original_status
 #@cli rep_blend_mode_type_int: _use_16_bit_mode={ 0=false | 1= true }
 #@cli : Blend Layers via statistical mode of colors. Optimized and coded with 8-bit and 16-bit positive integer images in mind.
+#@cli : Note: You can use 8 or 16 as argument to reflect the number of bits to use instead of 0,1 for self-documentation purpose.
 #@cli : Default values: '_use_16_bit_mode=0'
 #@cli : Author : Reptorian.
 rep_blend_mode_type_int:
 skip ${1=0}
 
 if $!<=1 return fi
+use_16_bit:=$1==16?1:$1?$1!=8
 
 all_values_in_ranges,dimension_valid={"
- const max_value=(1<<($1?16:8))-1;
+ const max_value=(1<<($use_16_bit?16:8))-1;
  v=[w#0,h#0,d#0,s#0];
  all_values_in_ranges=1;
  dimension_valid=1;
@@ -170,14 +174,14 @@ fi
 
 if $!==2 100%,100%,100%,100%,I#-2==I#-1?I#-1:vector(#s,nan) rm[-3,-2] return fi
 
-if s>($1?4:7) error exc_chans fi
+if s>($use_16_bit?4:7) error exc_chans fi
 
 round
 spectrum_size,number_of_images:=s,$!
 append c
 
 100%,100%,100%,$spectrum_size,"begin(
-  const use_16_bit=$1;
+  const use_16_bit=$use_16_bit;
   const number_of_images=$number_of_images;
   const spec_ref_img=s#-1;
   nan_vector=vector(#s,nan);
@@ -32253,6 +32257,62 @@ u "{$1}"\
 "{$3}"\
 "{$7}"\
 "{$8,$9}"
+#@gui Statistical Mode: fx_rep_mode_type_int, fx_rep_mode_type_int_preview(1)*:*
+#@gui:_=note("This filter finds the most common color. If there are 2 colors with the same number of colors or if every colors are unique, then some or all pixels will return nan. When every pixels are nan, then this filter will return a error.")
+#@gui:_=separator(),_=note("<b>Main</b>")
+#@gui:Depth=choice(0,"8-Bit","16-Bit")
+#@gui:Output=choice(0,"Blended","Per-Layer")
+#@gui:_=separator(),_=note("<b>Miscellaneous</b>")
+#@gui:NAN Replacement Color=color(0,255,0,255)
+#@gui:Old Main=value(-1,-1)
+#@gui:Old Color=value(-1)
+fx_rep_mode_type_int:
+if narg($_persistent) rm $_persistent keep[result]
+else fx_rep_mode_type_int_preview $*
+fi
+fx_rep_mode_type_int_preview:
+skip $*
+contain_persistent:=narg($_persistent)
+
+if ([${1-2}]!=[$7])||!$contain_persistent
+ to_rgba
+ if $1 * 257 fi
+ 
+ if $2
+  rep_mode_type_int $1,1
+ else  
+  rep_blend_mode_type_int $1
+ fi
+ 
+ foreach { if isnan(im) error all_nan@[$>] fi }
+ 
+ if $1 / 257 fi
+ 
+ name[0--1] result
+ 
+ if !$2
+  +f isnan(i0)?[${3-6}]:I
+  name[-2,-1] temp_result,result
+ fi
+ 
+ +store _persistent
+elif $contain_persistent?!$1&&([${3-6}]!=[$8])
+ rm $_persistent rm[result]
+ +f isnan(i0)?[${3-6}]:I
+ name[-2,-1] temp_result,result
+ +store _persistent
+else rm $_persistent
+fi
+
+rmn temp_result
+
+display_color:=1+!$1
+
+u "{$1}"\
+"{$2}"\
+"{${3-6}}_"$display_color\
+"{${1-2}}"\
+"{${3-6}}"
 ######################
 
 # Local Variables:
