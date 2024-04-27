@@ -129,6 +129,7 @@ append c
  
  if(maximum_count==1,nan_vector,
   number_of_counts_of_maximum_count=0;
+  
   repeat(uniques,p,
    if(occurences[p]==maximum_count,number_of_counts_of_maximum_count++;);
    if(number_of_counts_of_maximum_count==2,break(););
@@ -142,26 +143,44 @@ rm..
 #@cli rep_extract_unique_values_and_count:
 #@cli : Extract Unique values from a image starting from 0,0,0,0, and then outputs unique values only with the count.
 rep_extract_unique_values_and_count:
+m $0_a_nums:"100%,1,1,1,x a c"
+
+max_dim:=1<<24
 foreach {
-  current_img_ind=key_{$>}_
-
-  {whds#-1},1,1,2
-
-  eval[-2] >"begin(
-    key='"$current_img_ind"';
-    mi=0;
-   );
-   isnan(value=get([key,v2s(i-im#-2,16,16)]))?(
-    I[#-1,mi]=[i,1];
-    set([key,v2s(i-im#-2,16,16)],mi);
-    ++mi;
-   ):(
-    ++i(#-1,value,0,0,1);
-   );
-   end(resize(#-1,mi,1,1,2,0););"
-
-  rm..
+ if whds>$max_dim error lim_dim_exc fi
+  
+ unroll x +$0_a_nums pixelsort[-1] +,x,[-2] rm..
+ 100%,100%,100%,3
+ 
+ eval[-2] >"begin(
+   count=started=uniques=0;
+   min_value=old_number=nan;
+  );
+  i0==old_number?(
+   ++count;
+   if(i1<min_value,min_value=i1;);
+  ):(
+   if(started,I[#-1,uniques-1]=[old_number,count,min_value];);
+   ++uniques;
+   min_value=i1;
+   count=1;
+  );
+  old_number=i0;
+  started=1;
+  I;
+  end(
+   I[#-1,uniques-1]=[old_number,count,min_value];
+   set('end',uniques-1);
+  );
+  "
+ rm.. 
+ crop. 0,$end
+ s. c,-2
+ pixelsort[-2] +,x,[-1] rm.
+ 
 }
+
+um $0_a_nums
 #@cli rep_cbsoo: eq. to 'rep_channels_overblur_overline_blur_sharpen'.
 rep_cbsoo: rep_channels_blur_sharpen_overblur_overline $*
 #@cli rep_channels_overblur_overline_blur_sharpen: method_a={ 0=blur | 1=sharpen | 2=overblur | 3=overline },0%<_effect_factor_a[%]<=100%,_multiplication_factor>0,_blending_mode,0<_blending_opacity[%]<=100%...
