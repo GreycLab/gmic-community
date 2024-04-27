@@ -48,30 +48,31 @@
 #
 #-------------------------------
 
-#@cli rep_mode8: _fill_with_mode_color={ 0=false | 1=true }
+#@cli rep_mode_type_int: _use_16_bit_mode={ 0=false | 1= true },_fill_with_mode_color={ 0=false | 1=true }
 #@cli : Finds mode color of 8-bit images.
 #@cli : Default values: '_fill_with_mode_color=0'
 #@cli : Author : Reptorian.
-rep_mode8:
-l[] {
-  check "isint(${1=0})"
-  fill_with_mode_color=$1
-
-  onfail
-      noarg fill_with_mode_color=0
- }
+rep_mode_type_int:
+skip ${1=0},${2=0}
 
 original_status=${}
 
+max_value:=(1<<($1?16:8))-1
+
 foreach {
- if im<0||iM>255 error exc_val_det@[$>] fi
+ if im<0||iM>$max_value error exc_val_det@[$>] fi
+ if s>($1?4:7) error exc_chans fi
  
- if $fill_with_mode_color od:=w,h,d,s 
- else od=1,1,1,{s}
+ if $2 od:=w,h,d,s 
+ else  od=1,1,1,{s}
  fi
  
  eval[-1] >"begin(
-   bitshift_factors=expr('x?1<<(2+x)',s);
+   if($1
+   ,bitshift_factors=expr('16*x',s);
+   ,bitshift_factors=expr('8*x',s);
+   );
+   
    convert_color2int(color_values)=sum(color_values<<bitshift_factors);
    convert_int2color(integer_numb)=(integer_numb>>bitshift_factors)&0b11111111;
    nan_vector=vector(#s,nan);
@@ -135,20 +136,25 @@ foreach {
 }
 
 status $original_status
-#@cli rep_blend_mode8:
-#@cli : Blend Layers via statistical mode of colors. Optimized and coded with 8-bit images in mind.
-rep_blend_mode8:
+#@cli rep_blend_mode_type_int: _use_16_bit_mode={ 0=false | 1= true }
+#@cli : Blend Layers via statistical mode of colors. Optimized and coded with 8-bit and 16-bit positive integer images in mind.
+#@cli : Default values: '_use_16_bit_mode=0'
+#@cli : Author : Reptorian.
+rep_blend_mode_type_int:
+skip ${1=0}
+
 if $!<=1 return fi
 
 all_values_in_ranges,dimension_valid={"
+ const max_value=(1<<($1?16:8))-1;
  v=[w#0,h#0,d#0,s#0];
  all_values_in_ranges=1;
  dimension_valid=1;
  !same(v[0,3],[0,0,0])?(
   for(p=1,p<$!,++p,
    nv=[w#p,h#p,d#p,s#p];
-   if(!inrange(im#p,0,255,1,1),all_values_in_ranges=0;break(););
-   if(!inrange(iM#p,0,255,1,1),all_values_in_ranges=0;break(););
+   if(!inrange(im#p,0,max_value,1,1),all_values_in_ranges=0;break(););
+   if(!inrange(iM#p,0,max_value,1,1),all_values_in_ranges=0;break(););
    if(same(v[0,3],[0,0,0]),dimension_valid=0;break(););
    if(!same(nv,v),dimension_valid=0;break(););
    );
@@ -164,18 +170,23 @@ fi
 
 if $!==2 100%,100%,100%,100%,I#-2==I#-1?I#-1:vector(#s,nan) rm[-3,-2] return fi
 
-if s>7 error exc_chans fi
+if s>($1?4:7) error exc_chans fi
 
 round
 spectrum_size,number_of_images:=s,$!
 append c
 
 100%,100%,100%,$spectrum_size,"begin(
+  const use_16_bit=$1;
   const number_of_images=$number_of_images;
   const spec_ref_img=s#-1;
   nan_vector=vector(#s,nan);
   
-  bitshift_factors=expr('x?1<<(2+x)',s);
+  if(use_16_bit
+  ,bitshift_factors=expr('16*x',s);
+  ,bitshift_factors=expr('8*x',s);
+  );
+  
   convert_color2int(color_values)=sum(color_values<<bitshift_factors);
   convert_int2color(integer_numb)=(integer_numb>>bitshift_factors)&0b11111111;
  );
