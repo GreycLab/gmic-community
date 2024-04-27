@@ -47,6 +47,94 @@
 #@cli :: Reptorian's CLI Commands
 #
 #-------------------------------
+
+#@cli rep_mode8: _fill_with_mode_color={ 0=false | 1=true }
+#@cli : Finds mode color of 8-bit images.
+#@cli : Default values: '_fill_with_mode_color=0'
+#@cli : Author : Reptorian.
+rep_mode8:
+l[] {
+  check "isint(${1=0})"
+  fill_with_mode_color=$1
+
+  onfail
+      noarg fill_with_mode_color=0
+ }
+
+original_status=${}
+
+foreach {
+ if im<0||iM>255 error exc_val_det@[$>] fi
+ 
+ if $fill_with_mode_color od:=w,h,d,s 
+ else od=1,1,1,{s}
+ fi
+ 
+ eval[-1] >"begin(
+   bitshift_factors=expr('x?1<<(2+x)',s);
+   convert_color2int(color_values)=sum(color_values<<bitshift_factors);
+   convert_int2color(integer_numb)=(integer_numb>>bitshift_factors)&0b11111111;
+   nan_vector=vector(#s,nan);
+   list_of_colors=vector(#whd);
+   p=0;
+  );
+  list_of_colors[p++]=convert_color2int(I);
+  I;
+  end(
+   
+   list_of_colors=sort(list_of_colors);
+   
+   old_colors=nan_vector;
+   positions=occurences=vector(#whd,nan);
+   
+   uniques=0;
+   maximum_count=0;
+   maximum_position=nan;
+   
+   repeat(whd,p,
+    new_colors=list_of_colors[p];
+    
+    new_colors!=old_colors?(
+     insertion_pos=uniques++;
+     occurences[insertion_pos]=1;
+     positions[insertion_pos]=p;
+     
+     if(1>maximum_count,
+      maximum_count=1;
+      maximum_position=p;
+     );
+    ):(
+     temp=++occurences[insertion_pos];
+     if(temp>maximum_count,
+      maximum_count=temp;
+      maximum_position=p;
+     );
+    );
+    
+    old_colors=new_colors;
+   );
+   
+   if(maximum_count==1,result=nan_vector,
+    number_of_counts_of_maximum_count=0;
+    
+    repeat(uniques,p,
+     if(occurences[p]==maximum_count,number_of_counts_of_maximum_count++;);
+     if(number_of_counts_of_maximum_count==2,break(););
+    );
+    
+    result=number_of_counts_of_maximum_count==2?nan_vector:convert_int2color(list_of_colors[maximum_position]);
+   );
+   
+   set('mode_color',v2s(result););
+  );
+  "
+ rm.
+ 
+ $od,[$mode_color]
+
+}
+
+status $original_status
 #@cli rep_blend_mode8:
 #@cli : Blend Layers via statistical mode of colors. Optimized and coded with 8-bit images in mind.
 rep_blend_mode8:
@@ -97,7 +185,11 @@ append c
  list_of_colors=positions=occurences;
  old_colors=nan_vector;
  
- repeat(number_of_images,p,list_of_colors[p]=convert_color2int((values_of_colors)[p*s,s]););
+ q=0;
+ repeat(number_of_images,p,
+  list_of_colors[p]=convert_color2int((values_of_colors)[q,s]);
+  q+=s;
+ );
  list_of_colors=sort(list_of_colors);
  
  uniques=0;
@@ -616,17 +708,15 @@ um $0_bsoo_edit,+$0_bsoo_edit,$0_process_individual_channel_section,$0_process_g
 rep_decompose_bitplanes:
 l[] {
   check "${1=8}>1 && isint(${1=8})"
-  $=arg
+  d_bpi={$1-1}
 
   onfail
     if isnum($1)
-      if !isint($1)||$1<1 error inv_num_inp fi
+      if !isint($1)||$1<2 error inv_num_inp fi
     else
-      noarg arg1=8
+      noarg d_bpi=7
     fi
  }
-
-d_bpi={$arg1-1}
 
 foreach { repeat $d_bpi { +>>[-1] 1 &[-2] 1 } &[-1] 1 }
 #@cli rep_compose_bitplanes: _number_of_bits>0
@@ -636,17 +726,15 @@ foreach { repeat $d_bpi { +>>[-1] 1 &[-2] 1 } &[-1] 1 }
 rep_compose_bitplanes:
 l[] {
   check "${1=8}>1 && isint(${1=8})"
-  $=arg
+  d_bpi={$1-1}
 
   onfail
     if isnum($1)
-      if !isint($1)||$1<1 error inv_num_inp fi
+      if !isint($1)||$1<2 error inv_num_inp fi
     else
-      noarg arg1=8
+      noarg d_bpi=7
     fi
  }
-
-d_bpi={$arg1-1}
 
 P,Q=-1,-2
 repeat inf {
