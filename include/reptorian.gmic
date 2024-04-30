@@ -70,65 +70,42 @@ foreach {
  fi
  
  eval[-1] >"begin(
-   if($use_16_bit
-   ,bitshift_factors=expr('16*x',s);
-   ,bitshift_factors=expr('8*x',s);
-   );
+    if($use_16_bit
+    ,bitshift_factors=expr('x<<4',s);
+    ,bitshift_factors=expr('x<<3',s);
+    );
    
-   convert_color2int(color_values)=sum(color_values<<bitshift_factors);
-   convert_int2color(counting_num)=(counting_num>>bitshift_factors)&0b11111111;
-   nan_vector=vector(#s,nan);
-   list_of_colors=vector(#whd);
-   p=0;
+    convert_color2int(color_values)=sum(color_values<<bitshift_factors);
+    convert_int2color(counting_num)=(counting_num>>bitshift_factors)&$max_value;
+    nan_vector=vector(#s,nan);
+    list_of_colors=vector(#whd);
+    p=0;
   );
   list_of_colors[p++]=convert_color2int(I);
   I;
   end(
-   
-   list_of_colors=sort(list_of_colors);
-   
-   old_colors=nan_vector;
-   positions=occurences=vector(#whd,nan);
-   
-   uniques=0;
-   maximum_count=0;
-   maximum_position=nan;
-   
-   repeat(whd,p,
-    new_colors=list_of_colors[p];
+    count=maximum_count=old_maximum_count=0;
+    old_color=maximum_freq_color=nan;
     
-    new_colors!=old_colors?(
-     insertion_pos=uniques++;
-     occurences[insertion_pos]=1;
-     positions[insertion_pos]=p;
-     
-     if(1>maximum_count,
-      maximum_count=1;
-      maximum_position=p;
-     );
-    ):(
-     temp=++occurences[insertion_pos];
-     if(temp>maximum_count,
-      maximum_count=temp;
-      maximum_position=p;
-     );
+    list_of_colors=sort(list_of_colors);
+    
+    repeat(whd,p,
+        list_of_colors[p]!=old_color?(
+            count=1;
+        ):(
+            ++count;
+            count>maximum_count?(
+                maximum_count=count;
+                maximum_freq_color=old_color;
+            ):
+            count==maximum_count?(
+                old_maximum_count=maximum_count;
+            );
+        );
+        old_color=list_of_colors[p];
     );
-    
-    old_colors=new_colors;
-   );
-   
-   if(maximum_count==1,result=nan_vector,
-    number_of_counts_of_maximum_count=0;
-    
-    repeat(uniques,p,
-     if(occurences[p]==maximum_count,number_of_counts_of_maximum_count++;);
-     if(number_of_counts_of_maximum_count==2,break(););
-    );
-    
-    result=number_of_counts_of_maximum_count==2?nan_vector:convert_int2color(list_of_colors[maximum_position]);
-   );
-   
-   set('mode_color',v2s(result););
+ 
+    set('mode_color',v2s(if(maximum_count==1||(maximum_count==old_maximum_count),nan_vector,convert_int2color(maximum_freq_color););););
   );
   "
  rm.
