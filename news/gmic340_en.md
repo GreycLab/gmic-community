@@ -1,5 +1,5 @@
 
-# G'MIC 3.4.0: Freedom, Stability, Fraternity for Image Processing
+# G'MIC 3.4.0: Image processing, in the prime of its life.
 
 A new version **3.4.0** of [_G’MIC_](https://gmic.eu) (_GREYC’s Magic for Image Computing_) has just been released!
 
