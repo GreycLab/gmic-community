@@ -48,7 +48,7 @@ _Fig.2.1. Preview of the revamped G´MIC Online web service released with versio
 
 >>Visit [_G´MIC Online_](https://gmicol.greyc.fr/) and give it a real-world test 😱! And don't hesitate to report any issues. In any case, a big thank you to our colleagues in the _DDA_ team for this noteworthy overhaul!
 
-  - **_G´MIC-Qt_ Plugin**: Over the past year, the plugin has acquire more than **40 new image processing filters**, [detailed below](#toc-3-details-of-the-new-filters). Many employ the new "Random Parameters" button, which generates arbitrary filter settings, furnishing rapid previews that can be quickly evaluated for practical or aesthetic worth.
+  - **_G´MIC-Qt_ Plugin**: Over the past year, the plugin has acquired more than **40 new image processing filters**, [detailed below](#toc-3-details-of-the-new-filters). Many employ the new "Random Parameters" button, which generates arbitrary filter settings, furnishing rapid previews that can be quickly evaluated for practical or aesthetic worth.
 
 >>[![Random Parameters button in the G´MIC-Qt plugin](https://gmic.eu/gmic340/thumbs/randomize_parameters_fr.png)](https://gmic.eu/gmic340/img/randomize_parameters_en.jpg)
 >>_Fig.2.2. G´MIC-Qt Plugin: The new "Random Parameters" button assigns random values to the selected filter's parameters._
@@ -146,131 +146,131 @@ For example, we used this filter, with slight modifications, to generate the sho
 
 ## 3.3. Degradation Filters
 
-Sometimes, one seeks to deliberately _degrade_ images, either to simulate a real alteration (such as motion blur, sensor noise, etc.), or in the pursuit of a purely aesthetic effect ([Glitch Art](https://en.wikipedia.org/wiki/Glitch_art)). For these purposes, the following new effects have been added to _G'MIC_:
+Sometimes, one seeks to deliberately _degrade_ images, either to simulate a real phenomenon, such as motion blur, sensor noise and the like, or in the pursuit of a purely aesthetic effect ([Glitch Art](https://en.wikipedia.org/wiki/Glitch_art)). For these purposes, the following new effects have been added to _G'MIC_:
 
-- The **Rendering / CRT Scanlines** and **Degradations / CRT Phosphors** filters aim to mimic the display of images on [cathode-ray tube (CRT) screens](https://en.wikipedia.org/wiki/Cathode_ray_tube), by simulating two characteristic effects of these types of displays, namely the [Scanline effect](https://en.wikipedia.org/wiki/Scan_line) and [phosphor](https://en.wikipedia.org/wiki/Phosphor) display. These two filters were created in collaboration with [Romain Hérault](https://fr.linkedin.com/in/romain-herault-91a596137), a new contributor (who recently joined _GREYC_).
+- The **Rendering / CRT Scanlines** and **Degradations / CRT Phosphors** filters mimic the image display of [cathode-ray tubes (CRT)](https://en.wikipedia.org/wiki/Cathode_ray_tube), by simulating two characteristic effects of CRT displays, namely the [Scanline effect](https://en.wikipedia.org/wiki/Scan_line) and [phosphor excitation](https://en.wikipedia.org/wiki/Phosphor). These two filters were created in collaboration with [Romain Hérault](https://fr.linkedin.com/in/romain-herault-91a596137), a new contributor who recently joined _GREYC_.
 
-[![Filter 'Rendering / CRT Scanlines'](https://gmic.eu/gmic340/thumbs/filter_scanline.png)](https://gmic.eu/gmic340/img/filter_scanline.jpg)
+>>[![Filter 'Rendering / CRT Scanlines'](https://gmic.eu/gmic340/thumbs/filter_scanline.png)](https://gmic.eu/gmic340/img/filter_scanline.jpg)
 _Fig.3.3.1. The **Rendering / CRT Scanlines** filter imitates the typical "Scanline" effect of CRT displays._
 
-[![Filter 'Degradations / CRT Phosphors'](https://gmic.eu/gmic340/thumbs/filter_phosphor.png)](https://gmic.eu/gmic340/img/filter_phosphor.jpg)
-_Fig.3.3.2. The **Degradations / CRT Phosphors** filter simulates the phosphor display technique of CRT displays._
+>>[![Filter 'Degradations / CRT Phosphors'](https://gmic.eu/gmic340/thumbs/filter_phosphor.png)](https://gmic.eu/gmic340/img/filter_phosphor.jpg)
+>>_Fig.3.3.2. The **Degradations / CRT Phosphors** filter simulates the phosphor display technique of CRT displays._
 
-- The **Degradations / Blur [Motion]** filter allows synthesizing motion blur, with user-adjustable spline-based trajectories, directly modifiable by altering key points in the _G'MIC-Qt_ preview window, as illustrated in the figure below:
+- The **Degradations / Blur [Motion]** filter emulates path-based motion blur, with user-adjustable, spline-based trajectories which may be directly altered through key points in the _G'MIC-Qt_ preview window:
 
-[![Filter 'Degradations / Blur (Motion)'](https://gmic.eu/gmic340/thumbs/filter_blur_motion.png)](https://gmic.eu/gmic340/img/filter_blur_motion.jpg)
-_Fig.3.3.3. The **Degradations / Blur [Motion]** filter simulates motion blur._
+>>[![Filter 'Degradations / Blur (Motion)'](https://gmic.eu/gmic340/thumbs/filter_blur_motion.png)](https://gmic.eu/gmic340/img/filter_blur_motion.jpg)
+>>_Fig.3.3.3. The **Degradations / Blur [Motion]** filter simulates motion blur._
 
-- The **Degradations / Sloppy Mess** filter is intended for Glitch Art enthusiasts. It's one of the first filters by a new contributor, [Prawnsushi](http://prawnsushi.free.fr/), who recently took an interest in the _G'MIC_ language for filter creation. This effect is a bit slow to compute but offers many parameters and a wide range of different outputs.
+- The **Degradations / Sloppy Mess** filter is intended for Glitch Art enthusiasts. It's one of the first filters by a new contributor, [Prawnsushi](http://prawnsushi.free.fr/), who recently took an interest in the _G'MIC_ language for filter creation. This effect offers wide-ranging parameters to produce a panoply of disjoint and disassociated outputs.
 
-[![Filter 'Degradations / Sloppy Mess'](https://gmic.eu/gmic340/thumbs/filter_sloppy_mess.png)](https://gmic.eu/gmic340/img/filter_sloppy_mess.jpg)
-_Fig.3.3.4. The **Degradations / Sloppy Mess** filter deliberately creates artistic digital artifacts on your images._
+>>[![Filter 'Degradations / Sloppy Mess'](https://gmic.eu/gmic340/thumbs/filter_sloppy_mess.png)](https://gmic.eu/gmic340/img/filter_sloppy_mess.jpg)
+>>_Fig.3.3.4. The **Degradations / Sloppy Mess** filter deliberately creates artistic digital artifacts on your images._
 
 ## 3.4. Rendering and Texture Filters
 
-Rendering filters have the particularity of not requiring input images to function, as they create new images (or new layers) from scratch, through [procedural generation](https://en.wikipedia.org/wiki/Procedural_generation).
+Rendering filters, by and large, do not require input images; they summon new imagery by algorithmic means through [procedural generation](https://en.wikipedia.org/wiki/Procedural_generation).
 
-- The **Rendering / Underwoods** filter, another one created by _Prawnsushi_, is nothing less than an **underwood generator**! One might say it's not very useful, and indeed it's not a filter that will be indispensable for image processors, photographers, or illustrators in their daily work.
+- The **Rendering / Underwoods** filter, another creation of _Prawnsushi_, is nothing less than an **underwood generator**! One might say it's not very useful, and indeed it's not a filter that image processors, photographers, or illustrators will incorporate into their daily work.
 
-But in a way, this filter illustrates the whole philosophy of the _G'MIC_ project: To produce software that fosters **algorithmic creativity**, facilitates the implementation of **all kinds of filters** (useful or less useful), and allows **free sharing** with users. In practice, this filter has the merit of existing, anyone can try it, and it uses very little memory resources (a few dozen bytes, thanks to the compactness of the _G'MIC_ language by design). And moreover, the results are quite cool! And be assured that it will inevitably serve, one day or another, an artist wanting to synthesize an underwood image in two mouse clicks!
+>>Yet this filter illustrates the whole philosophy of the _G'MIC_ project: To produce software that fosters **algorithmic creativity**. _G'MIC_ facilitates the construction of **all kinds of filters** (useful or less useful), and allows **free sharing** with other _cognoscenti_ of this viewpoint. In practice, this filter has the simple merit of its own existence, there for anyone to try, and thereby — possibly! — discover the extraordinary. It uses very little memory resources, perhaps a few dozen bytes, thanks to the compactness of the _G'MIC_ language design. And moreover, the results are quite cool! And be assured that it will inevitably serve, one day or another, an artist wanting to synthesize an underwood image in two mouse clicks!
 
-[![Filter 'Rendering / Underwoods'](https://gmic.eu/gmic340/thumbs/filter_underwoods.png)](https://gmic.eu/gmic340/img/filter_underwoods.jpg)
-[![Filter 'Rendering / Underwoods'](https://gmic.eu/gmic340/thumbs/filter_underwoods2.png)](https://gmic.eu/gmic340/img/filter_underwoods2.jpg)
-_Fig.3.4.2. Examples of underwood image renderings by the **Rendering / Underwoods** filter._
+>>[![Filter 'Rendering / Underwoods'](https://gmic.eu/gmic340/thumbs/filter_underwoods.png)](https://gmic.eu/gmic340/img/filter_underwoods.jpg)
+>>[![Filter 'Rendering / Underwoods'](https://gmic.eu/gmic340/thumbs/filter_underwoods2.png)](https://gmic.eu/gmic340/img/filter_underwoods2.jpg)
+>>_Fig.3.4.1. Examples of underwood image renderings by the **Rendering / Underwoods** filter._
 
-- The **Patterns / Reaction-Diffusion** filter synthesizes textures like those encountered in the modeling of [reaction-diffusion systems](https://en.wikipedia.org/wiki/Reaction-diffusion_system).
+- The **Patterns / Reaction-Diffusion** filter synthesizes textures modeled after [reaction-diffusion systems](https://en.wikipedia.org/wiki/Reaction-diffusion_system).
 
-[![Filter 'Patterns / Reaction-Diffusion'](https://gmic.eu/gmic340/thumbs/filter_reaction_diffusion.png)](https://gmic.eu/gmic340/img/filter_reaction_diffusion.jpg)
-_Fig.3.4.3. The **Patterns / Reaction-Diffusion** filter in the G'MIC-Qt plugin._
+>>[![Filter 'Patterns / Reaction-Diffusion'](https://gmic.eu/gmic340/thumbs/filter_reaction_diffusion.png)](https://gmic.eu/gmic340/img/filter_reaction_diffusion.jpg)
+>>_Fig.3.4.2. The **Patterns / Reaction-Diffusion** filter in the G'MIC-Qt plugin._
 
-Again, the interest in this type of filter may seem quite limited. However, it's the perfect example of a texture that can serve as the basis for creating generative art. Take a texture created by this filter, apply some of the other effects available in _G'MIC_ (e.g., the **Deformations / Drop Water** filter), and you're ready to produce fun animations like the one below:
+>>Again, the interest in this type of filter may seem quite limited. However, it's the perfect example of a texture that — in a pipeline of filters of a similar ilk — serves as the basis for generative art. Take a texture created by this filter, apply some of the other effects available in _G'MIC_ (e.g., the **Deformations / Drop Water** filter), and you're ready to produce fun animations like the one below:
 
-[![Filter 'Patterns / Reaction-Diffusion'](https://gmic.eu/gmic340/thumbs/water_reaction_diffusion.png)](https://gmic.eu/gmic340/img/water_reaction_diffusion.mp4)
+>>[![Filter 'Patterns / Reaction-Diffusion'](https://gmic.eu/gmic340/thumbs/water_reaction_diffusion.png)](https://gmic.eu/gmic340/img/water_reaction_diffusion.mp4)
 
-- The **Rendering / Spline Spirograph** filter is inspired by the [Spirograph](https://en.wikipedia.org/wiki/Spirograph) game for generating parametric curves, creating intriguing texture and color effects. The presence of the **Random Parameters** button in the _G'MIC-Qt_ plugin is particularly welcome here, to quickly obtain a varied panorama of possible results from this filter!
+- The **Rendering / Spline Spirograph** filter is inspired by the [Spirograph](https://en.wikipedia.org/wiki/Spirograph) game for generating parametric curves, creating intriguing texture and color effects. The presence of the **Random Parameters** button in the _G'MIC-Qt_ plugin is particularly welcome here, as it quickly obtains a varied panorama of diverse results!
 
-[![Filter 'Rendering / Spline Spirograph'](https://gmic.eu/gmic340/thumbs/filter_spirograph.png)](https://gmic.eu/gmic340/img/filter_spirograph.jpg)
-[![Filter 'Rendering / Spline Spirograph'](https://gmic.eu/gmic340/thumbs/filter_spirograph3.png)](https://gmic.eu/gmic340/img/filter_spirograph3.jpg)
-_Fig.3.4.1. The **Rendering / Spline Spirograph** filter and some examples of possible renderings._
+>>[![Filter 'Rendering / Spline Spirograph'](https://gmic.eu/gmic340/thumbs/filter_spirograph.png)](https://gmic.eu/gmic340/img/filter_spirograph.jpg)
+>>[![Filter 'Rendering / Spline Spirograph'](https://gmic.eu/gmic340/thumbs/filter_spirograph3.png)](https://gmic.eu/gmic340/img/filter_spirograph3.jpg)
+>>_Fig.3.4.3. The **Rendering / Spline Spirograph** filter and some rendering examples._
 
-This filter also offers an animated output mode, producing several consecutive layers representing different frames of an animation, allowing the synthesis of short videos like this one:
+>>This filter also offers an animated output mode, allowing for the synthesis of short videos like this one:
 
-[![Filter 'Rendering / Spline Spirograph'](https://gmic.eu/gmic340/img/filter_spirograph4.gif)](https://gmic.eu/gmic340/img/filter_spirograph2.mp4)
+>>[![Filter 'Rendering / Spline Spirograph'](https://gmic.eu/gmic340/img/filter_spirograph4.gif)](https://gmic.eu/gmic340/img/filter_spirograph2.mp4)
 
-- The **Rendering / ABN Filigrees** filter also knows how to draw interesting parametric curves, inspired this time by the filigrees found on stock certificates or paper money. This filter pays homage to the _American Bank Note Company_, an engraver of financial paper that was active on Wall Street from the mid-19th century until about sixty years ago.
+- The **Rendering / ABN Filigrees** filter also knows how to draw interesting parametric curves, inspired this time by the filigrees found on stock certificates or paper money. This filter pays homage to the _American Bank Note Company_, an engraver of financial paper, active on Wall Street from the 19th century until sixty years ago.
 
-[![Filter 'Rendering / ABN Filigrees'](https://gmic.eu/gmic340/thumbs/filter_abn.png)](https://gmic.eu/gmic340/img/filter_abn.jpg)
-_Fig.3.4.4. The **Rendering / ABN Filigrees** filter._
+>>[![Filter 'Rendering / ABN Filigrees'](https://gmic.eu/gmic340/thumbs/filter_abn.png)](https://gmic.eu/gmic340/img/filter_abn.jpg)
+>>_Fig.3.4.4. The **Rendering / ABN Filigrees** filter._
 
 - The **Rendering / Random Signature** filter is also an amusing curve generator: it aims to draw random signatures, as illustrated in the video below:
 
-[![Filter 'Rendering / Random Signature'](https://gmic.eu/gmic340/thumbs/random_signature.png)](https://gmic.eu/gmic340/img/random_signature.mp4)
-_Fig.3.4.4. The **Rendering / Random Signature** filter creates random signatures._
+>>[![Filter 'Rendering / Random Signature'](https://gmic.eu/gmic340/thumbs/random_signature.png)](https://gmic.eu/gmic340/img/random_signature.mp4)
+>>_Fig.3.4.4. The **Rendering / Random Signature** filter creates random signatures._
 
-Again, a filter whose usefulness cannot be debated: _["It's completely useless, so it's absolutely indispensable!"](https://en.wikipedia.org/wiki/J%C3%A9r%C3%B4me_Bonaldi)_.
+>>Again, a filter whose usefulness cannot be debated: _["It's completely useless, so it's absolutely indispensable!"](https://en.wikipedia.org/wiki/J%C3%A9r%C3%B4me_Bonaldi)_.
 
-- And to finish this section, let's mention the **Rendering / Twisted Rays** filter which, as its name suggests, generates a twisted rays effect. Again, the use of this filter will probably remain quite confidential. But who knows if among the thousands of _G'MIC_ users, there isn't someone who was precisely looking to achieve this particular effect? Well, now they can! ☺
+- And to finish this section, let's mention the **Rendering / Twisted Rays** filter which, as its name suggests, generates a twisted rays effect. The use of this filter will probably remain quite unfathomable in the near term. But, even now, there may be among thousands of _G'MIC_ users a creator seeking this precise effect — _and now they can!_ ☺
 
-[![Filter 'Rendering / Twisted Rays'](https://gmic.eu/gmic340/thumbs/filter_twisted_rays.png)](https://gmic.eu/gmic340/img/filter_twisted_rays.jpg)
-_Fig.3.4.5. The **Rendering / Twisted Rays** filter creates a swirl of rays on your images._
+>>[![Filter 'Rendering / Twisted Rays'](https://gmic.eu/gmic340/thumbs/filter_twisted_rays.png)](https://gmic.eu/gmic340/img/filter_twisted_rays.jpg)
+>>_Fig.3.4.5. The **Rendering / Twisted Rays** filter creates a swirl of rays on your images._
 
-This filter can, for example, be used to create psychedelic animated effects like this:
+>>This filter can, for example, be used to create psychedelic animated effects like this:
 
-[![Filter 'Rendering / Twisted Rays'](https://gmic.eu/gmic340/img/filter_twisted_rays2.gif)](https://gmic.eu/gmic340/img/filter_twisted_rays2.gif)
+>>[![Filter 'Rendering / Twisted Rays'](https://gmic.eu/gmic340/img/filter_twisted_rays2.gif)](https://gmic.eu/gmic340/img/filter_twisted_rays2.gif)
 
 
 ## 3.5. Artistic Effects
 
-To conclude this list of new _G'MIC_ filters, here are some miscellaneous filters grouped under the term "Artistic" (this is generally the term used in image processing software for filters that are hard to categorize…).
+To conclude this list of new _G'MIC_ filters, here are some miscellaneous filters grouped under the term "Artistic", a term used in image processing software for filters that are hard to categorize…
 
-- The **Artistic / Stringify** filter decomposes an input image into quantized color blobs and connects the points (subsampled) located on the contours of these blobs with color segments. Again, the rendering may resemble the curves obtained with the Spirograph game.
+- The **Artistic / Stringify** filter decomposes an input image into quantized color blobs and connects the points (subsampled) located on the contours of these blobs with color segments. The rendering may resemble the curves obtained with the Spirograph game.
 
-[![Filter 'Artistic / Stringify'](https://gmic.eu/gmic340/thumbs/filter_stringify.png)](https://gmic.eu/gmic340/img/filter_stringify.jpg)
+>>[![Filter 'Artistic / Stringify'](https://gmic.eu/gmic340/thumbs/filter_stringify.png)](https://gmic.eu/gmic340/img/filter_stringify.jpg)
 _Fig.3.5.1. The **Artistic / Stringify** filter creates image abstractions from color segments._
 
 - The **Black & White / Filaments** filter is based on the projection of thousands of particles from one or more edges of the image, with trajectories deformed by the image's contour geometry. The drawing of these thousands of trajectories with semi-transparent colors produces images like these:
 
-[![Filter 'Black & White / Filaments'](https://gmic.eu/gmic340/thumbs/filter_filaments.png)](https://gmic.eu/gmic340/img/filter_filaments.jpg)
-[![Filter 'Black & White / Filaments'](https://gmic.eu/gmic340/thumbs/filter_filaments2.png)](https://gmic.eu/gmic340/img/filter_filaments2.jpg)
-_Fig.3.5.2. The **Black & White / Filaments** filter transforms your images into sets of deformed filaments._
+>>[![Filter 'Black & White / Filaments'](https://gmic.eu/gmic340/thumbs/filter_filaments.png)](https://gmic.eu/gmic340/img/filter_filaments.jpg)
+>>[![Filter 'Black & White / Filaments'](https://gmic.eu/gmic340/thumbs/filter_filaments2.png)](https://gmic.eu/gmic340/img/filter_filaments2.jpg)
+>>_Fig.3.5.2. The **Black & White / Filaments** filter transforms your images into sets of deformed filaments._
 
-- The **Arrays & Tiles / Loose Photos** filter simulates an effect of throwing photos haphazardly on a table, so that the content of the photos recreates a global image specified as the filter's input. Many parameters are adjustable (density, size and ratio of photographs, shading parameters, etc.), giving the user a great deal of freedom over the final rendering.
+- The **Arrays & Tiles / Loose Photos** filter simulates an effect of throwing photos haphazardly on a table, so that the content of the photos constitutes a global image, as specified by the filter's settings. Many parameters are adjustable (density, size and ratio of photographs, shading parameters, etc.), giving the user a great deal of freedom over the final rendering.
 
-[![Filter 'Arrays & Tiles / Loose Photos'](https://gmic.eu/gmic340/thumbs/filter_loose_photos.png)](https://gmic.eu/gmic340/img/filter_loose_photos.jpg)
-_Fig.3.5.3. Example of rendering by the **Arrays & Tiles / Loose Photos** filter._
+>>[![Filter 'Arrays & Tiles / Loose Photos'](https://gmic.eu/gmic340/thumbs/filter_loose_photos.png)](https://gmic.eu/gmic340/img/filter_loose_photos.jpg)
+>>_Fig.3.5.3. Example of rendering by the **Arrays & Tiles / Loose Photos** filter._
 
-- The **Rendering / Quick Copyright** filter, which already existed in previous versions, has been re-implemented from scratch. It is a filter facilitating the insertion of a copyright text (or text signature) on a digital image. It now has many parameters to finely adjust the position of the text, its size, font, etc. Combined with the automation capabilities of the _G'MIC_ language, this filter is advantageous for easily inserting text, in a standardized way, on thousands of photographs.
+- The **Rendering / Quick Copyright** filter, which already existed in previous versions, has been re-implemented from scratch. It facilitates the insertion of a copyright text (or text signature) on a digital image. It now has many parameters to finely adjust the position of the text, its size, font, and other aspects. Combined with the automation capabilities of the _G'MIC_ language, this filter is suited for easily inserting text, in a standardized way, on thousands of photographs.
 
-[![Filter 'Rendering / Quick Copyright'](https://gmic.eu/gmic340/thumbs/filter_quick_copyright.png)](https://gmic.eu/gmic340/img/filter_quick_copyright.jpg)
+>>[![Filter 'Rendering / Quick Copyright'](https://gmic.eu/gmic340/thumbs/filter_quick_copyright.png)](https://gmic.eu/gmic340/img/filter_quick_copyright.jpg)
 _Fig.3.5.4. The **Rendering / Quick Copyright** filter in action for inserting copyright text on an image._
 
-- Finally, the **Patterns / Random Rectangles** filter transforms an image into a random partition of colored rectangles, giving an abstract image effect, vaguely inspired by the style of some paintings by `[Piet Mondrian](https://en.wikipedia.org/wiki/Piet_Mondrian).`
+- Finally, the **Patterns / Random Rectangles** filter transforms an image into a random partition of colored rectangles, giving an abstract image effect, vaguely in the manner of [Piet Mondrian](https://en.wikipedia.org/wiki/Piet_Mondrian).
 
 [![Filter 'Patterns / Random Rectangles'](https://gmic.eu/gmic340/thumbs/filter_random_rectangles.png)](https://gmic.eu/gmic340/img/filter_random_rectangles.jpg)
-_Fig.3.5.5. The **Patterns / Random Rectangles** filter creates a colorful partition of randomly placed rectangles on the image._
+>>_Fig.3.5.5. The **Patterns / Random Rectangles** filter creates a colorful partition of randomly placed rectangles on the image._
 
-Again, one can imagine using this filter to generate textures that could be used to decorate objects, as demonstrated in the animation below (starting from a pure noise image):
+>>One can easily imagine using this filter to generate decorative object textures, as demonstrated in this animation below, which starts from a pure noise image:
 
-[![Filter 'Patterns / Random Rectangles'](https://gmic.eu/gmic340/img/filter_random_rectangles3.gif)](https://gmic.eu/gmic340/img/filter_random_rectangles2.mp4)
+>>[![Filter 'Patterns / Random Rectangles'](https://gmic.eu/gmic340/img/filter_random_rectangles3.gif)](https://gmic.eu/gmic340/img/filter_random_rectangles2.mp4)
 
 # 4. A Software with Varied Uses
 
-As we have tried to show, _G'MIC_ has multiple facets with a wide range of applications. The user community is not limited to digital artists but also includes researchers, programmers, algorithmicians, etc. Below are some other varied uses of the software.
+As we have shown, _G'MIC_ has multiple facets with a wide range of applications. The user community is not limited to digital artists but also includes researchers, programmers, algorithmicians, etc. Below are some other varied uses of the software.
 
 - **Denoising JWST Images:**
 
 In October 2023, we learned from [_M.J. McCaughrean_](https://piaille.fr/@markmccaughrean@mastodon.social), senior researcher at the [_ESA_ (_European Space Agency_)](https://en.wikipedia.org/wiki/European_Space_Agency) (retired in 2024), that _G'MIC_ was used by some people within the _ESA_ to process images from the [_James Webb Space Telescope_](https://en.wikipedia.org/wiki/James_Webb_Space_Telescope) (_JWST_), particularly for attenuating the frequency noise appearing on some images acquired by the telescope (using the **Repair / Banding Denoise** filter, among others).
 
-_G'MIC_ was, for instance, used (among other software) for creating the cover image of the [_Nature_ magazine, vol. 622, issue 7981](https://www.nature.com/nature/volumes/622/issues/7981) on October 5, 2023, as confirmed by _M.J. McGaughrean_ and indicated in [the associated publication](https://www.nature.com/articles/s41586-023-06551-1), of which he is a co-author.
+_G'MIC_ was used in conjunction with among other software for creating the cover image of the [_Nature_ magazine, vol. 622, issue 7981](https://www.nature.com/nature/volumes/622/issues/7981) on October 5, 2023, as confirmed by _M.J. McGaughrean_ and indicated in [the associated publication](https://www.nature.com/articles/s41586-023-06551-1), of which he is a co-author.
 
-[![Use of G'MIC by ESA](https://gmic.eu/gmic340/thumbs/nature.png)](https://gmic.eu/gmic340/img/nature.jpg)
-_Fig.4.1. Use of G'MIC for denoising images of the Herbig-Haro 211 protostar, acquired by the JWST._
+>>[![Use of G'MIC by ESA](https://gmic.eu/gmic340/thumbs/nature.png)](https://gmic.eu/gmic340/img/nature.jpg)
+>>_Fig.4.1. Use of G'MIC for denoising images of the Herbig-Haro 211 protostar, acquired by the JWST._
 
-For us developers, it was a pleasant surprise to learn this and realize that _G'MIC_ was being used in the field of astrophysics.
+It was a pleasant surprise for us developers to learn this and realize that _G'MIC_ was being used in the field of astrophysics.
 
 - **Creative Coding:**
 
-_G'MIC_ proves to be a valuable ally when seeking to do [creative coding](https://en.wikipedia.org/wiki/Creative_coding), due to its ability to easily generate/manipulate images and its standard library of operators. Over the past year, we have enjoyed exploring its possibilities for algorithmic creation of images and animations, a small selection of which is shown here:
+_G'MIC_ proves to be a valuable ally for [creative coding](https://en.wikipedia.org/wiki/Creative_coding), due to its ability to easily generate and manipulate images through its standard library of operators. Over the past year, we have enjoyed exploring its possibilities for algorithmic creation of images and animations, a small selection of which is shown here:
 
 Let's start with this little animation of swirling snowflakes ([source code](https://pastebin.com/02AsBKNg), 30 lines):
 
@@ -287,7 +287,7 @@ Finally, let's dive back into the wonderful world of [Mandelbrot fractals](https
 [![Rendering of the Mandelbrot Set using the "Orbit Trap" method](https://gmic.eu/gmic340/thumbs/orbit_trap.png)](https://gmic.eu/gmic340/img/orbit_trap.jpg)
 _Fig.4.4. Rendering of the Mandelbrot Set using the Orbit Trap method._
 
-Then, with another type of rendering known as [_Buddhabrot_](https://en.wikipedia.org/wiki/Buddhabrot), but here considering complex series of the type `zn+1 = zn^p + c`, and linearly varying the real exponent `p` between 0 and 6 (rather than keeping `p=2` as for the classic Mandelbrot set), to generate each image of the animation below (source code and details [on this page](https://discuss.pixls.us/t/intriguing-shapes-in-buddhabrot-like-fractals)):
+Then, with another type of rendering known as [_Buddhabrot_](https://en.wikipedia.org/wiki/Buddhabrot), but here considering complex series of the type $z_{n+1}=z_{n}^p+c$, and linearly varying the real exponent $p$ between 0 and 6 (rather than keeping $p=2$ as for the classic Mandelbrot set), to generate each image of the animation below (source code and details [on this page](https://discuss.pixls.us/t/intriguing-shapes-in-buddhabrot-like-fractals)):
 
 [![Buddhabrot Type Rendering for Complex Series with Exponent](https://gmic.eu/gmic340/thumbs/buddhabrot.png)](https://gmic.eu/gmic340/img/buddhabrot.mp4)
 _Fig.4.5. Fractal variations around the Buddhabrot._
