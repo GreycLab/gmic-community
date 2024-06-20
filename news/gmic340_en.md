@@ -1,9 +1,9 @@
 
-# G'MIC 3.4.0: Image Processing in the Prime of Its Development.
+# G'MIC 3.4.0: Image Processing in Its Prime.
 
 A new version **3.4.0** of [_G’MIC_](https://gmic.eu) (_GREYC’s Magic for Image Computing_) has just been released!
 
-On this occasion, we provide a description of the recent features added to our open-source [framework](https://en.wikipedia.org/wiki/Software_framework) for [digital image processing](https://en.wikipedia.org/wiki/Digital_image_processing), following our [previous news](https://gmic.eu/gmic325/) on this subject (published in May 2023).
+On this occasion, we summarize the recent features added to our open-source [framework](https://en.wikipedia.org/wiki/Software_framework) for [digital image processing](https://en.wikipedia.org/wiki/Digital_image_processing), following our [previous news](https://gmic.eu/gmic325/) on this subject (published in May 2023).
 
 [![G´MIC 3.4.0 Teaser](https://gmic.eu/gmic340/thumbs/teaser_small.png)](https://gmic.eu/gmic340/img/teaser.jpg)
 
@@ -13,21 +13,21 @@ _Note: Click on the images to get a full-resolution version, or a corresponding 
 
 [_G’MIC_](https://gmic.eu) is an open-source [framework](https://en.wikipedia.org/wiki/Software_framework) for [digital image](https://en.wikipedia.org/wiki/Digital_image) manipulation and processing, developed in the [_IMAGE_](https://www.greyc.fr/equipes/image/) team at the [_GREYC_](https://www.greyc.fr/) research laboratory in Caen ([_UMR CNRS_](https://en.wikipedia.org/wiki/Joint_Research_Unit) 6072).
 
-It defines various user interfaces for applying a wide range of algorithms to images and signals. The core of the project is the [_"G'MIC" scripting language interpreter_](https://gmic.eu/reference/) specifically designed to facilitate the prototyping and implementation of new image processing algorithms and operators. Users can harness operators from the several hundred already implemented, or write their own custom operators. These custom operators can then be accessed through the several user interfaces that the project offers.
+It defines various user interfaces for applying a wide range of algorithms to images and signals. The core of the project is the [_"G'MIC" scripting language interpreter_](https://gmic.eu/reference/) specifically designed to facilitate the prototyping and implementation of new image processing algorithms and operators. Users can harness operators from the several hundred already implemented, or write their own custom operators. These can then be accessed through the several user interfaces that the project offers.
 
 The most popular _G’MIC_ interfaces are:
 
 1. [`gmic`](https://gmic.eu/reference/), a command-line tool, and a useful complement to [_ImageMagick_](https://www.imagemagick.org/) or [_GraphicsMagick_](http://www.graphicsmagick.org) for processing, generating, or analyzing images from a [_shell_](https://en.wikipedia.org/wiki/Shell_%28computing%29);
-2. [_G’MIC Online_](https://gmicol.greyc.fr/) a web service where many _G'MIC_ operators may be applied on images, directly from a web browser;
+2. [_G’MIC Online_](https://gmicol.greyc.fr/) a web service where many _G'MIC_ filters can be applied on images, directly from a web browser;
 3. [_G’MIC-Qt_](https://github.com/c-koi/gmic-qt) a popular plugin supported by many digital image editing applications such as [_GIMP_](https://www.gimp.org/), [_Krita_](https://krita.org/), [_Paint.NET_](https://www.getpaint.net/), and [_Photoshop_](https://www.adobe.com/products/photoshop.html) (thanks to its availability as a [_8bf plugin_](https://github.com/0xC0000054/gmic-8bf)).
 
 [![Preview of the G’MIC-Qt Plugin](https://gmic.eu/gmic340/thumbs/gmic340.png)](https://gmic.eu/gmic340/img/gmic340.jpg)
 
-_Fig. 1.1. Preview of the G’MIC-Qt plugin version **3.4.0,** launched from GIMP 2.10, with the “Comicbook” filter selected._
+_Fig. 1.1. Preview of the G’MIC-Qt plugin version **3.4.0,** running in GIMP 2.10, with the “_Comicbook_” filter selected._
 
 # 2. What’s New in Version **3.4.0**?
 
-Version **3.4.0** of _G´MIC_ focuses on *stability* and *long-term support*: After more than 15 years of continuous project development, _G´MIC's_ constituent elements have been extensively put through their paces. We now strive for stabilizing the key _Application Programmer's Interfaces (APIs):_  [`libgmic`](https://gmic.eu/libgmic.html), to integrate _G´MIC_ features into _C_ or _C++_ code, [*G´MIC-Qt* plugin](https://github.com/c-koi/gmic-qt/blob/master/NEW_HOST_HOWTO.md) to port the plugin to new hosts, and the syntax of the _G´MIC_ script language, including the freezing of the parameter settings of the _G´MIC_ commands already available.
+Version **3.4.0** of _G´MIC_ focuses on *stability* and *long-term support*: After more than 15 years of continuous development, _G´MIC's_ core elements have been extensively put through their paces. We now strive for stabilizing the key _Application Programmer's Interfaces (APIs):_  [`libgmic`](https://gmic.eu/libgmic.html), to integrate _G´MIC_ features into _C_ or _C++_ code, [*G´MIC-Qt* plugin](https://github.com/c-koi/gmic-qt/blob/master/NEW_HOST_HOWTO.md) to port the plugin to new hosts, and the syntax of the _G´MIC_ script language, including the freezing of the parameter settings of the _G´MIC_ commands already available.
 
 Thus, all versions of the _3.4.x_ branch are dedicated to bug fixing and developing features that do not require modification of the language core. There will be less emphasis on developing new filters or image processing operators, and greater attention paid to ensuring maximum backward compatibility among *3.4.x* releases. In this sense, version _3.4.0_ represents a long term milestone release in the project's history.
 
