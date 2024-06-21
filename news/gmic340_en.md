@@ -29,7 +29,7 @@ _Fig. 1.1. Preview of the G’MIC-Qt plugin version **3.4.0,** running in GIMP 2
 
 Version **3.4.0** of _G´MIC_ focuses on *stability* and *long-term support*: After more than 15 years of continuous development, _G´MIC's_ core elements have been extensively put through their paces. We now strive for stabilizing the key _Application Programmer's Interfaces (APIs):_  [`libgmic`](https://gmic.eu/libgmic.html), to integrate _G´MIC_ features into _C_ or _C++_ code, [*G´MIC-Qt* plugin](https://github.com/c-koi/gmic-qt/blob/master/NEW_HOST_HOWTO.md) to port the plugin to new hosts, and the syntax of the _G´MIC_ script language, including the freezing of the parameter settings of the _G´MIC_ commands already available.
 
-Thus, all versions of the _3.4.x_ branch are dedicated to bug fixing and developing features that do not require modification of the language core. There will be less emphasis on developing new filters or image processing operators, and greater attention paid to ensuring maximum backward compatibility among *3.4.x* releases. In this sense, version _3.4.0_ represents a long term milestone release in the project's history.
+Thus, all versions of the _3.4.x_ branch are dedicated to bug fixing and developing features that do not require modification of the language core. Thus, there will be emphasis on developing new filters or image processing operators, and attention paid to ensuring maximum backward compatibility among *3.4.x* releases. In this sense, version _3.4.0_ represents a long term milestone release in the project's history.
 
 That said, in the run-up to _3.4.0,_ there have been notable improvements to several user interfaces:
 
