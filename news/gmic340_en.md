@@ -1,6 +1,6 @@
 # G'MIC *3.4.0* : Image Processing in Its Prime.
 
-A new version **3.4.0** of [_G’MIC_](https://gmic.eu) (_GREYC’s Magic for Image Computing_) has just been released!
+A new version **3.4.0** of [**G’MIC**](https://gmic.eu) (*GREYC’s Magic for Image Computing*) has just been released!
 
 On this occasion, we summarize the recent features added to our open-source [framework](https://en.wikipedia.org/wiki/Software_framework) for [digital image processing](https://en.wikipedia.org/wiki/Digital_image_processing), following our [previous news](https://gmic.eu/gmic325/) on this subject (published in May 2023).
 
@@ -19,8 +19,8 @@ It defines various user interfaces for applying a wide range of algorithms to im
 The most popular _G’MIC_ interfaces are:
 
 1. [`gmic`](https://gmic.eu/reference/), a command-line tool, and a useful complement to [_ImageMagick_](https://www.imagemagick.org/) or [_GraphicsMagick_](http://www.graphicsmagick.org) for processing, generating, or analyzing images from a [_shell_](https://en.wikipedia.org/wiki/Shell_%28computing%29);
-2. [_G’MIC Online_](https://gmicol.greyc.fr/) a web service where many _G'MIC_ filters can be applied on images, directly from a web browser;
-3. [_G’MIC-Qt_](https://github.com/c-koi/gmic-qt) a popular plugin supported by many digital image editing applications such as [_GIMP_](https://www.gimp.org/), [_Krita_](https://krita.org/), [_Paint.NET_](https://www.getpaint.net/), and [_Photoshop_](https://www.adobe.com/products/photoshop.html) (thanks to its availability as a [_8bf plugin_](https://github.com/0xC0000054/gmic-8bf)).
+2. [*G’MIC Online*](https://gmicol.greyc.fr/) a web service where many _G'MIC_ filters can be applied on images, directly from a web browser;
+3. [*G’MIC-Qt*](https://github.com/c-koi/gmic-qt) a popular plugin supported by many digital image editing applications such as [_GIMP_](https://www.gimp.org/), [_Krita_](https://krita.org/), [_Paint.NET_](https://www.getpaint.net/), and [_Photoshop_](https://www.adobe.com/products/photoshop.html) (thanks to its availability as a [_8bf plugin_](https://github.com/0xC0000054/gmic-8bf)).
 
 ===
 [![Preview of the G’MIC-Qt Plugin](https://gmic.eu/gmic340/thumbs/gmic340.png)](https://gmic.eu/gmic340/img/gmic340.jpg)
@@ -29,22 +29,22 @@ _Fig. 1.1. Preview of the G’MIC-Qt plugin version __3.4.0__, running in GIMP 2
 
 # 2. What’s New in Version __3.4.0__?
 
-Version __3.4.0__ of _G'MIC_ focuses on _stability_ and _long-term support_: After more than 15 years of continuous development, _G'MIC's_ core elements have been extensively put through their paces. We now strive for stabilizing the key _Application Programmer's Interfaces (APIs):_  [`libgmic`](https://gmic.eu/libgmic.html), to integrate _G'MIC_ features into _C_ or _C++_ code, [*G'MIC-Qt* plugin](https://github.com/c-koi/gmic-qt/blob/master/NEW_HOST_HOWTO.md) to port the plugin to new hosts, and the syntax of the _G'MIC_ script language, including the freezing of the parameter settings of the _G'MIC_ commands already available.
+Version __3.4.0__ of _G'MIC_ focuses on _stability_ and _long-term support_: After more than 15 years of continuous development, _G'MIC's_ core elements have been extensively put through their paces. We now strive for stabilizing the key _Application Programmer's Interfaces (APIs):_  [`libgmic`](https://gmic.eu/libgmic.html), to integrate _G'MIC_ features into _C_ or _C++_ code, [_G'MIC-Qt_ plugin](https://github.com/c-koi/gmic-qt/blob/master/NEW_HOST_HOWTO.md) to port the plugin to new hosts, and the syntax of the _G'MIC_ script language, including the freezing of the parameter settings of the _G'MIC_ commands already available.
 
-Thus, all versions of the _3.4.x_ branch are dedicated to bug fixing and developing features that do not require modification of the language core. Thus, there will be emphasis on developing new filters or image processing operators, and attention paid to ensuring maximum backward compatibility among *3.4.x* releases. In this sense, version _3.4.0_ represents a long term milestone release in the project's history.
+Thus, all versions of the _3.4.x_ branch are dedicated to bug fixing and developing features that do not require modification of the language core. Thus, there will be emphasis on developing new filters or image processing operators, and attention paid to ensuring maximum backward compatibility among _3.4.x_ releases. In this sense, version _3.4.0_ represents a long term milestone release in the project's history.
 
 That said, in the run-up to _3.4.0,_ there have been notable improvements to several user interfaces:
 
-  - **_G'MIC Online_** (_G'MICol_): This web service allows users to apply _G'MIC_ filters to their uploaded images through their web browsers. It has existed for several years, largely unchanged from its original form, while interactive web techniques have advanced. In 2024, the [_DDA_](https://www.greyc.fr/laboratoire/dda/) (_Application Development and Deployment_) team at the _GREYC_ laboratory undertook a complete overhaul of *G'MIC Online.* The web service now sports a new look, employs significant user interface improvements, with more intuitive widgets, an enhanced preview window, a choice between light and dark themes, revamped handling of filter favorites and better integration of the web service with the _G'MIC_ core, such that web users can now access recently developed filters and image processing pipelines.
+  - ** _G'MIC Online_ ** (*G'MICol*): This web service allows users to apply _G'MIC_ filters to their uploaded images through their web browsers. It has existed for several years, largely unchanged from its original form, while interactive web techniques have advanced. In 2024, the [_DDA_](https://www.greyc.fr/laboratoire/dda/) (_Application Development and Deployment_) team at the _GREYC_ laboratory undertook a complete overhaul of _G'MIC Online_. The web service now sports a new look, employs significant user interface improvements, with more intuitive widgets, an enhanced preview window, a choice between light and dark themes, revamped handling of filter favorites and better integration of the web service with the _G'MIC_ core, such that web users can now access recently developed filters and image processing pipelines.
 
 ===
 [![Preview of the _G'MIC Online_ service](https://gmic.eu/gmic340/thumbs/gmicol.png)](https://gmicol.greyc.fr/)
-_Fig.2.1. Preview of the revamped G'MIC Online web service released with version 3.4.0 of G'MIC (here with the light theme)._
+_Fig.2.1. Preview of the revamped G'MIC Online web service released with version 3.4.0 (here with the light theme)._
 ===
 
 Visit [_G'MIC Online_](https://gmicol.greyc.fr/) and give it a real-world test 😱! And don't hesitate to report any issues. In any case, a big thank you to our colleagues in the _DDA_ team for this noteworthy overhaul!
 
-  - ** _G'MIC-Qt_ Plugin**: Over the past year, the plugin has acquired more than **40 new image processing filters**, [_detailed below_](#3-details-of-the-new-filters). Many employ the new "Random Parameters" button, which generates arbitrary filter settings, furnishing rapid previews that can be quickly evaluated for practical or aesthetic worth.
+  - ** _G'MIC-Qt_ Plugin**: Over the past year, the plugin has acquired more than __40 new image processing filters__, [detailed below](#3-details-of-the-new-filters). Many employ the new _"Random Parameters"_ button, which generates arbitrary filter settings, furnishing rapid previews that can be quickly evaluated for practical or aesthetic worth.
 
 ===
 [![Random Parameters button in the G'MIC-Qt plugin](https://gmic.eu/gmic340/thumbs/randomize_parameters_fr.png)](https://gmic.eu/gmic340/img/randomize_parameters_en.jpg)
@@ -93,29 +93,29 @@ First, the **Colors / Mixer [Generic]** filter, a color channel mixing filter th
 
 ===
 [![Filter 'Colors / Mixer (Generic)'](https://gmic.eu/gmic340/thumbs/filter_mixer_generic.png)](https://gmic.eu/gmic340/img/filter_mixer_generic.jpg)
-_Fig.3.1.1. The **Colors / Mixer [Generic]** filter enriches the already available arsenal of filters for contrast and color enhancement._
+_Fig.3.1.1. The __Colors / Mixer [Generic]__ filter enriches the already available arsenal of filters for contrast and color enhancement._
 ===
 
 Let's also talk about the **Details / Sharpen [Alpha]** filter, which, as its name suggests, allows for fine detail enhancement in photographs. It minimizes the appearance of edge "halos", a common artifact arising from many detail enhancement filters. The Details/Sharpen [Alpha] filter is based on an original technique of pyramidal decomposition of the image obtained from an [_Alpha blending_](https://en.wikipedia.org/wiki/Alpha_compositing) operator.
 
 ===
 [![Filter 'Details / Sharpen (Alpha)'](https://gmic.eu/gmic340/thumbs/filter_sharpen_alpha.png)](https://gmic.eu/gmic340/img/filter_sharpen_alpha.jpg)
-_Fig.3.1.2. The **Details / Sharpen [Alpha]** filter allows for fine detail enhancement in photographs, minimizing the appearance of "halos"._
+_Fig.3.1.2. The __Details / Sharpen [Alpha]__ filter allows for fine detail enhancement in photographs, minimizing the appearance of "halos"._
 ===
 
 ===
 [![Filter 'Details / Sharpen (Alpha)'](https://gmic.eu/gmic340/thumbs/filter_sharpen_alpha2.png)](https://gmic.eu/gmic340/img/filter_sharpen_alpha2.jpg)
-_Fig.3.1.3. "Before/After" details illustrating the interest of the **Details / Sharpen [Alpha]** filter._
+_Fig.3.1.3. "Before/After" details illustrating the interest of the __Details / Sharpen [Alpha]__ filter._
 ===
 
 Finally, the **Layers / Spatial Blend Multi-Layers** filter merges into a single image multiple shots from the same viewpoint, while harnessing a spatial linear gradient between the various views. For example, one can photograph the same scene over day and night time intervals, then employ this spatial fusion filter to create time-transitional images like the one illustrated below:
 
 ===
 [![Filter 'Layers / Spatial Blend Multi-Layers'](https://gmic.eu/gmic340/thumbs/filter_spatial_blend_multilayers2.png)](https://gmic.eu/gmic340/img/filter_spatial_blend_multilayers2.jpg)
-_Fig.3.1.4. The **Layers / Spatial Blend Multi-Layers** filter allows for merging multiple photographs with an adjustable spatial linear gradient._
+_Fig.3.1.4. The __Layers / Spatial Blend Multi-Layers__ filter allows for merging multiple photographs with an adjustable spatial linear gradient._
 ===
 
-(**Credits**: the images used in the figure above are from the video "[_Stunning New York City skyline timelapse: Day to night_](https://www.youtube.com/watch?v=DDo73Njxdqc)” by the YouTube channel "_Rumble Viral_”.)
+(__Credits__: the images used in the figure above are from the video "[_Stunning New York City skyline timelapse: Day to night_](https://www.youtube.com/watch?v=DDo73Njxdqc)” by the YouTube channel "_Rumble Viral_”.)
 
 The following video illustrates the complete process, using the _G'MIC-Qt_ plugin under _GIMP 2.10_:
 
@@ -131,7 +131,7 @@ First, the **Deformations / Distort [RBF]** filter, which deforms an image based
 
 ===
 [![Filter 'Deformations / Distort (RBF)'](https://gmic.eu/gmic340/thumbs/filter_deformations_distort_rbf.png)](https://gmic.eu/gmic340/img/filter_deformations_distort_rbf.jpg)
-_Fig.3.2.1. The **Deformations / Distort [RBF]** filter allows for various distortions based on RBFs. Here, specifying the radial basis function phi(r) = log(0.1+r)._
+_Fig.3.2.1. The __Deformations / Distort [RBF]__ filter allows for various distortions based on RBFs. Here, specifying the radial basis function phi(r) = log(0.1+r)._
 ===
 
 Next, let's mention the arrival of an entirely new category **Map Projection**, which now contains fourteen filters for maps initially in the form of [_equirectangular projection_](https://en.wikipedia.org/wiki/Equirectangular_projection) (cylindrical equidistant maps). These may be further converted into other types of projections. This series of filters has been contributed by _Kristian Järventaus_, a member of the [_Cartographers Guild forum_](https://www.cartographersguild.com/showthread.php?t=47591), a forum specialized in cartography.
@@ -139,7 +139,7 @@ Next, let's mention the arrival of an entirely new category **Map Projection**, 
 ===
 [![Filters in the 'Map Projection' category](https://gmic.eu/gmic340/thumbs/filter_map_projection.png)](https://gmic.eu/gmic340/img/filter_map_projection.jpg)
 [![Filters in the 'Map Projection' category](https://gmic.eu/gmic340/thumbs/filter_map_projection2.png)](https://gmic.eu/gmic340/img/filter_map_projection2.jpg)
-_Fig.3.2.2. The new **Map Projection** filter category offers several geographical map projection algorithms._
+_Fig.3.2.2. The new __Map Projection__ filters offers several geographical map projection algorithms._
 ===
 
 We also note the arrival of the **Deformations / Square to Circle [alt]** filter, which transforms any rectangle (or square) centered in an image into an ellipse (or circle), and vice versa. A very specialized filter, with — at first glance — obviously few apparent applications, yet when you need it, you'll be glad to have it at hand! For example, we used it below to transform a round painting frame into a square frame:
@@ -147,14 +147,14 @@ We also note the arrival of the **Deformations / Square to Circle [alt]** filter
 ===
 [![Filter 'Deformations / Square to Circle (alt)'](https://gmic.eu/gmic340/thumbs/filter_square_to_circle.png)](https://gmic.eu/gmic340/img/filter_square_to_circle.jpg)
 [![Filter 'Deformations / Square to Circle (alt)'](https://gmic.eu/gmic340/thumbs/filter_square_to_circle2.png)](https://gmic.eu/gmic340/img/filter_square_to_circle2.jpg)
-_Fig.3.2.3. The **Deformations / Square to Circle [alt]** filter allows converting square or rectangular objects into round or elliptical objects, and vice versa._
+_Fig.3.2.3. The __Deformations / Square to Circle [alt]__ filter allows converting square or rectangular objects into round or elliptical objects, and vice versa._
 ===
 
 Finally, let's conclude this review of the new image deformation filters with the **Deformations / Poincaré Disk** filter, which generates [_Poincaré disks_](https://en.wikipedia.org/wiki/Poincar%C3%A9_disk), a family of geometric figures based on hyperbolic geometries, as illustrated in the following figure:
 
 ===
 [![Filter 'Deformations / Poincaré Disk'](https://gmic.eu/gmic340/thumbs/poincare_disk.png)](https://gmic.eu/gmic340/img/poincare_disk.jpg)
-_Fig.3.2.4. Some examples of Poincaré disks, generated by the **Deformations / Poincaré Disk** filter._
+_Fig.3.2.4. Some examples of Poincaré disks, generated by the __Deformations / Poincaré Disk__ filter._
 ===
 
 But where it becomes interesting is that this filter also allows you to deform images by projecting them onto these very particular geometries:
@@ -178,47 +178,47 @@ Sometimes, one seeks to deliberately _degrade_ images, either to simulate a real
 
 ===
 [![Filter 'Rendering / CRT Scanlines'](https://gmic.eu/gmic340/thumbs/filter_scanline.png)](https://gmic.eu/gmic340/img/filter_scanline.jpg)
-_Fig.3.3.1. The **Rendering / CRT Scanlines** filter imitates the typical "Scanline" effect of CRT displays._
+_Fig.3.3.1. The __Rendering / CRT Scanlines__ filter imitates the typical "Scanline" effect of CRT displays._
 ===
 
 ===
 [![Filter 'Degradations / CRT Phosphors'](https://gmic.eu/gmic340/thumbs/filter_phosphor.png)](https://gmic.eu/gmic340/img/filter_phosphor.jpg)
-_Fig.3.3.2. The **Degradations / CRT Phosphors** filter simulates the phosphor display technique of CRT displays._
+_Fig.3.3.2. The __Degradations / CRT Phosphors__ filter simulates the phosphor display technique of CRT displays._
 ===
 
 - The **Degradations / Blur [Motion]** filter emulates path-based motion blur, with user-adjustable, spline-based trajectories which may be directly altered through key points in the _G'MIC-Qt_ preview window:
 
 ===
 [![Filter 'Degradations / Blur (Motion)'](https://gmic.eu/gmic340/thumbs/filter_blur_motion.png)](https://gmic.eu/gmic340/img/filter_blur_motion.jpg)
-_Fig.3.3.3. The **Degradations / Blur [Motion]** filter simulates motion blur._
+_Fig.3.3.3. The __Degradations / Blur [Motion]__ filter simulates motion blur._
 ===
 
 - The **Degradations / Sloppy Mess** filter is intended for Glitch Art enthusiasts. It's one of the first filters by a new contributor, [Prawnsushi](http://prawnsushi.free.fr/), who recently took an interest in the _G'MIC_ language for filter creation. This effect offers wide-ranging parameters to produce a panoply of disjoint and disassociated outputs.
 
 ===
 [![Filter 'Degradations / Sloppy Mess'](https://gmic.eu/gmic340/thumbs/filter_sloppy_mess.png)](https://gmic.eu/gmic340/img/filter_sloppy_mess.jpg)
-_Fig.3.3.4. The **Degradations / Sloppy Mess** filter deliberately creates artistic digital artifacts on your images._
+_Fig.3.3.4. The __Degradations / Sloppy Mess__ filter deliberately creates artistic digital artifacts on your images._
 ===
 
 ## 3.4. Rendering and Texture Filters
 
 Rendering filters, by and large, do not require input images; they summon new imagery by algorithmic means through [_procedural generation_](https://en.wikipedia.org/wiki/Procedural_generation).
 
-- The **Rendering / Underwoods** filter, another creation of _Prawnsushi_, is nothing less than an **underwood generator**! One might say it's not very useful, and indeed it's not a filter that image processors, photographers, or illustrators will incorporate into their daily work.
+- The **Rendering / Underwoods** filter, another creation of _Prawnsushi_, is nothing less than an __underwood generator__! One might say it's not very useful, and indeed it's not a filter that image processors, photographers, or illustrators will incorporate into their daily work.
 
-Yet this filter illustrates the whole philosophy of the _G'MIC_ project: To produce software that fosters **algorithmic creativity**. _G'MIC_ facilitates the construction of **all kinds of filters** (useful or less useful), and allows **free sharing** with other _cognoscenti_ of this viewpoint. In practice, this filter has the simple merit of its own existence, there for anyone to try, and thereby — possibly! — discover the extraordinary. It uses very little memory resources, perhaps a few dozen bytes, thanks to the compactness of the _G'MIC_ language design. And moreover, the results are quite cool! And be assured that it will inevitably serve, one day or another, an artist wanting to synthesize an underwood image in two mouse clicks!
+Yet this filter illustrates the whole philosophy of the _G'MIC_ project: To produce software that fosters __algorithmic creativity__. _G'MIC_ facilitates the construction of __all kinds of filters__ (useful or less useful), and allows __free sharing__ with other _cognoscenti_ of this viewpoint. In practice, this filter has the simple merit of its own existence, there for anyone to try, and thereby — possibly! — discover the extraordinary. It uses very little memory resources, perhaps a few dozen bytes, thanks to the compactness of the _G'MIC_ language design. And moreover, the results are quite cool! And be assured that it will inevitably serve, one day or another, an artist wanting to synthesize an underwood image in two mouse clicks!
 
 ===
 [![Filter 'Rendering / Underwoods'](https://gmic.eu/gmic340/thumbs/filter_underwoods.png)](https://gmic.eu/gmic340/img/filter_underwoods.jpg)
 [![Filter 'Rendering / Underwoods'](https://gmic.eu/gmic340/thumbs/filter_underwoods2.png)](https://gmic.eu/gmic340/img/filter_underwoods2.jpg)
-_Fig.3.4.1. Examples of underwood image renderings by the **Rendering / Underwoods** filter._
+_Fig.3.4.1. Examples of underwood image renderings by the __Rendering / Underwoods__ filter._
 ===
 
 - The **Patterns / Reaction-Diffusion** filter synthesizes textures modeled after [_reaction-diffusion systems_](https://en.wikipedia.org/wiki/Reaction-diffusion_system).
 
 ===
 [![Filter 'Patterns / Reaction-Diffusion'](https://gmic.eu/gmic340/thumbs/filter_reaction_diffusion.png)](https://gmic.eu/gmic340/img/filter_reaction_diffusion.jpg)
-_Fig.3.4.2. The **Patterns / Reaction-Diffusion** filter in the G'MIC-Qt plugin._
+_Fig.3.4.2. The __Patterns / Reaction-Diffusion__ filter in the G'MIC-Qt plugin._
 ===
 
 Again, the interest in this type of filter may seem quite limited. However, it's the perfect example of a texture that — in a pipeline of filters of a similar ilk — serves as the basis for generative art. Take a texture created by this filter, apply some of the other effects available in _G'MIC_ (e.g., the **Deformations / Drop Water** filter), and you're ready to produce fun animations like the one below:
@@ -227,12 +227,12 @@ Again, the interest in this type of filter may seem quite limited. However, it's
 [![Filter 'Patterns / Reaction-Diffusion'](https://gmic.eu/gmic340/thumbs/water_reaction_diffusion.png)](https://gmic.eu/gmic340/img/water_reaction_diffusion.mp4)
 ===
 
-- The **Rendering / Spline Spirograph** filter is inspired by the [_Spirograph_](https://en.wikipedia.org/wiki/Spirograph) game for generating parametric curves, creating intriguing texture and color effects. The presence of the **Random Parameters** button in the _G'MIC-Qt_ plugin is particularly welcome here, as it quickly obtains a varied panorama of diverse results!
+- The **Rendering / Spline Spirograph** filter is inspired by the [_Spirograph_](https://en.wikipedia.org/wiki/Spirograph) game for generating parametric curves, creating intriguing texture and color effects. The presence of the _Random Parameters_ button in the _G'MIC-Qt_ plugin is particularly welcome here, as it quickly obtains a varied panorama of diverse results!
 
 ===
 [![Filter 'Rendering / Spline Spirograph'](https://gmic.eu/gmic340/thumbs/filter_spirograph.png)](https://gmic.eu/gmic340/img/filter_spirograph.jpg)
 [![Filter 'Rendering / Spline Spirograph'](https://gmic.eu/gmic340/thumbs/filter_spirograph3.png)](https://gmic.eu/gmic340/img/filter_spirograph3.jpg)
-_Fig.3.4.3. The **Rendering / Spline Spirograph** filter and some rendering examples._
+_Fig.3.4.3. The __Rendering / Spline Spirograph__ filter and some rendering examples._
 ===
 
 This filter also offers an animated output mode, allowing for the synthesis of short videos like this one:
@@ -245,14 +245,14 @@ This filter also offers an animated output mode, allowing for the synthesis of s
 
 ===
 [![Filter 'Rendering / ABN Filigrees'](https://gmic.eu/gmic340/thumbs/filter_abn.png)](https://gmic.eu/gmic340/img/filter_abn.jpg)
-_Fig.3.4.4. The **Rendering / ABN Filigrees** filter._
+_Fig.3.4.4. The __Rendering / ABN Filigrees__ filter._
 ===
 
 - The **Rendering / Random Signature** filter is also an amusing curve generator: it aims to draw random signatures, as illustrated in the video below:
 
 ===
 [![Filter 'Rendering / Random Signature'](https://gmic.eu/gmic340/thumbs/random_signature.png)](https://gmic.eu/gmic340/img/random_signature.mp4)
-_Fig.3.4.5. The **Rendering / Random Signature** filter creates random signatures._
+_Fig.3.4.5. The __Rendering / Random Signature__ filter creates random signatures._
 ===
 
 Again, a filter whose usefulness cannot be debated: [_"It's completely useless, so it's absolutely indispensable!"_](https://en.wikipedia.org/wiki/J%C3%A9r%C3%B4me_Bonaldi).
@@ -261,7 +261,7 @@ Again, a filter whose usefulness cannot be debated: [_"It's completely useless, 
 
 ===
 [![Filter 'Rendering / Twisted Rays'](https://gmic.eu/gmic340/thumbs/filter_twisted_rays.png)](https://gmic.eu/gmic340/img/filter_twisted_rays.jpg)
-_Fig.3.4.5. The **Rendering / Twisted Rays** filter creates a swirl of rays on your images._
+_Fig.3.4.5. The __Rendering / Twisted Rays__ filter creates a swirl of rays on your images._
 ===
 
 This filter can, for example, be used to create psychedelic animated effects like this:
@@ -278,7 +278,7 @@ To conclude this list of new _G'MIC_ filters, here are some miscellaneous filter
 
 ===
 [![Filter 'Artistic / Stringify'](https://gmic.eu/gmic340/thumbs/filter_stringify.png)](https://gmic.eu/gmic340/img/filter_stringify.jpg)
-_Fig.3.5.1. The **Artistic / Stringify** filter creates image abstractions from color segments._
+_Fig.3.5.1. The __Artistic / Stringify__ filter creates image abstractions from color segments._
 ===
 
 - The **Black & White / Filaments** filter is based on the projection of thousands of particles from one or more edges of the image, with trajectories deformed by the image's contour geometry. The drawing of these thousands of trajectories with semi-transparent colors produces images like these:
@@ -286,28 +286,28 @@ _Fig.3.5.1. The **Artistic / Stringify** filter creates image abstractions from 
 ===
 [![Filter 'Black & White / Filaments'](https://gmic.eu/gmic340/thumbs/filter_filaments.png)](https://gmic.eu/gmic340/img/filter_filaments.jpg)
 [![Filter 'Black & White / Filaments'](https://gmic.eu/gmic340/thumbs/filter_filaments2.png)](https://gmic.eu/gmic340/img/filter_filaments2.jpg)
-_Fig.3.5.2. The **Black & White / Filaments** filter transforms your images into sets of deformed filaments._
+_Fig.3.5.2. The __Black & White / Filaments__ filter transforms your images into sets of deformed filaments._
 ===
 
 - The **Arrays & Tiles / Loose Photos** filter simulates an effect of throwing photos haphazardly on a table, so that the content of the photos constitutes a global image, as specified by the filter's settings. Many parameters are adjustable (density, size and ratio of photographs, shading parameters, etc.), giving the user a great deal of freedom over the final rendering.
 
 ===
 [![Filter 'Arrays & Tiles / Loose Photos'](https://gmic.eu/gmic340/thumbs/filter_loose_photos.png)](https://gmic.eu/gmic340/img/filter_loose_photos.jpg)
-_Fig.3.5.3. Example of rendering by the **Arrays & Tiles / Loose Photos** filter._
+_Fig.3.5.3. Example of rendering by the __Arrays & Tiles / Loose Photos__ filter._
 ===
 
 - The **Rendering / Quick Copyright** filter, which already existed in previous versions, has been re-implemented from scratch. It facilitates the insertion of a copyright text (or text signature) on a digital image. It now has many parameters to finely adjust the position of the text, its size, font, and other aspects. Combined with the automation capabilities of the _G'MIC_ language, this filter is suited for easily inserting text, in a standardized way, on thousands of photographs.
 
 ===
 [![Filter 'Rendering / Quick Copyright'](https://gmic.eu/gmic340/thumbs/filter_quick_copyright.png)](https://gmic.eu/gmic340/img/filter_quick_copyright.jpg)
-_Fig.3.5.4. The **Rendering / Quick Copyright** filter in action for inserting copyright text on an image._
+_Fig.3.5.4. The __Rendering / Quick Copyright__ filter in action for inserting copyright text on an image._
 ===
 
 - Finally, the **Patterns / Random Rectangles** filter transforms an image into a random partition of colored rectangles, giving an abstract image effect, vaguely in the manner of [_Piet Mondrian_](https://en.wikipedia.org/wiki/Piet_Mondrian).
 
 ===
 [![Filter 'Patterns / Random Rectangles'](https://gmic.eu/gmic340/thumbs/filter_random_rectangles.png)](https://gmic.eu/gmic340/img/filter_random_rectangles.jpg)
-_Fig.3.5.5. The **Patterns / Random Rectangles** filter creates a colorful partition of randomly placed rectangles on the image._
+_Fig.3.5.5. The __Patterns / Random Rectangles__ filter creates a colorful partition of randomly placed rectangles on the image._
 ===
 
 One can easily imagine using this filter to generate decorative object textures, as demonstrated in this animation below, which starts from a pure noise image:
