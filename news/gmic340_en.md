@@ -9,9 +9,17 @@ On this occasion, we summarize the recent features added to our open-source [fra
 [![G'MIC 3.4.0 Teaser](https://gmic.eu/gmic340/thumbs/teaser_small.png)](https://gmic.eu/gmic340/img/teaser.jpg)
 ===
 
-## Table of Contents
+# Table of Contents
 1. [_G'MIC_ in a Nutshell](#_1_g_mic_in_a_nutshell)
 2. [What’s New in Version __3.4.0__?](#_2_what_s_new_in_version_3_4_0_)
+3. [Details of the New Filters](#_3_details_of_the_new_filters)
+    3.1. [Photo Retouching](#_3_1_photo_retouching)
+    3.2. [Distortion Filters](#_3_2_distortion_filters)
+    3.3. [Degradation Filters](#_3_3_degradation_filters)
+    3.4. [Rendering and Texture Filters](#_3_4_rendering_and_texture_filters)
+    3.5. [Artistic Effects](#_3_5_artistic_effects)
+4. [A Software with Varied Uses](#_4_a_software_with_varied_uses)
+5. [Conclusions](#_5_conclusions)
 
 _ __Note__: Click on the images of the article, to get a full-resolution version, or to play a video when the images contain the icon `![Play Video Icon](https://gmic.eu/gmic340/thumbs/icon_play_video.png)_
 
