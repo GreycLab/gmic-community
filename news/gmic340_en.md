@@ -9,9 +9,13 @@ On this occasion, we summarize the recent features added to our open-source [fra
 [![G'MIC 3.4.0 Teaser](https://gmic.eu/gmic340/thumbs/teaser_small.png)](https://gmic.eu/gmic340/img/teaser.jpg)
 ===
 
+## Table of Contents
+1. [_G'MIC_ in a Nutshell](#_1_g_mic_in_a_nutshell)
+2. [What’s New in Version __3.4.0__?](#_2_what_s_new_in_version_3_4_0_)
+
 _ __Note__: Click on the images of the article, to get a full-resolution version, or to play a video when the images contain the icon `![Play Video Icon](https://gmic.eu/gmic340/thumbs/icon_play_video.png)_
 
-# 1. _G’MIC_ in a Nutshell
+# 1. _G'MIC_ in a Nutshell
 
 [_G’MIC_](https://gmic.eu) is an open-source [framework](https://en.wikipedia.org/wiki/Software_framework) for [digital image](https://en.wikipedia.org/wiki/Digital_image) manipulation and processing, developed in the [_IMAGE_](https://www.greyc.fr/equipes/image/) team at the [_GREYC_](https://www.greyc.fr/) research laboratory in Caen ([_UMR CNRS_](https://en.wikipedia.org/wiki/Joint_Research_Unit) 6072).
 
@@ -45,7 +49,7 @@ _Fig.2.1. Preview of the revamped G'MIC Online web service released with version
 
 Visit [_G'MIC Online_](https://gmicol.greyc.fr/) and give it a real-world test 😱! And don't hesitate to report any issues. In any case, a big thank you to our colleagues in the _DDA_ team for this noteworthy overhaul!
 
-  - ** _G'MIC-Qt_ Plugin**: Over the past year, the plugin has acquired more than __40 new image processing filters__, [detailed below](#3-details-of-the-new-filters). Many employ the new _Random Parameters_ button, which generates arbitrary filter settings, furnishing rapid previews that can be quickly evaluated for practical or aesthetic worth.
+  - ** _G'MIC-Qt_ Plugin**: Over the past year, the plugin has acquired more than __40 new image processing filters__, [detailed below](#_3_details_of_the_new_filters). Many employ the new _Random Parameters_ button, which generates arbitrary filter settings, furnishing rapid previews that can be quickly evaluated for practical or aesthetic worth.
 
 ===
 [![Random Parameters button in the G'MIC-Qt plugin](https://gmic.eu/gmic340/thumbs/randomize_parameters_fr.png)](https://gmic.eu/gmic340/img/randomize_parameters_en.jpg)
@@ -84,7 +88,7 @@ That's all for the general improvements of the various interfaces offered by the
 
 # 3. Details of the New Filters
 
-In this extensive section, we categorize and describe the recent filters by type of use: [_Photo Retouching_](#31-photo-retouching), [_Distortion Filters_](#32-distortion-filters), [_Degradation Filters_](#33-degradation-filters), [_Rendering and Texture Filters_](#34-rendering-and-texture-filters), and finally [_Artistic Effects_](#35-artistic-effects).
+In this extensive section, we categorize and describe the recent filters by type of use: [_Photo Retouching_](#_3_1_photo_retouching), [_Distortion Filters_](#_3_2_distortion_filters), [_Degradation Filters_](#_3_3_degradation_filters), [_Rendering and Texture Filters_](#_3_4_rendering_and_texture_filters), and finally [_Artistic Effects_](#_3_5_artistic_effects).
 
 ## 3.1. Photo Retouching
 
