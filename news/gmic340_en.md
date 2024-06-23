@@ -1,6 +1,7 @@
-# G'MIC *3.4.0* : Image Processing in Its Prime.
+# G'MIC *3.4.0* : Image Processing in Its Prime!
+_By [David Tschumperlé](https://tschumperle.users.greyc.fr/) and [Garry Osgood](https://discuss.pixls.us/u/grosgood/)._
 
-A new version **3.4.0** of [**G’MIC**](https://gmic.eu) (*GREYC’s Magic for Image Computing*) has just been released.
+A new version **3.4.0** of [**G'MIC**](https://gmic.eu) (*GREYC's Magic for Image Computing*) has just been released.
 With this new release, we celebrate the project's __16th anniversary__!
 
 On this occasion, we summarize the recent features added to our open-source [framework](https://en.wikipedia.org/wiki/Software_framework) for [digital image processing](https://en.wikipedia.org/wiki/Digital_image_processing), following our [previous news](https://gmic.eu/gmic325/) on this subject (published in May 2023).
@@ -11,7 +12,7 @@ On this occasion, we summarize the recent features added to our open-source [fra
 
 # Table of Contents
 1. [_G'MIC_ in a Nutshell](#_1_g_mic_in_a_nutshell)
-2. [What’s New in Version __3.4.0__?](#_2_what_s_new_in_version_3_4_0_)
+2. [What's New in Version __3.4.0__?](#_2_what_s_new_in_version_3_4_0_)
 3. [Details of the New Filters](#_3_details_of_the_new_filters)
     3.1. [Photo Retouching](#_3_1_photo_retouching)
     3.2. [Distortion Filters](#_3_2_distortion_filters)
@@ -25,28 +26,28 @@ _ __Note__: Click on the images of the article, to get a full-resolution version
 
 # 1. _G'MIC_ in a Nutshell
 
-[_G’MIC_](https://gmic.eu) is an open-source [framework](https://en.wikipedia.org/wiki/Software_framework) for [digital image](https://en.wikipedia.org/wiki/Digital_image) manipulation and processing, developed in the [_IMAGE_](https://www.greyc.fr/equipes/image/) team at the [_GREYC_](https://www.greyc.fr/) research laboratory in Caen ([_UMR CNRS_](https://en.wikipedia.org/wiki/Joint_Research_Unit) 6072).
+[G'MIC](https://gmic.eu) is an open-source [framework](https://en.wikipedia.org/wiki/Software_framework) for [digital image](https://en.wikipedia.org/wiki/Digital_image) manipulation and processing, developed in the [_IMAGE_](https://www.greyc.fr/equipes/image/) team at the [_GREYC_](https://www.greyc.fr/) research laboratory in Caen ([_UMR CNRS_](https://en.wikipedia.org/wiki/Joint_Research_Unit) 6072).
 
-It defines various user interfaces for applying a wide range of algorithms to images and signals. The core of the project is the [_G'MIC scripting language interpreter_](https://gmic.eu/reference/) specifically designed to facilitate the prototyping and implementation of new image processing algorithms and operators. Users can harness operators from the several hundred already implemented, or write their own custom operators. These can then be accessed through the several user interfaces that the project offers.
+It defines various user interfaces for applying a wide range of algorithms to images and signals. The core of the project is the [_G'MIC_ scripting language interpreter](https://gmic.eu/reference/) specifically designed to ease the prototyping and implementation of new image processing algorithms and operators. Users can harness operators from the several hundred already implemented, or write their own custom operators. These can then be accessed through the several user interfaces that the project offers.
 
-The most popular _G’MIC_ interfaces are:
+The most popular G'MIC interfaces are:
 
 1. [`gmic`](https://gmic.eu/reference/), a command-line tool, and a useful complement to [_ImageMagick_](https://www.imagemagick.org/) or [_GraphicsMagick_](http://www.graphicsmagick.org) for processing, generating, or analyzing images from a [_shell_](https://en.wikipedia.org/wiki/Shell_%28computing%29);
-2. [*G’MIC Online*](https://gmicol.greyc.fr/) a web service where many _G'MIC_ filters can be applied on images, directly from a web browser;
-3. [*G’MIC-Qt*](https://github.com/c-koi/gmic-qt) a popular plugin supported by many digital image editing applications such as [_GIMP_](https://www.gimp.org/), [_Krita_](https://krita.org/), [_Paint.NET_](https://www.getpaint.net/), and [_Photoshop_](https://www.adobe.com/products/photoshop.html) (thanks to its availability as a [_8bf plugin_](https://github.com/0xC0000054/gmic-8bf)).
+2. [*G'MIC Online*](https://gmicol.greyc.fr/) a web service where many _G'MIC_ filters can be applied on images, directly from a web browser;
+3. [*G'MIC-Qt*](https://github.com/c-koi/gmic-qt) a popular plugin supported by many digital image editing applications such as [_GIMP_](https://www.gimp.org/), [_Krita_](https://krita.org/), [_Paint.NET_](https://www.getpaint.net/), and [_Photoshop_](https://www.adobe.com/products/photoshop.html) (thanks to its availability as a [_8bf plugin_](https://github.com/0xC0000054/gmic-8bf)).
 
 ===
-[![Preview of the G’MIC-Qt Plugin](https://gmic.eu/gmic340/thumbs/gmic340.png)](https://gmic.eu/gmic340/img/gmic340.jpg)
-_Fig. 1.1. Preview of the G’MIC-Qt plugin version __3.4.0__, running in GIMP 2.10, with the Comicbook filter selected._
+[![Preview of the G'MIC-Qt Plugin](https://gmic.eu/gmic340/thumbs/gmic340.png)](https://gmic.eu/gmic340/img/gmic340.jpg)
+_Fig. 1.1. Preview of the G'MIC-Qt plugin version __3.4.0__, running in GIMP 2.10, with the Comicbook filter selected._
 ===
 
-# 2. What’s New in Version __3.4.0__?
+# 2. What's New in Version __3.4.0__?
 
-Version __3.4.0__ of _G'MIC_ focuses on _stability_ and _long-term support_: After more than 15 years of continuous development, _G'MIC's_ core elements have been extensively put through their paces. We now strive for stabilizing the key _Application Programmer's Interfaces (APIs):_  [`libgmic`](https://gmic.eu/libgmic.html), to integrate _G'MIC_ features into _C_ or _C++_ code, [_G'MIC-Qt_ plugin](https://github.com/c-koi/gmic-qt/blob/master/NEW_HOST_HOWTO.md) to port the plugin to new hosts, and the syntax of the _G'MIC_ script language, including the freezing of the parameter settings of the _G'MIC_ commands already available.
+Version __3.4.0__ of _G'MIC_ focuses on _stability_ and _long-term support_: After more than 15 years of continuous development, _G'MIC's_ core elements have been extensively put through their paces. We now strive for stabilizing the key _Application Programmer's Interfaces (APIs):_  [`libgmic`](https://gmic.eu/libgmic.html), to integrate _G'MIC_ features into _C_ or _C++_ code, [_G'MIC-Qt_ plugin](https://github.com/c-koi/gmic-qt/blob/master/NEW_HOST_HOWTO.md) to port the plugin to new hosts, and the syntax of the _G'MIC_ script language itself, including the freezing of the parameter settings of the _G'MIC_ commands already available.
 
-Thus, all versions of the _3.4.x_ branch are dedicated to bug fixing and developing features that do not require modification of the language core. Thus, there will be emphasis on developing new filters or image processing operators, and attention paid to ensuring maximum backward compatibility among _3.4.x_ releases. In this sense, version _3.4.0_ represents a long term milestone release in the project's history.
+Thus, all versions of the _3.4.x_ branch will be dedicated to bug fixing and developing features that do not require modification of the language core, such as developing new filters or image processing operators. Attention will be paid to ensuring maximum backward compatibility among _3.4.x_ releases. In this sense, this version _3.4.0_ represents a long term milestone release in the project's history.
 
-That said, in the run-up to _3.4.0,_ there have been notable improvements to several user interfaces:
+That said, in the run-up from versions _3.3_ to _3.4_, there have been notable improvements to several user interfaces:
 
   - ** _G'MIC Online_ ** (*G'MICol*): This web service allows users to apply _G'MIC_ filters to their uploaded images through their web browsers. It has existed for several years, largely unchanged from its original form, while interactive web techniques have advanced. In 2024, the [_DDA_](https://www.greyc.fr/laboratoire/dda/) (_Application Development and Deployment_) team at the _GREYC_ laboratory undertook a complete overhaul of _G'MIC Online_. The web service now sports a new look, employs significant user interface improvements, with more intuitive widgets, an enhanced preview window, a choice between light and dark themes, revamped handling of filter favorites and better integration of the web service with the _G'MIC_ core, such that web users can now access recently developed filters and image processing pipelines.
 
@@ -57,14 +58,15 @@ _Fig.2.1. Preview of the revamped G'MIC Online web service released with version
 
 Visit [_G'MIC Online_](https://gmicol.greyc.fr/) and give it a real-world test 😱! And don't hesitate to report any issues. In any case, a big thank you to our colleagues in the _DDA_ team for this noteworthy overhaul!
 
-  - ** _G'MIC-Qt_ Plugin**: Over the past year, the plugin has acquired more than __40 new image processing filters__, [detailed below](#_3_details_of_the_new_filters). Many employ the new _Random Parameters_ button, which generates arbitrary filter settings, furnishing rapid previews that can be quickly evaluated for practical or aesthetic worth.
+- ** _G'MIC-Qt_ Plugin**: Over the past year, the plugin has acquired more than __40 new image processing filters__, [detailed below](#_3_details_of_the_new_filters). Many employ the new _Random Parameters_ button, which generates arbitrary filter settings, furnishing rapid previews that can be quickly evaluated for practical or aesthetic worth.
 
 ===
-[![Random Parameters button in the G'MIC-Qt plugin](https://gmic.eu/gmic340/thumbs/randomize_parameters_fr.png)](https://gmic.eu/gmic340/img/randomize_parameters_en.jpg)
+[![Random Parameters button in the G'MIC-Qt plugin](https://gmic.eu/gmic340/thumbs/randomize_parameters_en.png)](https://gmic.eu/gmic340/img/randomize_parameters_en.jpg)
 _Fig.2.2. G'MIC-Qt Plugin: The new Random Parameters button assigns random values to the selected filter's parameters._
 ===
 
-  - **`gmic` CLI Tool**: All filters created by the developer community are now integrated within the command-line tool executable. There are no longer discrepancies in the number of default filters available between the _G'MIC-Qt_ plugin and the `gmic` CLI tool. Previously, users needed to force filter updates with `$ gmic update` to align environments.
+
+- **`gmic` CLI Tool**: All filters created by the developer community are now integrated within the command-line tool executable. There are no longer discrepancies in the number of default filters available between the _G'MIC-Qt_ plugin and the `gmic` CLI tool. Previously, users needed to force filter updates with `$ gmic update` to align environments.
 
 `gmic` now offers over **4000 functions** to process your images from the command line. Notable efforts have been made to improve the integrated image viewer available through the `display` command, which has been completely re-tooled to allow viewing different image types within the same interface.
 
@@ -80,16 +82,16 @@ This is also the case for the mathematical function or 1D signal viewer (command
 _Fig.2.4. `gmic` CLI Tool: The G'MIC viewer for mathematical functions or 1D signals has also been re-implemented._
 ===
 
-Everything makes `gmic` a handy tool, even if we limit ourselves to viewing images on the command line.
+This makes `gmic` a handy tool, even if we limit ourselves to viewing images or signals on the command line.
 
 - **Other Improvements:**
-  - The integrated mathematical expression evaluator has evolved significantly: it is now one of the essential bricks of the _G'MIC_ language, as it is responsible for evaluating the results of the mathematical operations needed in scripts (needless to say, calculations are done all the time in image processing). This evaluator has been enriched with many new functions, especially for the calculation and processing of [_vectors_](https://en.wikipedia.org/wiki/Vector_(mathematics_and_physics)), [_matrices_](https://en.wikipedia.org/wiki/Matrix_(mathematics)), and native manipulation of [_heaps_](https://en.wikipedia.org/wiki/Heap_(data_structure)).
+  - The integrated mathematical expression evaluator has evolved significantly: it is one of the essential bricks of the _G'MIC_ language, as it is responsible for evaluating the results of the mathematical operations needed in scripts (needless to say, calculations are done all the time in image processing). This evaluator has been enriched with many new functions, especially for the calculation and processing of vectors and matrices, and native manipulation of heaps.
   - Many native (_C++_) functions formerly in the shared binary object library have now been entirely rewritten in the _G'MIC_ language. This facilitates their maintenance and further development, as future work can be scripted for immediate effect, instead of being subject to compilation and linking. Situated at the script level, such modifications become immediately available to users, as distribution of binaries will no longer be required.
   - The commands for loading/saving 3D meshes in `.obj` (_Wavefront_) format have been improved, and new commands for processing/creating 3D meshes have emerged (e.g., to visualize the normal vectors at the vertices of a mesh, as illustrated in the video below). And, no, this is not a rotten apple:
 
 ===
 [![Example of 3D rendering](https://gmic.eu/gmic340/thumbs/render3d.png)](https://gmic.eu/gmic340/img/render3d.mp4)
-_Fig.2.5. The management of 3D meshes within G'MIC has been enriched with new commands._
+_Fig.2.5. 3D mesh management within G'MIC has been enriched with new commands._
 ===
 
 That's all for the general improvements of the various interfaces offered by the framework. Let's now move on to the details of the new filters and image processing features that have appeared in _G'MIC_ over the past twelve months.
@@ -109,7 +111,7 @@ First, the **Colors / Mixer [Generic]** filter, a color channel mixing filter th
 _Fig.3.1.1. The __Colors / Mixer [Generic]__ filter enriches the already available arsenal of filters for contrast and color enhancement._
 ===
 
-Let's also talk about the **Details / Sharpen [Alpha]** filter, which, as its name suggests, allows for fine detail enhancement in photographs. It minimizes the appearance of edge halos, a common artifact arising from many detail enhancement filters. The Details/Sharpen [Alpha] filter is based on an original technique of pyramidal decomposition of the image obtained from an [_Alpha blending_](https://en.wikipedia.org/wiki/Alpha_compositing) operator.
+Let's also talk about the **Details / Sharpen [Alpha]** filter, which, as its name suggests, allows for fine detail enhancement in photographs. It minimizes the appearance of edge halos, a common artifact arising from many detail enhancement filters. The **Details/Sharpen [Alpha]** filter is based on an original technique of pyramidal decomposition of the image obtained from an [_Alpha blending_](https://en.wikipedia.org/wiki/Alpha_compositing) operator.
 
 ===
 [![Filter 'Details / Sharpen (Alpha)'](https://gmic.eu/gmic340/thumbs/filter_sharpen_alpha.png)](https://gmic.eu/gmic340/img/filter_sharpen_alpha.jpg)
@@ -118,7 +120,7 @@ _Fig.3.1.2. The __Details / Sharpen [Alpha]__ filter allows for fine detail enha
 
 ===
 [![Filter 'Details / Sharpen (Alpha)'](https://gmic.eu/gmic340/thumbs/filter_sharpen_alpha2.png)](https://gmic.eu/gmic340/img/filter_sharpen_alpha2.jpg)
-_Fig.3.1.3. Before/After details illustrating the interest of the __Details / Sharpen [Alpha]__ filter._
+_Fig.3.1.3. Before/After details illustrating the outcome of the __Details / Sharpen [Alpha]__ filter._
 ===
 
 Finally, the **Layers / Spatial Blend Multi-Layers** filter merges into a single image multiple shots from the same viewpoint, while harnessing a spatial linear gradient between the various views. For example, one can photograph the same scene over day and night time intervals, then employ this spatial fusion filter to create time-transitional images like the one illustrated below:
@@ -187,7 +189,7 @@ For example, we used this filter, with slight modifications, to generate the sho
 
 Sometimes, one seeks to deliberately _degrade_ images, either to simulate a real phenomenon, such as motion blur, sensor noise and the like, or in the pursuit of a purely aesthetic effect ([_Glitch Art_](https://en.wikipedia.org/wiki/Glitch_art)). For these purposes, the following new effects have been added to _G'MIC_:
 
-- The **Rendering / CRT Scanlines** and **Degradations / CRT Phosphors** filters mimic the image display of [_cathode-ray tubes (CRT)_](https://en.wikipedia.org/wiki/Cathode_ray_tube), by simulating two characteristic effects of CRT displays, namely the [_Scanline effect_](https://en.wikipedia.org/wiki/Scan_line) and [_phosphor excitation_](https://en.wikipedia.org/wiki/Phosphor). These two filters were created in collaboration with [_Romain Hérault_](https://fr.linkedin.com/in/romain-herault-91a596137), a new contributor who recently joined _GREYC_.
+- The **Rendering / CRT Scanlines** and **Degradations / CRT Phosphors** filters mimic the image display of [_cathode-ray tubes (CRT)_](https://en.wikipedia.org/wiki/Cathode_ray_tube), by simulating two characteristic effects of CRT displays, namely the [_Scanline effect_](https://en.wikipedia.org/wiki/Scan_line) and [_phosphor excitation_](https://en.wikipedia.org/wiki/Phosphor). These two filters were created in collaboration with [_Romain Hérault_](https://fr.linkedin.com/in/romain-herault-91a596137), a new contributor who recently joined the _GREYC_ laboratory.
 
 ===
 [![Filter 'Rendering / CRT Scanlines'](https://gmic.eu/gmic340/thumbs/filter_scanline.png)](https://gmic.eu/gmic340/img/filter_scanline.jpg)
@@ -371,7 +373,7 @@ Finally, let's dive back into the wonderful world of [_Mandelbrot fractals_](htt
 _Fig.4.4. Rendering of the Mandelbrot Set using the Orbit Trap method._
 ===
 
-Then, with another type of rendering known as [_Buddhabrot_](https://en.wikipedia.org/wiki/Buddhabrot), but here considering complex series of the type $z_{n+1}=z_{n}^p+c$, and linearly varying the real exponent $p$ between 0 and 6 (rather than keeping $p=2$ as for the classic Mandelbrot set), to generate each image of the animation below (source code and details [_on this page_](https://discuss.pixls.us/t/intriguing-shapes-in-buddhabrot-like-fractals)):
+Then, with another type of rendering known as [_Buddhabrot_](https://en.wikipedia.org/wiki/Buddhabrot), but here considering complex series of the type *z_[n+1]=z_[n]^p + c*, and linearly varying the real exponent *p* between 0 and 6 (rather than keeping *p=2* as for the classic Mandelbrot set), to generate each image of the animation below (source code and details [_on this page_](https://discuss.pixls.us/t/intriguing-shapes-in-buddhabrot-like-fractals)):
 
 ===
 [![Buddhabrot Type Rendering for Complex Series with Exponent](https://gmic.eu/gmic340/thumbs/buddhabrot.png)](https://gmic.eu/gmic340/img/buddhabrot.mp4)
@@ -389,16 +391,15 @@ Note that generating these high-resolution modified _Buddhabrot_ images requires
 _Fig.4.6. More or less successful attempt to use G'MIC for String Art._
 ===
 
-Can you recognize who is supposed to be represented in the photo below (there is nothing special to win…)? An attempt not necessarily crowned with success, which deserves to be explored further (especially by managing threads of different colors), but which nevertheless illustrates the multiple possibilities for experimentation that the _G'MIC_ framework allows!
+Can you recognize who is supposed to be represented in the photo below? An attempt not necessarily crowned with success, which deserves to be explored further (especially by managing threads of different colors), but which nevertheless illustrates the multiple possibilities for experimentation that the _G'MIC_ framework allows!
 
 - **Other Related Links**:
 
 To conclude, here are some miscellaneous links that demonstrate the versatility of _G'MIC_:
 
-1. **Steganography**: How to hide data in a noise image? The `rand` command can generate [_random values with density_](https://en.wikipedia.org/wiki/Probability_density_function), meaning their probability density is a function specified by the user. This has, for example, the application of hiding 256x256 images in histograms of 16-bit/channel noise images, as [_detailed on this page_](https://discuss.pixls.us/t/new-function-rand-pdf-random-values-following-a-custom-distribution).
+    1. **Steganography**: How to hide data in a noise image? The `rand` command can generate [_random values with density_](https://en.wikipedia.org/wiki/Probability_density_function), meaning their probability density is a function specified by the user. This has, for example, the application of hiding 256x256 images in histograms of 16-bit/channel noise images, as [_detailed on this page_](https://discuss.pixls.us/t/new-function-rand-pdf-random-values-following-a-custom-distribution).
 
-2. **Artistic Galleries**:
-[_Ivelieu_](https://deviantart.com/ivelieu/gallery) and [_Gannjondal_](https://deviantart.com/gannjondal/gallery) are two artists on the _Deviant Art_ site who sometimes use _G'MIC_ in their artistic creation process. Take a look at their respective galleries, it's worth it!
+    2. **Artistic Galleries**: [_Ivelieu_](https://deviantart.com/ivelieu/gallery) and [_Gannjondal_](https://deviantart.com/gannjondal/gallery) are two artists on the _Deviant Art_ site who sometimes use _G'MIC_ in their artistic creation process. Take a look at their respective galleries, it's worth it!
 
 ===
 [![Images from Ivelieu's gallery](https://gmic.eu/gmic340/thumbs/ivelieu.png)](https://gmic.eu/gmic340/img/ivelieu.jpg)
@@ -410,11 +411,11 @@ _Fig.4.7. Some works by Ivelieu / Deviant Art._
 _Fig.4.8. Some works by Gannjondal / Deviant Art._
 ===
 
-3. We learned from _Gilles Caulier_ that the next version of the photo management program _digiKam_ 8.4.0 [_will include a G'MIC processing tool_](https://www.reddit.com/r/kde/comments/1d67s1d/next_digikam_840_photo_manager_program_will/) within the _Batch Queue Manager_, which will allow _digiKam_ users to integrate _G'MIC_ filters into their post-processing workflows.
+    3. We learned from _Gilles Caulier_ that the next version of the photo management program _digiKam_ 8.4.0 [_will include a G'MIC processing tool_](https://www.reddit.com/r/kde/comments/1d67s1d/next_digikam_840_photo_manager_program_will/) within the _Batch Queue Manager_, which will allow _digiKam_ users to integrate _G'MIC_ filters into their post-processing workflows.
 
-4. [_Thiojoe_](https://www.thiojoe.com/) is a YouTuber who produces videos about technology and is a programmer in his spare time. He started developing a free tool based on _G'MIC_ to easily generate animations, a tool that you can [_find here_](https://github.com/ThioJoe/Gmic-Animation-Tools). It only works on _Windows_ for now, but we'll keep an eye on it.
+    4. [_Thiojoe_](https://www.thiojoe.com/) is a YouTuber who produces videos about technology and is a programmer in his spare time. He started developing a free tool based on _G'MIC_ to easily generate animations, a tool that you can [_find here_](https://github.com/ThioJoe/Gmic-Animation-Tools). It only works on _Windows_ for now, but we'll keep an eye on it.
 
-5. Finally, let's mention the _YouTube_ channel of [_JustCallMeInsane_](https://www.youtube.com/@JustCallMeInsane/search?query=g%27mic), a digital illustrator using _Krita_. She recently made a series of videos exploring the different categories of filters in the _G'MIC-Qt_ plugin for _Krita_. We hope in passing that the _Krita_ development team, which manages its own version of the plugin, will be able to update it quickly.
+    5. Finally, let's mention the _YouTube_ channel of [_JustCallMeInsane_](https://www.youtube.com/@JustCallMeInsane/search?query=g%27mic), a digital illustrator using _Krita_. She recently made a series of videos exploring the different categories of filters in the _G'MIC-Qt_ plugin for _Krita_. We hope in passing that the _Krita_ development team, which manages its own version of the plugin, will be able to update it quickly.
 
 And that's it for the latest news around the _G'MIC_ project and its new version _3.4.0_.
 
