@@ -1,6 +1,6 @@
 # G'MIC *3.4.0* : Image Processing in Its Prime.
 
-A new version **3.4.0** of [**G’MIC**](https://gmic.eu) (*GREYC’s Magic for Image Computing*) has just been released!
+A new version **3.4.0** of [**G’MIC**](https://gmic.eu) (*GREYC’s Magic for Image Computing*) has just been released.
 With this new release, we celebrate the project's __16th anniversary__!
 
 On this occasion, we summarize the recent features added to our open-source [framework](https://en.wikipedia.org/wiki/Software_framework) for [digital image processing](https://en.wikipedia.org/wiki/Digital_image_processing), following our [previous news](https://gmic.eu/gmic325/) on this subject (published in May 2023).
