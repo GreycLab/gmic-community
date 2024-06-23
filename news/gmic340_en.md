@@ -1,6 +1,7 @@
 # G'MIC *3.4.0* : Image Processing in Its Prime.
 
 A new version **3.4.0** of [**G’MIC**](https://gmic.eu) (*GREYC’s Magic for Image Computing*) has just been released!
+With this new release, we celebrate the project's __16th anniversary__!
 
 On this occasion, we summarize the recent features added to our open-source [framework](https://en.wikipedia.org/wiki/Software_framework) for [digital image processing](https://en.wikipedia.org/wiki/Digital_image_processing), following our [previous news](https://gmic.eu/gmic325/) on this subject (published in May 2023).
 
@@ -8,13 +9,13 @@ On this occasion, we summarize the recent features added to our open-source [fra
 [![G'MIC 3.4.0 Teaser](https://gmic.eu/gmic340/thumbs/teaser_small.png)](https://gmic.eu/gmic340/img/teaser.jpg)
 ===
 
-_ __Note__: Click on the images to get a full-resolution version, or to open the video when the images contain the icon `![Play Video Icon](https://gmic.eu/gmic340/thumbs/icon_play_video.png)_
+_ __Note__: Click on the images of the article, to get a full-resolution version, or to play a video when the images contain the icon `![Play Video Icon](https://gmic.eu/gmic340/thumbs/icon_play_video.png)_
 
 # 1. _G’MIC_ in a Nutshell
 
 [_G’MIC_](https://gmic.eu) is an open-source [framework](https://en.wikipedia.org/wiki/Software_framework) for [digital image](https://en.wikipedia.org/wiki/Digital_image) manipulation and processing, developed in the [_IMAGE_](https://www.greyc.fr/equipes/image/) team at the [_GREYC_](https://www.greyc.fr/) research laboratory in Caen ([_UMR CNRS_](https://en.wikipedia.org/wiki/Joint_Research_Unit) 6072).
 
-It defines various user interfaces for applying a wide range of algorithms to images and signals. The core of the project is the [_"G'MIC" scripting language interpreter_](https://gmic.eu/reference/) specifically designed to facilitate the prototyping and implementation of new image processing algorithms and operators. Users can harness operators from the several hundred already implemented, or write their own custom operators. These can then be accessed through the several user interfaces that the project offers.
+It defines various user interfaces for applying a wide range of algorithms to images and signals. The core of the project is the [_G'MIC scripting language interpreter_](https://gmic.eu/reference/) specifically designed to facilitate the prototyping and implementation of new image processing algorithms and operators. Users can harness operators from the several hundred already implemented, or write their own custom operators. These can then be accessed through the several user interfaces that the project offers.
 
 The most popular _G’MIC_ interfaces are:
 
@@ -24,7 +25,7 @@ The most popular _G’MIC_ interfaces are:
 
 ===
 [![Preview of the G’MIC-Qt Plugin](https://gmic.eu/gmic340/thumbs/gmic340.png)](https://gmic.eu/gmic340/img/gmic340.jpg)
-_Fig. 1.1. Preview of the G’MIC-Qt plugin version __3.4.0__, running in GIMP 2.10, with the "Comicbook” filter selected._
+_Fig. 1.1. Preview of the G’MIC-Qt plugin version __3.4.0__, running in GIMP 2.10, with the Comicbook filter selected._
 ===
 
 # 2. What’s New in Version __3.4.0__?
@@ -44,11 +45,11 @@ _Fig.2.1. Preview of the revamped G'MIC Online web service released with version
 
 Visit [_G'MIC Online_](https://gmicol.greyc.fr/) and give it a real-world test 😱! And don't hesitate to report any issues. In any case, a big thank you to our colleagues in the _DDA_ team for this noteworthy overhaul!
 
-  - ** _G'MIC-Qt_ Plugin**: Over the past year, the plugin has acquired more than __40 new image processing filters__, [detailed below](#3-details-of-the-new-filters). Many employ the new _"Random Parameters"_ button, which generates arbitrary filter settings, furnishing rapid previews that can be quickly evaluated for practical or aesthetic worth.
+  - ** _G'MIC-Qt_ Plugin**: Over the past year, the plugin has acquired more than __40 new image processing filters__, [detailed below](#3-details-of-the-new-filters). Many employ the new _Random Parameters_ button, which generates arbitrary filter settings, furnishing rapid previews that can be quickly evaluated for practical or aesthetic worth.
 
 ===
 [![Random Parameters button in the G'MIC-Qt plugin](https://gmic.eu/gmic340/thumbs/randomize_parameters_fr.png)](https://gmic.eu/gmic340/img/randomize_parameters_en.jpg)
-_Fig.2.2. G'MIC-Qt Plugin: The new "Random Parameters" button assigns random values to the selected filter's parameters._
+_Fig.2.2. G'MIC-Qt Plugin: The new Random Parameters button assigns random values to the selected filter's parameters._
 ===
 
   - **`gmic` CLI Tool**: All filters created by the developer community are now integrated within the command-line tool executable. There are no longer discrepancies in the number of default filters available between the _G'MIC-Qt_ plugin and the `gmic` CLI tool. Previously, users needed to force filter updates with `$ gmic update` to align environments.
@@ -96,16 +97,16 @@ First, the **Colors / Mixer [Generic]** filter, a color channel mixing filter th
 _Fig.3.1.1. The __Colors / Mixer [Generic]__ filter enriches the already available arsenal of filters for contrast and color enhancement._
 ===
 
-Let's also talk about the **Details / Sharpen [Alpha]** filter, which, as its name suggests, allows for fine detail enhancement in photographs. It minimizes the appearance of edge "halos", a common artifact arising from many detail enhancement filters. The Details/Sharpen [Alpha] filter is based on an original technique of pyramidal decomposition of the image obtained from an [_Alpha blending_](https://en.wikipedia.org/wiki/Alpha_compositing) operator.
+Let's also talk about the **Details / Sharpen [Alpha]** filter, which, as its name suggests, allows for fine detail enhancement in photographs. It minimizes the appearance of edge halos, a common artifact arising from many detail enhancement filters. The Details/Sharpen [Alpha] filter is based on an original technique of pyramidal decomposition of the image obtained from an [_Alpha blending_](https://en.wikipedia.org/wiki/Alpha_compositing) operator.
 
 ===
 [![Filter 'Details / Sharpen (Alpha)'](https://gmic.eu/gmic340/thumbs/filter_sharpen_alpha.png)](https://gmic.eu/gmic340/img/filter_sharpen_alpha.jpg)
-_Fig.3.1.2. The __Details / Sharpen [Alpha]__ filter allows for fine detail enhancement in photographs, minimizing the appearance of "halos"._
+_Fig.3.1.2. The __Details / Sharpen [Alpha]__ filter allows for fine detail enhancement in photographs, minimizing the appearance of halos._
 ===
 
 ===
 [![Filter 'Details / Sharpen (Alpha)'](https://gmic.eu/gmic340/thumbs/filter_sharpen_alpha2.png)](https://gmic.eu/gmic340/img/filter_sharpen_alpha2.jpg)
-_Fig.3.1.3. "Before/After" details illustrating the interest of the __Details / Sharpen [Alpha]__ filter._
+_Fig.3.1.3. Before/After details illustrating the interest of the __Details / Sharpen [Alpha]__ filter._
 ===
 
 Finally, the **Layers / Spatial Blend Multi-Layers** filter merges into a single image multiple shots from the same viewpoint, while harnessing a spatial linear gradient between the various views. For example, one can photograph the same scene over day and night time intervals, then employ this spatial fusion filter to create time-transitional images like the one illustrated below:
@@ -115,7 +116,7 @@ Finally, the **Layers / Spatial Blend Multi-Layers** filter merges into a single
 _Fig.3.1.4. The __Layers / Spatial Blend Multi-Layers__ filter allows for merging multiple photographs with an adjustable spatial linear gradient._
 ===
 
-(__Credits__: the images used in the figure above are from the video "[_Stunning New York City skyline timelapse: Day to night_](https://www.youtube.com/watch?v=DDo73Njxdqc)” by the YouTube channel "_Rumble Viral_”.)
+(__Credits__: the images used in the figure above are from the video [_Stunning New York City skyline timelapse: Day to night_](https://www.youtube.com/watch?v=DDo73Njxdqc) by the YouTube channel _Rumble Viral_.)
 
 The following video illustrates the complete process, using the _G'MIC-Qt_ plugin under _GIMP 2.10_:
 
@@ -164,7 +165,7 @@ But where it becomes interesting is that this filter also allows you to deform i
 _Fig.3.2.5. Projection of an image onto a Poincaré disk._
 ===
 
-For example, we used this filter, with slight modifications, to generate the short animation, "Flyover of the Poincaré Planet," which illustrates the astonishing fractal properties of these geometric oddities:
+For example, we used this filter, with slight modifications, to generate the short animation, _"Flyover of the Poincaré Planet"_, which illustrates the astonishing fractal properties of these geometric oddities:
 
 ===
 [![Filter 'Deformations / Poincaré Disk'](https://gmic.eu/gmic340/thumbs/planet_poincare.png)](https://gmic.eu/gmic340/img/planet_poincare.mp4)
@@ -178,7 +179,7 @@ Sometimes, one seeks to deliberately _degrade_ images, either to simulate a real
 
 ===
 [![Filter 'Rendering / CRT Scanlines'](https://gmic.eu/gmic340/thumbs/filter_scanline.png)](https://gmic.eu/gmic340/img/filter_scanline.jpg)
-_Fig.3.3.1. The __Rendering / CRT Scanlines__ filter imitates the typical "Scanline" effect of CRT displays._
+_Fig.3.3.1. The __Rendering / CRT Scanlines__ filter imitates the typical scanline effect of CRT displays._
 ===
 
 ===
@@ -403,7 +404,7 @@ _Fig.4.8. Some works by Gannjondal / Deviant Art._
 
 5. Finally, let's mention the _YouTube_ channel of [_JustCallMeInsane_](https://www.youtube.com/@JustCallMeInsane/search?query=g%27mic), a digital illustrator using _Krita_. She recently made a series of videos exploring the different categories of filters in the _G'MIC-Qt_ plugin for _Krita_. We hope in passing that the _Krita_ development team, which manages its own version of the plugin, will be able to update it quickly.
 
-And that's it for the "few" news around the _G'MIC_ project and its new version _3.4.0_.
+And that's it for the latest news around the _G'MIC_ project and its new version _3.4.0_.
 
 # 5. Conclusions
 
