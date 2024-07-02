@@ -179,7 +179,6 @@ pr_underwoods_preview:
   pr_underwoods ${1--2},1
 
 
-
 #@gui _<b>Degradations</b>
 #-------------------------
 
@@ -193,6 +192,7 @@ pr_underwoods_preview:
 #@gui : Invert Mirror Selection = ~bool(0,0,1)
 #@gui : sep = separator()
 #@gui : note = note("<span color="#EE5500"><small><b>Rotation:</b></small></span>")
+#@gui : Apply to channels = bool(0)
 #@gui : Range Clockwise = ~int(35,0,90)
 #@gui : Range Counter-Clockwise = ~int(-35,-90,0)
 #@gui : Boundary Conditions = ~int(2,0,3)
@@ -200,72 +200,72 @@ pr_underwoods_preview:
 #@gui : Center Y(%) = ~int(0,0,100)
 #@gui : sep = separator()
 #@gui : Deform = ~int(3,0,20)
+#@gui : Scale = ~float(.3,0.1,20)
 #@gui : sep = separator()
 #@gui : Iterations = int(1,1,20)
 #@gui : Blending =  ~choice(3,"Add","Alpha","And","Average","Blue","Burn","Darken","Difference","Divide","Dodge",\
 # "Edges","Exclusion","Freeze","Grainextract","Grainmerge","Green","Hardlight","Hardmix","Hue","Interpolation",\
 # "Lchlightness","Lighten","Lightness","Linearburn","Linearlight","Luminance","Multiply","Negation","Or","Overlay",\
-# "Pinlight","Red","Reflect","Saturation","Screen","Seamless","Seamless_mixed","Shapeareamax","Shapeareamax0",\
-# "Shapeareamin","Shapeareamin0","Shapeaverage","Shapeaverage0","Shapemedian","Shapemedian0","Shapemin","Shapemin0",\
-# "Shapemax","Shapemax0","Softburn","Softdodge","Softlight","Stamp","Subtract","Value","Vividlight",\
+# "Pinlight","Red","Reflect","Saturation","Screen","Seamless","Seamless_mixed","Softburn","Softdodge","Softlight","Stamp","Subtract","Value","Vividlight",\
 # "Xor")
 #@gui : Strength = ~float(100,0,100)
 #@gui : sep = separator()
 #@gui : note = note("<small>Author: <i><a href="http://prawnsushi.free.fr">Prawnsushi</i></a>.      \
 # Latest Update: <i>2023/08/17</i>.</small>")
 
-pr_sloppymess : skip "${1=0},${2=1},${3=0},${4=0},${5=-1},${6=0},${7=35},${8=-35},${9=2},${10=0},${11=0},${12=3},${13=1},${14=3},${15=100}"
+pr_sloppymess :
 
-ang,wid,ax,__mir,inter,inv,rang_f,rang_b,bound,cx,cy,def,it,bl,str=$*
+ang,wid,ax,_mir,inter,inv,chan,_rang_f,_rang_b,_bound,_cx,_cy,def,sca,it,bl,str=$*
 arg0 $bl,\
       "add","alpha","and","average","blue","burn","darken","difference","divide","dodge","edges","exclusion","freeze",\
       "grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lchlightness","lighten",\
       "lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red",\
-      "reflect","saturation","screen","seamless","seamless_mixed","shapeareamax","shapeareamax0","shapeareamin",\
-      "shapeareamin0","shapeaverage","shapeaverage0","shapemedian","shapemedian0","shapemin","shapemin0","shapemax",\
-      "shapemax0","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor"
-  blending_mode=${}
+      "reflect","saturation","screen","seamless","seamless_mixed","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor"
+blending_mode=${}
 
-  foreach {
-    n 0,255
-    wi,he:=w,h
-    if $ang>0&&$ang!=360 rotate $ang,0,3 fi
-    if $ax==0 spins,dir,sli={w/$wid},x,y else spins,dir,sli={h/$wid},y,x fi
-    if $__mir==0 __mir=x else __mir=y fi
-    repeat $it
-      +s. $dir,$spins
-      if $rang_f||$rang_b
-        repeat $spins { rotate[{$>+1}] {u($rang_f,$rang_b)},0,$bound,$cx%,$cy% }
+foreach {
+  n 0,255
+  wi,he:=w,h
+  if $ang>0&&$ang!=360 rotate $ang,0,3 fi
+  if $ax==0 spins,dir,sli={w/$wid},x,y else spins,dir,sli={h/$wid},y,x fi
+  if $_mir==0 _mir=x else _mir=y fi
+  repeat $it {
+    +s. $dir,$spins
+    if $_rang_f||$_rang_b
+      if $chan
+        apc[^0] "rotate {u($_rang_f,$_rang_b)},0,$_bound,$_cx%,$_cy%"
+      else
+        repeat $spins { rotate[{$>+1}] {u($_rang_f,$_rang_b)},0,$_bound,$_cx%,$_cy% }
       fi
-      l[^0] {
+    fi
+    l[^0] {
       sel=0--1
       if $inv==1 sel..=^ fi  # Negate selection
       if $inter>1
-        ap[$sel:$inter] "mirror $__mir"
+        ap[$sel:$inter] "mirror $_mir"
       elif $inter==-1
-        repeat 2 {
-          step:=floor(u(1,20))
-          ap[$sel:$step] "mirror $__mir"
-        }
+        step:=floor(u(1,20))
+        ap[$sel:$step] "mirror $_mir"
       fi
-      }
-      a[^0] $dir
-      +gradient_norm.
-      negate.
-      pr_deform[^0] $def
-      blend[^0] edges,0.6
-      blend $blending_mode,$str%
-    done
-
-    if $ang>0&&$ang!=360
-      rotate. -$ang,0,3
-      vx,vy:=floor((w-$wi)/2),floor((h-$he)/2)
-      vxb,vyb:=$vx+$wi-1,$vy+$he-1
-      crop. $vx,$vy,$vxb,$vyb
-    fi
-    equalize
-    n 0,255
+    }
+    a[^0] $dir
+    +gradient_norm.
+    negate.
+    pr_deform[^0] $def,0,$sca
+    blend[^0] edges,0.6
+    blend $blending_mode,$str%
   }
+
+  if $ang>0&&$ang!=360
+    rotate. -$ang,0,3
+    vx,vy:=floor((w-$wi)/2),floor((h-$he)/2)
+    vxb,vyb:=$vx+$wi-1,$vy+$he-1
+    crop. $vx,$vy,$vxb,$vyb
+  fi
+  equalize
+  n 0,255
+}
+
 pr_sloppymess_preview :
   pr_sloppymess $*
 
