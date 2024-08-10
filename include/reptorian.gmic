@@ -18555,17 +18555,22 @@ else
 
  fi
 fi
-#@cli rep_aspect_crop_2d: width_ratio>0,height_ratio>0,-1<=_shift_factor[%]<=1
+#@cli rep_aspect_crop_2d: width_ratio>0,height_ratio>0,-1<=_shift_factor[%]<=1 :  width_ratio>0,height_ratio>0,-1<=_shift_factor_a[%]<=1,-1<=_shift_factor_b[%]<=1
 #@cli : Crop images based on specified aspect ratio.
+#@cli :
 #@cli : Code for finding new dimension was provided by Sumruv in discord/generative. The code that was provided applies only in the case of ratio not equal to 1.
 #@cli : Default value: 'shift_factor=0'
 #@cli : Author: Reptorian.
 rep_aspect_crop_2d:
 skip ${3=0},${4=}
 
-_glob_auto_use_same_shift_factors={narg($4)?1:0}
+# cr = Crop Ratio
+# sf = Shift Factor
+# dsf = Different Shift Factors
+# ar = Aspect Ratio
+# arc = Aspect Ratio Crop
 
-check "$1>0&&$2>0"
+use_dsf={narg($4)?1:0}
 
 ####################################################
 #      Sumruv's Solution at discord/generative     #
@@ -18574,48 +18579,47 @@ check "$1>0&&$2>0"
 #       let new_b1 = new_b2 / a_ratio;             #
 ####################################################
 
-_glob_aspect_crop_ratio_2d_w,_glob_aspect_crop_ratio_2d_h,_glob_aspect_crop_2d_crop_shift_factor_a,_glob_aspect_crop_2d_crop_shift_factor_b=${1-2},{(cut(($_glob_auto_use_same_shift_factors?[$3,$4]:vector2($3)),-1,1)+1)/2}
-_glob_aspect_crop_2d_crop_shift_factor,_glob_arc2d_crop_ratio={[$_glob_aspect_crop_2d_crop_shift_factor_a,$_glob_aspect_crop_ratio_2d_h/$_glob_aspect_crop_ratio_2d_w]}
+cr2d_w,cr2d_h,sf_0,sf_1=${1-2},{(cut(($use_dsf?[$3,$4]:vector2($3)),-1,1)+1)/2}
+crop_ratio={$cr2d_h/$cr2d_w}
 
-
-if $_glob_aspect_crop_ratio_2d_w==$_glob_aspect_crop_ratio_2d_h
-  command "cmd_arc_2d_crop :
+if $crop_ratio==1
+  m __$0_arc_2d_crop:"
     if w==h return fi
-
+    
     if w>h
-      start_point={int($_glob_aspect_crop_2d_crop_shift_factor_a*(w-h))}
-      crop $start_point,0,{$start_point+h-1},{h-1}
+      start_point={int($sf_0*(w-h))}
+      crop $start_point,0,{[$start_point,0]+(h-1)}
     else
-      start_point={int($_glob_aspect_crop_2d_crop_shift_factor_b*(h-w))}
-      crop 0,$start_point,{w-1},{$start_point+w-1}
+      start_point={int($sf_1*(h-w)}
+      crop $start_point,0,{[0,$start_point]+(w-1)}
     fi
     "
 else
-
-  command "cmd_arc_2d_crop :
+  m __$0_arc_2d_crop:"
     ratio={h/w}
-
-    if $ratio==$_glob_arc2d_crop_ratio return fi
-
-    new_dim,mode={b=[w,h];aspect_ratio=$_glob_arc2d_crop_ratio;ny=min(b[0]*aspect_ratio,b[1]);ny<b[1]?[round(ny),1]:[round(b[1]/aspect_ratio),0];}
-
-    if $_glob_auto_use_same_shift_factors
-     _glob_aspect_crop_2d_crop_shift_factor={$mode?$_glob_aspect_crop_2d_crop_shift_factor_b:$_glob_aspect_crop_2d_crop_shift_factor_a}
-    fi
-
+    
+    if $ratio==$crop_ratio return fi
+    
+    new_dim,mode={\"
+        ny=min(w#-1*"$crop_ratio",h#-1);
+        ny<h#-1?([round(ny),1]):([round(h#-1/"$crop_ratio"),0]);
+      \"}
+      
+    shift_factor=${sf_$mode}
+    
     if $mode
-     start_point={int($_glob_aspect_crop_2d_crop_shift_factor*(h-$new_dim))}
-     crop 0,$start_point,{w-1},{$start_point+$new_dim-1}
+      start_point={int($shift_factor*(h-$new_dim))}
+      crop 0,$start_point,{[w-1,$start_point+$new_dim-1]}
     else
-     start_point={int($_glob_aspect_crop_2d_crop_shift_factor*(w-$new_dim))}
-     crop $start_point,0,{$start_point+$new_dim-1},{h-1}
+      start_point={int($shift_factor*(w-$new_dim))}
+      crop $start_point,0,{[$start_point+$new_dim-1,h-1]}
     fi
     "
 fi
 
-foreach { cmd_arc_2d_crop }
+foreach { __$0_arc_2d_crop }
 
-uncommand cmd_arc2d_crop
+um __$0_arc_2d_crop
 #@cli rep_nebulous: _main_surf_xy_factor>0,_main_surf_x_factor>0,_main_surf_y_factor>0,-100<=_x_center[%]<=100,-100<=_y_center[%]<=100,0<=_fxyangle<=360,_wave,0<=_lighting_angle<=360,_disturbance>=0,_distx,_disty,0<=_distangle<=360,_disturbance_mode={ 0= do_not_scale | 1=scale_by_axisfact },_color={ 0=gray | 1=color },_alpha_base={ 0=None | 1=hard_light | 2=hard_shade | 3=soft_light | 4=soft_light },_subpixelevel>=0,subpixelprocessingmethod={ 0=Average | 1=Linear | 2=Grid | 3=Bicubic | 4=Lanczos }
 #@cli : Creates a Nebulous texture inspired by its Paint.NET plugin equivalent made by MadJik.\n
 #@cli : '_main_surf_xy_factor' - Amount of waves by xy-axis.
