@@ -5479,7 +5479,7 @@ eval "
 #@cli rep_ncr_combinations: number_of_items>0,choices>0,_axis={x,y,z} : choices>0, number_of_items>0,_axis={x,y,z}
 #@cli : Generates all combinations that fits nCr. The algorithm used for this is based on Algorithm 515 (Buckles and Lybanon 1977) which allows index-based generation of combinations.
 #@cli :
-#@cli : Code has been adapted from sleeepjack's Python 2 code executing Algorithm 515 - https://github.com/sleeepyjack/alg515/blob/master/python/alg515.py
+#@cli : Code has been adapted from sleeepjack's Python 2 code executing Algorithm 515 only in case when non-zero index is used to find combination at a point - https://github.com/sleeepyjack/alg515/blob/master/python/alg515.py
 #@cli :
 #@cli : Note: If $2 is greater than $1, then $2 is number of items and $1 is choices. Only positive integer numbers are accepted!
 #@cli : Default values: '_axis=x'
@@ -5891,6 +5891,219 @@ eval "
   tv=mul_items[dec_half_list_size-p]*=tv;
  );
  sum(mul_items*position);"
+#@cli rep_rde_permutations: item_0_count,item_1_count,...,_axis={x,y,z}
+#@cli : Return all of the unique permutations of repeated distinct elements of different count.
+#@cli :
+#@cli : Algorithm is based on the implementation of Narayana Pandita's algorithm by PM 2Ring at stackoverflow.
+#@cli : Implementation of Narayana Pandita's algorithm -  https://stackoverflow.com/questions/8306654/finding-all-possible-permutations-of-a-given-string-in-python
+#@cli : Description of Narayana Pandita's algorithm - https://en.wikipedia.org/wiki/Permutation#Generation_in_lexicographic_order
+#@cli : Author : Reptorian.
+#@cli : Default values: '_axis=x'
++rep_rde_permutations:
+check "$#>=1"
+
+if isnum($-1)
+ items_count=${1--1}
+ axis=0
+else
+ check "inrange(_'$-1',_'x',_'z',1,1)"
+ items_count=${1--2}
+ axis={_'$-1'-_'x'}
+fi
+
+check "items_counts=["$items_counts"];
+       ( sum( isint(items_counts,1) ) == size(items_counts) );"
+
+total_items_count,number_of_possible_permutations={"
+    groups_of_items_counts=["$items_count"];
+    total_items_count=sum(groups_of_items_counts);
+    [total_items_count,fact(total_items_count)/prod(fact(groups_of_items_counts))]"}
+
+if $number_of_possible_permutations>(1<<24) error exc_permut_val:$number_of_string_permutations fi
+
+if ($number_of_possible_permutations*$total_items_count)>131072 p_mode=: else p_mode=> fi
+
+out_dim={v=vector(#3,1);v[$axis]=$number_of_possible_permutations;v}
+
+$out_dim,$total_items_count,:"
+    begin(
+
+        const axis=$axis;
+
+        axis==2?(iter_index()=z;):
+        axis==1?(iter_index()=y;):
+                iter_index()=x;
+
+        items_count=["$items_count"];
+        permutation_result=expr('
+                begin(
+                    items_counts=["$items_count"];
+                    position=0;
+                    current_count=-1;
+                );
+                if(items_counts[position]==++current_count,
+                    ++position;
+                    current_count=0;
+                );
+                position;
+            ',s);
+
+        level_length=$number_of_possible_permutations;
+
+        const max_index=s-1;
+        const dec_max_index=max_index-1;
+
+        started=0;
+
+        reverse_array_starting_from(a)=(
+            start=a;
+            end=max_index;
+            while(start<end,
+                swap(permutation_result[start++],permutation_result[end--]);
+            );
+
+        );
+
+    );
+
+    if(started,
+
+        for(jp=dec_max_index,jp>-1,--jp,
+            if(permutation_result[jp]<permutation_result[jp+1],break(););
+        );
+
+        v=permutation_result[jp];
+        for(kp=max_index,kp>jp,--kp,
+            if(v<permutation_result[kp],break(););
+        );
+
+        swap(permutation_result[kp],permutation_result[jp]);
+        reverse_array_starting_from(jp+1);
+    ,
+        if(index=iter_index(),
+            initial_permutation=permutation_result;
+
+            selectable_vector_size=s;
+            repeat(s,ind,
+                section_size=level_length/selectable_vector_size;
+                selected_indice=int(index/section_size);
+
+                current_item_count=initial_permutation[selected_indice];
+                copy(initial_permutation[selected_indice],initial_permutation[selected_indice+1],selectable_vector_size-selected_indice);
+                --selectable_vector_size;
+
+                level_length=section_size*items_count[current_item_count];
+                --items_count[current_item_count];
+
+                repeat(current_item_count,iter,
+                    index-=items_count[iter]*section_size;
+                );
+
+                permutation_result[ind]=current_item_count;
+            );
+        );
+        started=1;
+    );
+
+    permutation_result;"
+#@cli rep_rde_permutation_index2list: index,item_0_count>=1,item_1_count>=1,...
+#@cli : Return permutations of repeated distinct elements of different count which correspond to the index.
+#@cli :
+#@cli : Author: Reptorian.
+rep_rde_permutation_index2list:
+check "($#>1) && (sum([${1--2}]>1)==($#-1))"
+
+total_items_count={sum(${1--2})}
+if $total_items_count>18 error exec_items_count fi
+number_of_possible_permutations={fact($total_items_count)/prod(fact([${1--2}]))}
+
+1,{$total_items_count+1},1,1,<"begin(
+  items_group_count=[${1--2}];
+  started=0;
+  current_count=-1;
+  position=$#-2;
+ );
+ started?(
+  if(items_group_count[position]==++current_count,
+   --position;
+   current_count=0;
+  );
+  position;
+ ):(
+  started=1;
+  $total_items_count;
+ );
+ "
+
+eval "
+ const perms_possible=$number_of_possible_permutations;
+ level_length=perms_possible;
+ index=$-1%perms_possible;
+
+ items_group_count=[${1--2}];
+ result=vector(#$total_items_count);
+
+ repeat(size(result),ind,
+  section_size=level_length/da_size(#-1);
+  selected_indice=int(index/section_size);
+
+  current_item_count=i[#-1,selected_indice];
+  da_remove(#-1,selected_indice);
+
+  level_length=section_size*items_group_count[current_item_count];
+  --items_group_count[current_item_count];
+
+  repeat(current_item_count,iter,
+    index-=items_group_count[iter]*section_size;
+  );
+
+  result[ind]=current_item_count;
+ );
+
+ result;
+ "
+
+rm.
+#@cli rep_rde_permutation_list2index: item_group_index_0,item_group_index_1,...
+#@cli : Return the index which corresponds to the permutation of multiple repeated different elements of different counts.
+#@cli : Code adapted from rahul sharma at geeksforgeeks - https://ide.geeksforgeeks.org/6YsMwFEHpH
+#@cli :
+#@cli : Note: Group_index are often multiple number of the same number. All number must be a integer within boundary [0,$#). All integers within those range must show up at least once.
+#@cli :
+#@cli : Author: Reptorian.
+rep_rde_permutation_list2index:
+check "
+ list2check=[$*];
+ temp_list=vector(#$#);
+ min_val=min(list2check);
+ max_val=max(list2check);
+ !min_val&&max_val<$#?(
+  repeat(size(list2check),p,++temp_list[list2check[p]];);
+  repeat(max_val,p,if(!(valid=temp_list[p]),break();););
+  set('size',max_val+1);
+  set('list',v2s(temp_list););
+  valid;
+ );"
+
+eval "
+ item_group_counts=(["$list"])[0,$size];
+ list_of_number_arguments=[$*];
+ mul=fact($#);
+ index=0;
+ repeat($#,p,
+  mul/=$#-p;
+  sum=0;
+  d_fac=1;
+  loc=list_of_number_arguments[p];
+  repeat(size(item_group_counts),q,
+   t=item_group_counts[q];
+   q<loc?(sum+=t);
+   d_fac*=fact(t);
+  );
+  index+=(mul*sum)/d_fac;
+  --item_group_counts[loc];
+ );
+ index;"
 #@cli rep_string_permutations: string,_axis,_sort_string={ 0=do_not_sort_string | 1=sort_string | 2=logical_sort_string }
 #@cli : Return all the unique permutations of characters of string as a image with values representing the unicode representation of characters in input string. Permutations is dependent on character appearance order.
 #@cli :
