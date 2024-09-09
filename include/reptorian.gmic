@@ -6104,6 +6104,114 @@ eval "
   --item_group_counts[loc];
  );
  index;"
+#@cli rep_inc_combinations: size,_axis={x,y,z}
+#@cli : Generate all of the possible incremental combination.
+#@cli :
+#@cli : Author: Reptorian.
+#@cli : Default values: '_axis=x'
++rep_inc_combinations:
+skip ${2=x}
+check "isint($1,1,24)&&inrange(_'$2',_'x',_'z',1,1)"
+
+size,axis={[1<<($1-1),_'$2'-_'x']}
+out_dim={v=vector(#3,1);v[$axis]=$size;v}
+
+if ($size*$1)>131072 mode=: else mode=> fi
+
+$out_dim,$1,$mode"
+ begin(
+    const end_ind=s-1;
+    const dec_end_ind=end_ind-1;
+
+    const axis=$axis;
+    axis==2?(iter_index()=z;):
+    axis==1?(iter_index()=y;):
+             iter_index()=x;
+
+    started=0;
+    v=vector(#s);
+ );
+ started?(
+    positions=[end_ind,dec_end_ind];
+    while( ( (m=++v[positions[0]]) - v[positions[1]] )==2,
+        positions--;
+    );
+    if(positions[0]<end_ind,
+        copy(v[positions[0]],m,s-positions[0],1,0);
+    );
+    0;
+ ):(
+    if(index=iter_index(),
+        binary=vector(#end_ind);
+        pos=end_ind;
+        while(index,
+            binary[--pos]=index&1;
+            index>>=1;
+        );
+
+        p=0;
+        repeat(end_ind-pos,
+            if(binary[pos++],++p;);
+            v[pos]=p;
+        );
+    );
+    started=1;
+ );
+ v;
+ "
+#@cli rep_inc_combination_index2list: size,index
+#@cli : Return the incremental combination at index.
+#@cli : Note: Untested with high size values.
+rep_inc_combination_index2list:
+check "(isint($1,1,52)&&isint($2))?inrange($2,0,1<<($1-1),1,0)"
+eval "
+ const s=$1;
+ const d_s=s-1;
+ index=$2;
+
+ result=vector(#s);
+ binary=vector(#d_s);
+
+ pos=d_s;
+ while(index,
+  binary[--pos]=index&1;
+  index>>=1;
+ );
+
+ p=0;
+ repeat(d_s-pos,
+  if(binary[pos++],++p;);
+  result[pos]=p;
+ );
+
+ result;
+ "
+#@cli rep_inc_combination_list2index: number_list
+#@cli : Return the lexicographic index in which this incremental combination is found within a list of all possible incremental combination.
+#@cli : Note: Untested with high size of number_list.
+rep_inc_combination_list2index:
+check "
+ number_list=sort([$*]);
+ const max_index=size(number_list)-1;
+ valid=1;
+ v=0;
+ if(size(number_list)<53,
+  for(p=1,p<size(number_list),++p,
+   diff=number_list[p]-number_list[p-1];
+   diff==1?(
+    v|=1<<(max_index-p);
+   ):
+   diff>1?(
+    valid=0;
+    break();
+   );
+  );
+  if(valid,
+   set('{}',v);
+   valid;
+  );
+ );
+ "
 #@cli rep_string_permutations: string,_axis,_sort_string={ 0=do_not_sort_string | 1=sort_string | 2=logical_sort_string }
 #@cli : Return all the unique permutations of characters of string as a image with values representing the unicode representation of characters in input string. Permutations is dependent on character appearance order.
 #@cli :
