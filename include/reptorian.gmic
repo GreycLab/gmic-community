@@ -254,29 +254,50 @@ um $0_a_nums
 #@cli rep_val_ord_id
 #@cli : Change images value into the order of appearance starting from 0,0,0,0
 rep_val_ord_id:
-m $0_a_nums:"100%,1,1,1,x a c"
-
 foreach {
-	original_dimensions={[w#-1,h#-1,d#-1,s#-1]}
+	eval "
+		const ref_vector_size=whds<<1;
+		ref_vector=expr('p=x>>1;x&1?p:i[#-1,p];',ref_vector_size);
+		ref_vector=sort(ref_vector,1,whds,2);
 
-	unroll x
-	+$0_a_nums
-	pixelsort[-1] +,x,[-2]
-	rm[-2]
-	s c
+		count=last_p=0;
+		min_value=current_number=old_number=nan;
+		for(p=0,p<ref_vector_size,p+=2,
+			current_number=ref_vector[p];
+			current_number==old_number?(
+				++count;
+				value=ref_vector[p+1];
+				if(value<min_value,
+					min_value=value;
+				);
+			):(
+				if(count,
+					copy(ref_vector[last_p],min_value,count,2,0);
+				);
+				min_value=ref_vector[p+1];
+				count=1;
+				last_p=p;
+			);
+			old_number=current_number;
+		);
 
-	+blend[-1] [-2],shapemin rm[-3] rv
-	+a c rm[-2]
-	pixelsort[-1] +,x,[-2] rm[-2] s c
-	label[-2] 0,0
-	100%,1,1,1
+		ref_vector=sort(ref_vector,1,whds,2);
 
-	eval[-2] i[#-1,i]=i[#-3,x]
-	rm[-3,-2]
-	resize $original_dimensions,-1
+		id=-1;
+		old_number=nan;
+		for(p=0,p<ref_vector_size,p+=2,
+			ref_vector[p]!=old_number?(
+				++id;
+			);
+			old_number=ref_vector[p];
+			ref_vector[p]=id;
+		);
+
+		ref_vector=shift(ref_vector,-1,2);
+		ref_vector=sort(ref_vector,1,whds,2);
+		copy(i[#-1,0],ref_vector[1],whds,1,2);
+		"
 }
-
-um $0_a_nums
 #@cli rep_cbsoo: eq. to 'rep_channels_overblur_overline_blur_sharpen'.
 rep_cbsoo: rep_channels_blur_sharpen_overblur_overline $*
 #@cli rep_channels_overblur_overline_blur_sharpen: method_a={ 0=blur | 1=sharpen | 2=overblur | 3=overline },0%<_effect_factor_a[%]<=100%,_multiplication_factor>0,_blending_mode,0<_blending_opacity[%]<=100%...
