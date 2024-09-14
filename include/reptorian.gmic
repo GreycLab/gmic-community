@@ -210,59 +210,47 @@ append c
 	"
 
 rm..
-#@cli rep_extract_unique_values_and_count
-#@cli : Extract Unique values from a image starting from 0,0,0,0, and then outputs unique values only with the count.
-rep_extract_unique_values_and_count:
-m $0_a_nums:"100%,1,1,1,x a c"
+#@cli rep_val2order: map_2_img={ 0=no | 1=yes},keep_set_img={ 0=no|1=values|2=values+count }
+#@cli : Change images to order of appearance representation(s). map_2_img simply convert values to the order of their appearance starting from zero. set_img can contain unique values with optional count of unique values.
+rep_val2order:
+skip ${2=0}
+check isint($2)
+l[] {
+	check "isint(${1=1})"
+	map_2_img:=$2?$1:1
 
-max_dim:=1<<24
-foreach {
-	if whds>$max_dim error lim_dim_exc fi
-
-	unroll x +$0_a_nums pixelsort[-1] +,x,[-2] rm..
-	100%,100%,100%,3
-
-	eval[-2] >"begin(
-			count=started=uniques=0;
-			min_value=old_number=nan;
-		);
-		i0==old_number?(
-			++count;
-			if(i1<min_value,min_value=i1;);
-		):(
-			if(started,I[#-1,uniques-1]=[old_number,count,min_value];);
-			++uniques;
-			min_value=i1;
-			count=1;
-		);
-		old_number=i0;
-		started=1;
-		I;
-		end(
-			I[#-1,uniques-1]=[old_number,count,min_value];
-			set('end',uniques-1);
-		);
-		"
-
-	rm..
-	crop. 0,$end
-	s. c,-2
-	pixelsort[-2] +,x,[-1] rm.
+	onfail
+		map_2_img=1
 }
 
-um $0_a_nums
-#@cli rep_val_ord_id
-#@cli : Change images value into the order of appearance starting from 0,0,0,0
-rep_val_ord_id:
-foreach {
-	eval "
-		const ref_vector_size=whds<<1;
-		ref_vector=expr('p=x>>1;x&1?p:i[#-1,p];',ref_vector_size);
-		ref_vector=sort(ref_vector,1,whds,2);
+keep_set_img:=min(abs($2),2)
 
-		count=last_p=0;
-		min_value=current_number=old_number=nan;
-		for(p=0,p<ref_vector_size,p+=2,
+foreach {
+	if $keep_set_img
+		0
+	fi
+
+	eval "
+		const od=whds#0;
+		const ref_vector_size=od<<1;
+		const keep_set_img=$keep_set_img;
+		const map_2_img=$map_2_img;
+
+		ref_vector=expr('p=x>>1;x&1?p:i[#0,p];',ref_vector_size);
+		ref_vector=sort(ref_vector,1,od,2);
+
+		if(keep_set_img,
+			const set_size=od*3;
+			uniques_set_vec=vector(#set_size,inf);
+			insertion_pos=-3;
+			uniques=0;
+		);
+		if(map_2_img,
+			last_p=0;
+		);
+		count=0;
+		min_value=current_number=old_number=last_p_val=nan;
+		for(p=0,p<=ref_vector_size,p+=2,
 			current_number=ref_vector[p];
 			current_number==old_number?(
 				++count;
@@ -272,31 +260,51 @@ foreach {
 				);
 			):(
 				if(count,
-					copy(ref_vector[last_p],min_value,count,2,0);
+					if(keep_set_img,
+						copy(uniques_set_vec[insertion_pos],[min_value,last_p_val,count],3,1,1);
+					);
+					if(map_2_img,
+						copy(ref_vector[last_p],min_value,count,2,0);
+					);
 				);
 				min_value=ref_vector[p+1];
 				count=1;
-				last_p=p;
+				if(keep_set_img,
+					++uniques;
+					insertion_pos+=3;
+					last_p_val=current_number;
+				);
+				if(map_2_img,
+					last_p=p;
+				);
 			);
 			old_number=current_number;
 		);
 
-		ref_vector=sort(ref_vector,1,whds,2);
-
-		id=-1;
-		old_number=nan;
-		for(p=0,p<ref_vector_size,p+=2,
-			ref_vector[p]!=old_number?(
-				++id;
+		keep_set_img?(
+			--uniques;
+			uniques_set_vec=sort(uniques_set_vec,1,od,3);
+			resize(#1,uniques,1,1,keep_set_img,-1);
+			copy(i[#1,0],uniques_set_vec[1],uniques,1,3);
+			if(keep_set_img==2,
+				copy(i[#1,uniques],uniques_set_vec[2],uniques,1,3);
 			);
-			old_number=ref_vector[p];
-			ref_vector[p]=id;
 		);
 
-		ref_vector=shift(ref_vector,-1,2);
-		ref_vector=sort(ref_vector,1,whds,2);
-		copy(i[#-1,0],ref_vector[1],whds,1,2);
+		if(map_2_img,
+			ref_vector=sort(ref_vector,1,od,2);
+			id=-1;
+			old_number=nan;
+			for(p=0,p<=ref_vector_size,p+=2,
+				ref_vector[p]!=old_number?(
+					++id;
+				);
+				old_number=ref_vector[p];
+				i[#0,ref_vector[p+1]]=id;
+			);
+		);
 		"
+	if !$map_2_img rm[0] fi
 }
 #@cli rep_cbsoo: eq. to 'rep_channels_overblur_overline_blur_sharpen'.
 rep_cbsoo: rep_channels_blur_sharpen_overblur_overline $*
@@ -840,7 +848,7 @@ l[] {
 		else
 			noarg d_bpi=7
 		fi
-	}
+}
 
 foreach {
 	repeat $d_bpi {
@@ -867,7 +875,7 @@ l[] {
 		else
 			noarg d_bpi=7
 		fi
-	}
+}
 
 P,Q=-1,-2
 
