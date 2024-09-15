@@ -59,7 +59,7 @@ skip ${1=0},${2=0}
 original_status=${}
 
 use_16_bit:=$1==16?1:$1?$1!=8
-max_value,max_spec_size:=mv=(1<<($use_16_bit?(ms=4;16):(ms=7;8)))-1;[mv,ms]
+max_value,max_spec_size:=mv=(1<<($use_16_bit?(ms=3;16):(ms=6;8)))-1;[mv,ms]
 
 foreach {
 	if im<0||iM>$max_value
@@ -70,53 +70,148 @@ foreach {
 		error exc_chans
 	fi
 
-	if $2 od:=w,h,d,s
-	else  od=1,1,1,{s}
+	s:=s#0
+	output_dimension:=$2?[w#0,h#0,d#0,$s]:[vector(#3,1),$s];
+	length,use_mt:=length=ceil(whd/$_cpus);[length,length>0x1000]
+
+	{whd#0},1,1,4,inf
+
+	if $use_mt
+		$_cpus
+		mode=:
+	else
+		mode=>
+		1
 	fi
 
-	eval[-1] >"begin(
+	eval[-1] $mode"
+		begin(
+			const number_of_pixels=whd#0;
+			const length=$length;
+			const bit_mask=(1<<24)-1;
+			const max_value=$max_value;
+			const use_mt=$use_mt;
+			const cpus=use_mt?$_cpus:1;
+			const d_cpus=cpus-1;
+
+			current_vector=vector(#length,inf);
+			uniques_info=vector(#cpus,0);
+			init_current_pixel_vector=vector(#cpus);
+
+
+			if(!use_mt,maximum_count_and_place=vector(#3););
+
+
 			if($use_16_bit
-			,bitshift_factors=expr('x<<4',s);
-			,bitshift_factors=expr('x<<3',s);
+			,bitshift_factors=expr('x<<4',s#0);
+			,bitshift_factors=expr('x<<3',s#0);
 			);
 
 			convert_color2int(color_values)=sum(color_values<<bitshift_factors);
-			convert_int2color(counting_num)=(counting_num>>bitshift_factors)&$max_value;
-			nan_vector=vector(#s,nan);
-			list_of_colors=vector(#whd);
-			p=0;
+			convert_int2color(counting_num)=(counting_num>>bitshift_factors)&max_value;
+			convert_int2base_float(integer)=[integer>>48,(integer>>24)&bit_mask,integer&bit_mask];
 		);
-		list_of_colors[p++]=convert_color2int(I);
-		I;
-		end(
-			count=maximum_count=old_maximum_count=0;
-			old_color=maximum_freq_color=nan;
 
-			list_of_colors=sort(list_of_colors);
+		init_current_pixel_vector[t]=t*length;
+		init_current_pixel=t*length;
 
-			repeat(whd,p,
-				list_of_colors[p]!=old_color?(
-					count=1;
-				):(
-					++count;
-					count>maximum_count?(
-						maximum_count=count;
-						maximum_freq_color=old_color;
-					):
-					count==maximum_count?(
-						old_maximum_count=maximum_count;
-					);
+		current_pixel=init_current_pixel;
+
+		rf=min(length,number_of_pixels-current_pixel);
+		repeat(rf,idx,
+			current_vector[idx]=convert_color2int(I[#0,current_pixel++]);
+		);
+
+		current_vector=sort(current_vector);
+
+		old_number=nan;
+		uniques=0;
+		repeat(rf,idx,
+			current_number=current_vector[idx];
+			current_number!=old_number?(
+				draw(#1,convert_int2base_float(current_number),init_current_pixel+uniques,0,0,0,1,1,1,3);
+				i(#1,init_current_pixel+uniques,0,0,3)=1;
+				counts=++uniques;
+			):(
+				counts=++i(#1,init_current_pixel+uniques-1,0,0,3);
+			);
+			if(!use_mt,
+				if(counts>maximum_count_and_place[0],
+					maximum_count_and_place[2]=maximum_count_and_place[0];
+					maximum_count_and_place[0]=counts;
+					maximum_count_and_place[1]=uniques-1;
 				);
-				old_color=list_of_colors[p];
+			);
+			old_number=current_number;
+		);
+
+		uniques_info[t]=uniques;
+		end(
+			merge(uniques_info,+);
+			merge(init_current_pixel_vector,+);
+
+			if(use_mt,maximum_count_and_place=vector(#3););
+
+
+			for(p=1,p<cpus,++p,
+
+				start_pos=init_current_pixel_vector[p];
+				end_pos=start_pos+uniques_info[p];
+
+				for(q=start_pos,q<end_pos,++q,
+					pixel=I[#1,q];
+					current_color=(pixel)[0,3];
+					counts=pixel[3];
+
+					found_color=0;
+
+					repeat(uniques_info[0],r,
+						if(same((I[#1,r])[0,3],current_color),
+							i(#1,r,0,0,3)+=counts;
+							counts=i(#1,r,0,0,3);
+							found_color=1;
+							break();
+						);
+					);
+
+					if(counts>maximum_count_and_place[0],
+						maximum_count_and_place[2]=maximum_count_and_place[0];
+						maximum_count_and_place[0]=counts;
+						maximum_count_and_place[1]=r;
+					);
+
+					if(found_color,continue(););
+					I[#1,uniques_info[0]++]=pixel;
+				);
 			);
 
-			set('mode_color',v2s(if(maximum_count==1||(maximum_count==old_maximum_count),nan_vector,convert_int2color(maximum_freq_color););););
+			resize(#1,uniques_info[0],1,1,4,0,0);
+			set('{}',v2s(maximum_count_and_place));
+
+		);"
+
+	rm[0,-1]
+
+	maximum_a,place,maximum_b=${}
+	color=[{"
+		$maximum_a!=$maximum_b?(
+			const max_value=$max_value;
+
+			if($use_16_bit
+			,bitshift_factors=expr('x<<4',$s);
+			,bitshift_factors=expr('x<<3',$s);
+			);
+
+			convert_basefloat2int(vector_number)=(vector_number[0]<<48)|(vector_number[1]<<24)|vector_number[2];
+			convert_int2color(counting_num)=(counting_num>>bitshift_factors)&max_value;
+
+			convert_int2color(convert_basefloat2int((I[#0,$place])[0,3]));
+		):(
+			vector(#$s,nan);
 		);
-		"
-	rm.
+	"}]
 
-	$od,[$mode_color]
-
+	$output_dimension,$color rm..
 }
 
 status $original_status
