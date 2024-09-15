@@ -215,7 +215,7 @@ rm..
 #@cli : Default values: '_keep_set_vals=0'
 rep_val2order:
 skip ${2=0}
-check isint($2)
+check isint($2)&&$!
 
 l[] {
 	check "isint(${1=1})"
@@ -225,19 +225,23 @@ l[] {
 		map_2_img=1
 }
 
-set_val_mode,keep_set_val_img,use_status,mode_4={v=min(abs($2),4);[v,v&&v<4,v>=3,v==4];}
-max_spec_size,alter_set_val_img={[1+($set_val_mode==2),!$mode_4]}
+set_val_mode,use_set_val_img,use_status,mode_4={v=min(abs($2),4);[v,v&&v<4,v>=3,v==4];}
+output_status_mode,max_spec_size={[$!>1,1+($set_val_mode==2)]}
 
-if !$use_status
+if $use_status
+	status_out,end=
+else
 	original_status=${}
 fi
 
 if $mode_4
-    map_2_img=0
+	map_2_img=0
 fi
 
+remove_primary_image:=!$map_2_img&&!$mode_4
+
 foreach {
-	if $keep_set_val_img
+	if $use_set_val_img
 		0
 	fi
 
@@ -245,7 +249,7 @@ foreach {
 		const od=whds#0;
 		const ref_vector_size=od<<1;
 		const set_val_mode=$set_val_mode;
-		const alter_set_val_img=$alter_set_val_img;
+		const use_set_val_img=$use_set_val_img;
 		const use_status=$use_status;
 		const max_spec_size=$max_spec_size;
 		const map_2_img=$map_2_img;
@@ -311,14 +315,14 @@ foreach {
 		set_val_mode?(
 			--uniques;
 			uniques_set_vec=sort(uniques_set_vec,1,od,3);
-			if(alter_set_val_img,
+			if(use_set_val_img,
 				resize(#1,uniques,1,1,max_spec_size,-1);
 				copy(i[#1,0],uniques_set_vec[1],uniques,1,3);
 				if(max_spec_size==2,
 					copy(i[#1,uniques],uniques_set_vec[2],uniques,1,3);
 				);
 			);
-            if(use_status,
+			if(use_status,
 				set('uniques_count',v2s((uniques_set_vec)[2,od,3]));
 				set('size',uniques);
 			);
@@ -326,15 +330,24 @@ foreach {
 		"
 
 	if $use_status
-		status {([$uniques_count])[0,$size]}
+		part_status={([$uniques_count])[0,$size]}
+
+		if $output_status_mode
+			status_out.=$end\"$part_status\"
+			end=,
+		else
+			status_out=$part_status
+		fi
 	fi
 
-	if !$map_2_img&&!$mode_4
+	if $remove_primary_image
 		rm[0]
 	fi
 }
 
-if !$use_status
+if $use_status
+	status $status_out
+else
 	status $original_status
 fi
 #@cli rep_cbsoo: eq. to 'rep_channels_overblur_overline_blur_sharpen'.
