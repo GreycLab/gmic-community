@@ -48,6 +48,71 @@
 #
 #-------------------------------
 
+#@cli rep_mode: _fill_with_mode_color={ 0=false | 1=true }
+#@cli : Transform image to the most common color of images.
+#@cli : Note: Code adapted from G'MIC Standard Library colormap code.
+#@cli : Default values: '_fill_with_mode_color=1'
+rep_mode:
+skip ${1=1}
+
+original_status=${}
+
+foreach {
+	# Prepare dimensions for output
+	output_dimensions:=$1?[w#-1,h#-1,d#-1,s#-1]:[1,1,1,s#-1]
+
+	# Compute hashcode map.
+	+n. 0,255 f. "ret = vectors(); H = 0; repeat (s,p,(H*=31)+=j(0,0,0,p)); ret[0] = H%2048; ret"
+	channels. 0 equalize. 2048 n. 0,2047 round. 1
+
+	# Find single occurrence of each color/vector.
+	0x2048
+	eval[0] ">
+		begin(sizes = vector2048(); ret = vectors());
+		col_s = I;
+		H = i#1; indH = H + 2;
+		sH = sizes[H];
+		!sH || find(#indH,col_s,s#0*(sH - 1),-s#0)<0?( # Color not found
+			sH>=h(#indH)?resize(#indH,s#0,max(8,2*h#indH),1,1,0);
+			copy(i(#indH,0,sH,0,0),col_s);
+			++sizes[H];
+		);
+		ret;
+		end(fill(sizes,k,resize(#k + 2,s#0,sizes[k],1,1,0)));"
+
+	a[2--1] y permute. yzcx rm..
+
+	index.. .,0,0
+	histogram.. {[w,0,w-1]}
+
+	# Compare frequency to check
+	eval.. >"begin(
+			count_and_place=vector(#3);
+		);
+		if(i>count_and_place[0],
+			count_and_place[1]=count_and_place[0];
+			count_and_place[0]=i;
+			count_and_place[2]=x;
+		);
+		end(
+			set('{}',v2s(count_and_place););
+		);"
+
+	# Transform image into most common color
+	maximal_a,maximal_b,max_pos=${}
+
+	if $maximal_a==$maximal_b
+		color=[{vector(#s#-1,nan)}]
+		rm
+	else
+		color=[{I[#-1,$max_pos]}]
+		rm
+	fi
+
+	$output_dimensions,$color
+}
+
+status $original_status
 #@cli rep_mode_type_int: _use_16_bit_mode={ 0=false | 1= true },_fill_with_mode_color={ 0=false | 1=true }
 #@cli : Finds mode color of 8-bit images.
 #@cli : Note: You can use 8 or 16 as first argument to reflect the number of bits to use instead of 0,1 for self-documentation purpose.
