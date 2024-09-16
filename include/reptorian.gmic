@@ -374,34 +374,20 @@ rm..
 #@cli : Change images to order of appearance representation(s). map_2_img simply convert values to the order of their appearance starting from zero. set_vals can contain unique values with optional count of unique values.
 #@cli : Default values: '_keep_set_vals=0'
 rep_val2order:
-imgs=$!
+check "$! && $#<4"
 
-l[] {
-	check "$#<3?($#==2?bool(sum($1,$-1)):$1)&&(isnum($1)?isint($1))"
-	map_2_img=$1
+if $#==3
+	map_2_img,set_val_mode,seed:=$*
+else
+	seed:=0xcd3efa1e
+	map_2_img,set_val_mode:=$#==2?vector2($*):[$1,!$1]
+fi
 
-	if $#==2
-		arg2=$-1
-	elif $#==1
-		arg2:=!$map_2_img
-	fi
-
-	onfail
-		check $#<3
-		if isnum($1)
-			if $#==2
-				inv_args
-			fi
-		else
-			noarg
-				check $imgs&&$#<3
-				map_2_img,arg2=1,0
-		fi
-}
+check "$map_2_img || $set_val_mode"
 
 output_status_mode:=$!>1
 
-set_val_mode:=min(abs($arg2),4)
+set_val_mode:=min(abs($set_val_mode),4)
 use_count:=$set_val_mode>1
 use_values:=isint($set_val_mode,1,3)
 use_status:=$set_val_mode>=3
@@ -420,7 +406,9 @@ fi
 
 remove_primary_image:=!$map_2_img&&!$mode_4
 
-dictionary_size,max_index={(1<<10)-[0,1]}
+bitshift_factor=10
+dictionary_size,max_index={(1<<$bitshift_factor)-[0,1]}
+
 foreach {
 
 	# Create hash table
@@ -460,18 +448,20 @@ foreach {
 				action_2()=0;
 			);
 
+			const seed=$seed;
+			const bitshift_factor=$bitshift_factor;
 			const bit_mask=$max_index;
 			const prime=31;
 			id=0;
+			n_start(n)=n>bit_mask?xor(n<<1,seed):n&bit_mask;
 			hash_value(n)=(
-				N=n;
+				N=n_start(n);
 				hash_value=0;
 				while(N,
-					byte=N&0xff;
-					hash_value=hash_value*prime+byte;
-					N>>=8;
+					hash_value=(hash_value*prime+N)&bit_mask;
+					N>>=bitshift_factor;
 				);
-				(hash_value&bit_mask)+1;
+				hash_value+1;
 			);
 		);
 		key=hash_value(i);
