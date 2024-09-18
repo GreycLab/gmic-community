@@ -113,6 +113,88 @@ foreach {
 }
 
 status $original_status
+#@cli rep_mode_blend
+#@cli : Blend Layers via statistical mode of colors.
+#@cli : Author : Reptorian.
+rep_mode_blend:
+is_dimensions_valid={"
+		v=[w#0,h#0,d#0,s#0];
+		dimension_valid=1;
+		!same(v[0,3],[0,0,0])?(
+			for(p=1,p<$!,++p,
+				nv=[w#p,h#p,d#p,s#p];
+				if(same(v[0,3],[0,0,0]),dimension_valid=0;break(););
+				if(!same(nv,v),dimension_valid=0;break(););
+			);
+		):(
+			p=dimension_valid=0;
+		);
+		set('img_checked',p);
+		dimension_valid
+	"}
+
+if !$is_dimensions_valid    error inv_dim_det@[$img_checked] fi
+
+if $!==1 return fi
+if $!==2 100%,100%,100%,100%,I#-2==I#-1?I#-1:vector(#s,nan) rm[-3,-2] return fi
+
+spectrum_size,number_of_images:=s,$!
+
+a c
+
+100%,100%,100%,$spectrum_size,"begin(
+		const S=$spectrum_size;
+		const layers=$number_of_images;
+		init_new_counts=vector(#layers);
+		v_NaN=vector(#S,nan);
+	);
+
+	v=I#-1;
+
+	counts=init_new_counts;
+	uniques_color_count=1;
+	found_at_least_one_duplicate=0;
+	counts_limit=S;
+
+	for(p=S,p<s#-1,p+=S,
+		current_color=(v)[p,S];
+		found_duplicate=0;
+		for(q=[0,0],q[1]<counts_limit,q+=[1,S],
+			if(same((v)[q[1],S],current_color),
+				++counts[q[0]];
+				found_duplicate=1;
+				break();
+			);
+		);
+		found_duplicate?(
+			found_at_least_one_duplicate=1;
+		):(
+			copy(v[counts_limit],current_color);
+			counts_limit+=S;
+			++counts[q[0]-1];
+			++uniques_color_count;
+		);
+	);
+
+	found_at_least_one_duplicate?(
+		current_maxima=old_maxima=maxima_pos=0;
+		for(r=[0,0],r[1]<uniques_color_count,r+=[S,1],
+			if(counts[r[1]]>=current_maxima,
+				old_maxima=current_maxima;
+				current_maxima=counts[r[1]];
+				maxima_pos=r[0];
+			);
+		);
+		current_maxima!=old_maxima?(
+			(v)[maxima_pos,S];
+		):(
+			v_NaN;
+		);
+	):(
+		v_NaN;
+	);
+	"
+rm..
 #@cli rep_mode_type_int: _use_16_bit_mode={ 0=false | 1= true },_fill_with_mode_color={ 0=false | 1=true }
 #@cli : Finds mode color of 8-bit images.
 #@cli : Note: You can use 8 or 16 as first argument to reflect the number of bits to use instead of 0,1 for self-documentation purpose.
@@ -430,7 +512,7 @@ foreach {
 		);
 		hash_value(i);"
 
-	# Create hash table
+	# Create Hash Table
 	0 [-1]x$max_index
 
 	# Optional image to store uniques values or counts of uniques values or both
