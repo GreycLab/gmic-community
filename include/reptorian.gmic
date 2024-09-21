@@ -48,6 +48,43 @@
 #
 #-------------------------------
 
+#@cli rep_freq_sortvals: string
+#@cli : Input into frequency of sorted values. If you use image next to command, it will convert into image representing frequency of sorted value.
+rep_freq_sortvals:
+skip "${1=}"
+
+if narg($1)
+	({'$*'})
+else
+	old_status=${}
+fi
+
+if narg($old_status)
+	foreach { _rep_freq_order }
+	u $old_status
+else
+	_rep_freq_order
+	u {crop(#-1)}
+	rm.
+fi
+_rep_freq_order:
+sort.
+0
+eval.. >"begin(
+		compare_num=i[#-2,0];
+		da_push(#-1,0);
+		pos=0;
+	);
+
+	if(i==compare_num
+	,++i[#-1,pos];
+	,da_push(#-1,1);++pos;compare_num=i;
+	);
+	i;
+
+	end(da_freeze(#-1););
+	"
+rm..
 #@cli rep_mode: _fill_with_mode_color={ 0=false | 1=true }
 #@cli : Transform image to the most common color of images.
 #@cli : Note: Code adapted from G'MIC Standard Library colormap code.
@@ -6710,6 +6747,156 @@ check "
 			valid;
 		);
 	);
+	"
+#@cli rep_sum_permutations: size>0,limit>=0,_axis={x,y,z}
+#@cli : Create a image representing every possible fixed-size vector which sum of non-negative integers is up to integer limit.
++rep_sum_permutations:
+check "isint($1,1)&&isint($2,0)&&$#>3?inrange(_'$-1',_'x',_'z',1,1):1"
+sum_permutations_size:=$2?perm($1,$2+$1,0):$1
+
+if $sum_permutations_size>(1<<24) exc_size fi
+
+if $#>2
+	axis={_'$-1'-_'x'}
+else
+	axis=0
+fi
+
+dims={v=vector(#3,1);v[$axis]=$sum_permutations_size;v;}
+
+if !$2
+	$dims
+	return
+fi
+
+$dims,$1,>"begin(
+	v=vectors();
+	const max_sum=$2;
+	const dec_max_sum=max_sum-1;
+	const end_pos=s-1;
+	scanline_pos=end_pos;
+	const dec_end_pos=end_pos-1;
+	mode=1;
+	p=0;
+	started=0;
+	limit=max_sum;
+	old_mode=1;
+ );
+ started?(
+	mode?(
+		if((++v[end_pos]) == limit,
+			mode=0;
+		);
+	):(
+		v[scanline_pos] == max_sum?(
+			copy(v[scanline_pos],0,s-scanline_pos,1,0);
+			v[--scanline_pos] = 1;
+			mode = 1;
+			limit = dec_max_sum;
+		):(
+			boundary = inf;
+			mode = found_number_pos = previous_numbers_sum = 0;
+
+			# The for loop is used to find the sum of previous numbers before modified numbers. It is also used to scan where to modify the number.
+			for( p = end_pos , p>=scanline_pos, --p,
+				if(!found_number_pos?v[p],
+					found_number_pos = p;
+					boundary = p-1;
+				);
+				if(p<boundary,
+					previous_numbers_sum += v[p];
+				);
+			);
+
+			# This section modifies the first and second last number.
+			v[found_number_pos--]=0;
+			( total = (++v[found_number_pos])+previous_numbers_sum ) != max_sum ?(
+				mode = 1;
+				limit = max_sum-total;
+			);
+		);
+	);
+ );
+ started=1;
+ v;"
+#@cli rep_sum_permutation_index2list: size>0,limit>=0,index
+#@cli : Return the list of non-negative integers values which adds up to limit at lexicographic index.
+#@cli : Note: Code was generated via ChatGPT, and yes it has been tested. No, I can't think of any better solution, so I do not recommend this code.
+rep_sum_permutation_index2list:
+check "isint($1,1)&&isint($2,0)"
+
+if !$2 u {vector($#1)} return fi
+
+eval "
+	const size=$1;
+	const d_size=size-1;
+	const level_length=perm($1,$2+$1,0);
+	index=$3%level_length;
+	sections_count=$2;
+	level_id=$1-1;
+	output=vector(#size);
+
+	use_index=1;
+	repeat(d_size,p,
+		left_blocks_group_size=total_block_length=0;
+
+		repeat(sections_count,q,
+			left_blocks_group_size=total_block_length;
+			total_block_length+=perm(level_id,level_id+(sections_count-q),0);
+			if(total_block_length>index,break(););
+		);
+
+		--level_id;
+		index-=left_blocks_group_size;
+		sections_count-=q;
+		output[p]=q;
+
+		if(!sections_count,
+			use_index=0;
+			break();
+		);
+	);
+
+	if(use_index,
+		output[d_size]=index;
+	);
+
+	output;
+	"
+#@cli rep_sum_permutation_list2index: limit,number_a,number_b,...
+#@cli : Return the lexicographic index in which the list of number is found within the list of  arrays which sums up to the limit.
+#@cli : Note: Code was generated from ChatGPT, and modified from it. So, I do not know who the source is, nor do I see a better alternative in terms of efficiency. So, beware if you want to use this code for your coding project. It does work, however.
+rep_sum_permutation_list2index:
+check "isint($1,0)?(
+		v=[${2--1}];
+		sum(isint(v),0)==($#-1)?(
+			sum(v)<=$1;
+		);
+	);"
+
+eval "
+	const size_of_arr=$#-1;
+	const dec_size_of_arr=size_of_arr-1;
+	const max_int_sum=$1;
+	list_of_num=[${2--1}];
+
+	total=0;
+	current_sum=0;
+
+	repeat(size_of_arr,p,
+		repeat(list_of_num[p],q,
+			remaining_sum=max_int_sum-current_sum-q;
+			remaining_sum?(
+				r=size_of_arr-p-1;
+				total+=perm(r,remaining_sum+r,0);
+			):(
+				break();
+			);
+		);
+		current_sum+=list_of_num[p];
+	);
+
+	total;
 	"
 #@cli rep_string_permutations: string,_axis,_sort_string={ 0=do_not_sort_string | 1=sort_string | 2=logical_sort_string }
 #@cli : Return all the unique permutations of characters of string as a image with values representing the unicode representation of characters in input string. Permutations is dependent on character appearance order.
