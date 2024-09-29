@@ -4076,38 +4076,38 @@ else
   crop. 0,$trim_end_point status {t} rm.
  fi
 fi
-#@cli rep_posdec2altbase_num: positive_decimal,base
+#@cli rep_posdec2altbase_num: base,positive_decimal
 #@cli : Return decimal into specified base using series of digits represented in base 10 separated by comma.
 rep_posdec2altbase_num:
 base_float_max:=1<<24
-check "isint($1,0)"
+check "isint($2,0)"
 
-if isnum($2)
-	base=$2
+if isnum($1)
+	base=$1
 else
 	base_bin,base_oct,base_dec,base_hex=2,8,10,16
-	base=${base_$2}
+	base=${base_$1}
 fi
 
 check "isint($base,2,$base_float_max)"
 
-if $1<(1<<53)
+if $2<(1<<53)
 	eval "expr('<begin(
 				const base=$base;
-				n=$1;
+				n=$2;
 			);
 			remainder=n%base;
 			n=int(n/base);
 			remainder;
-			',1+int(log($1)/log($base)));"
+			',1+int(log($2)/log($base)));"
 	return
 fi
 
-positive_decimal_start_pos,S={V='$1';[for(p=0,V[p]==_'0',++p);,size(V)]}
-positive_decimal:=('$1')[$positive_decimal_start_pos,$S-$positive_decimal_start_pos]
+positive_decimal_start_pos,S={V='$2';[for(p=0,V[p]==_'0',++p);,size(V)]}
+positive_decimal:=('$2')[$positive_decimal_start_pos,$S-$positive_decimal_start_pos]
 
 if isint(log10($base))
-	if !$1 u 0 return fi
+	if !$2 u 0 return fi
 
 	if $base==10
 		u {["$positive_decimal"]-_'0'}
@@ -4144,8 +4144,7 @@ exponent:=size('{$temp_base-1}')
 {ceil(w#-2/$exponent)},1,1,2,"begin(
 		const base_float=$base_float_max;
 		const bit_mask=base_float-1;
-		started=0;
-		pos=0;
+		pos=started=0;
 		int2float_max(v)=[v>>24,v&bit_mask];
 	);
 	if(started
@@ -4219,6 +4218,123 @@ eval.. "begin(
 	"
 
 u {crop(#-1)} rm[-2,-1]
+#@cli rep_altbase_num2posdec: base,digit_a,digit_b,...
+#@cli : Return the decimal number which corresponds to arguments.
+rep_altbase_num2posdec:
+base_float_max:=1<<24
+
+if isnum($1)
+	base=$1
+else
+	base_bin,base_oct,base_dec,base_hex=2,8,10,16
+	base=${base_$1}
+fi
+
+(${2--1})
+crop. {for(p=0,!i[#-1,p],++p);set('p',p);p;},100%
+check "( isint($base,2,$base_float_max) && im>=0 && iM<$base && $#>1 ) ? ( sum(isint(crop(#-1)))== w#-1 )"
+
+if isint(log10($base))
+	exponent:=size('$base')-1
+else
+	if w#-1<=int(log(1<<53)/log($base))
+		eval. <"begin(
+				const base=$base;
+				M=1;
+				n=0;
+			);
+			n+=i*M;
+			M*=base;
+			end(set('{}',n););
+			"
+		rm.
+		return
+	fi
+
+	digits_per_sections,temp_base={dps=int(log($base_float_max)/log($base));[dps,$base^dps]}
+	exponent:=min(size('{$temp_base-1}'),7)
+
+	1,1,1,1
+	{ceil(w#-2/$digits_per_sections)},1,1,2,"begin(
+			const base_float=$base_float_max;
+			const bit_mask=base_float-1;
+			const dps=$digits_per_sections;
+			multiplier=expr('const m=w-1;$base^(m-x)',$digits_per_sections);
+			pos=started=0;
+			int2float_max(v)=[v>>24,v&bit_mask];
+		);
+		if(started
+		,pos+=dps;
+		,pos=w#-2-dps*(w-x);started=1;
+		);
+		int2float_max(sum(crop(#-2,pos,0,0,0,dps,1,1,1)*multiplier));
+		"
+
+	rm[-3]
+
+	eval "
+		const base_float=$base_float_max;
+		const bit_mask=base_float-1;
+		const divisor=1e"$exponent";
+		const multiplier=$temp_base;
+		float_max2int(v)=v[0]<<24|v[1];
+		int2float_max(v)=[v>>24,v&bit_mask];
+		while(w(#-1)>1||float_max2int(I[#-1,w(#-1)-1]),
+			crop_point=nan;
+			remainder=current_number=0;
+			repeat(w(#-1),p,
+				current_number*=multiplier;
+				current_number+=float_max2int(I[#-1,p]);
+				remainder=current_number%divisor;
+				current_number>divisor?(
+					I[#-1,p]=int2float_max(int(current_number/divisor));
+					current_number=remainder;
+					if(isnan(crop_point),
+						crop_point=p;
+					);
+					[0,0];
+				):(
+					I[#-1,p]=[0,0];
+				);
+			);
+			da_insert(#-2,0,remainder);
+			if(!isnan(crop_point),
+				resize(#-1,w(#-1)-crop_point,1,1,2,0,0,crop_point,0,0,0);
+			);
+		);
+
+		da_freeze(#-2);
+		"
+
+	rm.
+fi
+
+first_digits_set_size:=size('{i[#-1,0]}')
+
+{$first_digits_set_size+(wh#-1-1)*$exponent},1,1,1,{_'0'}
+
+eval.. "begin(
+		const _0=_'0';
+		const sp=$first_digits_set_size-1;
+		const dps=$exponent;
+		const base=10;
+		insertion_pos=started=0;
+	);
+	started?(
+		insertion_pos+=dps;
+	):(
+		insertion_pos=sp+dps*y;
+		started=1;
+	);
+	t_insertion_pos=insertion_pos;
+	n=i;
+	while(n,
+		i[#-1,t_insertion_pos--]=(n%base)+_0;
+		n=int(n/base);
+	);
+	i;"
+
+u {t} rm[-2,-1]
 #@cli rep_num2altbase: abs_num,base
 #@cli : Insert number in bases other than 10. Each numbers are represented as digits by themselves.
 +rep_num2altbase:
