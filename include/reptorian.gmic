@@ -5931,65 +5931,96 @@ check "($1>=$2&&$1>0&&isint($1))&&($2>0&&isint($2))&&inrange(_'$3',_'x',_'z',1,1
 
 if [${1-2}]==[1,1] 1 return fi
 
-num_of_combinations,axis={perm($2,$1,1)},{_'$3'-_'x'}
+num_of_permutations,axis={perm($2,$1,1)},{_'$3'-_'x'}
 
-if $axis==2   out_dim=1,1,$num_of_combinations
-elif $axis==1 out_dim=1,$num_of_combinations,1
-else          out_dim=$num_of_combinations,1,1
+if $axis==2   out_dim=1,1,$num_of_permutations
+elif $axis==1 out_dim=1,$num_of_permutations,1
+else          out_dim=$num_of_permutations,1,1
 fi
 
 if $2==1 $out_dim,1,${arg\ $axis+1,x,y,z} return fi
 
-$out_dim,$2,>"begin(
-  const edge=s-1;
-  const n=$1;
-  const dec_n=n-1;
-  const axis=$axis;
+if $num_of_permutations>0x10000 mode=: else mode=> fi
 
-  axis==2?(
-   axis()=z;
-  ):
-  axis==1?(
-   axis()=y;
-  ):(
-   axis()=x;
-  );
+$out_dim,$2,$mode"
+	begin(
+		const edge=s-1;
+		const n=$1;
+		const dec_n=n-1;
+		const axis=$axis;
 
-  output=expr('x',n);
+		axis==2?(
+			axis()=z;
+		):
+		axis==1?(
+			axis()=y;
+		):(
+			axis()=x;
+		);
 
-  reverse_array_starting_from(a)=(
-   start=a;
-   end=dec_n;
-   while(start<end,
-    swap(output[start++],output[end--]);
-   );
-  );
+		started=0;
 
- );
+		output=expr('x',n);
 
- if(axis(),
-  j=s;
-  while(j<n && (output[edge]>=output[j]),++j;);
+		reverse_array_starting_from(a)=(
+			start=a;
+			end=dec_n;
+			while(start<end,
+				swap(output[start++],output[end--]);
+			);
+		);
 
-  j<n?(
-   swap(output[edge],output[j]);
-  ):(
-   reverse_array_starting_from(s);
+		move_ind(a,b)=a!=b?(
+				t_val=output[a];
+				copy(output[b+1],output[b],a-b,1,1);
+				output[b]=t_val;
+			);
 
-   i=edge-1;
-   while(i>=0 && output[i]>=output[i+1],--i;);
+		division_numbers_arr=expr('begin(
+				const m=($1==$2?1:$1-$2)+1;
+				v=m;
+			);
+			x>1?v=v*(m+x-1):(x?v:1);'
+			,1+($1==$2?$1-2:min($1-1,$2-1)));
 
-   j=dec_n;
-   while(j>i && (output[i]>=output[j]),--j;);
+		const size_dna=size(division_numbers_arr);
 
-   swap(output[i],output[j]);
+	);
 
-   reverse_array_starting_from(i+1);
-  );
- );
+	started?(
+		j=s;
+		while(j<n && (output[edge]>=output[j]),++j;);
 
- (output)[0,s];
- "
+		j<n?(
+			swap(output[edge],output[j]);
+		):(
+			reverse_array_starting_from(s);
+
+			i=edge-1;
+			while(i>=0 && output[i]>=output[i+1],--i;);
+
+			j=dec_n;
+			while(j>i && (output[i]>=output[j]),--j;);
+
+			swap(output[i],output[j]);
+
+			reverse_array_starting_from(i+1);
+		);
+	):(
+		if(index=axis(),
+			divisor_position=size_dna-1;
+			repeat(size_dna,p,
+				division_number=division_numbers_arr[divisor_position];
+				pos=int(index/division_number);
+				move_ind(p+pos,p);
+				index%=division_number;
+				--divisor_position;
+			);
+		);
+		started=1;
+	);
+
+	(output)[0,s];"
 #@cli rep_npr_permutation_index2list: number_of_item,selected_items_count,permutation_number
 #@cli : Return permutation order at index permutation_number.
 rep_npr_permutation_index2list:
@@ -6598,7 +6629,7 @@ if ($number_of_possible_permutations*$total_items_count)>131072 p_mode=: else p_
 
 out_dim={v=vector(#3,1);v[$axis]=$number_of_possible_permutations;v}
 
-$out_dim,$total_items_count,:"
+$out_dim,$total_items_count,$p_mode"
 	begin(
 
 		const axis=$axis;
