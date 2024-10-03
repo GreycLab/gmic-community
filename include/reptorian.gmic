@@ -6939,8 +6939,16 @@ if !$2
 	return
 fi
 
-$dims,$1,>"begin(
+if $sum_permutations_size>0x10000 mode=: else mode=> fi
+
+$dims,$1,$mode"
+	begin(
 		v=vectors();
+
+		const axis=$axis;
+		axis==2?(iter_index()=z;):
+		axis==1?(iter_index()=y;):
+		         iter_index()=x;
 
 		const max_sum=$2;
 		const dec_max_sum=max_sum-1;
@@ -6986,8 +6994,53 @@ $dims,$1,>"begin(
 				);
 			);
 		);
+	):(
+		if(index=iter_index(),
+			check_scanline=use_index=1;
+			sections_count=max_sum;
+			level_id=end_pos;
+			t_sum=0;
+
+			repeat(end_pos,p,
+				left_blocks_group_size=total_block_length=0;
+
+				repeat(sections_count,q,
+					left_blocks_group_size=total_block_length;
+					total_block_length+=perm(level_id,level_id+(sections_count-q),0);
+					if(total_block_length>index,break(););
+				);
+
+				--level_id;
+				index-=left_blocks_group_size;
+				sections_count-=q;
+				v[p]=q;
+
+				if(check_scanline?q,
+					scanline_pos=p;
+					check_scanline=0;
+				);
+
+				if(p<end_pos,
+					t_sum+=q;
+				);
+
+				if(!sections_count,
+					use_index=0;
+					break();
+				);
+			);
+
+			if(use_index,
+				v[end_pos]=index;
+			);
+
+			sum_v=t_sum+v[end_pos];
+			limit=max_sum-t_sum;
+			mode=sum_v!=max_sum;
+		);
+
+		started=1;
 	);
-	started=1;
 	v;"
 #@cli rep_sum_permutation_index2list: size>0,limit>=0,index
 #@cli : Return the list of non-negative integers values which adds up to limit at lexicographic index.
