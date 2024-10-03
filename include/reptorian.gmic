@@ -6606,7 +6606,7 @@ eval "
 #@cli : Description of Narayana Pandita's algorithm - https://en.wikipedia.org/wiki/Permutation#Generation_in_lexicographic_order
 #@cli : Author : Reptorian.
 #@cli : Default values: '_axis=x'
-+rep_rde_permutations:
++new_rep_rde_permutations:
 check "$#>=1"
 
 if isnum($-1)
@@ -6626,91 +6626,90 @@ total_items_count,number_of_possible_permutations={"
 		total_items_count=sum(groups_of_items_counts);
 		[total_items_count,fact(total_items_count)/prod(fact(groups_of_items_counts))]"}
 
-if $number_of_possible_permutations>(1<<24) error exc_permut_val:$number_of_string_permutations fi
+if $number_of_possible_permutations>(1<<24)
+	error exc_permut_val:$number_of_string_permutations
+fi
 
-if ($number_of_possible_permutations*$total_items_count)>131072 p_mode=: else p_mode=> fi
+if ($number_of_possible_permutations*$total_items_count)>0x20000
+	p_mode=:
+else
+	p_mode=>
+fi
 
 out_dim={v=vector(#3,1);v[$axis]=$number_of_possible_permutations;v}
 
 $out_dim,$total_items_count,$p_mode"
 	begin(
+		const max_index=s-1;
+		const dec_max_index=max_index-1;
 
 		const axis=$axis;
-
 		axis==2?(iter_index()=z;):
 		axis==1?(iter_index()=y;):
 		         iter_index()=x;
 
-		items_count=["$items_count"];
-		permutation_result=expr('
-				begin(
-					items_counts=["$items_count"];
-					position=0;
-					current_count=-1;
-				);
-				if(items_counts[position]==++current_count,
-					++position;
-					current_count=0;
-				);
-				position;
-			',s);
+		const t_items=$total_items_count;
+		const n_perms=$number_of_possible_permutations;
 
-		level_length=$number_of_possible_permutations;
-
-		const max_index=s-1;
-		const dec_max_index=max_index-1;
-
-		started=0;
+		items_group_count=["$items_count"];
+		permutation=vector(#t_items);
+		q=0;
+		repeat(size(items_group_count),p,
+			count=items_group_count[p];
+			copy(permutation[q],p,count,1,0);
+			q+=count;
+		);
 
 		reverse_array_starting_from(a)=(
 			start=a;
 			end=max_index;
 			while(start<end,
-				swap(permutation_result[start++],permutation_result[end--]);
+				swap(permutation[start++],permutation[end--]);
 			);
 		);
 
-	);
+		move_ind(a,b)=(
+			t_val=permutation[a];
+			a!=b?(
+				copy(permutation[b+1],permutation[b],a-b,1,1);
+				permutation[b]=t_val;
+			);
+		);
 
+		started=0;
+	);
 	started?(
 		for(jp=dec_max_index,jp>-1,--jp,
-			if(permutation_result[jp]<permutation_result[jp+1],break(););
+			if(permutation[jp]<permutation[jp+1],break(););
 		);
 
-		v=permutation_result[jp];
+		v=permutation[jp];
 		for(kp=max_index,kp>jp,--kp,
-			if(v<permutation_result[kp],break(););
+			if(v<permutation[kp],break(););
 		);
 
-		swap(permutation_result[kp],permutation_result[jp]);
+		swap(permutation[kp],permutation[jp]);
 		reverse_array_starting_from(jp+1);
 	):(
 		if(index=iter_index(),
-			initial_permutation=permutation_result;
-
-			selectable_vector_size=s;
-			repeat(s,ind,
-				section_size=level_length/selectable_vector_size;
+			level_length=n_perms;
+			for(V=[0,t_items],index,V+=[1,-1],
+				section_size=level_length/V[1];
 				selected_indice=int(index/section_size);
 
-				current_item_count=initial_permutation[selected_indice];
-				copy(initial_permutation[selected_indice],initial_permutation[selected_indice+1],selectable_vector_size-selected_indice);
-				--selectable_vector_size;
+				move_ind(V[0]+selected_indice,V[0]);
 
-				level_length=section_size*items_count[current_item_count];
-				--items_count[current_item_count];
+				level_length=section_size*items_group_count[t_val];
+				--items_group_count[t_val];
 
-				repeat(current_item_count,iter,
-					index-=items_count[iter]*section_size;
+				repeat(t_val,q,
+					index-=items_group_count[q]*section_size;
 				);
-
-				permutation_result[ind]=current_item_count;
 			);
 		);
 		started=1;
 	);
-
-	permutation_result;"
+	permutation;"
 #@cli rep_rde_permutation_index2list: item_0_count>=1,item_1_count>=1,...,index
 #@cli : Return permutations of repeated distinct elements of different count which correspond to the index.
 #@cli :
@@ -6723,9 +6722,9 @@ if $total_items_count>18 error exec_items_count fi
 number_of_possible_permutations={fact($total_items_count)/prod(fact([${1--2}]))}
 
 eval "
-	const ttc=$total_items_count;
+	const tic=$total_items_count;
 	items_group_count=[${1--2}];
-	all_items=vector(#ttc);
+	all_items=vector(#tic);
 	q=0;
 	repeat(size(items_group_count),p,
 		count=items_group_count[p];
@@ -6752,7 +6751,7 @@ eval "
 			);
 		);
 
-		for(V=[0,ttc],index,V+=[1,-1],
+		for(V=[0,tic],index,V+=[1,-1],
 			section_size=level_length/V[1];
 			selected_indice=int(index/section_size);
 
