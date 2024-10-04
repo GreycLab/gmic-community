@@ -7047,7 +7047,7 @@ $dims,$1,$mode"
 rep_sum_permutation_index2list:
 check "isint($1,1)&&isint($2,0)"
 
-if !$2 u {vector($#1)} return fi
+if !$2 u {vector(#$1)} return fi
 
 eval "
 	const size=$1;
@@ -7148,7 +7148,6 @@ $dims,$1,"begin(
 		last_v=v[ep]=$2;
 		end_pos=scanline_pos=ep;
 		started=0;
-		old_next_step=next_step_to_check=$2;
 	);
 	if(started,
 		v[scanline_pos]==$2?(
@@ -7180,6 +7179,68 @@ $dims,$1,"begin(
 	);
 	started=1;
 	v;"
+#@cli rep_total_sum_permutation_index2list: size>0,sum>=0,index
+#@cli : Return the list of non-negative integers values which adds up to sum at lexicographic index.
+rep_total_sum_permutation_index2list:
+check "isint($1,1)&&isint($2,0)"
+
+if !$2 u {vector(#$1)} return fi
+
+eval "
+	const size=$1;
+	const d_size=size-1;
+	const level_length=perm(d_size,$2+d_size,0);
+	level_id=$1-2;
+	sections_count=$2;
+	index=$3%level_length;
+	N=sections_count;
+	output=vector(#size);
+
+	p=0;
+	while(N,
+		left_blocks_group_size=total_block_length=0;
+
+		repeat(sections_count,q,
+			left_blocks_group_size=total_block_length;
+			total_block_length+=perm(level_id,level_id+(sections_count-q),0);
+			if(total_block_length>index,break(););
+		);
+
+		--level_id;
+		index-=left_blocks_group_size;
+		sections_count-=q;
+		output[p++]=q;
+		N-=q;
+	);
+
+	output;
+	"
+#@cli rep_total_sum_permutation_list2index: number_a,number_b,...
+#@cli : Return the lexicographic index in which the list of number is found within the list of  arrays which adds up to a sum.
+#@cli : Note: Code was generated from ChatGPT, and modified from it. So, I do not know who the source is, nor do I see a better alternative in terms of efficiency. So, beware if you want to use this code for your coding project. It does work, however.
+rep_total_sum_permutation_list2index:
+check "sum(isint([$*],0))==$#"
+
+eval "
+	L=[$*];
+	S=sum(L);
+	const L_s=size(L);
+	const d_L_s=L_s-2;
+
+	index=0;
+	repeat($#-1,p,
+		current_value=L[p];
+		repeat(current_value,value,
+			(remaining_sum=S-value)?(
+				tv=d_L_s-p;
+				index+=perm(tv,remaining_sum+tv,0);
+			):(break(););
+		);
+		S-=current_value;
+		if(!S,break();)
+	);
+	index;
+	"
 #@cli rep_string_permutations: string,_axis,_sort_string={ 0=do_not_sort_string | 1=sort_string | 2=logical_sort_string }
 #@cli : Return all the unique permutations of characters of string as a image with values representing the unicode representation of characters in input string. Permutations is dependent on character appearance order.
 #@cli :
