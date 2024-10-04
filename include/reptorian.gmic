@@ -7119,6 +7119,67 @@ eval "
 
 	total;
 	"
+#@cli rep_total_sum_permutations: size>0,sum_total>=0,_axis={x,y,z}
+#@cli : Create a image representing every possible fixed-size vector which sum of non-negative integers is equal to the total of sum.
++rep_total_sum_permutations:
+check "isint($1,1)&&isint($2,0)&&$#>3?inrange(_'$-1',_'x',_'z',1,1):1"
+total_sum_permutations_size={d_s=$1-1;perm(d_s,d_s+$2,0)}
+
+if $total_sum_permutations_size>(1<<24) exc_size fi
+
+if $#>2
+	axis={_'$-1'-_'x'}
+else
+	axis=0
+fi
+
+dims={v=vector(#3,1);v[$axis]=$total_sum_permutations_size;v;}
+
+if !$2
+	$dims
+	return
+fi
+
+$dims,$1,"begin(
+		v=vector(#s);
+		const ep=size(v)-1;
+		const d_ep=ep-1;
+		last_p_found=d_ep;
+		last_v=v[ep]=$2;
+		end_pos=scanline_pos=ep;
+		started=0;
+		old_next_step=next_step_to_check=$2;
+	);
+	if(started,
+		v[scanline_pos]==$2?(
+			copy(v[scanline_pos],0,$1-scanline_pos,1,0);
+			v[--scanline_pos]=1;
+			v[ep]=$2-1;
+		):
+		!v[ep]?(
+			end_pos=last_p_found+1;
+			last_p_found=last_val_found=sum=0;
+			for(p=scanline_pos,p<end_pos,++p,
+				cv=v[p];
+				if(cv,
+					sum+=cv;
+					last_p_found=p;
+					last_val_found=cv;
+				);
+			);
+			previous_sum_total=sum-last_val_found+1;
+			copy(v[last_p_found],0,ep-last_p_found,1,0);
+			++v[last_p_found-1];
+			v[ep]=$2-previous_sum_total;
+		):(
+			++v[d_ep];
+			--v[ep];
+			last_p_found=d_ep;
+		);
+		last_v=v[ep];
+	);
+	started=1;
+	v;"
 #@cli rep_string_permutations: string,_axis,_sort_string={ 0=do_not_sort_string | 1=sort_string | 2=logical_sort_string }
 #@cli : Return all the unique permutations of characters of string as a image with values representing the unicode representation of characters in input string. Permutations is dependent on character appearance order.
 #@cli :
