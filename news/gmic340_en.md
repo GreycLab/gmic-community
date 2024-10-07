@@ -34,7 +34,7 @@ The most popular G'MIC interfaces are:
 
 1. [`gmic`](https://gmic.eu/reference/), a command-line tool, and a useful complement to [_ImageMagick_](https://www.imagemagick.org/) or [_GraphicsMagick_](http://www.graphicsmagick.org) for processing, generating, or analyzing images from a [_shell_](https://en.wikipedia.org/wiki/Shell_%28computing%29);
 2. [*G'MIC Online*](https://gmicol.greyc.fr/) a web service where many _G'MIC_ filters can be applied on images, directly from a web browser;
-3. [*G'MIC-Qt*](https://github.com/c-koi/gmic-qt) a popular plugin supported by many digital image editing applications such as [_GIMP_](https://www.gimp.org/), [_Krita_](https://krita.org/), [_Paint.NET_](https://www.getpaint.net/), and [_Photoshop_](https://www.adobe.com/products/photoshop.html) (thanks to its availability as a [_8bf plugin_](https://github.com/0xC0000054/gmic-8bf)).
+3. [*G'MIC-Qt*](https://github.com/GreycLab/gmic-qt) a popular plugin supported by many digital image editing applications such as [_GIMP_](https://www.gimp.org/), [_Krita_](https://krita.org/), [_Paint.NET_](https://www.getpaint.net/), and [_Photoshop_](https://www.adobe.com/products/photoshop.html) (thanks to its availability as a [_8bf plugin_](https://github.com/0xC0000054/gmic-8bf)).
 
 ===
 [![Preview of the G'MIC-Qt Plugin](https://gmic.eu/gmic340/thumbs/gmic340.png)](https://gmic.eu/gmic340/img/gmic340.jpg)
@@ -43,7 +43,7 @@ _Fig. 1.1. Preview of the G'MIC-Qt plugin version __3.4.0__, running in GIMP 2.1
 
 # 2. What's New in Version __3.4.0__?
 
-Version __3.4.0__ of _G'MIC_ focuses on _stability_ and _long-term support_: After more than 15 years of continuous development, _G'MIC's_ core elements have been extensively put through their paces. We now strive for stabilizing the key _Application Programmer's Interfaces (APIs):_  [`libgmic`](https://gmic.eu/libgmic.html), to integrate _G'MIC_ features into _C_ or _C++_ code, [_G'MIC-Qt_ plugin](https://github.com/c-koi/gmic-qt/blob/master/NEW_HOST_HOWTO.md) to port the plugin to new hosts, and the syntax of the _G'MIC_ script language itself, including the freezing of the parameter settings of the _G'MIC_ commands already available.
+Version __3.4.0__ of _G'MIC_ focuses on _stability_ and _long-term support_: After more than 15 years of continuous development, _G'MIC's_ core elements have been extensively put through their paces. We now strive for stabilizing the key _Application Programmer's Interfaces (APIs):_  [`libgmic`](https://gmic.eu/libgmic.html), to integrate _G'MIC_ features into _C_ or _C++_ code, [_G'MIC-Qt_ plugin](https://github.com/GreycLab/gmic-qt/blob/master/NEW_HOST_HOWTO.md) to port the plugin to new hosts, and the syntax of the _G'MIC_ script language itself, including the freezing of the parameter settings of the _G'MIC_ commands already available.
 
 Thus, all versions of the _3.4.x_ branch will be dedicated to bug fixing and developing features that do not require modification of the language core, such as developing new filters or image processing operators. Attention will be paid to ensuring maximum backward compatibility among _3.4.x_ releases. In this sense, this version _3.4.0_ represents a long term milestone release in the project's history.
 
