@@ -33633,62 +33633,74 @@ u "{$1}"\
 "{$3}"\
 "{$7}"\
 "{$8,$9}"
-#@gui Statistical Mode: fx_rep_mode_type_int, fx_rep_mode_type_int_preview(1)*:*
+#@gui Statistical Mode: fx_rep_stat_mode, fx_rep_stat_mode_preview(1)*:*
 #@gui:_=note("This filter finds the most common color. If there are 2 colors with the same number of colors or if every colors are unique, then some or all pixels will return nan. When every pixels are nan, then this filter will return a error.")
 #@gui:_=separator(),_=note("<b>Main</b>")
-#@gui:Depth=choice(0,"8-Bit","16-Bit")
 #@gui:Output=choice(0,"Blended","Per-Layer")
 #@gui:_=separator(),_=note("<b>Miscellaneous</b>")
 #@gui:NAN Replacement Color=color(0,255,0,255)
-#@gui:Old Main=value(-1,-1)
+#@gui:Old Output=value(-1)
 #@gui:Old Color=value(-1)
-fx_rep_mode_type_int:
-if narg($_persistent) rm $_persistent keep[result]
-else fx_rep_mode_type_int_preview $*
+fx_rep_stat_mode:
+if narg($_persistent)
+	rm
+	$_persistent
+	keep[result]
+else
+	fx_rep_stat_mode_preview $*
 fi
-fx_rep_mode_type_int_preview:
+fx_rep_stat_mode_preview:
 skip $*
 contain_persistent:=narg($_persistent)
 
-if ([${1-2}]!=[$7])||!$contain_persistent
- to_rgba
- if $1 * 257 fi
+if $1!=$6||!$contain_persistent
+	to_rgba
 
- if $2
-  rep_mode_type_int $1,1
- else
-  rep_blend_mode_type_int $1
- fi
+	if $1
+		foreach {
+			w$>,h$>:=w,h
+		}
+		rep_mode 0
+	else
+		rep_mode_blend
+	fi
 
- foreach { if isnan(im) error all_nan@[$>] fi }
+	foreach {
+		eval[-1] "begin(
+				counts_of_nan=0;
+			);
+			isnan(i)?++counts_of_nan;
+			end(
+				merge(counts_of_nan,+);
+				set('{}',counts_of_nan==whds);
+			);
+			"
+		if ${} error all_nan@[$>] fi
+		if $1 resize ${w$>},${h$>},100%,100%,0,1 fi
+	}
 
- if $1 / 257 fi
+	name[0--1] result
 
- name[0--1] result
+	if !$1
+		+f isnan(i0)?[${2-5}]:I
+		name[-2,-1] temp_result,result
+	fi
 
- if !$2
-  +f isnan(i0)?[${3-6}]:I
-  name[-2,-1] temp_result,result
- fi
-
- +store _persistent
-elif $contain_persistent?!$1&&([${3-6}]!=[$8])
- rm $_persistent rm[result]
- +f isnan(i0)?[${3-6}]:I
- name[-2,-1] temp_result,result
- +store _persistent
-else rm $_persistent
+	+store _persistent
+elif $contain_persistent?!same([${2-5}],[$7])
+	rm $_persistent rm[result]
+	+f isnan(i0)?[${2-5}]:I
+	name[-2,-1] temp_result,result
+else
+	rm $_persistent
 fi
 
 rmn temp_result
 
-display_color:=1+!$1
-
 u "{$1}"\
-"{$2}"\
-"{${3-6}}_"$display_color\
-"{${1-2}}"\
-"{${3-6}}"
+"{${2-5}}"_{(!$1)<<1}\
+"{$1}"\
+"{${2-5}}"
 ######################
 
 # Local Variables:
