@@ -85,68 +85,172 @@ eval.. >"begin(
 	end(da_freeze(#-1););
 	"
 rm..
-#@cli rep_mode: _fill_with_mode_color={ 0=false | 1=true }
+#@cli rep_mode: _fill_with_mode_color={ 0=false | 1=true },_seed
 #@cli : Transform image to the most common color of images.
-#@cli : Note: Code adapted from G'MIC Standard Library colormap code.
 #@cli : Default values: '_fill_with_mode_color=1'
 rep_mode:
-skip ${1=1}
+skip ${1=1},${2=}
 
 original_status=${}
 
+buckets_per_threads:=1<<8
+mt_dictionary_buckets:=$_cpus<<8
+
 foreach {
-	# Prepare dimensions for output
+	spec_size:=s
 	output_dimensions:=$1?[w#-1,h#-1,d#-1,s#-1]:[1,1,1,s#-1]
+	mt_mode:=whd>0x8000
 
-	# Compute hashcode map.
-	+n. 0,255 f. "ret = vectors(); H = 0; repeat (s,p,(H*=31)+=j(0,0,0,p)); ret[0] = H%2048; ret"
-	channels. 0 equalize. 2048 n. 0,2047 round. 1
-
-	# Find single occurrence of each color/vector.
-	0x2048
-	eval[0] ">
-		begin(sizes = vector2048(); ret = vectors());
-		col_s = I;
-		H = i#1; indH = H + 2;
-		sH = sizes[H];
-		!sH || find(#indH,col_s,s#0*(sH - 1),-s#0)<0?( # Color not found
-			sH>=h(#indH)?resize(#indH,s#0,max(8,2*h#indH),1,1,0);
-			copy(i(#indH,0,sH,0,0),col_s);
-			++sizes[H];
-		);
-		ret;
-		end(fill(sizes,k,resize(#k + 2,s#0,sizes[k],1,1,0)));"
-
-	a[2--1] y permute. yzcx rm..
-
-	index.. .,0,0
-	histogram.. {[w,0,w-1]}
-
-	# Compare frequency to check
-	eval.. >"begin(
-			count_and_place=vector(#3);
-		);
-		if(i>count_and_place[0],
-			count_and_place[1]=count_and_place[0];
-			count_and_place[0]=i;
-			count_and_place[2]=x;
-		);
-		end(
-			set('{}',v2s(count_and_place););
-		);"
-
-	# Transform image into most common color
-	maximal_a,maximal_b,max_pos=${}
-
-	if $maximal_a==$maximal_b
-		color=[{vector(#s#-1,nan)}]
-		rm
+	if $mt_mode
+		dictionary_buckets,p_mode=$mt_dictionary_buckets,:
 	else
-		color=[{I[#-1,$max_pos]}]
-		rm
+		dictionary_buckets,p_mode=$buckets_per_threads,>
 	fi
 
-	$output_dimensions,$color
+	# Create Hashmap
+	100%,100%,100%,1,$p_mode"
+		begin_t(
+			narg($2)?(
+				srand($2+(t<<8));
+			);
+			seed=v(0x1234,0xabcd);
+			offset=2+(t<<8);
+		);
+		channels=I#0;
+		hash_value=0;
+		repeat($spec_size,p,
+			hash_value=xor(((hash_value<<1)-hash_value)*seed,channels[p]);
+			hash_value&=0xff;
+		);
+		hash_value+offset;"
+
+	# Find Mode of Color
+
+	0x$dictionary_buckets
+
+	eval[0] $p_mode"
+		begin_t(
+			const spec_size=$spec_size;
+			const inc_spec_size=spec_size+1;
+			const dec_spec_size=spec_size-1;
+			last_color=vectors(nan);
+			last_p=nan;
+			sizes=found_vectors=vector(#0x100);
+			count_of_found_vector=0;
+			offset=2+(t<<8);
+		);
+		key=i#1;
+		H=h(#key);
+
+		if(!H,
+			found_vectors[count_of_found_vector++]=key;
+		);
+
+		same_color=same(I,last_color);
+		(H?(p=same_color?last_p:find(#key,I,0,inc_spec_size)+1))?(
+			if(!same_color,p+=dec_spec_size;);
+			++i[#key,p];
+			last_p=p;
+		):(
+			new_size=H+inc_spec_size;
+			resize(#key,1,new_size,1,1,-1);
+			copy(i(#key,0,H,0,0),[I,1]);
+			++sizes[key-offset];
+			last_p=new_size;
+		);
+		last_color=I;
+		I;
+		end_t(
+			repeat(count_of_found_vector,p,
+				img_pos=found_vectors[p];
+				resize(#img_pos,inc_spec_size,sizes[img_pos-offset],1,1,-1);
+			);
+		);"
+
+	rm[0,1]
+	a y
+	permute yzcx
+	s c,-{s-1}
+
+	if !$mt_mode
+		eval[1] "
+			begin(m=0);
+			if(i==iM#1,
+				++m;
+			);
+			end(
+				merge(m,+);
+				set('{}',m);
+			);"
+
+		if ${}>1
+			$output_dimensions,[{vector(#s#0,nan)}]
+		else
+			$output_dimensions,{I[#0,xM#1]}
+		fi
+
+		keep[-1]
+		continue
+	fi
+
+	{w#0},1,1,1,"begin(
+			narg($2)?(
+				srand($2);
+			);
+			seed=v(0x1234,0xabcd);
+		);
+		channels=I#0;
+		hash_value=0;
+		repeat(s#0,p,
+			hash_value=xor(((hash_value<<1)-hash_value)*seed,channels[p]);
+			hash_value&=0xff;
+		);
+		hash_value+3;"
+
+	0x$buckets_per_threads
+
+	eval[0] >"begin(
+			const step_s=s+1;
+			const back_s=s-1;
+			current_maximum_color=vectors(nan);
+			maxima_a=maxima_b=0;
+			chval(value)=if(value>=maxima_a,
+					current_maximum_color=I;
+					maxima_b=maxima_a;
+					maxima_a=value;
+			);
+			last_color=vectors(nan);
+			last_p=nan;
+		);
+		key=i#2;
+		H=h(#key);
+
+		same_color=same(I,last_color);
+		(H?(p=same_color?last_p:find(#key,I,0,step_s)+1))?(
+			if(!same_color,p+=back_s;);
+			current_number_of_color=i[#key,p]+=i#1;
+			chval(current_number_of_color);
+			last_p=p;
+		):(
+			new_size=H+step_s;
+			resize(#key,1,new_size,1,1,-1);
+			current_number_of_color=i#1;
+			chval(current_number_of_color);
+			copy(i(#key,0,H,0,0),[I,current_number_of_color]);
+			last_p=new_size;
+		);
+		I;
+
+		end(
+			maxima_a>maxima_b?(
+				set('{}',v2s(current_maximum_color));
+			):(
+				set('{}',v2s(vectors(nan)););
+			);
+		);"
+
+	rm
+	$output_dimensions,[${}]
 }
 
 status $original_status
