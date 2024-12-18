@@ -436,15 +436,20 @@ if $use_hashmap_processing
 			const spec_size=$spectrum_size;
 			const inc_spec_size=spec_size+1;
 			const dec_spec_size=spec_size-1;
+			const count_boundary=s>>1;
+			const maximum_vector_size=spec_size*s;
+
 			offset_pos=(t<<8)+2;
+
 			chval(value)=if(value>=maxima_a,
 					current_maximum_color=current_color;
+					if(value>count_boundary,maxima_a=value;break());
 					maxima_b=maxima_a;
 					maxima_a=value;
 			);
 		);
 
-		size_buckets=vector(#0x100);
+		size_table=vector(#0x100,0);
 		maxima_a=maxima_b=number_of_buckets=color_pos=last_p=0;
 
 		keys=I;
@@ -457,31 +462,29 @@ if $use_hashmap_processing
 			key=keys[v];
 			relative_key=key-offset_pos;
 
-			size_bucket=size_buckets[relative_key];
-			height_current_bucket=h(#key);
+			current_size=size_table[relative_key];
+			H=h(#key);
 
 			same_color=current_color==old_color;
-			bucket_pos=height_current_bucket-size_bucket;
-			(size_bucket?(p=same_color?last_p:find(#key,current_color,bucket_pos,inc_spec_size)+1))?(
+			(current_size?(p=same_color?last_p:find(#key,current_color,current_size-inc_spec_size,-inc_spec_size)+1))?(
 				if(!same_color,p+=dec_spec_size);
 				current_number_of_color=++i[#key,p];
 				chval(current_number_of_color);
 				last_p=p;
 			):(
-				size_buckets[relative_key]+=inc_spec_size;
-				current_size_bucket=size_buckets[relative_key];
-
-				(height_current_bucket?current_size_bucket>height_current_bucket:1)?(
-					insertion_pos=height_current_bucket;
-					resize(#key,1,current_size_bucket,1,1,-1);
-				):(
-					insertion_pos=height_current_bucket-current_size_bucket;
+				if(inrange(H,0,maximum_vector_size,1,0),
+					if(current_size+inc_spec_size>=H,
+						new_size=cut(H<<1,inc_spec_size,maximum_vector_size);
+						resize(#key,1,new_size,1,1,-1);
+					);
 				);
-
-				copy(i(#key,0,insertion_pos,0,0),[current_color,1]);
+				copy(i[#key,current_size],[current_color,1]);
 				chval(1);
-				last_p=insertion_pos+spec_size;
+				last_p=current_size+spec_size;
+				size_table[relative_key]+=inc_spec_size;
 			);
+
+
 			color_pos+=spec_size;
 			old_color=current_color;
 		);
@@ -501,6 +504,7 @@ else
 	f "begin(
 			const S=$spectrum_size;
 			const layers=$number_of_images;
+			const count_boundary=layers>>1;
 			init_new_counts=vector(#layers);
 			init_new_counts[0]=1;
 
@@ -510,7 +514,7 @@ else
 		colors=I;
 		counts=init_new_counts;
 		last_nonduplicate_pos=S;
-		found_at_least_one_duplicate=0;
+		found_at_least_one_duplicate=reached_boundary=0;
 		old_color=v_NaN;
 
 		for(pos=S,pos<s,pos+=S,
@@ -527,7 +531,11 @@ else
 				);
 			);
 			old_color=current_color;
-			++counts[q_pos[1]];
+
+			if(++counts[q_pos[1]]>count_boundary,
+				break();
+			);
+
 			found_duplicate?(
 				found_at_least_one_duplicate=1;
 			):(
@@ -536,6 +544,9 @@ else
 			);
 		);
 
+		reached_boundary?(
+			current_color;
+		):
 		found_at_least_one_duplicate?(
 			current_maxima=old_maxima=maxima_pos=0;
 			for(r=[0,0],r[0]<last_nonduplicate_pos,r+=[S,1],
