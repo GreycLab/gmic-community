@@ -3034,63 +3034,39 @@ local[-1] {
 #@cli : Return corrected file name for exporting files.
 #@cli : Note: Every single arguments applied to this command counts as a single string.
 rep_correct_exp_ne:
+('$*':;)
 
-str_inp="$*"
-str_stoi=[{'$str_inp'}]
-str_length:=size($str_stoi)
-
-if $str_length>255 error str_length<256==F fi
-
-if $str_length==3
-	if find('AUXCONNULPRN',$str_stoi,0,3)+1
-		error "Cannot use Windows reserved filename"
-	fi
-elif $str_length==4
-	if (find('COMLPT',($str_stoi)[0,3],0,3)+1)&&inrange(($str_stoi)[3],_'0',_'9',1,1)
-		error "Cannot use Windows reserved filename"
-	fi
+if h>=0x100
+	error Error: Length exceeds maximum allowed (256 characters)
 fi
 
-(0) => temporary_string_image
+({h}) a[-2,-1] y
+
+invalid_chars:='\"#<>:/?*"\\"'
 
 eval "
-	const string_to_process=$temporary_string_image;
-	inv_chars='#<>:/?*\"';
+	for(p=da_size(#-1)-1,p>=-1,--p,
+		char=i[#-1,p];
+		if(isin(i[#-1,p],"$invalid_chars"),da_remove(#-1,p););
+		if(same(char,_'~'),i[#-1,p]=_'-';);
+		if(same(char,_'.'),i[#-1,p]=_'_';);
+	);
+	final_size=da_size(#-1);
 
-	da_push(#string_to_process,"{'$str_inp'}");
-	end_ind=da_size(#string_to_process)-1;
+	first_three_chars=uppercase(crop(#-1,0,0,0,0,1,3,1,1));
 
-	for(p=end_ind,p>-1,--p,
-
-		v=i[#string_to_process,p];
-
-		find(inv_chars,v,0,1)+1?(
-			da_remove(#string_to_process,p);
-		);
-
-		v=='~'?(
-			I[#string_to_process,p]='-';
-		):
-		v=='.'?(
-			I[#string_to_process,p]='_';
-		);
-
+	final_size==3?(
+		isin(first_three_chars,'AUX','CON','NUL','PRN')?run('error \"Cannot use Windows reserved filename.\"');
+	):
+	final_size==4?(
+		isin(first_three_chars,'COM','LPT')&&inrange(i[#-1,3],_'1',_'9',1,1)?run('error \"Cannot use Windows reserved filename.\"');
 	);
 
-	end(da_freeze(#string_to_process););"
+	da_freeze(#-1);"
 
-if h==3
-	if find('AUXCONNULPRN',crop(#$temporary_string_image),0,3)+1
-		error "Cannot use Windows reserved filename"
-	fi
-elif h==4
-	if (find('COMLPT',(crop(#$temporary_string_image))[0,3],0,3)+1)&&inrange(i(#$temporary_string_image,0,3),_'0',_'9',1,1)
-		error "Cannot use Windows reserved filename"
-	fi
-fi
+u {t} rm.
 
-u {t}
-rm.
+if !same('$*','{t}') v + e[2] "File Name Changed!" v - fi
 #@cli rep_find_factors_of: num_0...
 #@cli : Return the factors found in all numbers at once.
 #@cli :
