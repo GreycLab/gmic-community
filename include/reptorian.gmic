@@ -6972,6 +6972,7 @@ check "
 #@cli rep_sum_permutations: size>0,limit>=0,_axis={x,y,z}
 #@cli : Create a image representing every possible fixed-size vector which sum of non-negative integers is up to integer limit.
 +rep_sum_permutations:
+skip ${3=x}
 check "isint($1,1)&&isint($2,0)&&$#>3?inrange(_'$-1',_'x',_'z',1,1):1"
 sum_permutations_size:=$2?perm($1,$2+$1,0):$1
 
@@ -7173,10 +7174,9 @@ eval "
 #@cli rep_total_sum_permutations: size>0,sum_total>=0,_axis={x,y,z}
 #@cli : Create a image representing every possible fixed-size vector which sum of non-negative integers is equal to the total of sum.
 +rep_total_sum_permutations:
+skip ${3=x}
 check "isint($1,1)&&isint($2,0)&&$#>3?inrange(_'$-1',_'x',_'z',1,1):1"
 total_sum_permutations_size={d_s=$1-1;perm(d_s,d_s+$2,0)}
-
-if $total_sum_permutations_size>(1<<24) exc_size fi
 
 if $#>2
 	axis={_'$-1'-_'x'}
@@ -7191,16 +7191,22 @@ if !$2
 	return
 fi
 
-$dims,$1,>"begin(
+if $total_sum_permutations_size>0x10000 mode=: else mode=> fi
+
+$dims,$1,$mode"
+	begin(
+		const axis=$axis;
+		axis==2?(iter_index()=z;):
+		axis==1?(iter_index()=y;):
+		         iter_index()=x;
 		v=vector(#s);
 		const ep=size(v)-1;
 		const d_ep=ep-1;
 		last_p_found=d_ep;
-		last_v=v[ep]=$2;
 		end_pos=scanline_pos=ep;
 		started=0;
 	);
-	if(started,
+	started?(
 		v[scanline_pos]==$2?(
 			copy(v[scanline_pos],0,$1-scanline_pos,1,0);
 			v[--scanline_pos]=1;
@@ -7226,9 +7232,36 @@ $dims,$1,>"begin(
 			--v[ep];
 			last_p_found=d_ep;
 		);
-		last_v=v[ep];
+	):(
+		(index=iter_index())?(
+			level_length=perm(ep,$2+ep,0);
+			level_id=$1-2;
+			sections_count=$2;
+			N=sections_count;
+			find_scanline_pos=1;
+			p=0;
+			while(N,
+				left_blocks_group_size=total_block_length=0;
+				repeat(sections_count,q,
+					left_blocks_group_size=total_block_length;
+					total_block_length+=perm(level_id,level_id+(sections_count-q),0);
+					if(total_block_length>index,break(););
+				);
+				--level_id;
+				index-=left_blocks_group_size;
+				sections_count-=q;
+				if(find_scanline_pos?q,
+					scanline_pos=p;
+					find_scanline_pos=0;
+				);
+				v[last_p_found=p++]=q;
+				N-=q;
+			);
+		):(
+			v[ep]=$2;
+		);
+		started=1;
 	);
-	started=1;
 	v;"
 #@cli rep_total_sum_permutation_index2list: size>0,sum>=0,index
 #@cli : Return the list of non-negative integers values which adds up to sum at lexicographic index.
