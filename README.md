@@ -3,7 +3,11 @@
 #### A Full-Featured Open-Source Framework for Image Processing
 ##### https://gmic.eu
 
+<a href="https://gmic.eu">![Logo](https://gmic.eu/img/logos2.jpg)</a>
+
 -----------------------
+
+## Overview
 
 **G'MIC** is a full-featured open-source framework for **[digital image processing](https://en.wikipedia.org/wiki/Image_processing)**, distributed under the
 **[CeCILL](http://cecill.info/index.en.html)** free software licenses (LGPL-like and/or GPL-compatible).
@@ -59,15 +63,44 @@ Other open-source projects are known to use some of the <b><font color="#000066"
 
 -----------------------
 
-## Give Us Support !
+## Testing the software
 
-  If you appreciate what we do on G'MIC, please consider supporting us !
-
-  We collaborate with ["Association LILA (Libre comme l'Art)"](https://libreart.info/en/projects/gmic),
-  a French non-profit organization which collects donations to help developing the G'MIC project.
-
-  [Visit the donation page](https://libreart.info/en/projects/gmic)
+The correct functioning of the **G'MIC** software can be tested using these two commands, which execute all the commands
+and filters available in the framework:
+~~~
+$ gmic input_text https://gmic.eu/gmic_stdlib.\$_version parse_cli images
+~~~
+and
+~~~
+$ gmic input_text https://gmic.eu/gmic_stdlib.\$_version parse_gui images
+~~~
+Please make sure you run these commands in a new empty folder, as it generates a lot of new image files.
 
 -----------------------
 
-<a href="https://gmic.eu">![Logo](https://gmic.eu/img/logos2.jpg)</a>
+## Referencing the software
+
+To cite G'MIC in your own publications, please reference the JOSS article, published in January 2025:
+
+- [D. Tschumperlé](https://tschumperle.users.greyc.fr),
+  [S. Fourey](https://foureys.users.greyc.fr) and G. Osgood (2025).
+  [G'MIC: An Open-Source Self-Extending Framework for Image Processing](https://doi.org/10.21105/joss.06618),
+  Journal of Open Source Software, 10(105), 6618, https://doi.org/10.21105/joss.06618
+
+- Corresponding _BibTeX_ entry:
+~~~
+@article{Tschumperlé2025,
+  doi = {10.21105/joss.06618},
+  url = {https://doi.org/10.21105/joss.06618},
+  year = {2025},
+  publisher = {The Open Journal},
+  volume = {10},
+  number = {105},
+  pages = {6618},
+  author = {David Tschumperlé and Sébastien Fourey and Garry Osgood},
+  title = {G'MIC: An Open-Source Self-Extending Framework for Image Processing},
+  journal = {Journal of Open Source Software}
+}
+~~~
+
+-----------------------
