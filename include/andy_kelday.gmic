@@ -3339,6 +3339,48 @@ gcd_self_guided : skip ${1=3},${2=0.01}
     *[0,-1] *. -1 +. 1 *[-2,-1] boxfilter. $1 +
   }
 
+#@cli gcd_seams
+#@cli : Find vertical paths with optimal variance for a given gradient map.
+#@cli : $ image.jpg gradient_norm gcd_seams
+gcd_seams :
+  foreach {
+    # Calculate low matrix (backwards propagation).
+    +f[0] "<i+min(j(-1,1),j(0,1),j(1,1))"
+
+    # Initialise seams, top matrix.
+    100%,100%,100%,100% +rows[1] 0
+    => grad,low,seam,top
+
+    repeat h#0-1 {
+      # get next row from low matrix
+      nr:=$>+1 +z[low] 0,$nr,100%,$nr => cmp
+
+      # Find optimum matches between two 1D matrices.
+      +*[top,cmp] # vertical weights
+      +shift[top] 1 *. [cmp] # diagonal backward weights
+      +shift[cmp] 1 *. [top] # diagonal forward weights
+      +[-2,-1] # summed diagonal weights
+      j[cmp] [top]
+      f[cmp] ">max(j(-1)+i#-2,j(-2)+i#-1)" # forward pass: f(x)
+      shift[cmp] 1 +[-2] [cmp] # calculate all f(x-1) + vertical
+      shift[cmp] 1 +[cmp,-1]   # calculate all f(x-2) + diagonal
+      >[-2,-1] f. "<j(1)<0?1:-i" => offs # backward pass: offsets
+
+      # Add matched row to seams.
+      j[seam] [offs],0,$>
+
+      # Distribute matched energy within top matrix.
+      f[top] "j(i#-1)" rm[offs]
+
+      # Add next energy row to top matrix.
+      +z[grad] 0,$nr,100%,$nr +[top,-1]
+    }
+
+    # Calculate seam energy.
+    j[grad] [top],0,100% rm[low,top]
+    f[grad] "<j(i#-1,1,0,0,0,1)" rm[seam]
+  }
+
 #=============================================
 #************* FILE BROWSER ******************
 #=============================================
