@@ -5187,84 +5187,46 @@ rep_contains_wave_at_end: skip "${1=}" if narg($1) u {a=['$1'];(a)[size(a)-1]==_
 rep_random_bits: check "$1>0" u {`expr('v(_'0',_'1')',$1)`}
 #@cli rep_sym_xy: eq. to 'rep_symmetrize_xy'.
 rep_sym_xy: rep_symmetrize_xy $1
-#@cli rep_symmetrize_xy: 0<=mode<=3
+#@cli rep_symmetrize_xy: 0<=mode<=3,_border_size>=0
 #@cli : Create copies and then append images to generate symmetry alongside xy-axis.
 #@cli :
+#@cli : Default values: '_border_size=0'
 #@cli : Author: Reptorian.
-rep_symmetrize_xy:
-mode={int($1)%4}
+new_rep_symmetrize_xy:
+skip ${2=1}
+mode,s,e={[$1&3,[int(abs($2))+[0,1]]]}
 
-resize_end={([0,0,1,1,0,1,1,0])[$mode*2,2]}
+resize_end={([0,0,1,1,0,1,1,0])[$mode<<1,2]}
 
-if $mode==3
-	crop_a_0,crop_a_1,crop_a_2,crop_a_3=1,0,1,2
-	image_a=,1~,1~
-	image_b=,0~,1~
-	crop_b=1,h#0-1,w#0-1,h#0-1
-	crop_c=0,0,0,h#0-2
-elif $mode==2
-	crop_a_0,crop_a_1,crop_a_2,crop_a_3=0,1,2,1
-	image_b=,1~
-	image_c=,1~,1~
-	crop_b=0,0,w#0-2,0
-	crop_c=w#0-1,1,w#0-1,h#0-1
+if !$s
+	foreach { r 200%,200%,100%,100%,0,3,$resize_end }
+	return
+fi
+
+if !$mode
+	crop_x0,crop_y0,crop_x1,crop_y1=0,0,$e,$e
 elif $mode==1
-	crop_a_0,crop_a_1,crop_a_2,crop_a_3=1,1,1,1
-	image_a=,0~,1~
-	image_c=,1~
-	crop_b=1,0,w#0-1,0
-	crop_c=0,1,0,h#0-1
+	crop_x0,crop_y0,crop_x1,crop_y1=$s,$s,1,1
+elif $mode==2
+	crop_x0,crop_y0,crop_x1,crop_y1=0,$s,$e,1
 else
-	crop_a_0,crop_a_1,crop_a_2,crop_a_3=0,0,2,2
-	image_a=,1~
-	image_b=,1~,1~
-	image_c=,0~,1~
-	crop_b=0,h#0-1,w#0-2,h#0-1
-	crop_c=w#0-1,0,w#0-1,h#0-2
+	crop_x0,crop_y0,crop_x1,crop_y1=$s,0,1,$e
 fi
 
-if $mode<2
-	mirror_a,mirror_b,mirror_c=x,y,x
-else
-	mirror_a,mirror_b,mirror_c=y,x,y
-fi
-
-if $mode&1
-	image_d=0
-else
-	image_d=1~
-fi
-
-if !($mode%3)
-	image_e=,1~
-fi
+a_x,a_y,b_x,b_y:=xor(vector(#4,$crop_x0,$crop_y0),[1,1,0,0])
 
 foreach {
-	+crop[0] $crop_a_0,$crop_a_1,{w-$crop_a_2},{h-$crop_a_3}
-	+resize[0] {w#0+w#-1},{h#0+h#-1},100%,100%,0,0,$resize_end
+	+crop[0] $crop_x0,$crop_y0,{[w,h]-[$crop_x1,$crop_y1]}
+	r[-1] {[w#-2,h#-2]+[w#-1,h#-1]},100%,100%,0,0,$resize_end
 
-	mirror[-2] $mirror_a
-	image[-1] [-2]$image_a
+	mirror[0] xy
+	j[1] [0],$a_x~,$a_y~
+	mirror[0] x
+	j[1] [0],$b_x~,$a_y~
+	mirror[0] xy
+	j[1] [0],$a_x~,$b_y~
 
-	mirror[-2] $mirror_b
-	image[-1] [-2]$image_b
-
-	mirror[-2] $mirror_c
-	image[-1] [-2]$image_c
-
-	rm[-2]
-
-	+crop[0] {[$crop_b]}
-	mirror[-1] x
-	image[-2] [-1],$image_d,.5~
-	rm[-1]
-
-	crop[0] {[$crop_c]}
-	mirror[-2] y
-
-	image[-1] [-2],.5~$image_e
-
-	rm[-2]
+	rm[0]
 }
 #@cli rep_cellular_automata : int_rule,_min_arr_size
 #@cli : Default values: '_min_arr_size=n/a'
@@ -10390,7 +10352,7 @@ if $1!=0
 			n=yi-sqr(xi);
 			xn=xi*c-n*s;
 			yn=xi*s+n*c;
-			if(xn==inf||yn==inf||xn==-inf||yn==-inf,break());
+			if(isinf(xn)||isinf(yn),break(););
 			xi=xn;yi=yn;
 			if(m!=t,
 				cx=round(posx+"$out_xi"/2*dist);
