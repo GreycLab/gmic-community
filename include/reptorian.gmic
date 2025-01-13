@@ -2497,49 +2497,50 @@ repeat $# {
 		output;"
 	rm..
 }
-#@cli rep_nearest_ratio: value_a>0,value_b>0,_maximum_proposition_number>0,_output_whether_true_ratio={ 0=False | 1=True },_force_proposition_number={ 0=False | True }
-#@cli : Return nearest ratio from 2 different values
-#@cli : Default value: '_maximum_divisor=0'
+#@cli rep_nearest_ratio: value_a>0,value_b>0,_maximum_proposition_number>0,output_whether_true_ratio={ 0=False | 1=True },force_proposition_number={ 0=False | True }
+#@cli : Return nearest ratio from 2 different values. Proposition number is only used when force_fit_proposition_number is true.
+#@cli : Note: The minimum number of arguments is 2. Maximum number of argument is 5. Defaults may change depending on the number of arguments.
 rep_nearest_ratio:
-skip ${3=0},${4=0},${5=0}
-check "!(find([${1-2}]>0,0,0,1)+1)&&isint($3)&&$3>=0"
+size_of_vector:=max($#,3)
+proposition_number:=vector(#$size_of_vector,${1--1})[2]
+
+check "isint($1,1) &&
+       isint($2,1) &&
+       isint($proposition_number,0) &&
+       ($#==5?isbool($-2)&&isbool($-1):
+        $#==4?isbool($-1):
+            1) &&
+       isint($#,2,5)"
 
 eval "
-	const nv=2+($4&1);
-	const max_prop_num=$3;
-	v=[${1-2}];
-	a=min(v);
-	b=max(v);
-	common_number=gcd(a,b);
-	$5?(
-		prop_test=gcd(max_prop_num,common_number);
-		true_ratio=prop_test>1;
-		end=true_ratio?prop_test:max_prop_num;
-		lower_ratio=round(a/b*end);
-		if((temp=gcd(end,lower_ratio))>1,
-			lower_ratio/=temp;
-			end/=temp;
-		);
-		ans=v[0]>v[1]?[end,lower_ratio]:[lower_ratio,end];
-	):(
-		c=b/common_number;
-		true_ratio=0;
-		!max_prop_num||c<max_prop_num?(
-			b=c;
-			a/=common_number;
-			true_ratio=1;
-			ans=v[0]>v[1]?[b,a]:[a,b];
-		):(
-			ratio=a/b;
-			proposition_number=round(ratio*max_prop_num);
-			common_number=gcd(proposition_number,max_prop_num);
-			b=max_prop_num/common_number;
-			proposition_number/=common_number;
-			a=proposition_number;
-			ans=v[0]>v[1]?[b,a]:[a,b];
+	ratio=[${1-2}];
+	const proposition_number=$proposition_number;
+	const force_fit_proposition_number=($#==5?$-2:$#>2)&&(proposition_number>1);
+	const final_vector_size=2+($#>3?bool($-1));
+
+	minval=min(ratio);
+	maxval=max(ratio);
+	ratio_divisor=gcd(${1-2});
+	is_mode_force_fit=0;
+	is_true_ratio=1;
+
+	if(force_fit_proposition_number,
+		if(proposition_number!=(maxval/ratio_divisor),
+			is_mode_force_fit=1;
+			is_true_ratio=0;
 		);
 	);
-	vectornv(ans,true_ratio);"
+
+	is_mode_force_fit?(
+		a=round(minval/maxval*proposition_number);
+		ratio=ratio[0]<ratio[1]?[a,proposition_number]:[proposition_number,a];
+		ratio/=gcd(ratio);
+	):(;
+		ratio/=ratio_divisor;
+	);
+
+	vector(#final_vector_size,ratio,is_true_ratio);
+	"
 #@cli rep_red_acrylic_filter: [source_image],_luminosity_blend_factor>=0%,_green_cut>=0%,_green_visibility>=0%
 #@cli : Alter a image so that target image would be visible using a red acrylic plastic sheet as cover.
 rep_red_acrylic_filter:
@@ -32482,7 +32483,7 @@ else
   s.=\n\n"- Image \#"{$>+1}" -"
   s.=\n"Dimensions: "$w{`120`}$h
 
-  a,b,true_ratio=${rep_nearest_ratio\ $w,$h,$2,1}
+  a,b,true_ratio=${rep_nearest_ratio\ $w,$h,$2,1,1}
 
   if $true_ratio
    s.=\n"Aspect Ratio: "$a{`58`}$b
