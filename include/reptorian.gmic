@@ -2536,7 +2536,7 @@ eval "
 		ratio=ratio[0]<ratio[1]?[a,proposition_number]:[proposition_number,a];
 		ratio/=gcd(ratio);
 		if(!a,ratio=map(ratio,[1,proposition_number]));
-	):(;
+	):(
 		ratio/=ratio_divisor;
 	);
 
@@ -32482,7 +32482,7 @@ else
 		s.=\n"Average Value: "{ia}
 		s.=\n"Variance Value: "{iv}
 		s.=\n"Summation Value: "{is}
-		s.=\n"Product Value: "{ip}
+		s.=\n"Product Value: "${-_rep_calc_product_of_image}
 		s.=\n"Median Value: "{ic}
 		s.=\n"L2-Norm Vlaue: "{in}
 	}
@@ -32495,6 +32495,63 @@ fi
 u "{"$str_inform"}"\
 "{$2}"\
 "{$2}"
+_rep_calc_product_of_image:
+products=
+sep=
+
+foreach {
+	if isinf(iM#-1)||isinf(im#-1)||(!isfinite(ia#-1))||isfinite(ip#-1)
+		products.=$sep{ip#-1}
+	else
+		eval[-1] "
+			begin(
+				convert_to_scientific_notation(value)=(
+					value?(
+						current_exponent=floor(log10(abs(value)));
+						current_coeff=value/(10^current_exponent);
+					):(
+						current_exponent=0;
+						current_coeff=0;
+					);
+				);
+				accumulate()=(
+					accumulative_exponent+=current_exponent;
+					t_prod=current_coeff*accumulative_coeff;
+					abs(t_prod)>10?(
+						t_prod=t_prod/10;
+						++accumulative_exponent;
+					);
+					accumulative_coeff=t_prod;
+				);
+				accumulative_coeff=1;
+				accumulative_exponent=0;
+			);
+			current_scientific_notation=convert_to_scientific_notation(i);
+			accumulate();
+			i;
+			end(
+				merge(accumulative_coeff,*);
+				merge(accumulative_exponent,+);
+				accumulative_coeff?(
+					current_exponent=floor(log10(abs(accumulative_coeff)));
+					accumulative_exponent+=current_exponent;
+					accumulative_coeff=accumulative_coeff/(10^current_exponent);
+				);
+				set('accumulative_coeff',accumulative_coeff);
+				set('accumulative_exponent',accumulative_exponent);
+			);
+			"
+		if !$accumulative_coeff products.=${sep}0
+		else
+			products.=$sep${accumulative_coeff}e
+			if $accumulative_exponent>=0 products.=+ fi
+			products.=$accumulative_exponent
+		fi
+	fi
+	sep=,
+}
+
+u $products
 #@gui Lavander Binary Map:fx_rep_lavander_binary_map,fx_rep_lavander_binary_map_preview(0)*
 #@gui:_=note("Based on the work of Lavander at discord/generative. Instruction on how it works is described at the bottom of this filter.")
 #@gui:_=separator(),_=note("<b>Main</b>")
