@@ -1400,7 +1400,7 @@ status {`([${}])[0,$final_size]`}
 #@cli : '_appended_into_palette=1','_method=0','_mask_factor=1','_cube_size=16'
 rep_nonexistent_colors_pal:
 skip ${2=1},${3=0},${4=1},${5=64}
-check "isint($1)&&$1>=1"
+check "isint($1)&&$1>=1&&inrange($4,0,1,0,1)&&isint($5,7,256)"
 
 number_of_new_colors,append_into_pal,cube_size=$1,$2,$5
 
@@ -1411,98 +1411,45 @@ else
 fi
 
 if $far_mode
-
-	mask_factor={1-$4}
-	if !inrange($4,0,1,0,1)
-		error 0<\$\4<=1==F
+	# Unfortunately this code requires coordinates of vertexs in 4D+ dimensions via voronoi to actually be optimal
+	mask_factor:=1/$4
+	scale_factor:=255/($cube_size-1)
+	/ $scale_factor # Normalize Palettes
+	foreach { resize {whd},1,1,100%,-1 }
+	num_of_imgs:=$!
+	$num_of_imgs,1,1,1,s#x colormap. 0,1,1
+	repeat w#-1 {
+		size_of_channels:=i[#$num_of_imgs,$>]
+		current_box_dimensions={vector(#$size_of_channels,$cube_size)}
+		box_dimensions_$size_of_channels=$current_box_dimensions
+		+rep_cartesian_product $current_box_dimensions => cube_$size_of_channels
+	}
+	rm[$num_of_imgs]
+	repeat $num_of_imgs {
+		current_index=$>
+		repeat $number_of_new_colors {
+			current_number_of_channels:=s#$current_index
+			[${cube_$current_number_of_channels}]
+			+index[-1] [$current_index],0,1
+			-[-2,-1]
+			sqr. compose_channels. +
+			if $mask_factor!=1 sqrt. +n. 0,1 negate. ^. $mask_factor *[-2,-1] fi
+			max_coords:=xM#-1
+			(${rep_cartesian_product_index2list\ ${box_dimensions_$current_number_of_channels},$max_coords}) permute. yzcx
+			a[$current_index,-1] x rm.
+		}
+	}
+	rm[$num_of_imgs--1]
+	if !$append_into_pal
+		foreach { crop {w-$number_of_new_colors},100% }
 	fi
+	* $scale_factor round
+else
+	foreach {
+		current_number_of_colors:=whd
 
-	if !isint($cube_size)||!inrange($cube_size,7,256,1,1)
-		error inv_inp_\$\5
-	fi
-
-	if $cube_size==256
-		initial_code=i(#-1,I)=1
-		xyz_code=[xM,yM,zM]
-		m "cmd_$0_insert_new_color: point 0,$""1,0,1,$""2,$""3,$""4"
-	else
-		d_cube_size={$cube_size-1}
-		initial_code=i(#-1,I*{$d_cube_size/255})=1
-		xyz_code=round([xM,yM,zM])
-		m "cmd_$0_insert_new_color: point 0,$""1,0,1,{round([$""2,$""3,$""4]*"{255/$d_cube_size}")}"
-	fi
-
-	if $mask_factor
-		m "cmd_$0_generate_pal:
-			current_number_of_colors=$""1
-
-			if "$append_into_pal"
-				1,{"$number_of_new_colors"+$current_number_of_colors},1,1,y
-				map[-1] [-3]
-				rm[-3]
-			else
-				1,"$number_of_new_colors",1,{s#-2}
-				rm[-3]
-				current_number_of_colors=0
-			fi
-
-			+fill[-2] :\"const max_coords="$d_cube_size";!i?(inrange(x,0,max_coords,0,0)&&inrange(y,0,max_coords,0,0)&&inrange(z,0,max_coords,0,0));\"
-			+inpaint_pde[-3] [-1],100%,0
-			remove[-2]
-			erode_circ. 2,1,1 blur. 2 +. 1 ^. "$mask_factor"
-
-			repeat "$number_of_new_colors" {
-				+distance... 1,2 *. .. xyz:="$xyz_code" rm.
-				point... $xyz,1,1
-				cmd_$0_insert_new_color.. $current_number_of_colors,$xyz
-				current_number_of_colors+=1
-			}
-
-			remove[-3,-1]
-			"
-	else
-		m "cmd_$0_generate_pal:
-			current_number_of_colors=$""1
-
-			if "$append_into_pal"
-				1,{"$number_of_new_colors"+$current_number_of_colors},1,1,y
-				map[-1] [-3]
-				rm[-3]
-			else
-				1,"$number_of_new_colors",1,{s#-2}
-				rm[-3]
-				current_number_of_colors=0
-			fi
-
-			repeat "$number_of_new_colors" {
-				+distance.. 1,2 xyz:="$xyz_code" rm.
-				point.. $xyz,1,1
-				cmd_$0_insert_new_color. $current_number_of_colors,$xyz
-				current_number_of_colors+=1
-			}
-
-			remove[-2]
-			"
-	fi
-
-fi
-
-foreach {
-
-	current_number_of_colors:=whd
-
-	if $far_mode
-
-		if s!=3
-			error inv_chans_num
-		fi
-
-		{vector3($cube_size)},1
-		eval[-2] $initial_code
-		cmd_$0_generate_pal $current_number_of_colors
-	else
-		if !inrange(1,6,1,1)
-			error inv_chans_num
+		if !inrange(s#-1,1,6,1,1)
+			error inv_chans_num@[$>]
 		fi
 
 		if $append_into_pal
@@ -1659,10 +1606,8 @@ foreach {
 			"
 
 		keep[{!$append_into_pal}]
-	fi
-}
-
-um cmd_$0_insert_new_color,cmd_$0_generate_pal
+	}
+fi
 #@cli rep_van_neumann_condition_tiling: width,height,whole_number_count_starting_from_zero>=4
 #@cli : Generate random tiles which meets van neumann condition.
 +rep_van_neumann_condition_tiling:
@@ -23980,7 +23925,7 @@ u "{$1}"\
 #@gui:Color 146 Selected=_bool(0)
 #@gui:Palette Color 147=color(193,120,170)
 #@gui:‎  ‎  ‎  ‎Delete Color 147‎  ‎  ‎  ‎  =button(0)
-#@gui:Color 147Selected=_bool(0)
+#@gui:Color 147 Selected=_bool(0)
 #@gui:Palette Color 148=color(185,109,145)
 #@gui:‎  ‎  ‎  ‎Delete Color 148‎  ‎  ‎  ‎  =button(0)
 #@gui:Color 148 Selected=_bool(0)
@@ -29795,7 +29740,7 @@ u "{$1}"\
 "{$20}" #TODO#
 #@gui Statistical Average: fx_rep_bchstatfunc_average,fx_rep_bchstatfunc_average
 #@gui:Mode=choice(0,"RGB","sRGB","RYB","LAB")
-#@gui:Use Alpha?=bool(0)
+#@gui:Preserve Alpha?=bool(0)
 #@gui:_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"),Preview Split=point(50,50,0,0,200,200,200,0,10)_0
 #@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2024/01/15</i>.</small>")
 fx_rep_bchstatfunc_average:
@@ -29805,7 +29750,7 @@ convert_colors_bwd=${arg\ 1+$1,,srgb2rgb,ryb2rgb,lab2rgb}
 m __$0_average_per_channels:$convert_colors_fwd" +resize 1,1,1,100%,2 ri[-1] [-2] remove[-2] "$convert_colors_bwd
 
 foreach {
-	if !(s&1)&&$1
+	if !(s&1)&&!$1
 		s c,-{s-1}
 		__$0_average_per_channels[0]
 		a c
