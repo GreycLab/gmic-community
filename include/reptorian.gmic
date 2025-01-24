@@ -1446,166 +1446,178 @@ if $far_mode
 	* $scale_factor round
 else
 	foreach {
+
 		current_number_of_colors:=whd
 
-		if !inrange(s#-1,1,6,1,1)
-			error inv_chans_num@[$>]
-		fi
+		if $far_mode
 
-		if $append_into_pal
-			1,{$number_of_new_colors+$current_number_of_colors},1,1,y
-			map[-1] [-2]
-			rm[-2]
-			1,1,1,100%
+			if s!=3
+				error inv_chans_num
+			fi
+
+			{vector3($cube_size)},1
+			eval[-2] $initial_code
+			cmd_$0_generate_pal $current_number_of_colors
 		else
-			1,1,1,100%x2
-		fi
+			if !inrange(s#-1,1,6,1,1)
+				error inv_chans_num
+			fi
 
-		eval "  # Enter JIT compiler
-			const number_of_new_colors=$number_of_new_colors;
-			const number_of_channels=s#0;
-			const current_number_of_colors=$current_number_of_colors;
-			const append_into_pal=$append_into_pal;
-			const maximum_integer_value=256^number_of_channels;
+			if $append_into_pal
+				1,{$number_of_new_colors+$current_number_of_colors},1,1,y
+				map[-1] [-2]
+				rm[-2]
+				1,1,1,100%
+			else
+				1,1,1,100%x2
+			fi
 
-			bitshift_factors=expr('x?1<<(2+x)',number_of_channels);
+			eval "  # Enter JIT compiler
+				const number_of_new_colors=$number_of_new_colors;
+				const number_of_channels=s#0;
+				const current_number_of_colors=$current_number_of_colors;
+				const append_into_pal=$append_into_pal;
+				const maximum_integer_value=256^number_of_channels;
 
-			convert_color2int(color_values)=sum(color_values<<bitshift_factors);
-			convert_int2color(value)=(value>>bitshift_factors)&0xff;
+				bitshift_factors=expr('x?1<<(2+x)',number_of_channels);
 
-			min_pos_val=-1;
-			max_pos_val=inf;
+				convert_color2int(color_values)=sum(color_values<<bitshift_factors);
+				convert_int2color(value)=(value>>bitshift_factors)&0xff;
 
-			state_check=mode=0;
-			old_value=middle_pivot=pivot_value=-1;
+				min_pos_val=-1;
+				max_pos_val=inf;
 
-			repeat(current_number_of_colors,p,
-				current_color=I[#0,p];
-				current_value=convert_color2int(current_color);
+				state_check=mode=0;
+				old_value=middle_pivot=pivot_value=-1;
 
-				mode==3?(
-					state_check=0;
-					current_value==min_pos_val||current_value==max_pos_val||current_value==pivot_value||current_value==old_value?(
-						continue();
-					):(
-						old_value=current_value;
+				repeat(current_number_of_colors,p,
+					current_color=I[#0,p];
+					current_value=convert_color2int(current_color);
 
-						current_value<min_pos_val?(
-							min_pos_val=current_value;
-							da_insert(#-1,0,current_color);
-						):
-						current_value>max_pos_val?(
-							max_pos_val=current_value;
-							da_push(#-1,current_color);
-						):
-						current_value>pivot_value?(
-							for(q=middle_pivot+1,q<da_size(#-1),++q,
-								test_value=convert_color2int(I[#-1,q]);
-								test_value>current_value?(
-									break();
-								):
-								test_value==current_value?(
-									state_check=1;
-									break();
-								);
-							);
-							if(state_check
-							,continue();
-							,da_insert(#-1,q,current_color);
-							);
-						):( # current_value<pivot_value
-							for(q=middle_pivot-1,q>0,--q,
-								test_value=convert_color2int(I[#-1,q]);
-								current_value>test_value?(
-									break();
-								):
-								test_value==current_value?(
-									state_check=1;
-									break();
-								);
-							);
-							if(state_check
-							,continue();
-							,da_insert(#-1,q+1,current_color);
-							);
-						);
-						middle_pivot=da_size(#-1)>>1;
-						pivot_value=convert_color2int(I[#-1,middle_pivot]);
-					);
-				):
-				mode==2?(
-					if(!state_check,
-						min_pos_val=convert_color2int(I[#-1,0]);
-						max_pos_val=convert_color2int(I[#-1,1]);
-						state_check=1;
-					);
-					current_value==min_pos_val||current_value==max_pos_val?(
-						continue();
-					):(
-						middle_pivot=1;
-						mode=3;
+					mode==3?(
 						state_check=0;
+						current_value==min_pos_val||current_value==max_pos_val||current_value==pivot_value||current_value==old_value?(
+							continue();
+						):(
+							old_value=current_value;
 
-						current_value<min_pos_val?(
-							pivot_value=min_pos_val;
-							min_pos_val=current_value;
-							da_insert(#-1,0,current_color);
-						):
-						current_value<max_pos_val?(
-							pivot_value=current_value;
-							da_insert(#-1,1,current_color);
-						):
-						current_value>max_pos_val?(
-							pivot_value=max_pos_val;
-							max_pos_val=current_value;
-							da_push(#-1,current_color);
+							current_value<min_pos_val?(
+								min_pos_val=current_value;
+								da_insert(#-1,0,current_color);
+							):
+							current_value>max_pos_val?(
+								max_pos_val=current_value;
+								da_push(#-1,current_color);
+							):
+							current_value>pivot_value?(
+								for(q=middle_pivot+1,q<da_size(#-1),++q,
+									test_value=convert_color2int(I[#-1,q]);
+									test_value>current_value?(
+										break();
+									):
+									test_value==current_value?(
+										state_check=1;
+										break();
+									);
+								);
+								if(state_check
+								,continue();
+								,da_insert(#-1,q,current_color);
+								);
+							):( # current_value<pivot_value
+								for(q=middle_pivot-1,q>0,--q,
+									test_value=convert_color2int(I[#-1,q]);
+									current_value>test_value?(
+										break();
+									):
+									test_value==current_value?(
+										state_check=1;
+										break();
+									);
+								);
+								if(state_check
+								,continue();
+								,da_insert(#-1,q+1,current_color);
+								);
+							);
+							middle_pivot=da_size(#-1)>>1;
+							pivot_value=convert_color2int(I[#-1,middle_pivot]);
 						);
-					);
-				):
-				mode?(
-					current_value>old_value?(
+					):
+					mode==2?(
+						if(!state_check,
+							min_pos_val=convert_color2int(I[#-1,0]);
+							max_pos_val=convert_color2int(I[#-1,1]);
+							state_check=1;
+						);
+						current_value==min_pos_val||current_value==max_pos_val?(
+							continue();
+						):(
+							middle_pivot=1;
+							mode=3;
+							state_check=0;
+
+							current_value<min_pos_val?(
+								pivot_value=min_pos_val;
+								min_pos_val=current_value;
+								da_insert(#-1,0,current_color);
+							):
+							current_value<max_pos_val?(
+								pivot_value=current_value;
+								da_insert(#-1,1,current_color);
+							):
+							current_value>max_pos_val?(
+								pivot_value=max_pos_val;
+								max_pos_val=current_value;
+								da_push(#-1,current_color);
+							);
+						);
+					):
+					mode?(
+						current_value>old_value?(
+							da_push(#-1,current_color);
+							old_value=current_value;
+							mode=2;
+						):
+						current_value<old_value?(
+							da_insert(#-1,0,current_color);
+							old_value=current_value;
+							mode=2;
+						);
+					):(
 						da_push(#-1,current_color);
 						old_value=current_value;
-						mode=2;
-					):
-					current_value<old_value?(
-						da_insert(#-1,0,current_color);
-						old_value=current_value;
-						mode=2;
+						mode=1;
 					);
+				);
+
+				append_into_pal?(
+					insertion_pos=current_number_of_colors;
+					insert_new_color(color)=I[#-2,insertion_pos++]=color;
 				):(
-					da_push(#-1,current_color);
-					old_value=current_value;
-					mode=1;
+					insert_new_color(color)=da_push(#-2,color);
 				);
-			);
 
-			append_into_pal?(
-				insertion_pos=current_number_of_colors;
-				insert_new_color(color)=I[#-2,insertion_pos++]=color;
-			):(
-				insert_new_color(color)=da_push(#-2,color);
-			);
-
-			last_rn=inf;
-			q=0; # Inserted position
-			repeat(number_of_new_colors,
-				selec_u=v(0,maximum_integer_value-da_size(#-1),1,0);
-				for(q=(selec_u>=last_rn?++q),q<da_size(#-1),++q,
-					selec_u>=convert_color2int(I[#-1,q])?(
-						++selec_u;
-					):(break(););
+				last_rn=inf;
+				q=0; # Inserted position
+				repeat(number_of_new_colors,
+					selec_u=v(0,maximum_integer_value-da_size(#-1),1,0);
+					for(q=(selec_u>=last_rn?++q),q<da_size(#-1),++q,
+						selec_u>=convert_color2int(I[#-1,q])?(
+							++selec_u;
+						):(break(););
+					);
+					new_color=convert_int2color(selec_u);
+					da_insert(#-1,q,new_color);
+					insert_new_color(new_color);
+					last_rn=selec_u;
 				);
-				new_color=convert_int2color(selec_u);
-				da_insert(#-1,q,new_color);
-				insert_new_color(new_color);
-				last_rn=selec_u;
-			);
 
-			if(!append_into_pal,da_freeze(#-2););
-			"
+				if(!append_into_pal,da_freeze(#-2););
+				"
 
-		keep[{!$append_into_pal}]
+			keep[{!$append_into_pal}]
+		fi
 	}
 fi
 #@cli rep_van_neumann_condition_tiling: width,height,whole_number_count_starting_from_zero>=4
