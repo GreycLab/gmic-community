@@ -48,6 +48,149 @@
 #
 #-------------------------------
 
+#@cli rep_zip: axis={ x=horizontal | y=vertical | z=depth },output_sections={ 0=false | 1=sections | split_sections }
+#@cli : Zips images. All images must have same spectrum size!
+#@cli : $ (0,5,9,13,15,16) (1,6,10) (2,7,11) (3,8,12,14) (4) rep_zip x
+#@cli : $ (0,3,6) (1,4,7) (2,5,8) rep_zip x
+#@cli : $ sp cat,flower rep_zip x resize. 1360,525,1,100%,-1
+#@cli : Author: Reptorian.
+rep_zip:
+skip ${2=0}
+check "inrange(('$1')[0],_'x',_'z',1,1)&&isint($2,0,2)"
+
+old_status=${}
+
+arg0 $2,"."," and split by sections."," and split by split_sections."
+e[^-1] "Zips image"$?" along $1-axis"${}
+
+remove_empty
+if $!<=1 return fi
+
+vol_of_images,info_image:=$!+[0,1]
+axis:='$1'
+axis_ind={$axis-_'x'}
+$!,1,1,1,whd#x
+
+check isint($!,2)?!var(expr('s#x',w))&&im#-1
+
++sort.
+discard. x
+sort.
+
+100%,1,1,{3+bool($2)},>"begin(
+		t_sum=0;
+		ref_vec=["{crop(#-2)}"];
+	);
+	x?(
+		previous_pos=j(#-1,-1);
+		rows=sum(ref_vec>previous_pos);
+		columns=i(#-1)-previous_pos;
+		area=columns*rows;
+		v=[t_sum,t_sum+area-1,previous_pos,rows];
+		t_sum+=area;
+	):(
+		t_sum=w#-2*im#-2;
+		v=[0,t_sum-1,0,w#-2];
+		0;
+	);
+	v;
+	"
+
+rm..
+
+{D=vector(#3,1);D[$axis_ind]=is#-2;[D,s#0]},${arg0\ is#-1>0x10000,>,:}"
+	begin(
+		const vol_of_images_ind=$vol_of_images;
+		const num_of_unique_volumes=w#vol_of_images_ind;
+		const info_image_ind=$info_image;
+		const axis=$axis;
+		const min_range_pos=0;
+		const max_range_pos=1;
+		const start_img_ind_pos=2;
+		result=vector(#s,0);
+		num_of_available_arrays=num_of_unique_volumes;
+		available_volume_of_images=expr('x',num_of_unique_volumes);
+		initialized=1;
+		range_min=range_max=img_ind=img_pos=-1;
+		pos_info_image=0;
+		axis==_'x'?(axis()=x;):
+		axis==_'y'?(axis()=y;):
+		            axis()=z;
+	);
+	pos=axis();
+	initialized||pos>range_max?(
+		initialized?(
+			pos?(
+				left=0;
+				right=w#info_image_ind-1;
+				while(left<=right,
+					pos_info_image=left+((right-left)>>1);
+					range_min=i(#info_image_ind,pos_info_image,0,0,min_range_pos);
+					range_max=i(#info_image_ind,pos_info_image,0,0,max_range_pos);
+					isint(pos,range_min,range_max)?(
+						break();
+					):
+					pos<range_min?(
+						right=pos_info_image-1;
+					):(
+						left=pos_info_image+1;
+					);
+				);
+				start_img_pos=i(#info_image_ind,pos_info_image,0,0,start_img_ind_pos);
+			):(
+				pos_info_image=start_img_pos=0;
+				range_min=i(#info_image_ind,pos_info_image,0,0,min_range_pos);
+				range_max=i(#info_image_ind,pos_info_image,0,0,max_range_pos);
+			);
+		):(
+			++pos_info_image;
+			range_min=i(#info_image_ind,pos_info_image,0,0,min_range_pos);
+			range_max=i(#info_image_ind,pos_info_image,0,0,max_range_pos);
+			start_img_pos=i(#info_image_ind,pos_info_image,0,0,start_img_ind_pos);
+		);
+		if(pos,
+			q=temp_num_of_available_arrays=0;
+			repeat(num_of_available_arrays,p,
+				current_img_ind=available_volume_of_images[p];
+				current_dim_size=i[#vol_of_images_ind,current_img_ind];
+				current_dim_size>start_img_pos?(
+					available_volume_of_images[q++]=current_img_ind;
+					++temp_num_of_available_arrays;
+				);
+			);
+			num_of_available_arrays=temp_num_of_available_arrays;
+		);
+		relative_pos=pos-range_min;
+		img_pos=start_img_pos+int(relative_pos/num_of_available_arrays);
+		img_ind=relative_pos%num_of_available_arrays;
+		initialized=0;
+	);
+	current_img_ind=available_volume_of_images[img_ind];
+	copy(result[0],i[#current_img_ind,img_pos],s,1,i[#vol_of_images_ind,current_img_ind]);
+	if(++img_ind==num_of_available_arrays,
+		++img_pos;
+		img_ind=0;
+	);
+	result;"
+
+if $2
+	keep[-2,-1]
+	repeat w#-2-1 {
+		t0,t1={m=I[#0,$>][0,2];m-m[0]}
+		+crop[1] $t0,$t1
+		crop[1] {$t1+1},100%
+	}
+	move[1] $!
+	name[^0] {crop(#0,0,0,0,3,w#0,1,1,1)}
+	if $2==2
+		foreach[1--1] { s x,-{0,n} }
+	fi
+	rm[0]
+else
+	k[-1]
+fi
+
+status ${}
 #@cli rep_arg2freqsortvals: value_1,value_2,....
 #@cli : Convert arguments into frequency of sorted values.
 rep_arg2freqsortvals:
