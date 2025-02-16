@@ -65,126 +65,177 @@ arg0 $2,"."," and split by sections."," and split by split_sections."
 e[^-1] "Zips image"$?" along $1-axis"${}
 
 remove_empty
-if $!<=1 return fi
+
+if $!<=1
+	status $old_status
+	return
+fi
 
 vol_of_images,info_image:=$!+[0,1]
 axis:='$1'
 axis_ind={$axis-_'x'}
-$!,1,1,1,whd#x
 
-check isint($!,2)?!var(expr('s#x',w))&&im#-1
+check isint($!,2)&&!var(expr('s#x',$!))
 
-+sort.
-discard. x
-sort.
+eval "
+	list_of_volumes=expr('whd#x',$!);
+	sorted_list_of_volumes=sort(list_of_volumes);
 
-100%,1,1,{3+bool($2)},>"begin(
-		t_sum=0;
-		ref_vec=["{crop(#-2)}"];
+	num_of_unique_volumes=1;
+
+	for(p=1,p<size(list_of_volumes),++p,
+		if(sorted_list_of_volumes[p]!=sorted_list_of_volumes[p-1],
+			sorted_list_of_volumes[num_of_unique_volumes++]=sorted_list_of_volumes[p];
+		);
 	);
-	x?(
-		previous_pos=j(#-1,-1);
-		rows=sum(ref_vec>previous_pos);
-		columns=i(#-1)-previous_pos;
-		area=columns*rows;
-		v=[t_sum,t_sum+area-1,previous_pos,rows];
-		t_sum+=area;
-	):(
-		t_sum=w#-2*im#-2;
-		v=[0,t_sum-1,0,w#-2];
-		0;
-	);
-	v;
+
+	set('sortset_volumes',v2s(sorted_list_of_volumes));
+	set('num_of_unique_volumes',num_of_unique_volumes);
+	set('final_dimensions',sum(list_of_volumes));
 	"
 
-rm..
+sortset_volumes:=[$sortset_volumes][0,$num_of_unique_volumes]
 
-{D=vector(#3,1);D[$axis_ind]=is#-2;[D,s#0]},${arg0\ is#-1>0x10000,>,:}"
+imgs:=$!
+0
+{$num_of_unique_volumes}
+
+eval "
+	img_inds=expr('x',$imgs);
+	sortset_volumes=["$sortset_volumes"];
+
+	const size_img_inds=size(img_inds);
+	const size_sortset_volumes=size(sortset_volumes);
+	const size_ranges_and_length=size(sortset_volumes)<<2;
+	const overlimit_num_of_available_volumes_per_section=size_img_inds*size_sortset_volumes;
+
+	total_num_of_available_indices=num_of_available_indices=size_img_inds;
+
+	ranges_and_length=vector(#size_ranges_and_length);
+	list_of_available_img_inds=vector(#overlimit_num_of_available_volumes_per_section,img_inds);
+	list_of_start_img_ind_pos=vector(#size_sortset_volumes);
+
+	t_sum=rl_pos=previous_pos=0;
+	repeat(size(sortset_volumes),p,
+		current_value_in_sortset_volumes=sortset_volumes[p];
+		p?(
+			temp_num_of_available_indices=0;
+			repeat(num_of_available_indices,q,
+				current_img_ind=img_inds[q];
+				if(whd#current_img_ind>previous_pos,
+					img_inds[temp_num_of_available_indices++]=img_inds[q];
+				);
+			);
+			num_of_available_indices=temp_num_of_available_indices;
+			area=num_of_available_indices*(current_value_in_sortset_volumes-previous_pos);
+			list_of_start_img_ind_pos[p]=total_num_of_available_indices;
+			copy(list_of_available_img_inds[total_num_of_available_indices],img_inds,num_of_available_indices);
+			total_num_of_available_indices+=num_of_available_indices;
+			copy(ranges_and_length[rl_pos],[t_sum,t_sum+area-1,previous_pos,num_of_available_indices]);
+			t_sum+=area;
+		):(
+			t_sum=size(img_inds)*sortset_volumes[0];
+			copy(ranges_and_length[rl_pos],[0,t_sum-1,0,size(img_inds)]);
+			0;
+		);
+
+		rl_pos+=4;
+		previous_pos=current_value_in_sortset_volumes;
+	);
+	resize(#-2,total_num_of_available_indices,1,1,1);
+	copy(i[#-2,0],list_of_available_img_inds,total_num_of_available_indices);
+	copy(i[#-1,0],list_of_start_img_ind_pos);
+	set('ranges_and_length',v2s(ranges_and_length));
+
+	if($2,
+		set('split_positions',v2s(ranges_and_length[4,size_sortset_volumes-1,4]));
+		if($2==2,
+			set('subsplit_size',v2s(ranges_and_length[3,size_sortset_volumes,4]));
+		);
+	);
+
+	"
+
+{D=vector(#3,1);D[$axis_ind]=$final_dimensions;[D,s#0]},${arg0\ $final_dimensions>0x10000,>,:}"
 	begin(
-		const vol_of_images_ind=$vol_of_images;
-		const num_of_unique_volumes=w#vol_of_images_ind;
-		const info_image_ind=$info_image;
+		dimensions=expr('whd#x',$imgs);
+		ranges_and_length=["$ranges_and_length"];
+		result=vector(#s,0);
 		const axis=$axis;
 		const min_range_pos=0;
 		const max_range_pos=1;
 		const start_img_ind_pos=2;
-		result=vector(#s,0);
-		num_of_available_arrays=num_of_unique_volumes;
-		available_volume_of_images=expr('x',num_of_unique_volumes);
+		range_min=range_max=img_ind_pos_start=img_ind_pos_boundary=-1;
+		rl_pos=start_img_ind_ref_pos=0;
 		initialized=1;
-		range_min=range_max=img_ind=img_pos=-1;
-		pos_info_image=0;
 		axis==_'x'?(axis()=x;):
 		axis==_'y'?(axis()=y;):
 		            axis()=z;
 	);
 	pos=axis();
-	initialized||pos>range_max?(
+	if(pos>range_max,
 		initialized&&pos?(
 			left=0;
-			right=w#info_image_ind-1;
+			right=w#-1-1;
 			while(left<=right,
-				pos_info_image=left+((right-left)>>1);
-				range_min=i(#info_image_ind,pos_info_image,0,0,min_range_pos);
-				range_max=i(#info_image_ind,pos_info_image,0,0,max_range_pos);
+				start_img_ind_ref_pos=left+((right-left)>>1);
+				rl_pos=start_img_ind_ref_pos<<2;
+				range_min=ranges_and_length[rl_pos];
+				range_max=ranges_and_length[rl_pos+1];
 				isint(pos,range_min,range_max)?(
 					break();
 				):
 				pos<range_min?(
-					right=pos_info_image-1;
+					right=start_img_ind_ref_pos-1;
 				):(
-					left=pos_info_image+1;
+					left=start_img_ind_ref_pos+1;
 				);
 			);
 		):(
-			if(!initialized,++pos_info_image);
-			range_min=i(#info_image_ind,pos_info_image,0,0,min_range_pos);
-			range_max=i(#info_image_ind,pos_info_image,0,0,max_range_pos);
-		);
-		start_img_pos=i(#info_image_ind,pos_info_image,0,0,start_img_ind_pos);
-		if(pos,
-			q=temp_num_of_available_arrays=0;
-			repeat(num_of_available_arrays,p,
-				current_img_ind=available_volume_of_images[p];
-				current_dim_size=i[#vol_of_images_ind,current_img_ind];
-				current_dim_size>start_img_pos?(
-					available_volume_of_images[q++]=current_img_ind;
-					++temp_num_of_available_arrays;
-				);
+			if(!initialized,
+				++start_img_ind_ref_pos;
+				rl_pos+=4;
 			);
-			num_of_available_arrays=temp_num_of_available_arrays;
+			range_min=ranges_and_length[rl_pos];
+			range_max=ranges_and_length[rl_pos+1];
 		);
+		start_img_pos=ranges_and_length[rl_pos+2];
+		number_of_available_indices=ranges_and_length[rl_pos+3];
 		relative_pos=pos-range_min;
-		img_pos=start_img_pos+int(relative_pos/num_of_available_arrays);
-		img_ind=relative_pos%num_of_available_arrays;
+		img_pos=start_img_pos+int(relative_pos/number_of_available_indices);
+		temp=i[#-1,start_img_ind_ref_pos];
+		img_ind_pos_start=temp;
+		img_ind_pos_boundary=temp+number_of_available_indices;
+		img_ind=img_ind_pos_start+(relative_pos%number_of_available_indices);
 		initialized=0;
 	);
-	current_img_ind=available_volume_of_images[img_ind];
-	copy(result[0],i[#current_img_ind,img_pos],s,1,i[#vol_of_images_ind,current_img_ind]);
-	if(++img_ind==num_of_available_arrays,
+	select_img_ind=i[#-2,img_ind];
+	copy(result[0],i[#select_img_ind,img_pos],s,1,dimensions[select_img_ind]);
+	if(++img_ind==img_ind_pos_boundary,
 		++img_pos;
-		img_ind=0;
+		img_ind=img_ind_pos_start;
 	);
-	result;"
+	result;
+	"
+k.
 
 if $2
-	keep[-2,-1]
-	repeat w#-2-1 {
-		t0,t1={m=I[#0,$>][0,2];m-m[0]}
-		+crop[1] $t0,$t1
-		crop[1] {$t1+1},100%
-	}
-	move[1] $!
-	name[^0] {crop(#0,0,0,0,3,w#0,1,1,1)}
-	if $2==2
-		foreach[1--1] { s x,-{0,n} }
-	fi
-	rm[0]
-else
-	k[-1]
+	m __$0_vars:"$""=vars n_vars=$""#"
+	__$0_vars $split_positions
+	repeat $n_vars { rep_split_at_nth_point[0] $1,${vars{$<+1}} }
+	if $2==2 __$0_vars $subsplit_size foreach { s $1,-${vars{$>+1}} } fi
+	um __$0_vars,__$0_split
 fi
 
-status ${}
+status $old_status
+#@cli rep_split_at_nth_point: axis,split_point
+#@cli : Split at nth point.
+rep_split_at_nth_point:
+e[^-1] "Split image"$?" at pixel index $2"${}
+if same('$1','z')   foreach { +crop[0] 0,0,$2,0,0,100% crop[0] 0,0,0,0,0,{$2-1} }
+elif same('$1','y') foreach { +crop[0] 0,$2,0,100% crop[0] 0,0,0,{$2-1} }
+else                foreach { +crop[0] $2,100% crop[0] 0,{$2-1} }
+fi
 #@cli rep_arg2freqsortvals: value_1,value_2,....
 #@cli : Convert arguments into frequency of sorted values.
 rep_arg2freqsortvals:
