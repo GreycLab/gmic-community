@@ -153,7 +153,6 @@ eval "
 			set('subsplit_size',v2s(ranges_and_length[3,size_sortset_volumes,4]));
 		);
 	);
-
 	"
 
 {D=vector(#3,1);D[$axis_ind]=$final_dimensions;[D,s#0]},${arg0\ $final_dimensions>0x10000,>,:}"
@@ -221,21 +220,70 @@ k.
 
 if $2
 	m __$0_vars:"$""=vars n_vars=$""#"
-	__$0_vars $split_positions
-	repeat $n_vars { rep_split_at_nth_point[0] $1,${vars{$<+1}} }
-	if $2==2 __$0_vars $subsplit_size foreach { s $1,-${vars{$>+1}} } fi
-	um __$0_vars,__$0_split
+	rep_multisplit $split_positions
+	name[0--1] $subsplit_size
+	if $2==2 rep_multisplit -$1,$subsplit_size fi
+	um __$0_vars
 fi
 
 status $old_status
-#@cli rep_split_at_nth_point: axis,split_point
-#@cli : Split at nth point.
-rep_split_at_nth_point:
-e[^-1] "Split image"$?" at pixel index $2"${}
-if same('$1','z')   foreach { +crop[0] 0,0,$2,0,0,100% crop[0] 0,0,0,0,0,{$2-1} }
-elif same('$1','y') foreach { +crop[0] 0,$2,0,100% crop[0] 0,0,0,{$2-1} }
-else                foreach { +crop[0] $2,100% crop[0] 0,{$2-1} }
+#@cli rep_multisplit: 'axis','split_point_a','split_point_b',....
+#@cli : Split at nth points.
+#@cli : Note: if 'axis' has 2 chars, then it will split different images with equal sized blocks.
+rep_multisplit:
+check "a='$1';S=size(a);
+       set('S',S);
+       b=a[S-1];
+       set('axis_arg',b-_'x');
+       isint(S,1,2)&&
+       inrange(b,_'x',_'z',1,1)&&
+       (sum(isint([${2--1}],1))==($#-1));"
+
+old_status=${}
+
+arg $S," at pixel indexes "," into different sized blocks - "
+end_msg=${}${2--1}
+e[^-1] "Split image"$?$end_msg
+
+m __$0_vars:"$""=vars nargs=$""#"
+
+if $S==2
+	__$0_vars ${2--1}
+	axis=${arg0\ $axis_arg,x,y,z}
+	foreach { split $axis,-${vars{$>+1}} }
+else
+	eval "
+		args=[${2--1}];
+		args=sort(args);
+		q=1;
+		for(p=1,p<size(args),++p,
+			if(args[p]!=args[p-1],
+				args[q++]=args[p];
+			);
+		);
+		set('count_of_uniques',q);
+		args;"
+
+	__$0_vars {[${}][0,$count_of_uniques]}
+
+	mode=${arg0\ $axis_arg,columns,rows,slices}
+	dim=${arg0\ $axis_arg,w,h,d}
+
+	foreach {
+		repeat $nargs {
+			cut_point=${vars{$<+1}}
+			l[0] {
+				check isint($cut_point,0,$dim#0-1)
+				+$mode $cut_point,100%
+				$mode.. 0,{$cut_point-1}
+			}
+		}
+	}
 fi
+
+um __$0_vars
+
+status $old_status
 #@cli rep_arg2freqsortvals: value_1,value_2,....
 #@cli : Convert arguments into frequency of sorted values.
 rep_arg2freqsortvals:
