@@ -5972,59 +5972,62 @@ if $1==1 1 return fi
 
 axis,fact_size={_'$2'-_'x'},{fact($1)}
 
-out_dim={v=vector(#3,1);v[$axis]=$fact_size;v}
+{v=vector(#3,1);v[$axis]=$fact_size;v},$1
 
-if $1>8 mode=: else mode=> fi
+if $1>8 mode=:
+else mode=>
+fi
 
-$out_dim,$1,$mode"
-	begin(
-		const max_index=s-1;
-		const dec_max_index=max_index-1;
+{_'$mode'==_':'?$_cpus:1},1,1,2,v=whd#-1-(w-1-x)*int(whd#-1/w);[v>>24,v&0xffffff]
+eval. $mode"
+	const S=s#-2;
+	const max_index=S-1;
+	const dec_max_index=max_index-1;
 
-		const axis=$axis;
-		axis==2?(axis()=z;):
-		axis==1?(axis()=y;):
-		         axis()=x;
+	permutation=expr('x',S);
 
-		started=0;
-		permutation=expr('x',s);
-
-		reverse_array_starting_from(a)=(
-			start=a;
-			end=max_index;
-			while(start<end,
-				swap(permutation[start++],permutation[end--]);
-			);
-		);
-
-		move_ind(a,b)=a!=b?(
-			t_val=permutation[a];
-			copy(permutation[b+1],permutation[b],a-b,1,1);
-			permutation[b]=t_val;
+	reverse_array_starting_from(a)=(
+		start=a;
+		end=max_index;
+		while(start<end,
+			swap(permutation[start++],permutation[end--]);
 		);
 	);
 
-	started?(
+	move_ind(a,b)=a!=b?(
+		t_val=permutation[a];
+		copy(permutation[b+1],permutation[b],a-b,1,1);
+		permutation[b]=t_val;
+	);
+
+	t=J(-1);
+	p=t[0]<<24|t[1];
+
+	if(index=p,
+		fn=max_index;
+		repeat(fn,q,
+			division_number=fact(fn);
+			pos=int(index/division_number);
+			move_ind(q+pos,q);
+			index-=pos*division_number;
+			--fn;
+		);
+	);
+
+	I[#-2,p]=permutation;
+
+	i=i0<<24|i1;
+	while(++p<i,
 		fn=b=max_index;
 		while(permutation[fn-1]>=permutation[fn],--fn;if(!fn,break();););
 		while(b>fn&&permutation[b]<=permutation[fn-1],--b;);
 		swap(permutation[fn-1],permutation[b]);
 		reverse_array_starting_from(fn);
-	):(
-		if(index=axis(),
-			fn=max_index;
-			repeat(fn,p,
-				division_number=fact(fn);
-				pos=int(index/division_number);
-				move_ind(p+pos,p);
-				index-=pos*division_number;
-				--fn;
-			);
-		);
-		started=1;
+		I[#-2,p]=permutation;
 	);
+	"
 
-	permutation;"
+rm.
 #@cli rep_permutation_index2list: number_of_item,permutation_number
 #@cli : Return permutation order at index permutation_number.
 rep_permutation_index2list:
@@ -6114,87 +6117,85 @@ fi
 
 if $2==1 $out_dim,1,${arg\ $axis+1,x,y,z} return fi
 
-if $num_of_permutations>0x10000 mode=: else mode=> fi
+if $num_of_permutations>0x10000 mode=:
+else mode=>
+fi
 
-$out_dim,$2,$mode"
-	begin(
-		const edge=s-1;
-		const n=$1;
-		const dec_n=n-1;
-		const axis=$axis;
+$out_dim,$2
+{_'$mode'==_':'?$_cpus:1},1,1,2,v=whd#-1-(w-1-x)*int(whd#-1/w);[v>>24,v&0xffffff]
+eval. $mode"
+	const s=s#-2;
+	const edge=s-1;
+	const n=$1;
+	const dec_n=n-1;
 
-		axis==2?(
-			axis()=z;
-		):
-		axis==1?(
-			axis()=y;
-		):(
-			axis()=x;
+	output=expr('x',n);
+
+	reverse_array_starting_from(a)=(
+		start=a;
+		end=dec_n;
+		while(start<end,
+			swap(output[start++],output[end--]);
 		);
-
-		started=0;
-
-		output=expr('x',n);
-
-		reverse_array_starting_from(a)=(
-			start=a;
-			end=dec_n;
-			while(start<end,
-				swap(output[start++],output[end--]);
-			);
-		);
-
-		move_ind(a,b)=a!=b?(
-				t_val=output[a];
-				copy(output[b+1],output[b],a-b,1,1);
-				output[b]=t_val;
-			);
-
-		division_numbers_arr=expr('begin(
-				const m=($1==$2?1:$1-$2)+1;
-				v=m;
-			);
-			x>1?v=v*(m+x-1):(x?v:1);'
-			,1+($1==$2?$1-2:min($1-1,$2-1)));
-
-		const size_dna=size(division_numbers_arr);
-
 	);
 
-	started?(
-		j=s;
-		while(j<n && (output[edge]>=output[j]),++j;);
+	move_ind(a,b)=a!=b?(
+		t_val=output[a];
+		copy(output[b+1],output[b],a-b,1,1);
+		output[b]=t_val;
+	);
 
-		j<n?(
-			swap(output[edge],output[j]);
+	division_numbers_arr=expr('begin(
+			const m=($1==$2?1:$1-$2)+1;
+			v=m;
+		);
+		x>1?v=v*(m+x-1):(x?v:1);'
+	,1+($1==$2?$1-2:min($1-1,$2-1)));
+
+	const size_dna=size(division_numbers_arr);
+
+	t=J(-1);
+	p=t[0]<<24|t[1];
+
+	if(index=p,
+		divisor_position=size_dna-1;
+		repeat(size_dna,q,
+			division_number=division_numbers_arr[divisor_position];
+			pos=int(index/division_number);
+			move_ind(q+pos,q);
+			index%=division_number;
+			--divisor_position;
+		);
+	);
+
+	I[#-2,p]=output[0,s];
+
+	i=i0<<24|i1;
+	while(++p<i,
+		y=s;
+		while(y<n && (output[edge]>=output[y]),++y;);
+
+		y<n?(
+			swap(output[edge],output[y]);
 		):(
 			reverse_array_starting_from(s);
 
-			i=edge-1;
-			while(i>=0 && output[i]>=output[i+1],--i;);
+			z=edge-1;
+			while(z>=0 && output[z]>=output[z+1],--z;);
 
-			j=dec_n;
-			while(j>i && (output[i]>=output[j]),--j;);
+			y=dec_n;
+			while(y>z && (output[z]>=output[y]),--y;);
 
-			swap(output[i],output[j]);
+			swap(output[z],output[y]);
 
-			reverse_array_starting_from(i+1);
+			reverse_array_starting_from(z+1);
 		);
-	):(
-		if(index=axis(),
-			divisor_position=size_dna-1;
-			repeat(size_dna,p,
-				division_number=division_numbers_arr[divisor_position];
-				pos=int(index/division_number);
-				move_ind(p+pos,p);
-				index%=division_number;
-				--divisor_position;
-			);
-		);
-		started=1;
+
+		I[#-2,p]=output[0,s];
 	);
+	"
 
-	(output)[0,s];"
+rm.
 #@cli rep_npr_permutation_index2list: number_of_item,selected_items_count,permutation_number
 #@cli : Return permutation order at index permutation_number.
 rep_npr_permutation_index2list:
@@ -6302,37 +6303,41 @@ mode,ss,num_of_permutations,axis={pm=$1>0;[pm,pm?[$2,$1^$2]:[abs($1),$2^abs($1)]
 if $num_of_permutations>131072 p_mode=: else p_mode=> fi
 
 out_dim={v=[1,1,1];v[$axis]=$num_of_permutations;v;}
-
-$out_dim,$ss,$p_mode"
-	begin(
-		const axis=$axis;
-		const mode=$mode;
-		const d_s=s-1;
-		mode?(
-			const mod_factor=$1;
-			v=reverse(expr('$1^x',$2));
-		):(
-			const mod_factor=$2;
-			v=reverse(expr('$2^x',abs($1)));
-		);
-		const d_mode_factor=mod_factor-1;
-		axis==2?(iter_index()=z;):
-		axis==1?(iter_index()=y;):
-		         iter_index()=x;
-		started=0;
-	);
-	started?(
-		p=d_s;
-		while(v[p]==d_mode_factor,
-			v[p]=0;
-			--p;
-		);
-		++v[p];
+$out_dim,$ss
+{_'$p_mode'==_':'?$_cpus:1},1,1,2,v=whd#-1-(w-1-x)*int(whd#-1/w);[v>>24,v&0xffffff]
+eval. $p_mode"
+	const d_s=s#-2-1;
+	const mode=$mode;
+	mode?(
+		const mod_factor=$1;
+		v=reverse(expr('$1^x',$2));
 	):(
-		v=int(iter_index()/v)%mod_factor;
-		started=1;
+		const mod_factor=$2;
+		v=reverse(expr('$2^x',abs($1)));
 	);
-	v;"
+	const d_mod_factor=mod_factor-1;
+
+	t=J(-1);
+	p=t[0]<<24|t[1];
+
+	I[#-2,p]=v=int(p/v)%mod_factor;
+
+	i=i0<<24|i1;
+	while(++p<i,
+		q=d_s;
+
+		while(v[q]==d_mod_factor,
+			v[q]=0;
+			--q;
+		);
+
+		++v[q];
+
+		I[#-2,p]=v;
+	);
+	"
+
+rm.
 #@cli rep_r_permutation_index2list: times_items_can_repeat, repetition, position : -number_of_items, occurance_per_items, position
 #@cli : Return the list of numbers which correspond to the index provided based on permutations with repetition.
 rep_r_permutation_index2list:
@@ -6392,67 +6397,69 @@ fi
 
 if $num_combs>(768*$_cpus) mode=: fi
 
-$out_dim,$choices,$mode"
-	begin(
-		const n_items=$n_items;
-		const max_value=n_items-1;
-		const dec_max_value=max_value-1;
-		const axis=$axis;
-		const max_index=s-1;
-		const dec_max_index=max_index-1;
-		const IR=perm(max_index,n_items-1,0);
-		axis==2?(iter_index()=z;):
-		axis==1?(iter_index()=y;):
-		         iter_index()=x;
-		started=0;
-		comb=vector(#s,0);
-		ref_comb=expr('x+1',n_items-1);
-		copy(comb[1],ref_comb[0],s-1);
-	);
+$out_dim,$choices
+{_'$mode'==_':'?$_cpus:1},1,1,2,v=whd#-1-(w-1-x)*int(whd#-1/w);[v>>24,v&0xffffff]
+eval. $mode"
+	const S=s#-2;
+	const n_items=$n_items;
+	const max_value=n_items-1;
+	const dec_max_value=max_value-1;
+	const max_index=S-1;
+	const dec_max_index=max_index-1;
+	const IR=perm(max_index,n_items-1,0);
 
-	started?(
-		comb[max_index]==max_value?(
-			K=dec_max_value;
-			for(R=dec_max_index,comb[R]==K,K--;--R;);
-			copy(comb[R],ref_comb[comb[R]],s-R);
-		):(++comb[max_index];);
-	):(
-		index=iter_index();
+	comb=vector(#S,0);
+	ref_comb=expr('x+1',n_items-1);
+	copy(comb[1],ref_comb[0],S-1);
 
-		if(index,
+	t=J(-1);
+	p=t[0]<<24|t[1];
 
-			V=1;
-			R=IR;
-			K=R;
+	if(index=p,
+		V=1;
+		R=IR;
+		K=R;
 
+		while(K<=index,
+			++V;
+			R=perm(max_index,n_items-V,0);
+			K+=R;
+		);
+
+		K-=R;
+		comb[0]=V-1;
+
+		for(q=2,q<S,++q,
+			sp=S-q;
+			++V;
+			R=perm(sp,n_items-V,0);
+			K+=R;
 			while(K<=index,
-				++V;
-				R=perm(max_index,n_items-V,0);
-				K+=R;
-			);
-
-			K-=R;
-			comb[0]=V-1;
-
-			for(p=2,p<s,++p,
-				sp=s-p;
 				++V;
 				R=perm(sp,n_items-V,0);
 				K+=R;
-				while(K<=index,
-					++V;
-					R=perm(sp,n_items-V,0);
-					K+=R;
-				);
-				K-=R;
-				comb[p-1]=V-1;
 			);
-
-			started=1;
-			comb[max_index]=V+index-K;
+			K-=R;
+			comb[q-1]=V-1;
 		);
+
+		comb[max_index]=V+index-K;
 	);
-	comb;"
+
+	I[#-2,p]=comb;
+
+	i=i0<<24|i1;
+	while(++p<i,
+		comb[max_index]==max_value?(
+			K=dec_max_value;
+			for(R=dec_max_index,comb[R]==K,K--;--R;);
+			copy(comb[R],ref_comb[comb[R]],S-R);
+		):(++comb[max_index];);
+		I[#-2,p]=comb;
+	);
+	"
+
+rm.
 #@cli rep_ncr_combination_index2list: number_of_items,choices,index : choices, number_of_items,index
 #@cli : Return ncr combination at index. The algorithm used for this is based on Algorithm 515 (Buckles and Lybanon 1977) which allows index-based generation of combinations.
 #@cli :
@@ -6557,53 +6564,57 @@ elif $axis==1 out_dim=1,$num_combs,1
 else          out_dim=$num_combs,1,1
 fi
 
-if $num_combs>131072 mode=: fi
+if $num_combs>131072 mode=: else mode=> fi
 
-$out_dim,$choices,$mode"
-	begin(
-		const n_items=$n_items;
-		const max_ind=s-1;
-		const axis=$axis;
-		axis==2?(iter_index()=z;):
-		axis==1?(iter_index()=y;):
-		         iter_index()=x;
-		comb=vector(#s,0);
-		started=0;
-	);
-	started?(
-		if(++comb[max_ind]==n_items,
-			for(p=max_ind-1,p>-1,--p,
-				if(++comb[p]<n_items,
-						break();
-				);
+$out_dim,$choices
+{_'$mode'==_':'?$_cpus:1},1,1,2,v=whd#-1-(w-1-x)*int(whd#-1/w);[v>>24,v&0xffffff]
+eval. $mode"
+	const S=s#-2;
+	const n_items=$n_items;
+	const max_ind=S-1;
+	comb=vector(#S,0);
+
+	t=J(-1);
+	p=t[0]<<24|t[1];
+
+	if(m_index=p,
+		m_items=n_items;
+		m_choices=$choices;
+		temp=perm(m_choices-1,m_items+m_choices-2,0);
+		--m_choices;
+		item_choice=0;
+		repeat($choices,k,
+			while(temp<=m_index,
+				m_index-=temp;
+				temp*=m_items-1;
+				temp=int(temp/(m_items+m_choices-1));
+				--m_items;
+				++item_choice;
 			);
-			copy(comb[p+1],comb[p],max_ind-p,1,0);
-		);
-	):(
-		iter_index()?(
-			m_items=n_items;
-			m_choices=$choices;
-			m_index=iter_index();
-			temp=perm(m_choices-1,m_items+m_choices-2,0);
+			temp*=m_choices;
+			if((m_items+m_choices)>2,temp=int(temp/(m_items+m_choices-1)););
+			comb[k]=item_choice;
 			--m_choices;
-			item_choice=0;
-			repeat($choices,k,
-				while(temp<=m_index,
-					m_index-=temp;
-					temp*=m_items-1;
-					temp=int(temp/(m_items+m_choices-1));
-					--m_items;
-					++item_choice;
-				);
-				temp*=m_choices;
-				if((m_items+m_choices)>2,temp=int(temp/(m_items+m_choices-1)););
-				comb[k]=item_choice;
-				--m_choices;
-			);
 		);
-		started=1;
 	);
-	comb;"
+
+	I[#-2,p]=comb;
+
+	i=i0<<24|i1;
+	while(++p<i,
+		if(++comb[max_ind]==n_items,
+			for(q=max_ind-1,q>-1,--q,
+				if(++comb[q]<n_items,
+					break();
+				);
+			);
+			copy(comb[q+1],comb[q],max_ind-q,1,0);
+		);
+		I[#-2,p]=comb;
+	);
+	"
+
+rm.
 #@cli rep_r_combination_index2list: n,k,index
 #@cli : Return the list of numbers which correspond to the index provided based on a list of all possible combinations with repetition.
 #@cli : Code is taken from Joseph Wood at codereview.stackexchange - https://codereview.stackexchange.com/questions/285415/find-the-list-of-combination-with-repetition-given-rank-and-number-of-items/287944#287944
@@ -6692,7 +6703,7 @@ if $n_vars_isint!=$vars2chk invalid_var_inp fi
 dims,s_size={v=[$v_list];[prod(v),size(v)];}
 
 if $dims>33554432 error dims_lim_exc fi
-if int($dims/$_cpus)>131072 p_mode=: else p_mode=> fi
+if int($dims/$_cpus)>0x10000 p_mode=: else p_mode=> fi
 
 dims={v=vector(#3,1);v[$axis]=$dims;v;}
 
@@ -6700,39 +6711,44 @@ if max($v_list)==1 1,1,1,$s_size return
 elif $s_size==1 $dims,1,${arg\ $axis+1,x,y,z} return
 fi
 
-$dims,$s_size,$p_mode"
-	begin(
-		const axis=$axis;
-		const mode=$mode;
-		const d_s=s-1;
-		const dec_d_s=d_s-1;
-		items_list=["$v_list"];
-		div_list=vector(#s,1);
+$dims,$s_size
+{_'$p_mode'==_':'?$_cpus:1},1,1,2,v=whd#-1-(w-1-x)*int(whd#-1/w);[v>>24,v&0xffffff]
+eval. $p_mode"
+	const S=s#-2;
+	const d_s=S-1;
+	const dec_d_s=d_s-1;
+	items_list=["$v_list"];
+
+	t=J(-1);
+	p=t[0]<<24|t[1];
+
+	p?(
+		div_list=vector(#S,1);
 		tv=1;
-		repeat(d_s,p,
-			div_list[dec_d_s-p]=tv*=items_list[d_s-p];
+		repeat(d_s,q,
+			div_list[dec_d_s-q]=tv*=items_list[d_s-q];
 		);
-		axis==2?(iter_index()=z;):
-		axis==1?(iter_index()=y;):
-		         iter_index()=x;
-		started=0;
-		v=vector(#s,0);
-	);
-	started?(
-		p=d_s;
-		while(v[p]==items_list[p],
-			v[p]=0;
-			--p;
-		);
-		++v[p];
+		v=int(p/div_list)%items_list;
 	):(
-		(pos=iter_index())?(
-			v=int(pos/div_list)%items_list;
-		);
-		items_list--;
-		started=1;
+		v=vector(#S,0);
 	);
-	v;"
+
+	--items_list;
+
+	I[#-2,p]=v;
+
+	i=i0<<24|i1;
+	while(++p<i,
+		q=d_s;
+		while(v[q]==items_list[q],
+			v[q]=0;
+			--q;
+		);
+		++v[q];
+		I[#-2,p]=v;
+	);"
+
+rm.
 #@cli rep_cartesian_product_index2list: number_of_items_a,number_of_items_b,...,index
 #@cli : Return the list of numbers which correspond to the index provided. Every arguments must be a integer.
 rep_cartesian_product_index2list:
@@ -6812,47 +6828,67 @@ fi
 
 out_dim={v=vector(#3,1);v[$axis]=$number_of_possible_permutations;v}
 
-$out_dim,$total_items_count,$p_mode"
-	begin(
-		const max_index=s-1;
-		const dec_max_index=max_index-1;
+$out_dim,$total_items_count
+{_'$p_mode'==_':'?$_cpus:1},1,1,2,v=whd#-1-(w-1-x)*int(whd#-1/w);[v>>24,v&0xffffff]
+eval. $p_mode"
+	const S=s#-2;
 
-		const axis=$axis;
-		axis==2?(iter_index()=z;):
-		axis==1?(iter_index()=y;):
-		         iter_index()=x;
+	const max_index=S-1;
+	const dec_max_index=max_index-1;
 
-		const t_items=$total_items_count;
-		const n_perms=$number_of_possible_permutations;
+	const t_items=$total_items_count;
+	const n_perms=$number_of_possible_permutations;
 
-		items_group_count=["$items_count"];
-		permutation=vector(#t_items);
-		q=0;
-		repeat(size(items_group_count),p,
-			count=items_group_count[p];
-			copy(permutation[q],p,count,1,0);
-			q+=count;
-		);
+	items_group_count=["$items_count"];
+	permutation=vector(#t_items);
 
-		reverse_array_starting_from(a)=(
-			start=a;
-			end=max_index;
-			while(start<end,
-				swap(permutation[start++],permutation[end--]);
-			);
-		);
-
-		move_ind(a,b)=(
-			t_val=permutation[a];
-			a!=b?(
-				copy(permutation[b+1],permutation[b],a-b,1,1);
-				permutation[b]=t_val;
-			);
-		);
-
-		started=0;
+	q=0;
+	repeat(size(items_group_count),p,
+		count=items_group_count[p];
+		copy(permutation[q],p,count,1,0);
+		q+=count;
 	);
-	started?(
+
+	reverse_array_starting_from(a)=(
+		start=a;
+		end=max_index;
+		while(start<end,
+			swap(permutation[start++],permutation[end--]);
+		);
+	);
+
+	move_ind(a,b)=(
+		t_val=permutation[a];
+		a!=b?(
+			copy(permutation[b+1],permutation[b],a-b,1,1);
+			permutation[b]=t_val;
+		);
+	);
+
+	t=J(-1);
+	p=t[0]<<24|t[1];
+
+	if(index=p,
+		level_length=n_perms;
+		for(V=[0,t_items],index,V+=[1,-1],
+			section_size=level_length/V[1];
+			selected_indice=int(index/section_size);
+
+			move_ind(V[0]+selected_indice,V[0]);
+
+			level_length=section_size*items_group_count[t_val];
+			--items_group_count[t_val];
+
+			repeat(t_val,q,
+				index-=items_group_count[q]*section_size;
+			);
+		);
+	);
+
+	I[#-2,p]=permutation;
+
+	i=i0<<24|i1;
+	while(++p<i,
 		for(jp=dec_max_index,jp>-1,--jp,
 			if(permutation[jp]<permutation[jp+1],break(););
 		);
@@ -6864,26 +6900,12 @@ $out_dim,$total_items_count,$p_mode"
 
 		swap(permutation[kp],permutation[jp]);
 		reverse_array_starting_from(jp+1);
-	):(
-		if(index=iter_index(),
-			level_length=n_perms;
-			for(V=[0,t_items],index,V+=[1,-1],
-				section_size=level_length/V[1];
-				selected_indice=int(index/section_size);
 
-				move_ind(V[0]+selected_indice,V[0]);
-
-				level_length=section_size*items_group_count[t_val];
-				--items_group_count[t_val];
-
-				repeat(t_val,q,
-					index-=items_group_count[q]*section_size;
-				);
-			);
-		);
-		started=1;
+		I[#-2,p]=permutation;
 	);
-	permutation;"
+	"
+
+rm.
 #@cli rep_rde_permutation_index2list: item_0_count>=1,item_1_count>=1,...,index
 #@cli : Return permutations of repeated distinct elements of different count which correspond to the index.
 #@cli :
@@ -6996,49 +7018,54 @@ out_dim={v=vector(#3,1);v[$axis]=$size;v}
 
 if ($size*$1)>131072 mode=: else mode=> fi
 
-$out_dim,$1,$mode"
-	begin(
-		const end_ind=s-1;
-		const dec_end_ind=end_ind-1;
+$out_dim,$1
+{_'$mode'==_':'?$_cpus:1},1,1,2,v=whd#-1-(w-1-x)*int(whd#-1/w);[v>>24,v&0xffffff]
+eval. $mode"
+	const S=s#-2;
+	const end_ind=S-1;
+	const dec_end_ind=end_ind-1;
 
-		const axis=$axis;
-		axis==2?(iter_index()=z;):
-		axis==1?(iter_index()=y;):
-		         iter_index()=x;
+	v=vector(#S);
 
-		started=0;
-		v=vector(#s);
+	t=J(-1);
+	p=t[0]<<24|t[1];
+
+	if(index=p,
+		binary=vector(#end_ind);
+
+		pos=end_ind;
+		while(index,
+			binary[--pos]=index&1;
+			index>>=1;
+		);
+
+		q=0;
+		repeat(end_ind-pos,
+			if(binary[pos++],++q;);
+				v[pos]=q;
+		);
 	);
-	started?(
+
+	I[#-2,p]=v;
+
+	i=i0<<24|i1;
+	while(++p<i,
 		positions=[end_ind,dec_end_ind];
+
 		while( ( ++v[positions[0]] ) - v[positions[1]]  == 2,
 			positions--;
 		);
+
 		if(positions[0]<end_ind,
 			m=v[positions[0]];
-			copy(v[positions[0]],m,s-positions[0],1,0);
+			copy(v[positions[0]],m,S-positions[0],1,0);
 		);
-		0;
-	):(
-		if(index=iter_index(),
-			binary=vector(#end_ind);
 
-			pos=end_ind;
-			while(index,
-				binary[--pos]=index&1;
-				index>>=1;
-			);
-
-			p=0;
-			repeat(end_ind-pos,
-				if(binary[pos++],++p;);
-					v[pos]=p;
-			);
-		);
-		started=1;
+		I[#-2,p]=v;
 	);
-	v;
 	"
+
+rm.
 #@cli rep_inc_combination_index2list: size,index
 #@cli : Return the incremental combination at index.
 #@cli : Note: Untested with high size values.
@@ -7099,7 +7126,7 @@ skip ${3=x}
 check "isint($1,1)&&isint($2,0)&&$#>3?inrange(_'$-1',_'x',_'z',1,1):1"
 sum_permutations_size:=$2?perm($1,$2+$1,0):$1
 
-if $sum_permutations_size>(1<<24) exc_size fi
+if $sum_permutations_size>(1<<24) error exc_size fi
 
 if $#>2
 	axis={_'$-1'-_'x'}
@@ -7116,33 +7143,80 @@ fi
 
 if $sum_permutations_size>0x10000 mode=: else mode=> fi
 
-$dims,$1,$mode"
-	begin(
-		v=vectors();
+$dims,$1
+{_'$mode'==_':'?$_cpus:1},1,1,2,v=whd#-1-(w-1-x)*int(whd#-1/w);[v>>24,v&0xffffff]
+eval. $mode"
+	const S=s#-2;
 
-		const axis=$axis;
-		axis==2?(iter_index()=z;):
-		axis==1?(iter_index()=y;):
-		         iter_index()=x;
+	const max_sum=$2;
+	const dec_max_sum=max_sum-1;
+	const end_pos=S-1;
+	const dec_end_pos=end_pos-1;
 
-		const max_sum=$2;
-		const dec_max_sum=max_sum-1;
-		const end_pos=s-1;
-		const dec_end_pos=end_pos-1;
+	v=vector(#S);
 
+	t=J(-1);
+	index=p=t[0]<<24|t[1];
+
+	index?(
+		check_scanline=use_index=1;
+		sections_count=max_sum;
+		level_id=end_pos;
+		t_sum=0;
+
+		repeat(end_pos,q,
+			left_blocks_group_size=total_block_length=0;
+
+			repeat(sections_count,r,
+				left_blocks_group_size=total_block_length;
+				total_block_length+=perm(level_id,level_id+(sections_count-r),0);
+				if(total_block_length>index,break(););
+			);
+
+			--level_id;
+			index-=left_blocks_group_size;
+			sections_count-=r;
+			v[q]=r;
+
+			if(check_scanline?r,
+				scanline_pos=q;
+				check_scanline=0;
+			);
+
+			if(q<end_pos,
+				t_sum+=r;
+			);
+
+			if(!sections_count,
+				use_index=0;
+				break();
+			);
+		);
+
+		if(use_index,
+			v[end_pos]=index;
+		);
+
+		sum_v=t_sum+v[end_pos];
+		limit=max_sum-t_sum;
+		mode=sum_v!=max_sum;
+	):(
 		scanline_pos=end_pos;
-		mode=old_mode=1;
-		p=started=0;
+		mode=1;
 		limit=max_sum;
 	);
-	started?(
+
+	I[#-2,p]=v;
+
+	i=i0<<24|i1;
+	while(++p<i,
 		mode?(
 			if((++v[end_pos]) == limit,
 				mode=0;
 			);
 		):(
 			v[scanline_pos] == max_sum?(
-				copy(v[scanline_pos],0,s-scanline_pos,1,0);
+				copy(v[scanline_pos],0,S-scanline_pos,1,0);
 				v[--scanline_pos] = 1;
 				mode = 1;
 				limit = dec_max_sum;
@@ -7151,13 +7225,13 @@ $dims,$1,$mode"
 				mode = found_number_pos = previous_numbers_sum = 0;
 
 				# The for loop is used to find the sum of previous numbers before modified numbers. It is also used to scan where to modify the number.
-				for( p = end_pos , p>=scanline_pos, --p,
-					if(!found_number_pos?v[p],
-						found_number_pos = p;
-						boundary = p-1;
+				for( q = end_pos , q>=scanline_pos, --q,
+					if(!found_number_pos?v[q],
+						found_number_pos = q;
+						boundary = q-1;
 					);
-					if(p<boundary,
-						previous_numbers_sum += v[p];
+					if(q<boundary,
+						previous_numbers_sum += v[q];
 					);
 				);
 
@@ -7169,54 +7243,12 @@ $dims,$1,$mode"
 				);
 			);
 		);
-	):(
-		if(index=iter_index(),
-			check_scanline=use_index=1;
-			sections_count=max_sum;
-			level_id=end_pos;
-			t_sum=0;
 
-			repeat(end_pos,p,
-				left_blocks_group_size=total_block_length=0;
-
-				repeat(sections_count,q,
-					left_blocks_group_size=total_block_length;
-					total_block_length+=perm(level_id,level_id+(sections_count-q),0);
-					if(total_block_length>index,break(););
-				);
-
-				--level_id;
-				index-=left_blocks_group_size;
-				sections_count-=q;
-				v[p]=q;
-
-				if(check_scanline?q,
-					scanline_pos=p;
-					check_scanline=0;
-				);
-
-				if(p<end_pos,
-					t_sum+=q;
-				);
-
-				if(!sections_count,
-					use_index=0;
-					break();
-				);
-			);
-
-			if(use_index,
-				v[end_pos]=index;
-			);
-
-			sum_v=t_sum+v[end_pos];
-			limit=max_sum-t_sum;
-			mode=sum_v!=max_sum;
-		);
-
-		started=1;
+		I[#-2,p]=v;
 	);
-	v;"
+	"
+
+rm.
 #@cli rep_sum_permutation_index2list: size>0,limit>=0,index
 #@cli : Return the list of non-negative integers values which adds up to limit at lexicographic index.
 rep_sum_permutation_index2list:
@@ -7316,20 +7348,53 @@ fi
 
 if $total_sum_permutations_size>0x10000 mode=: else mode=> fi
 
-$dims,$1,$mode"
-	begin(
-		const axis=$axis;
-		axis==2?(iter_index()=z;):
-		axis==1?(iter_index()=y;):
-		         iter_index()=x;
-		v=vector(#s);
-		const ep=size(v)-1;
-		const d_ep=ep-1;
+$dims,$1
+{_'$mode'==_':'?$_cpus:1},1,1,2,v=whd#-1-(w-1-x)*int(whd#-1/w);[v>>24,v&0xffffff]
+eval. $mode"
+	const S=s#-2;
+
+	const ep=S-1;
+	const d_ep=ep-1;
+
+	v=vector(#S);
+
+	t=J(-1);
+	index=p=t[0]<<24|t[1];
+
+	index?(
+		level_length=perm(ep,$2+ep,0);
+		level_id=$1-2;
+		sections_count=$2;
+		N=sections_count;
+		find_scanline_pos=1;
+		q=0;
+		while(N,
+			left_blocks_group_size=total_block_length=0;
+			repeat(sections_count,r,
+				left_blocks_group_size=total_block_length;
+				total_block_length+=perm(level_id,level_id+(sections_count-r),0);
+				if(total_block_length>index,break(););
+			);
+			--level_id;
+			index-=left_blocks_group_size;
+			sections_count-=r;
+			if(find_scanline_pos?r,
+				scanline_pos=q;
+				find_scanline_pos=0;
+			);
+			v[last_p_found=q++]=r;
+			N-=r;
+		);
+	):(
 		last_p_found=d_ep;
-		end_pos=scanline_pos=ep;
-		started=0;
+		scanline_pos=ep;
+		v[ep]=$2;
 	);
-	started?(
+
+	I[#-2,p]=v;
+
+	i=i0<<24|i1;
+	while(++p<i,
 		v[scanline_pos]==$2?(
 			copy(v[scanline_pos],0,$1-scanline_pos,1,0);
 			v[--scanline_pos]=1;
@@ -7338,11 +7403,11 @@ $dims,$1,$mode"
 		!v[ep]?(
 			end_pos=last_p_found+1;
 			last_p_found=last_val_found=sum=0;
-			for(p=scanline_pos,p<end_pos,++p,
-				cv=v[p];
+			for(q=scanline_pos,q<end_pos,++q,
+				cv=v[q];
 				if(cv,
 					sum+=cv;
-					last_p_found=p;
+					last_p_found=q;
 					last_val_found=cv;
 				);
 			);
@@ -7355,37 +7420,12 @@ $dims,$1,$mode"
 			--v[ep];
 			last_p_found=d_ep;
 		);
-	):(
-		(index=iter_index())?(
-			level_length=perm(ep,$2+ep,0);
-			level_id=$1-2;
-			sections_count=$2;
-			N=sections_count;
-			find_scanline_pos=1;
-			p=0;
-			while(N,
-				left_blocks_group_size=total_block_length=0;
-				repeat(sections_count,q,
-					left_blocks_group_size=total_block_length;
-					total_block_length+=perm(level_id,level_id+(sections_count-q),0);
-					if(total_block_length>index,break(););
-				);
-				--level_id;
-				index-=left_blocks_group_size;
-				sections_count-=q;
-				if(find_scanline_pos?q,
-					scanline_pos=p;
-					find_scanline_pos=0;
-				);
-				v[last_p_found=p++]=q;
-				N-=q;
-			);
-		):(
-			v[ep]=$2;
-		);
-		started=1;
+
+		I[#-2,p]=v;
 	);
-	v;"
+	"
+
+rm.
 #@cli rep_total_sum_permutation_index2list: size>0,sum>=0,index
 #@cli : Return the list of non-negative integers values which adds up to sum at lexicographic index.
 rep_total_sum_permutation_index2list:
