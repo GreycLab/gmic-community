@@ -172,72 +172,96 @@ eval "
 	);
 	"
 
-{D=vector(#3,1);D[$axis_ind]=$final_dimensions;[D,s#0]},${arg0\ $final_dimensions>0x10000,>,:}"
-	begin(
-		dimensions=expr('whd#x',$imgs);
-		ranges_and_length=["$ranges_and_length"];
-		result=vector(#s,0);
-		const axis=$axis;
-		const min_range_pos=0;
-		const max_range_pos=1;
-		const start_img_ind_pos=2;
-		range_min=range_max=img_ind_pos_start=img_ind_pos_boundary=-1;
-		rl_pos=start_img_ind_ref_pos=0;
-		initialized=1;
-		if(s>1
-		,copy_pixel()=copy(result[0],i[#select_img_ind,img_pos],s,1,dimensions[select_img_ind]);
-		,copy_pixel()=result=i[#select_img_ind,img_pos];
-		);
-		axis==_'x'?(axis()=x;):
-		axis==_'y'?(axis()=y;):
-		            axis()=z;
-	);
-	pos=axis();
-	if(pos>range_max,
-		initialized&&pos?(
-			left=0;
-			right=w#-1-1;
-			while(left<=right,
-				start_img_ind_ref_pos=left+((right-left)>>1);
-				rl_pos=start_img_ind_ref_pos<<2;
-				range_min=ranges_and_length[rl_pos];
-				range_max=ranges_and_length[rl_pos+1];
-				isint(pos,range_min,range_max)?(
-					break();
-				):
-				pos<range_min?(
-					right=start_img_ind_ref_pos-1;
-				):(
-					left=start_img_ind_ref_pos+1;
-				);
-			);
-		):(
-			if(!initialized,
-				++start_img_ind_ref_pos;
-				rl_pos+=4;
-			);
-			range_min=ranges_and_length[rl_pos];
-			range_max=ranges_and_length[rl_pos+1];
-		);
+if $final_dimensions>0x10000 mode=: else mode=> fi
+
+{D=vector(#3,1);D[$axis_ind]=$final_dimensions;[D,s#0]}
+
+{_'$mode'==_':'?$_cpus:1},1,1,2,v=whd#-1-(w-1-x)*int(whd#-1/w);[v>>24,v&0xffffff]
+eval. $mode"
+	const S=s#-2;
+
+	dimensions=expr('whd#x',$imgs);
+	ranges_and_length=["$ranges_and_length"];
+
+	const min_range_pos=0;
+	const max_range_pos=1;
+	const start_img_ind_pos=2;
+	const target_volume=whd#-2;
+
+	range_min=range_max=img_ind_pos_start=img_ind_pos_boundary=-1;
+	rl_pos=start_img_ind_ref_pos=0;
+
+	generate_information()=(
 		start_img_pos=ranges_and_length[rl_pos+2];
 		number_of_available_indices=ranges_and_length[rl_pos+3];
-		relative_pos=pos-range_min;
+		relative_pos=p-range_min;
 		img_pos=start_img_pos+int(relative_pos/number_of_available_indices);
-		temp=i[#-1,start_img_ind_ref_pos];
+		temp=i[#-3,start_img_ind_ref_pos];
 		img_ind_pos_start=temp;
 		img_ind_pos_boundary=temp+number_of_available_indices;
 		img_ind=img_ind_pos_start+(relative_pos%number_of_available_indices);
-		initialized=0;
 	);
-	select_img_ind=i[#-2,img_ind];
+
+	if(S>1
+	,copy_pixel()=copy(i[#-2,p],i[#select_img_ind,img_pos],S,target_volume,dimensions[select_img_ind]);
+	,copy_pixel()=i[#-2,p]=i[#select_img_ind,img_pos];
+	);
+
+	T=J(-1);
+	p=T[0]<<24|T[1];
+
+	p?(
+		left=0;
+		right=w#-3-1;
+		while(left<=right,
+			start_img_ind_ref_pos=left+((right-left)>>1);
+			rl_pos=start_img_ind_ref_pos<<2;
+			range_min=ranges_and_length[rl_pos];
+			range_max=ranges_and_length[rl_pos+1];
+			isint(p,range_min,range_max)?(
+				break();
+			):
+			p<range_min?(
+				right=start_img_ind_ref_pos-1;
+			):(
+				left=start_img_ind_ref_pos+1;
+			);
+		);
+	):(
+		range_min=ranges_and_length[rl_pos];
+		range_max=ranges_and_length[rl_pos+1];
+	);
+
+	generate_information();
+
+	select_img_ind=i[#-4,img_ind];
 	copy_pixel();
 	if(++img_ind==img_ind_pos_boundary,
 		++img_pos;
 		img_ind=img_ind_pos_start;
 	);
-	result;
+	iters=i0<<24|i1;
+	while(++p<iters,
+		if(p>range_max,
+			++start_img_ind_ref_pos;
+			rl_pos+=4;
+			range_min=ranges_and_length[rl_pos];
+			range_max=ranges_and_length[rl_pos+1];
+			generate_information();
+		);
+
+		select_img_ind=i[#-4,img_ind];
+		copy_pixel();
+		if(++img_ind==img_ind_pos_boundary,
+			++img_pos;
+			img_ind=img_ind_pos_start;
+		);
+	);
+
+	I;
 	"
-k.
+
+k..
 
 if $2
 	rep_multisplit $1,$split_positions
@@ -33648,106 +33672,106 @@ copy_from_stored_K_value\
 activate_changes={$mode_K_a?$pre_negation_diff:($mode_K_diff||$K_diff||$negate_after_K_input_diff||$user_diff||$copy_from_stored_K_value)}
 
 if $started&&narg($_persistent)
- if $activate_changes
-  if $mode_K_a
-   rm $_persistent
-   rep_tuppers_self_K[tuppers_self_image_base] $pre_negation_a
-   store _persistent
+	if $activate_changes
+		if $mode_K_a
+			rm $_persistent
+			rep_tuppers_self_K[tuppers_self_image_base] $pre_negation_a
+			store _persistent
 
-   ('${}')
+			('${}')
 
-   if !$allow_mode_switch
-    replace_str ",","\n\n"
-   fi
+			if !$allow_mode_switch
+				replace_str ",","\n\n"
+			fi
 
-   k_value_from_images={t}
-   rm
-  else
-   if $negate_after_K_input_diff
-    rm $_persistent
-    negate[tuppers_image_mode_0]
-    store _persistent
-   else
-    width,height={[w,h]}
-    rm $_persistent
-    store temporary_image
-    $width,$height
+			k_value_from_images={t}
+			rm
+		else
+			if $negate_after_K_input_diff
+				rm $_persistent
+				negate[tuppers_image_mode_0]
+				store _persistent
+			else
+				width,height={[w,h]}
+				rm $_persistent
+				store temporary_image
+				$width,$height
 
-    if $user_diff||$mode_K_diff
-     if $user_mode_a
-      predefined_K=${arg\ $user_mode_a,960939379918958884971672962127852754715004339660129306651505519271702802395266424689642842174350718121267153782770623355993237280874144307891325963941337723487857735749823926629715517173716995165232890538221612403238855866184013235585136048828693337902491454229288667081096184496091705183454067827731551705405381627380967602565625016981482083418783163849115590225610003652351370343874461848378737238198224849863465033159410054974700593138339226497249461751545728366702369745461014655997933798537483143786841806593422227898388722980000748404719,395237837253173619377196292693949302406153931873024916260538490717335936871532361396117451541392229602948889604348128275446264586897474193776400465275167777832622157773372879463606146128022620285693891540788235229239672405060120203686774511468011972485984983535894919421543461759499096362152894616017344239642743391778941134500105852623176726707340602287941750635663845779675174278129608159631247023276032,1162909606774227786762360554904656873467005634722346243123857684508335800080212296528535403972500597220234608121734983386023291518966099546891430040655179625172067449629161883859511896818291049959507502002794829515164438990867773160767189319641778161093019870270482668056135958042158788515967843798733586173623987894941361961956503217167249393827582112256509171868414221167242597679368110852891933106118102448936895420986905619254557683605421985950220457144259359231632456877367983992190446749365022925067669913265323579719756925062086656,1843812769630219797102194898630589042838024531800431544407803208699762220759288686771851688175304525277287596637929619481851566234761209320517998687008822582390183399326187543197624279014134019615905245154166656477378450656137074612544163896000320136805982694616420881365676363963235184229519627621212049120298076086417612215067181351396556381877005473113076180736051591032787133962681831575450591579944470027127255325865144199772221608835705143631909500064802696725673323645838019575905814384115925441812137010043170716647424}
-      rep_tuppers_self $predefined_K,$negate_after_using_k_input_a
-     else
-      rep_tuppers_self $k_a,$negate_after_using_k_input_a
-     fi
-    fi
+				if $user_diff||$mode_K_diff
+					if $user_mode_a
+						predefined_K=${arg\ $user_mode_a,960939379918958884971672962127852754715004339660129306651505519271702802395266424689642842174350718121267153782770623355993237280874144307891325963941337723487857735749823926629715517173716995165232890538221612403238855866184013235585136048828693337902491454229288667081096184496091705183454067827731551705405381627380967602565625016981482083418783163849115590225610003652351370343874461848378737238198224849863465033159410054974700593138339226497249461751545728366702369745461014655997933798537483143786841806593422227898388722980000748404719,395237837253173619377196292693949302406153931873024916260538490717335936871532361396117451541392229602948889604348128275446264586897474193776400465275167777832622157773372879463606146128022620285693891540788235229239672405060120203686774511468011972485984983535894919421543461759499096362152894616017344239642743391778941134500105852623176726707340602287941750635663845779675174278129608159631247023276032,1162909606774227786762360554904656873467005634722346243123857684508335800080212296528535403972500597220234608121734983386023291518966099546891430040655179625172067449629161883859511896818291049959507502002794829515164438990867773160767189319641778161093019870270482668056135958042158788515967843798733586173623987894941361961956503217167249393827582112256509171868414221167242597679368110852891933106118102448936895420986905619254557683605421985950220457144259359231632456877367983992190446749365022925067669913265323579719756925062086656,1843812769630219797102194898630589042838024531800431544407803208699762220759288686771851688175304525277287596637929619481851566234761209320517998687008822582390183399326187543197624279014134019615905245154166656477378450656137074612544163896000320136805982694616420881365676363963235184229519627621212049120298076086417612215067181351396556381877005473113076180736051591032787133962681831575450591579944470027127255325865144199772221608835705143631909500064802696725673323645838019575905814384115925441812137010043170716647424}
+						rep_tuppers_self $predefined_K,$negate_after_using_k_input_a
+					else
+						rep_tuppers_self $k_a,$negate_after_using_k_input_a
+					fi
+				fi
 
-    if $K_diff
-     rep_tuppers_self $k_a,$negate_after_using_k_input_a
-    fi
+				if $K_diff
+					rep_tuppers_self $k_a,$negate_after_using_k_input_a
+				fi
 
-    if $copy_from_stored_K_value
-     rep_tuppers_self $k_value_from_images,$negate_after_using_k_input_a
-     k_a=$k_value_from_images
-    fi
+				if $copy_from_stored_K_value
+					rep_tuppers_self $k_value_from_images,$negate_after_using_k_input_a
+					k_a=$k_value_from_images
+				fi
 
-    name tuppers_image_mode_0
+				name tuppers_image_mode_0
 
-    $temporary_image
-    temporary_image,activate_changes=0
-    store _persistent
-   fi
-  fi
- fi
+				$temporary_image
+				temporary_image,activate_changes=0
+				store _persistent
+			fi
+		fi
+	fi
 else
- n_imgs={$!}
- mode_K_a=1
- negate_after_using_k_input=$pre_negation_a
+	n_imgs={$!}
+	mode_K_a=1
+	negate_after_using_k_input=$pre_negation_a
 
- if $!>1
-  allow_mode_switch=0
-  reverse
- fi
+	if $!>1
+		allow_mode_switch=0
+		reverse
+	fi
 
- eval "
-  standard_image_size=[106,17];
-  allow_example=1;
-  repeat($n_imgs,img_id,
-   if([w#img_id,h#img_id]!=standard_image_size,
-    allow_example=0;
-    break();
-   );
-  );
-  allow_example;
-  "
+	eval "
+	standard_image_size=[106,17];
+	allow_example=1;
+	repeat($n_imgs,img_id,
+		if([w#img_id,h#img_id]!=standard_image_size,
+			allow_example=0;
+			break();
+		);
+	);
+	allow_example;
+	"
 
- allow_example=${}
+	allow_example=${}
 
- rep_tuppers_self_K $pre_negation_a
+	rep_tuppers_self_K $pre_negation_a
 
- name tuppers_self_image_base
- store _persistent
+	name tuppers_self_image_base
+	store _persistent
 
- if $allow_mode_switch
-  k_a,k_b,k_value_from_images=${}
- else
-  ('${}')
-  replace_str ",","\n\n"
-  k_value_from_images={t}
-  rm
- fi
+	if $allow_mode_switch
+		k_a,k_b,k_value_from_images=${}
+	else
+		('${}')
+		replace_str ",","\n\n"
+		k_value_from_images={t}
+		rm
+	fi
 
 fi
 
 rm $_persistent
 
 if $mode_K_a
- remove_named tuppers_image_mode_0
- if !$allow_mode_switch
-  append y
- fi
+	remove_named tuppers_image_mode_0
+	if !$allow_mode_switch
+		append y
+	fi
 else
- remove_named tuppers_self_image_base
+	remove_named tuppers_self_image_base
 fi
 
 * 255
@@ -33783,15 +33807,18 @@ fx_rep_color_region:
 if narg($_persistent)
  remove $_persistent
 else
- rep_color_region $1%,$2%,$3
+	rep_color_region $1%,$2%,$3
 fi
 fx_rep_color_region_preview:
 imgs={$!}
+
 if [${1-3}]!=[${4-6}]||!narg($_persistent)
- +rep_color_region $1%,$2%,$3
- store[-$imgs--1] _persistent
+	+rep_color_region $1%,$2%,$3
+	store[-$imgs--1] _persistent
 fi
+
 gui_split_preview "remove $_persistent keep[0]",${-3--1}
+
 u "{$1}"\
 "{$2}"\
 "{$3}"{!$1?2}\
