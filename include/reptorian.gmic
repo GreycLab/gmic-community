@@ -3171,33 +3171,65 @@ foreach {
 
 uncommand cmd_vibrance,cmd_$0_adj
 #@cli rep_import_pal: file_a...file_z
-#@cli : Import JASC-PAL Palette (.pal)
+#@cli : Import JASC-PAL Palette or Microsoft RIFF Palettes (.pal). What is imported is automatically based on header
 #@cli : There can be as many files. This import file relative to your current directory.
 +rep_import_pal:
 check $#
 
-newline,space,sep={'\n\ ^'}
+old_status=${}
+
+$=files
+
+space,sep={'\ ^'}
+newline={'\n'}
+CRLF:=0xd,$newline
 
 0 l[-1] {
 	rm[0]
 
-	it $*
+	repeat $# {
+		ib ${files{$>+1}} l[-1] {
+			name_of_file={n}
 
-	foreach {
-		split -,$newline
+			if same(crop(#-1,0,0,0,0,1,8,1,1),'JASC-PAL')
 
-		number_of_colors={2,t} rm[0-2]
-		number_of_channels:=sum(!(crop(#0)-$space))+1
+				if same(crop(#-1,0,8,0,0,1,2,1,1),[$CRLF])
+					split_parts=$CRLF
+				else
+					split_parts=$newline
+				fi
 
-		repeat $number_of_colors {
-			replace $space,$sep
-			({0,t}) rm[0]
-			if s!=$number_of_channels error inval_jasc_pal fi
+				split -,$split_parts
+				colors={2,t}
+				L=3-{2+$colors}
+				C=0
+
+				foreach[$L] {
+					replace $space,$sep
+					({t})
+					rm..
+					if $C?s!=$C error invalid_pal_file
+					elif !$C C:=s#-1
+					fi
+				}
+
+				k[$L] a x
+			elif same(crop(#-1,0,0,0,0,1,4,1,1),'RIFF')
+				crop 0,16,0,100%
+				resize 4,{h>>2},1,1,-1
+				crop 0,2
+
+				permute yzcx
+			else
+				invalid_pal_file
+			fi
+
+			name[-1] $name_of_file
 		}
-
-		keep[-$number_of_colors--1] a x
 	}
 }
+
+status $old_status
 #@cli rep_import_pdn_txt: file_a...file_z...,_discard_alpha={ 0=keep | 1=discard_alpha | 2=auto }
 #@cli : Import PDN Palette (.txt)
 #@cli : There can be as many files. This import file relative to your current directory.
