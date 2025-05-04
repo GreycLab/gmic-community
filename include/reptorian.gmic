@@ -3258,95 +3258,119 @@ name[-1] $name_of_file
 #@cli : There can be as many files. This import file relative to your current directory.
 #@cli : Default values: '_discard_alpha=2'
 +rep_import_pdn_txt:
-if narg($-1)&&$#>1 alpha_mode={$-1%3}
-else alpha_mode=2
+check $#
+
+if narg($-1)&&$#>1&&isint($-1)
+	alpha_mode={$-1%3}
+	num_of_args=$#-1
+else
+	alpha_mode=2
+	num_of_args=$#
 fi
 
-newline,commentary={'\n'},{';'}
+newline,commentary:='\n;'
 
-0 l[-1] {
-	rm[0]
+$=files
 
-	if $#>1 it ${1--2} else it $1 fi
+repeat $num_of_args
+{
+	0 => ${files{$>+1}}
+	file_name={b}
 
-	foreach {
-
-		split -,$newline
-
-		foreach {
-
-			if i==$commentary
-
-				rm
-
-			else
-
-				if h<8 rm continue fi
-
-				eval "
-					const commentary=$commentary;
-					o=-1;
-
-					is_hex_character(character)=
-						inrange(character,_'0',_'9',1,1)||
-						inrange(character,_'a',_'f',1,1)||
-						inrange(character,_'A',_'F',1,1);
-
-					repeat(w#-1,p,
-
-						char=i(#-1,0,p);
-
-						if(char==commentary,break(););
-
-						if(is_hex_character(char),
-							o=p;
-							break();
-						);
-
-					);
-
-					o;"
-
-				if ${}==-1
-					rm
-				else
-					crop 0,${},0,{${}+7}
-					(${rep_hex2int8\ {t}})
-					permute. cyzx
-					rm..
-				fi
-
-			fi
-
-		}
-
-		remove_duplicates
-
-		a x
-
-		shift 0,0,0,-1,2,0
-
-		if $alpha_mode
-
-			if $alpha_mode==2
-
-				sh. 3
-
-				if !iv#-1
-					rm.
-					channels 0,2
-					s x remove_duplicates a x
-				else rm.
-				fi
-
-			else channels 0,2
-			fi
-
-		fi
-
+	l[-1]
+	{
+		rm.
+		it ${file_name}
+		onfail
+			it ${file_name}.txt
 	}
 
+	__$0_process_file[-1]
 }
+__rep_import_pdn_txt_process_file:
+name_of_file={n}
+
+split -,$newline
+
+colors_detected,colors_limit=0,96
+foreach {
+
+	if i==$commentary
+
+		rm
+
+	else
+
+		if h<8 rm continue fi
+
+		eval "
+			const commentary=$commentary;
+			o=-1;
+
+			is_hex_character(character)=
+				inrange(character,_'0',_'9',1,1)||
+				inrange(character,_'a',_'f',1,1)||
+				inrange(character,_'A',_'F',1,1);
+
+			repeat(w#-1,p,
+
+				char=i(#-1,0,p);
+
+				if(char==commentary,break(););
+
+				if(is_hex_character(char),
+					o=p;
+					break();
+				);
+
+			);
+
+			o;"
+
+		if ${}==-1
+			rm
+		else
+			crop 0,${},0,{${}+7}
+			(${rep_hex2int8\ {t}})
+			permute. cyzx
+			rm..
+
+			if $colors_detected+1==96
+				break
+			fi
+
+			colors_detected+=1
+		fi
+
+	fi
+
+}
+
+remove_duplicates
+
+a x
+
+shift 0,0,0,-1,2,0
+
+if $alpha_mode
+
+	if $alpha_mode==2
+
+		sh. 3
+
+		if !iv#-1
+			rm.
+			channels 0,2
+			s x remove_duplicates a x
+		else rm.
+		fi
+
+	else channels 0,2
+	fi
+
+fi
+
+name[-1] $name_of_file
 #@cli rep_correct_exp_ne: string
 #@cli : Return corrected file name for exporting files.
 #@cli : Note: Every single arguments applied to this command counts as a single string.
