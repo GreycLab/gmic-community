@@ -3183,63 +3183,69 @@ $=files
 space,sep,newline,RIFF_pal_header_size:='\ ^\n',24
 CRLF:=0xd,$newline
 
-0 l[-1] {
-	rm[0]
-
-	repeat $# {
-		ib ${files{$>+1}} l[-1] {
-			name_of_file={n}
-
-			if same(crop(#-1,0,0,0,0,1,8,1,1),'JASC-PAL')
-
-				if same(crop(#-1,0,8,0,0,1,2,1,1),[$CRLF])
-					split_parts=$CRLF
-				else
-					split_parts=$newline
-				fi
-
-				split -,$split_parts
-				count_of_colors={2,t}
-				images_indices_contains_colors=3-{2+$count_of_colors}
-				count_of_channels=0
-
-				foreach[$images_indices_contains_colors] {
-					replace $space,$sep
-
-					({t})
-
-					rm..
-
-					if $count_of_channels?s!=$count_of_channels
-						error invalid_pal_file
-					elif !$count_of_channels
-						count_of_channels:=s#-1
-					fi
-				}
-
-				k[$images_indices_contains_colors]
-				a x
-			elif same(crop(#-1,0,0,0,0,1,4,1,1),'RIFF')
-				crop 0,$RIFF_pal_header_size,0,{"
-					pos=h#-1-4;
-					empty_vector=crop(#-1,0,pos,0,0,1,4,1,1);
-					pos-=4;
-					while(pos>$RIFF_pal_header_size,if(crop(#-1,0,pos,0,0,1,4,1,1)!=empty_vector,break(););pos-=4;);
-					pos+3;
-					"}
-				resize 4,{h>>2},1,1,-1
-				crop 0,2
-				permute yzcx
-			else
-				invalid_pal_file
-			fi
-
-			name[-1] $name_of_file
-		}
+repeat $#
+{
+	0 => ${files{$>+1}} file_name={b}
+	l[-1]
+	{
+		rm.
+		ib ${file_name}
+		__$0_process_file
+		onfail
+			ib ${file_name}.pal
+			__$0_process_file
 	}
 }
 
 status $old_status
+__rep_import_pal_process_file:
+name_of_file={n}
+
+if same(crop(#-1,0,0,0,0,1,8,1,1),'JASC-PAL')
+
+	if same(crop(#-1,0,8,0,0,1,2,1,1),[$CRLF])
+		split_parts=$CRLF
+	else
+		split_parts=$newline
+	fi
+
+	split -,$split_parts
+	count_of_colors={2,t}
+	images_indices_contains_colors=3-{2+$count_of_colors}
+	count_of_channels=0
+
+	foreach[$images_indices_contains_colors] {
+		replace $space,$sep
+
+		({t})
+
+		rm..
+
+		if $count_of_channels?s!=$count_of_channels
+			error invalid_pal_file
+		elif !$count_of_channels
+			count_of_channels:=s#-1
+		fi
+	}
+
+	k[$images_indices_contains_colors]
+	a x
+elif same(crop(#-1,0,0,0,0,1,4,1,1),'RIFF')
+	crop 0,$RIFF_pal_header_size,0,{"
+		pos=h#-1-4;
+		empty_vector=crop(#-1,0,pos,0,0,1,4,1,1);
+		pos-=4;
+		while(pos>$RIFF_pal_header_size,if(crop(#-1,0,pos,0,0,1,4,1,1)!=empty_vector,break(););pos-=4;);
+		pos+3;
+		"}
+	resize 4,{h>>2},1,1,-1
+	crop 0,2
+	permute yzcx
+else
+	invalid_pal_file
+fi
+
+name[-1] $name_of_file
 #@cli rep_import_pdn_txt: file_a...file_z...,_discard_alpha={ 0=keep | 1=discard_alpha | 2=auto }
 #@cli : Import PDN Palette (.txt)
 #@cli : There can be as many files. This import file relative to your current directory.
