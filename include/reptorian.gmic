@@ -3196,7 +3196,7 @@ repeat $#
 			ib ${file_name}.pal
 	}
 
-	__$0_process_file[-1]
+	tic __$0_process_file[-1] toc
 }
 
 status $old_status
@@ -3309,24 +3309,13 @@ eval "
 		isint(character,_'a',_'f')||
 		isint(character,_'A',_'F');
 
-	hash(V)=(
-		ref(V,vec2hash);
-		hash_value=0;
-		repeat(S,q,
-			hash_value=xor(((hash_value<<1)-hash_value)*seed,V[q]);
-			hash_value&=bit_mask;
-		);
-		unref(_p,vec2hash);
-		hash_value;
-	);
-
 	alpha_mode==1?(
 		const S=3;
 		generate_color(pos)=(
-			temp_current_color=s2v([('0x'),crop(#0,0,pos,0,0,1,8,1,1)])>>[24,16,8,0]&0xff;
-			current_color=temp_current_color[1,3];
+			if(!s2v([('0x'),crop(#0,0,pos,0,0,1,2,1,1)]),break(););
+			current_color=s2v([('0x'),crop(#0,0,pos+2,0,0,1,6,1,1)])>>[16,8,0]&0xff;
 		);
-		process_hex(pos)=(generate_color(pos);if(!temp_current_color[0],break();););
+		process_hex(pos)=generate_color(pos);
 		last_color=vector(#3,nan);
 		insert_color()=current_color;
 		0;
@@ -3352,13 +3341,23 @@ eval "
 		0;
 	);
 
-	p=number_of_colors=break_all=0;
+	p=number_of_colors=0;
 	while((p=find(#0,new_line,p,1)+1)&&number_of_colors<96,
 		current_char=i[#0,p];
-		while(current_char!=new_line,
+		while(current_char!=new_line&&p<h#0,
+			if(current_char==commentary,
+				++p;
+				break();
+			);
+
 			if(is_hex_character(current_char),
 				process_hex(p);
-				bucket_size_ind=hash(current_color);
+				hash_value=0;
+				repeat(S,q,
+					hash_value=xor(((hash_value<<1)-hash_value)*seed,current_color[q]);
+					hash_value&=bit_mask;
+				);
+				bucket_size_ind=hash_value;
 				dictionary_index=bucket_size_ind+1;
 				H=sizes[bucket_size_ind];
 				!(H?(same(current_color,last_color)?1:find(#dictionary_index,current_color,(H-1)*S,-S)+1))?(
@@ -3371,33 +3370,24 @@ eval "
 					++sizes[bucket_size_ind];
 				);
 				last_color=current_color;
-				break();
-			);
-
-			if(current_char==commentary,
+				p+=8;
 				break();
 			);
 
 			current_char=i[#0,++p];
-
-			if(p>=h#0,
-				break_all=1;
-				break();
-			);
 		);
-
-		if(break_all,break(););
 	);
 
 	if(alpha_mode==2,
 		set('contain_alpha',contain_alpha);
 	);
+
 	set('number_of_colors',number_of_colors);"
 
 k[-1] => $name_of_file
 
 if $alpha_mode==2&&!$contain_alpha
-	resize[-1] $number_of_colors,1,1,{3+$contain_alpha},0
+	resize[-1] $number_of_colors,1,1,3,0
 else
 	crop[-1] 0,{$number_of_colors-1}
 fi
