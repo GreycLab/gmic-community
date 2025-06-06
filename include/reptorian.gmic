@@ -355,9 +355,8 @@ eval.. >"begin(
 	end(da_freeze(#-1););
 	"
 rm..
-#@cli rep_uniq_cols: _preserve_frequency={ 0=false | 1=true }
+#@cli rep_uniq_cols: preserve_frequency={ 0=false | 1=true }
 #@cli : Find all colors, with the option to preserve frequency
-#@cli : Default values: '_preserve_frequency=0
 rep_uniq_cols:
 check isbool($1) _rep_colors_freqstat {$1-2}
 #@cli rep_mode: fill_with_mode_color={ 0=false | 1=true }
@@ -4786,35 +4785,41 @@ skip ${2=1}
 struppercase $1
 
 eval "
-	started=char_changed=pos=old_pos=ans=num=0;
-	old_relative_pos=-1;
+	started=char_changed=pos=old_pos=is_odd_pos=ans=num=0;
+	old_character_idx=-1;
 	const _H=_'H';
 
 	roman_chars='IVXLCDM';
 	roman_num='"${}"';
 	const chars_count=size(roman_chars);
+	last_known_odd_char_pos=chars_count-1;
 
 	const is_strict=$2;
 	num_vals=expr('(x&1?5:1)*10^(x>>1)',chars_count);
-	char_freq_list=vector(#chars_count,0);
+	char_freq_list=last_pos=vector(#chars_count,0);
 	ref_num_vals=[2,0,3,4,5,6,1];
 
 	const roman_num_length=size(roman_num);
 	const dec_roman_num_length=roman_num_length-1;
 
 	repeat(roman_num_length,p,
-		relative_pos=roman_num[dec_roman_num_length-p];
+		char_pos=dec_roman_num_length-p;
+		character_idx=roman_num[char_pos];
 
-		if(changed_pos=(relative_pos!=old_relative_pos),
+		if(changed_pos=(character_idx!=old_character_idx),
 			if(started&&!char_changed,char_changed=changed_pos);
-			sel=relative_pos&0b111;
-			if(sel==4,sel>>=relative_pos>_H;);
+			sel=character_idx&0b111;
+			if(sel==4,sel>>=character_idx>_H;);
 			pos=ref_num_vals[sel];
-			if(relative_pos!=roman_chars[pos],run('error inv_char_det'););
+			if(character_idx!=roman_chars[pos],run('error inv_char_det'););
 			if(is_strict,
 				if(pos-old_pos<-2,
 					run('error inv_char_gap');
 				);
+			);
+			is_odd_pos=pos&1;
+			if(is_odd_pos,
+				last_known_odd_char_pos=char_pos;
 			);
 			num=num_vals[pos];
 		);
@@ -4825,56 +4830,31 @@ eval "
 		);
 
 		encounters=++char_freq_list[pos];
-		if(encounters>(3+char_changed),
+		if(is_odd_pos?encounters>1:encounters>(3+char_changed),
 			run('error excess_char');
 		);
 
-		if(num<<2<ans,ans-=num,ans+=num);
-		old_relative_pos=relative_pos;
+		(num<<2<ans)||(old_pos>pos)?(
+			last_known_odd_char_pos-char_pos>1?(
+				if(roman_num[char_pos+1]==character_idx,
+					run('error excess_char');
+				);
+			):(
+				if(is_odd_pos,
+					run('invalid_char_order');
+				);
+			);
+			ans-=num;
+		):(
+			ans+=num;
+		);
+
+		old_character_idx=character_idx;
 		old_pos=pos;
 		started=1;
 	);
 
-	if(ans>3999,run('error exc_val'););
-
-	if(is_strict,
-
-		thousands=int(ans/1000);
-		hundreds=int(ans%1000/100);
-		tens=int(ans%100/10);
-		ones=ans%10;
-		place=0;
-
-		test_vector=vector(#roman_num_length,0);
-
-		process_section(value,low,mid,high,top)=if(value,
-			value==9||value==4?(
-				copy(test_vector[place],(value>5?top:mid),2);
-				place+=2;
-			):
-			value>4?(
-				num_of_chars=value-4;
-				copy(test_vector[place],high,num_of_chars);
-				place+=num_of_chars;
-			):(
-				num_of_chars=value;
-				copy(test_vector[place],low,num_of_chars);
-				place+=num_of_chars;
-			);
-		);
-
-		if(thousands,
-			copy(test_vector[0],'MMM',thousands);
-			place+=thousands;
-		);
-
-		process_section(hundreds,'CCC','CD','DCCC','CM');
-		process_section(tens,'XXX','XL','LXXX','XC');
-		process_section(ones,'III','IV','VIII','IX');
-
-		if(roman_num!=test_vector,run('error inv_char_set'););
-
-	);
+	if(!isint(ans,1,3999),run('error out_of_bound_val'););
 
 	ans;"
 #@cli rep_output_jasc: filename
@@ -7641,7 +7621,7 @@ eval "
 			):(break(););
 		);
 		S-=current_value;
-		if(!S,break();)
+		if(!S,break(););
 	);
 	index;
 	"
