@@ -48,6 +48,109 @@
 #
 #-------------------------------
 
+#@cli rep_xp2b: base_pow2_a,base_pow2_b,str_a,str_b
+#@cli : Convert between bases of power of 2 bases. Only binary, octal, and hexadecimal is supported.
+#@cli : base_pow_2_? can be number representing the base, or string.
+#@cli : str_? are the number represented by base_pow2_a
+rep_xp2b:
+a,b,I,T,n0:=isnum($1),isnum($2),$!,$#-2,'0'
+check ($a?isin($1,2,8,16):1)&&($b?isin($2,2,8,16):1)&&isint($#,3)
+
+base_bin,base_binary=2
+base_oct,base_octal=8
+base_hex,base_hexadecimal=16
+
+if $a
+	base_a=$1
+else
+	base_a=${base_$1}
+fi
+
+if $b
+	base_b=$2
+else
+	base_b=${base_$2}
+fi
+
+if $base_a==$base_b u ${3--1} return fi
+
+m "__$0_vars: $""=str"
+__$0_vars ${3--1}
+um __$0_vars
+
+is_base_b_bin={$base_b==$base_bin}
+if $base_a>2
+	is_base_a_hex={$base_a==$base_hex}
+
+	+rep_cartesian_product {vector(#(3+$is_base_a_hex),2)} => binaries
+
+	if $is_base_b_bin +. $n0 fi
+
+	step={3+$is_base_a_hex}
+
+	repeat $T {
+		('${str{$>+1}}')
+		z. {repeat(w#-1-1,p,if(i[#-1,p]!=_'0',break();););p;},100%
+		{w*$step}
+		eval[-2] "begin(
+				p=started=0;
+			);
+			started?(
+				p+=$step;
+			):(
+				p=x*$step;
+				started=1;
+			);
+			ind=s2v([('0x'),i]);
+			if(!isint(ind,0,w#$binaries-1),
+				run('error inval_char');
+			);
+			copy(i[#-1,p],I[#$binaries,ind]);
+			"
+		if $is_base_b_bin
+			z. {repeat(w-1,p,if(i[#-1,p]!=_'0',break();););p;},100%
+			res.=$sep{t}
+			sep=,
+			rm[-2,-1]
+		else
+			rm[-2]
+		fi
+	}
+
+	rm[binaries]
+	if $is_base_b_bin
+		u $res
+		return
+	fi
+else
+	repeat $T {
+		('${str{$>+1}}')
+		check isint([im,iM],_'0',_'1')==[1,1]
+		z. {repeat(w#-1-1,p,if(i[#-1,p]!=_'0',break();););p;},100%
+		-. $n0
+	}
+fi
+
+chunks_size={3+($base_b==$base_hex)}
+foreach[$I--1] {
+	{ceil(w/$chunks_size)},1,1,1,"begin(
+			const off=-(w#-1-w*$chunks_size);
+			chars='0123456789ABCDEF';
+			shift_factor=reverse(expr('x',$chunks_size));
+			p=started=0;
+		);
+		started?(
+			p+=$chunks_size;
+		):(
+			p=x*$chunks_size-off;
+		);
+		chars[sum(crop(#-1,p,$chunks_size)<<shift_factor)];"
+	res.=$sep{t}
+	sep=,
+	rm
+}
+
+u $res
 #@cli rep_pattern_str: 0<max_number_of_digits<=16,_use_padding={ 0=False | 1=True },_use_hex_ind={ 0=False | 1=True }
 #@cli : Creates a string utilized for pattern.
 #@cli : Default values: '_use_padding=0','_use_hex_ind=1'
@@ -4502,10 +4605,10 @@ else
 
 fi
 #@cli rep_posdec2altbase_num: base,positive_decimal
-#@cli : Return decimal into specified base using series of digits represented in base 10 separated by comma.
+#@cli : Return decimal into specified base using series of digits represented in base 10 separated by comma. Integers bigger than DOUBLE_MAX or 1.7976931348623157*10^308 is supported.
 rep_posdec2altbase_num:
-base_float_max:=1<<24
-check "isint($2,0)"
+bfm={1<<24} # base_float_max
+check isnum($1)?isint($1,2,$bfm):1
 
 if isnum($1)
 	base=$1
@@ -4514,139 +4617,125 @@ else
 	base=${base_$1}
 fi
 
-check "isint($base,2,$base_float_max)"
-
-if $2<(1<<53)
-	eval "expr('<begin(
-				const base=$base;
-				n=$2;
-			);
-			remainder=n%base;
-			n=int(n/base);
-			remainder;
-			',1+int(log($2)/log($base)));"
-	return
+('$2')
+check isint([im,iM],_'0',_'9')==[1,1]
+crop_point={for(p=0,if(i[#-1,p]!=_'0',break(););,++p);p;}
+if $crop_point
+	unroll. x
+	crop. $crop_point,100%
 fi
++>>[-1] 0 !=[-1] [-2] if iM error non_dec_str else rm. fi
 
-positive_decimal_start_pos,S={V='$2';[for(p=0,V[p]==_'0',++p);,size(V)]}
-positive_decimal:=('$2')[$positive_decimal_start_pos,$S-$positive_decimal_start_pos]
+number_of_digits={size('$1')-1}
+if $base==10^$number_of_digits
+	unroll. x
+	u {"expr('begin(
+			const step_size=$number_of_digits;
+			step=-(whd#-1%step_size);
+		);
+		selected_indice=crop(#-1,step,0,0,0,step_size,1,1,1);
+		step+=step_size;
+		s2v(selected_indice+(!selected_indice*_'0'));
+		',ceil(whd#-1/$number_of_digits));
+	"}
+	rm.
+elif $2<=(1<<53)
+	w:=w rm.
+	{ceil(($w*log(10))/log($base))},1,1,1,<"begin(
+			const b=$base;
+			v=$2;
+			p=w;
+		);
+		if(v,
+			r=v%b;
+			v=int(v/b);
+			--p;
+			r;
+		);
+		end(set('p',p);set('q',w-p));"
+	u {crop(#-1)[$p,$q]} rm.
+else
+	unroll. x
 
-if isint(log10($base))
-	if !$2 u 0 return fi
-
-	if $base==10
-		u {["$positive_decimal"]-_'0'}
-	else
-		u {"decimal=["$positive_decimal"];
-
-			const num_of_digits_per_section=log10($base);
-			const order_of_magnitude_base_10=size(decimal);
-			const new_vector_size=ceil(order_of_magnitude_base_10/num_of_digits_per_section);
-			const K_d=order_of_magnitude_base_10%num_of_digits_per_section;
-
-			new_vector=vector(#new_vector_size);
-
-			if(K_d,
-				new_vector[0]=s2v((decimal)[0,K_d]);
-			);
-
-			insertion_pos=new_vector_size;
-			for(pos=order_of_magnitude_base_10-num_of_digits_per_section, pos>=0, pos-=num_of_digits_per_section,
-				new_vector[--insertion_pos]=s2v((decimal)[pos,num_of_digits_per_section]);
-			);
-
-			new_vector;
-		"}
-	fi
-
-	return
-fi
-
-digits_per_sections,temp_base={dps=int(log($base_float_max)/log($base));[dps,$base^dps]}
-exponent:=size('{$temp_base-1}')
-
-($positive_decimal) 1,1,1,1
-{ceil(w#-2/$exponent)},1,1,2,"begin(
-		const base_float=$base_float_max;
-		const bit_mask=base_float-1;
-		pos=started=0;
-		int2float_max(v)=[v>>24,v&bit_mask];
-	);
-	if(started
-	,pos+=$exponent;
-	,pos=w#-2-$exponent*(w-x);started=1;
-	);
-	val=crop(#-2,pos,0,0,0,$exponent,1,1,1);
-	val+=!val;
-	int2float_max(s2v(val));
-	"
-rm[-3]
-
-eval "
-	const base_float=$base_float_max;
-	const bit_mask=base_float-1;
-	const divisor=$temp_base;
-	const multiplier=1e"$exponent";
-	float_max2int(v)=v[0]<<24|v[1];
-	int2float_max(v)=[v>>24,v&bit_mask];
-	while(w(#-1)>1||float_max2int(I[#-1,w(#-1)-1]),
-		crop_point=nan;
-		remainder=current_number=0;
-		repeat(w(#-1),p,
-			current_number*=multiplier;
-			current_number+=float_max2int(I[#-1,p]);
-			remainder=current_number%divisor;
-			current_number>divisor?(
-				I[#-1,p]=int2float_max(int(current_number/divisor));
-				current_number=remainder;
-				if(isnan(crop_point),
-					crop_point=p;
+	digits_per_base_change:=int(log($bfm)/log($base))
+	new_base:=$base^$digits_per_base_change
+	{ceil((w*log(10))/log($new_base))+1},1,1,1,<"begin(
+			const base_10M=10e7;
+			const new_base=$new_base;
+			temp_process_area=expr('begin(
+					const step_size=8;
+					step=(init_step=whd#-1%step_size;init_step?-(step_size-init_step):0);
 				);
-				[0,0];
-			):(
-				I[#-1,p]=[0,0];
+				selected_indice=crop(#-1,step,0,0,0,step_size,1,1,1);
+				step+=step_size;
+				s2v(selected_indice+(!selected_indice*_'0'));
+			',ceil(whd#-1/8));
+			valid_digit_end=0;
+			start_of_res_digit=w;
+			end_of_res_digit=nan;
+			start_point=0;
+			const end_point=size(temp_process_area)-1;
+		);
+		carry_over=0;
+		if(start_point<end_point||temp_process_area[end_point],
+			remainder=0;
+			find_start_point=1;
+			for(p=start_point,p<size(temp_process_area),++p,
+				current_value=carry_over*base_10M+temp_process_area[p];
+				carry_over=current_value%new_base;
+				remainder=temp_process_area[p]=int(current_value/new_base);
+				if(find_start_point,
+					if(remainder,
+						start_point=p;
+						find_start_point=0;
+					);
+				);
 			);
+			if(carry_over&&!valid_digit_end,
+				end_of_res_digit=x;
+				valid_digit_end=1;
+			);
+			--start_of_res_digit;
 		);
-		da_insert(#-2,0,remainder);
-		if(!isnan(crop_point),
-			resize(#-1,w(#-1)-crop_point,1,1,2,0,0,crop_point,0,0,0);
-		);
-	);
+		carry_over;
+		end(
+			set('start',start_of_res_digit);
+			set('end',end_of_res_digit);
+		);"
 
-	da_freeze(#-2);
-	"
+	z. $start,$end rm[-2]
 
-rm.
-
-first_digits_set_size:=int(log(i[#-1,0])/log($base))
-{$first_digits_set_size+(h#-1-1)*$digits_per_sections+1},1,1,1
-
-eval.. "begin(
-		const sp=$first_digits_set_size;
-		const dps=$digits_per_sections;
-		const base=$base;
-		insertion_pos=started=0;
-	);
-	started?(
-		insertion_pos+=dps;
-	):(
-		insertion_pos=sp+dps*y;
-		started=1;
-	);
-	t_insertion_pos=insertion_pos;
-	n=i;
-	while(n,
-		i[#-1,t_insertion_pos--]=n%base;
-		n=int(n/base);
-	);
-	i;
-	"
-
-u {crop(#-1)} rm[-2,-1]
+	if $digits_per_base_change>1
+		length_non_first={$digits_per_base_change*(w-1)}
+		{int(log(i[#-1,0])/log($base))+1+$length_non_first}
+		eval[-2] "begin(
+				insertion_pos=w#-1-$length_non_first-1;
+				started=0;
+			);
+			started?(
+				insertion_pos+=$digits_per_base_change;
+			):(
+				insertion_pos+=x*$digits_per_base_change;
+				started=1;
+			);
+			v=i;current_pos=insertion_pos;
+			while(v,
+				i[#-1,current_pos--]=v%$base;
+				v=int(v/$base);
+			);
+			insertion_pos;"
+		u {crop(#-1)}
+		rm[-2,-1]
+	else
+		u {crop(#-1)}
+		rm[-1]
+	fi
+fi
 #@cli rep_altbase_num2posdec: base,digit_a,digit_b,...
-#@cli : Return the decimal number which corresponds to arguments.
+#@cli : Return the decimal number which corresponds to arguments. Accurately calculate the integer number for numbers bigger than the DOUBLE_MAX or 1.7976931348623157*10^308.
 rep_altbase_num2posdec:
-base_float_max:=1<<24
+bfm={1<<24} # base_float_max
+check isnum($1)?isint($1,2,$bfm):1
 
 if isnum($1)
 	base=$1
@@ -4656,110 +4745,153 @@ else
 fi
 
 (${2--1})
-crop. {for(p=0,!i[#-1,p],++p);set('p',p);p;},100%
-check "( isint($base,2,$base_float_max) && im>=0 && iM<$base && $#>1 ) ? ( sum(isint(crop(#-1)))== w#-1 )"
+check im>=0&&iM<$base&&isfinite(ia)
+crop_point={for(p=0,!i[#-1,p],++p);p;}
+if $crop_point
+	unroll. x
+	crop. $crop_point,100%
+fi
++>>[-1] 0 !=[-1] [-2] if iM error non_int_det else rm. fi
 
-if isint(log10($base))
-	exponent:=size('$base')-1
-else
-	if w#-1<=int(log(1<<53)/log($base))
-		eval. <"begin(
-				const base=$base;
-				M=1;
-				n=0;
-			);
-			n+=i*M;
-			M*=base;
-			end(set('{}',n););
-			"
-		rm.
-		return
-	fi
-
-	digits_per_sections,temp_base={dps=int(log($base_float_max)/log($base));[dps,$base^dps]}
-	exponent:=min(size('{$temp_base-1}'),7)
-
-	1,1,1,1
-	{ceil(w#-2/$digits_per_sections)},1,1,2,"begin(
-			const base_float=$base_float_max;
-			const bit_mask=base_float-1;
-			const dps=$digits_per_sections;
-			multiplier=expr('const m=w-1;$base^(m-x)',$digits_per_sections);
-			pos=started=0;
-			int2float_max(v)=[v>>24,v&bit_mask];
+if whd<=int(log((1<<53)-1)/log($base))+1
+	eval. <"begin(
+			M=1;
+			total=0;
 		);
-		if(started
-		,pos+=dps;
-		,pos=w#-2-dps*(w-x);started=1;
+		if(!isint(i),
+			run('error non_int_det');
 		);
-		int2float_max(sum(crop(#-2,pos,0,0,0,dps,1,1,1)*multiplier));
-		"
-
-	rm[-3]
-
-	eval "
-		const base_float=$base_float_max;
-		const bit_mask=base_float-1;
-		const divisor=1e"$exponent";
-		const multiplier=$temp_base;
-		float_max2int(v)=v[0]<<24|v[1];
-		int2float_max(v)=[v>>24,v&bit_mask];
-		while(w(#-1)>1||float_max2int(I[#-1,w(#-1)-1]),
-			crop_point=nan;
-			remainder=current_number=0;
-			repeat(w(#-1),p,
-				current_number*=multiplier;
-				current_number+=float_max2int(I[#-1,p]);
-				remainder=current_number%divisor;
-				current_number>divisor?(
-					I[#-1,p]=int2float_max(int(current_number/divisor));
-					current_number=remainder;
-					if(isnan(crop_point),
-						crop_point=p;
-					);
-					[0,0];
-				):(
-					I[#-1,p]=[0,0];
-				);
-			);
-			da_insert(#-2,0,remainder);
-			if(!isnan(crop_point),
-				resize(#-1,w(#-1)-crop_point,1,1,2,0,0,crop_point,0,0,0);
-			);
-		);
-
-		da_freeze(#-2);
-		"
+		total+=i*M;M*=$base;
+		end(
+			set('{}',total);
+		);"
 
 	rm.
+	return
+else
+	num_of_digits,n0:=size('$1'),_'0'
+	if $1==10^($num_of_digits-1)
+		if $num_of_digits==2
+			u {`[${2--1}+_'0']`} return
+		fi
+		FDC={size('$2')}
+		num_of_digits-=1
+	else
+		digits_per_base_change={int(log($bfm)/log($base))}
+		new_base={$base^$digits_per_base_change}
+		num_of_digits={size('$new_base')-1}
+		base_power_of_10={10^$num_of_digits}
+
+		# Convert into larger base
+		if $new_base>$base
+			{ceil(whd/$digits_per_base_change)},1,1,1,"begin(
+					const dpbc=$digits_per_base_change;
+					const scp=whd#-1%dpbc;   # Shift crop point;
+					const fcs=dpbc-scp;      # First crop_point
+					multipliers=expr('<begin(v=0;);v?(v*=$base):(v=1);',dpbc);
+					started=crop_point=0;
+					current_area=vector(#dpbc);
+					scp?(
+						first_multiplier=multipliers[fcs,scp];
+						temp_small=vector(#scp);
+					);
+				);
+				started?(
+					crop_point+=dpbc;
+					copy(current_area,i[#0,crop_point],dpbc,1,1);
+					dot(multipliers,current_area);
+				):(
+					started=1;
+					x?(
+						crop_point=x*dpbc-fcs;
+						copy(current_area,i[#0,crop_point],dpbc,1,1);
+						dot(multipliers,current_area);
+					):(
+						crop_point=-fcs;
+						scp?(
+							copy(temp_small,i[#0,0],scp,1,1);
+							dot(first_multiplier,temp_small);
+						):(
+							copy(current_area,i[#0,0],dpbc,1,1);
+							dot(multipliers,current_area);
+						);
+					);
+				);"
+
+			rm..
+		fi
+
+		# Convert into base of power of 10
+		{ceil(log($new_base)/log($base_power_of_10)*w)}
+		eval "
+			start_point=insertion_point=0;
+			const divisor=$base_power_of_10;
+			const end_point=w#-2-1;
+			const operating_base=$new_base;
+			insertion_pos=w#-1;
+			temp_process_area=crop(#-2);
+			insert_valid=0;
+			while(start_point<end_point||temp_process_area[end_point],
+				remainder=carry_over=0;
+				find_start_point=1;
+				for(p=start_point,p<w#-2,++p,
+					current_value=carry_over*operating_base+temp_process_area[p];
+					carry_over=current_value%divisor;
+					remainder=temp_process_area[p]=int(current_value/divisor);
+					if(find_start_point,
+						if(remainder,
+							start_point=p;
+							find_start_point=0;
+						);
+					);
+				);
+				if(carry_over,
+					insert_valid=1;
+				);
+				if(insert_valid,
+					i[#-1,--insertion_pos]=carry_over;
+				);
+			);
+			if(carry_over,i[#-1,--insertion_pos]=carry_over);
+			insertion_pos+1;
+			"
+
+		rm.. crop. ${},100%
+
+		# End of base conversion
+
+		FDC={int(log10(i[#-1,0]))+1} # First Digits Count
+
+	fi
+
 fi
 
-first_digits_set_size:=size('{i[#-1,0]}')
+# Print out result!
 
-{$first_digits_set_size+(wh#-1-1)*$exponent},1,1,1,{_'0'}
+{$FDC+(w#-1-1)*$num_of_digits},1,1,1,$n0
 
 eval.. "begin(
-		const _0=_'0';
-		const sp=$first_digits_set_size-1;
-		const dps=$exponent;
-		const base=10;
-		insertion_pos=started=0;
+		const FDC=$FDC;
+		const NOD=$num_of_digits;
+		const d_NOD=NOD-1;
+		const off=NOD-FDC;
+		insertion_point=started=count_of_insert=0;
 	);
 	started?(
-		insertion_pos+=dps;
+		insertion_point+=NOD;
+		count_of_insert=NOD;
 	):(
-		insertion_pos=sp+dps*y;
+		insertion_point=x*NOD-off+d_NOD;
+		count_of_insert=x?NOD:FDC;
 		started=1;
 	);
-	t_insertion_pos=insertion_pos;
-	n=i;
-	while(n,
-		i[#-1,t_insertion_pos--]=(n%base)+_0;
-		n=int(n/base);
-	);
-	i;"
+	chars=v2s(i,NOD,NOD);
+	ref_pos=chars[d_NOD]?d_NOD:argmin(chars)-1;
+	copy(i[#-1,insertion_point],chars[ref_pos],ref_pos+1,-1,-1);
+	"
 
-u {t} rm[-2,-1]
+u {`crop(#-1)`} # Set status variable to result
+rm[-2,-1]
 #@cli rep_num2altbase: abs_num,base
 #@cli : Insert number in bases other than 10. Each numbers are represented as digits by themselves.
 +rep_num2altbase:
