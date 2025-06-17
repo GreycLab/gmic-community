@@ -49,16 +49,18 @@
 #-------------------------------
 
 #@cli rep_xp2b: base_pow2_a,base_pow2_b,str_a,str_b
-#@cli : Convert between bases of power of 2 bases. Only binary, octal, and hexadecimal is supported.
-#@cli : base_pow_2_? can be number representing the base, or string.
+#@cli : Convert between bases of power of 2 bases. Only binary, quaternary, octal, hexadecimal, and triacontadecimal number is supported.
+#@cli : base_pow2_? can be number representing the base, or string.
 #@cli : str_? are the number represented by base_pow2_a
 rep_xp2b:
 a,b,I,T,n0:=isnum($1),isnum($2),$!,$#-2,'0'
-check ($a?isin($1,2,8,16):1)&&($b?isin($2,2,8,16):1)&&isint($#,3)
+check ($a?isin($1,2,8,32):1)&&($b?isin($2,2,8,32):1)&&isint($#,3)
 
 base_bin,base_binary=2
+base_qua,base_quaternary=4
 base_oct,base_octal=8
 base_hex,base_hexadecimal=16
+base_tca,base_triacontadecimal=32
 
 if $a
 	base_a=$1
@@ -72,21 +74,40 @@ else
 	base_b=${base_$2}
 fi
 
-if $base_a==$base_b u ${3--1} return fi
-
 m "__$0_vars: $""=str"
 __$0_vars ${3--1}
 um __$0_vars
+
+b2,b4,b8,b16,b32=1,2,3,4,5
+
+if $base_a==$base_b
+	if $base_a<$base_hex
+		max_val:=_'0'+$base_a-1
+		repeat $T {
+			('${str{$>+1}}')
+			if !isint([im,iM],_'0',$max_val) error non_vald_char fi
+			rm.
+		}
+	else
+		max_lower,max_higher={[_'a',_'A']-2+$base_a}
+		repeat $T {
+			('${str{$>+1}}')
+			f isint(i,_'0',_'9')||isint(i,_'a',$max_lower)||isint(i,_'A',$max_higher)
+			if !im error non_val_char fi
+			rm.
+		}
+	fi
+	u ${3--1}
+	return
+fi
 
 is_base_b_bin={$base_b==$base_bin}
 if $base_a>2
 	is_base_a_hex={$base_a==$base_hex}
 
-	+rep_cartesian_product {vector(#(3+$is_base_a_hex),2)} => binaries
-
+	step=${b$base_a}
+	+rep_cartesian_product {vector(#$step,2)} => binaries
 	if $is_base_b_bin +. $n0 fi
-
-	step={3+$is_base_a_hex}
 
 	repeat $T {
 		('${str{$>+1}}')
@@ -94,6 +115,8 @@ if $base_a>2
 		{w*$step}
 		eval[-2] "begin(
 				p=started=0;
+				const _shift_lower=_'a'-10;
+				const _shift_higher=_'A'-10;
 			);
 			started?(
 				p+=$step;
@@ -101,7 +124,15 @@ if $base_a>2
 				p=x*$step;
 				started=1;
 			);
-			ind=s2v([('0x'),i]);
+			ind=isint(i,_'0',_'9')?(
+					i-_'0';
+				):
+				isint(i,_'A',_'V')?(
+					i-_shift_higher;
+				):
+				isint(i,_'a',_'v')?(
+					i-_shift_lower;
+				):(-1;);
 			if(!isint(ind,0,w#$binaries-1),
 				run('error inval_char');
 			);
@@ -131,11 +162,13 @@ else
 	}
 fi
 
-chunks_size={3+($base_b==$base_hex)}
+chunks_size=${b$base_b}
 foreach[$I--1] {
 	{ceil(w/$chunks_size)},1,1,1,"begin(
 			const off=-(w#-1-w*$chunks_size);
-			chars='0123456789ABCDEF';
+			const _0=_'0';
+			const _offset=(_'a')-10;
+			const _shift_lower=_'a'-10;
 			shift_factor=reverse(expr('x',$chunks_size));
 			p=started=0;
 		);
@@ -144,7 +177,9 @@ foreach[$I--1] {
 		):(
 			p=x*$chunks_size-off;
 		);
-		chars[sum(crop(#-1,p,$chunks_size)<<shift_factor)];"
+		v=sum(crop(#-1,p,$chunks_size)<<shift_factor);
+		v<10?v+_0:v+_offset;
+		"
 	z. {repeat(w#-1-1,p,if(i[#-1,p]!=_'0',break();););p;},100%
 	res.=$sep{t}
 	sep=,
