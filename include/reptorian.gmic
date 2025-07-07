@@ -60,7 +60,7 @@
 #@cli : - 32 - tca - triacontadecimal
 #@cli : str_? are the number represented by base_pow2_a
 rep_xp2b:
-a,b,I,T,n0:=isnum($1),isnum($2),$!,$#-2,'0'
+a,b,I,T,n0:=isnum($1),isnum($2),$!,$#-2,'0' # I = Number of Images ; T = Number of input strings to convert
 check ($a?isin($1,2,4,8,16,32):1)&&($b?isin($2,2,4,8,16,32):1)&&isint($#,3)
 
 base_bin,base_binary=2
@@ -139,7 +139,9 @@ if $base_a>2
 				):
 				isint(i,_'a',_'v')?(
 					i-_shift_lower;
-				):(-1;);
+				):(
+					-1;
+				);
 			if(!isint(ind,0,w#$binaries-1),
 				run('error inval_char');
 			);
@@ -2108,7 +2110,8 @@ repeat $! {
 					"`}) # Code taken from print in G'MIC STDLIB
 }
 #@cli rep_cin: '_message'
-#@cli : Allows users to input into status. Maximum string length is 1024!
+#@cli : Allows users to input into status.
+#@cli : Warning: "\" does not work for now (May be fixed later)! All other available keys in G'MIC works.
 #@cli : Default values: '_message=G'MIC rep_cin output:'
 #@cli : $ echo ${-rep_cin}
 #@cli : $ rep_cin , echo "Status Output: "${}
@@ -2117,88 +2120,120 @@ repeat $! {
 #@cli : $ m=${rep_cin\ {'"Input: "'}} echo "Status Output: "$m
 rep_cin:
 skip "${1=}"
-screen_w,screen_h={*,u},{*,v}
-screen_h>>=1
-started,stack_point=0
-current_str_0=""
-max_stack_size:=(1<<10)+1
-case:='A'-'a'
-n0:='0'
+screen_w,screen_h:={*,u},{*,v}>>1
+stack_size,case,n0:=(1<<10)+1,_'A'-_'a',_'0'
+insertion_pos,started,mode=0
+old_insertion_pos,old_da_size=nan
+wait_factor=1
 
 if $#>1
 	message={`[$*]`}
 else
-	if narg("$1")
-		message="$1"
+	if narg({``$1})
+		message={``$1}
 	else
 		message="G'MIC rep_cin input: "
 	fi
 fi
 
-do
+1,$stack_size,1,1
 
-	if {*,BACKSPACE}
-		if $stack_point>0
-			stack_point-=1
-			if $stack_point<0
-				stack_point=0
-			fi
-			o=${current_str_$stack_point}
-		fi
+do {
+	if {*,ENTER}" || "{*,ESC} w[] 0,0 break fi
+	use_key=1
 
-		w[] $screen_w,1,0,0,$message$o
-		wait
-	elif {*,ENTER}" || "{*,ESC}
-		break
-	else
-		shift_pressed:=({*,SHIFTLEFT}||{*,SHIFTRIGHT})
-		use_capitalization:=!$shift_pressed
-		key={*,k}
+	if {*,BACKSPACE}" && "da_size(#-1)&&$insertion_pos
+		use_key=0
+		eval da_remove(#-1,cut($insertion_pos-1,0,da_size(#-1)-1))
+		insertion_pos:=cut($insertion_pos-1,0,da_size(#-1))
+	fi
 
-		in_char_set_1,in_char_set_2,is_letter,is_num_range,is_space={[inrange($key,186,192,1,1),inrange($key,219,222,1,1),inrange($key,_'A',_'Z',1,1),inrange($key,_'0',_'9',1,1),$key==_'\ ']}
+	arrow_pressed={{*,ARROWLEFT}||{*,ARROWRIGHT}}
 
-		if $is_space
-			shift_pressed=0
-		fi
-
-		if $stack_point<$max_stack_size?($in_char_set_1||$in_char_set_2||$is_letter||$is_num_range||$is_space)
-			stack_point+=1
-
-			if $shift_pressed
-				if $in_char_set_1   o.={`(':+<_>?~')[$key-186]`}
-				elif $in_char_set_2 o.={`('\{|\}\"')[$key-219]`}
-				elif $is_num_range  o.={`('\)!@#$%^&*\(')[$key-$n0]`}
-				else                o.={`$key`}
-				fi
-			else
-				if $in_char_set_1   o.={`(';=,-./\`')[$key-186]`}
-				elif $in_char_set_2
-					if $key==220    o.=\\
-					else            o.={`('[\\]\'')[$key-219]`}
-					fi
-				elif $is_letter     o.={`$key-$case`}
-				else                o.={`$key`}
-				fi
-			fi
-			current_str_$stack_point=$o
-		fi
-
-		if $started
-			w[] $screen_w,1,0,0,$message$o
-		else
-			w[] $screen_w,1,0,0,0,$screen_h,$message$o
-			started=1
+	if $arrow_pressed
+		ARROWLEFT={*,ARROWLEFT}
+		ARROWRIGHT={*,ARROWRIGHT}
+		insertion_pos={cut($insertion_pos-$ARROWLEFT+$ARROWRIGHT,0,da_size(#-1))}
+		wait_factor=0
+	elif $use_key
+		__rep_cin_key2int
+		if ${}
+			eval da_insert(#-1,$insertion_pos,${})
+			insertion_pos+=1
 		fi
 	fi
 
-	wait 50
-while {*}
+	if $insertion_pos!=$old_insertion_pos||da_size(#-1)!=$old_da_size
+		if !da_size(#-1)
+			M0=
+			M1=_
+		else
+			if ($insertion_pos>=(da_size(#-1)))||!$insertion_pos
+				M0={`crop(#-1,0,0,0,0,1,{da_size(#-1)},1,1)`}
+				M1=$M0
+				if $insertion_pos
+					M1.=_
+				else
+					M1..=_
+				fi
+			else
+				left={`crop(#-1,0,0,0,0,1,$insertion_pos,1,1)`}
+				right={`crop(#-1,0,$insertion_pos,0,0,1,{da_size(#-1)-$insertion_pos},1,1)`}
+				M0=$left$right
+				M1=${left}_$right
+			fi
+		fi
+	fi
+
+	if $started
+		w[] $screen_w,1,0,0,$message${M$mode}
+	else
+		w[] $screen_w,1,0,0,0,$screen_h,$message$M0
+		started=1
+	fi
+
+	mode={!$mode}
+	old_insertion_pos=$insertion_pos
+	old_da_size:=da_size(#-1)
+
+	if $wait_factor wait $wait_factor
+	else wait
+	fi
+
+	wait_factor=115
+} while {*}
+
+rm.
+
+u $M0 wait
 
 # Below is the reference I used to help create the above code:
 # ;=,-./` [\]'
 # 186,187,188,189,190,191,192,219,220,221,222
+__rep_cin_key2int:
+shift_pressed:=({*,SHIFTLEFT}||{*,SHIFTRIGHT})
+use_capitalization:=!$shift_pressed
+key={*,k}
 
-status $o wait
+conditions={[inrange($key,186,192,1,1),inrange($key,219,222,1,1),inrange($key,_'A',_'Z',1,1),inrange($key,_'0',_'9',1,1),$key==_'\ ']}
+in_char_set_1,in_char_set_2,is_letter,is_num_range,is_space=$conditions
+
+if !same([$conditions],0)
+	wait_factor=0
+
+	if $is_space
+		u {_'\ '}
+		return
+	fi
+
+	if $in_char_set_1   u {(';=,-./`:+<_>?~')[$key-186+($shift_pressed?7)]}
+	elif $in_char_set_2 u {('[\\]\'\{\|\}\"')[$key-219+($shift_pressed?4)]}
+	elif $is_num_range  u {$shift_pressed?(')!@#\$%^&*(')[$key-_'0']:$key}
+	else                u {$key-(!$shift_pressed?$case)}
+	fi
+else
+	u 0
+fi
 #@cli rep_closest_number_in_ordered_list_of_numbers: number_to_search,number_a,number_b....
 #@cli : Find closest number in list of number
 rep_closest_number_in_ordered_list_of_numbers:
