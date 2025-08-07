@@ -7375,6 +7375,281 @@ eval "
 	);
 	index;
 	"
+#@cli rep_rde_combinations: selected_count,item_0_count>=1,item_1_count>=1,...,_axis={x,y,z}
+#@cli : Generates all possible combinations of repeated distinct elements of different counts, and the total number of elements is equal to the selected_count.
+#@cli :
+#@cli : Default values: '_axis=x'
++rep_rde_combinations:
+check "isint($1,1)&&$#>1"
+
+if isnum($-1)
+	items_counts=${2--1}
+	axis=0
+else
+	check "inrange(_'$-1',_'x',_'z',1,1)"
+	items_counts=${2--2}
+	axis={_'$-1'-_'x'}
+fi
+
+check "items_counts=["$items_counts"];
+       ( sum( isint(items_counts,1) ) == size(items_counts) ) && ($1 <= sum(items_counts) );"
+
+number_of_possible_combinations={([${_rep_rde_combination_sizes_from_right\ $1,$items_counts}])[0]}
+if $number_of_possible_combinations>(1<<24) error exc_combin_size:$number_of_possible_combinations fi
+
+out_dim={v=vector(#3,1);v[$axis]=$number_of_possible_combinations;v}
+
+$out_dim,$1,>"begin(
+		items_count=["$items_counts"];
+		const number_of_sets_of_items=size(items_count);
+		const last_item_pos=number_of_sets_of_items-1;
+
+		result_vector=end_vector=vector(#$1);
+
+		const size_result_vector=size(result_vector);
+		const last_result_vector_pos=size_result_vector-1;
+		const start_compare_pos=last_result_vector_pos-1;
+
+		inserted_current_element_count=temp_pos=0;
+
+		repeat(size_result_vector,pos,
+			result_vector[pos]=temp_pos;
+
+			if(++inserted_current_element_count==items_count[temp_pos],
+				++temp_pos;
+				inserted_current_element_count=0;
+			);
+		);
+
+		pos=last_result_vector_pos;
+		temp_pos=last_item_pos;
+		inserted_current_element_count=0;
+
+		repeat(size_result_vector,
+			end_vector[pos--]=temp_pos;
+
+			if(++inserted_current_element_count==items_count[temp_pos],
+				--temp_pos;
+				inserted_current_element_count=0;
+			);
+		);
+
+		--result_vector[last_result_vector_pos];
+	);
+
+	if(++result_vector[last_result_vector_pos]==number_of_sets_of_items,
+		compare_pos=start_compare_pos;
+
+		do(if(result_vector[compare_pos]!=end_vector[compare_pos],break(););
+			--compare_pos;
+		,compare_pos>=0);
+
+		selected_item=result_vector[compare_pos]+1;
+		inserted_current_element_count=0;
+
+		do(
+			result_vector[compare_pos++]=selected_item;
+
+			if(++inserted_current_element_count==items_count[selected_item],
+				++selected_item;
+				inserted_current_element_count=0;
+			);
+		,compare_pos<size_result_vector);
+	);
+
+	result_vector;"
+#@cli rep_rde_combinations_index2list: selected_count,item_0_count,item_1_count,...,index
+#@cli : Return combination of repeated distinct elements found at index.
+rep_rde_combination_index2list:
+item_count=${2--2}
+item_group_count={$#-2}
+
+check "item_count=["$item_count"];
+       ( sum( isint(item_count,1) ) == size(item_count) ) && ($1 <= sum(item_count) ) && (isint($1,1)&&$#>2);
+       "
+
+if $1==1
+	u {$-1%$#-2}
+	return
+fi
+
+distance_from_right=${_rep_rde_combination_sizes_from_right\ $1,$item_count}
+selected_items,number_of_possible_combinations=$1,{[$distance_from_right][0]}
+index,selected_index:=$-1%$number_of_possible_combinations,0
+
+$selected_items
+
+({vmin([$item_count],$selected_items)})
+
+total_offset=0
+repeat $selected_items {
+	index,t_selected_offset=${_rep_rde_combination_offset_from_index_and_distance_from_right\ $index,$distance_from_right}
+
+	crop. $t_selected_offset,100%
+
+	set.. {$total_offset+$t_selected_offset},$>
+	set. {i[#-1,0]-1},0
+
+	if !i[#-1,0]
+		crop. 1,100%
+		t_selected_offset+=1
+	fi
+
+	cut. 0,{max($<,1)}
+
+	distance_from_right=${_rep_rde_combination_sizes_from_right\ $<,{crop(#-1)}}
+	total_offset+=$t_selected_offset
+}
+
+u {crop(#-2)} rm[-2,-1]
+#@cli rep_rde_combination_list2index: selected_count,item_1_count,...,selected_item_1,...
+#@cli : Return the lexicographic index in which this combination is found within all possible combinations of multi-set of possibly different size.
+#@cli : Author: Reptorian.
+rep_rde_combination_list2index:
+check "
+	const item_groups_and_selections_arg_count=$#-1;
+	const selected_count=$1;
+	const item_groups_set_cardinality=item_groups_and_selections_arg_count-selected_count;
+	const max_item_index=item_groups_set_cardinality-1;
+
+	if((item_groups_and_selections_arg_count-selected_count>=1)&&isint(selected_count,1),
+		item_group_and_selection=[${2--1}];
+
+		frequency_of_items_per_group=item_group_and_selection[0,item_groups_set_cardinality];
+		total_number_of_items_to_choose_from=sum(frequency_of_items_per_group);
+
+		if(total_number_of_items_to_choose_from>=selected_count,
+
+			selected_items=item_group_and_selection[item_groups_and_selections_arg_count-selected_count,selected_count];
+			amount_of_items=sum(frequency_of_items_per_group);
+
+			is_valid_items_freq=min(frequency_of_items_per_group)>=1;
+			is_valid_selected_items=same(isint(selected_items,0,max_item_index),1);
+
+			is_valid_items_freq&&is_valid_selected_items?(
+				is_all_ints_valid=1;
+				frequency_checker=vector(#item_groups_set_cardinality);
+
+				repeat(selected_count,p,
+					item_selected=selected_items[p];
+					if(++frequency_checker[item_selected]>frequency_of_items_per_group[item_selected],
+						is_all_ints_valid=0;
+						break();
+					);
+				);
+
+				if(is_all_ints_valid,
+					set('item_count_groups',v2s(vmin(frequency_of_items_per_group,selected_count)));
+					set('item_selection',v2s(sort(selected_items)));
+					1; # <- Confirms all conditions is valid
+				);
+			);
+		);
+	);"
+
+($item_count_groups) ($item_selection) f. +max(i-j(-1),0)
+
+index=0
+repeat w#-1 {
+	selection={i[#-1,$>]}
+	distance_from_right=${_rep_rde_combination_sizes_from_right\ {$<+1},{crop(#-2)}}
+	crop[-2] $selection,100%
+	set[-2] {i[#-2,0]-1},0
+	if !i[#-2,0]
+		crop[-2] 1,100%
+		set[-1] {[i[#-1,$>+1]-1,$>+1]}
+	fi
+	cut[-2] 0,{max($<,1)}
+	index+=V=[$distance_from_right];V[0]-V[$selection]
+}
+
+rm[-2,-1]
+u $index
+_rep_rde_combination_offset_from_index_and_distance_from_right:
+eval "distance_from_right=[${2--1}];
+      size_of_combinations=distance_from_right[0];
+      index=$1;
+
+      differential=nan;
+      for(selected_offset=size(distance_from_right)-1,selected_offset>=0,--selected_offset,
+          differential=size_of_combinations-distance_from_right[selected_offset];
+          if(index>=differential,break(););
+      );
+
+      index-=differential;
+
+      [index,selected_offset];"
+_rep_rde_combination_sizes_from_right:
+list_of_items_counts={vmin(reverse([${2--1}]),$1)}
+sum_items_counts={sum($list_of_items_counts)}
+check $sum_items_counts>=$1
+
+if $1==$sum_items_counts
+	u 1
+	return
+elif $1==1
+	u {expr('$#-x-1',$#-1)}
+	return
+fi
+
+I,M,N,R:=$!+[0,1,2],$#-2
+
+$#,1,1,2 insertion_pos={w#-1-1} ({[$list_of_items_counts]+1})
+repeat w#-1 { {I[#$M,$>]},1,1,2,[1,0] }
+rm[$M]
+
+# https://www.geeksforgeeks.org/multiply-two-polynomials-2/
+
+append_length_to_output,items_count=0,0
+
+post_insert_zero={"
+		V=["$list_of_items_counts"];
+		contain_1=items_count=0;
+		repeat(size(V),p,
+			items_count+=V[p];
+			if(items_count>=$1,
+				contain_1=items_count==$1;
+				break();
+			);
+		);
+		contain_1;
+	"}
+
+insert_append=0
+
+repeat $R {
+	{w#$M+w#$N-1},1,1,2
+
+	eval[$M] >"
+		const bit_mask=(1<<24)-1;
+		M=i0|(i1<<24);
+		repeat(w#-1,p,
+			Nv=I[#$N,p];
+			Ov=I[#-1,x+p];
+			N=Nv[0]|(Nv[1]<<24);
+			O=Ov[0]|(Ov[1]<<24);
+			F=O+(M*N);
+			I[#-1,x+p]=[F&bit_mask,F>>24];
+		);I;"
+
+	rm[$M,$N]
+	move[-1] $M
+
+	if !$insert_append?(V=I[#$M,$1];(V[0]|V[1]<<24)>1)
+		insert_append=1
+	fi
+
+	if $insert_append
+		eval I[#$I,$insertion_pos]=I[#$M,$1]
+		insertion_pos-=1
+	fi
+}
+
+L:=$#-$insertion_pos-1
+
+u {crop(#$I,$insertion_pos+1,0,0,0,$L,1,1,1)|(crop(#$I,$insertion_pos+1,0,0,1,$L,1,1,1)<<24)}{`$post_insert_zero?',1'`}
+
+rm[-2,-1]
 #@cli rep_inc_combinations: size,_axis={x,y,z}
 #@cli : Generate all of the possible incremental combination.
 #@cli :
