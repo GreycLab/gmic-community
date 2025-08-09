@@ -7592,16 +7592,6 @@ elif $1==1
 	return
 fi
 
-I,M,N,R:=$!+[0,1,2],$#-2
-
-$#,1,1,2 insertion_pos={w#-1-1} ({[$list_of_items_counts]+1})
-repeat w#-1 { {I[#$M,$>]},1,1,2,[1,0] }
-rm[$M]
-
-# https://www.geeksforgeeks.org/multiply-two-polynomials-2/
-
-append_length_to_output,items_count=0,0
-
 post_insert_zero={"
 		V=["$list_of_items_counts"];
 		contain_1=items_count=0;
@@ -7615,41 +7605,47 @@ post_insert_zero={"
 		contain_1;
 	"}
 
-insert_append=0
+($list_of_items_counts) +. 1
++f. >begin(p=0;);x?(p+=i-1;):(p=i);p;
 
-repeat $R {
-	{w#$M+w#$N-1},1,1,2
-
-	eval[$M] >"
-		const bit_mask=(1<<24)-1;
-		M=i0|(i1<<24);
-		repeat(w#-1,p,
-			Nv=I[#$N,p];
-			Ov=I[#-1,x+p];
-			N=Nv[0]|(Nv[1]<<24);
-			O=Ov[0]|(Ov[1]<<24);
-			F=O+(M*N);
-			I[#-1,x+p]=[F&bit_mask,F>>24];
-		);I;"
-
-	rm[$M,$N]
-	move[-1] $M
-
-	if !$insert_append?(V=I[#$M,$1];(V[0]|V[1]<<24)>1)
-		insert_append=1
-	fi
-
-	if $insert_append
-		eval I[#$I,$insertion_pos]=I[#$M,$1]
-		insertion_pos-=1
-	fi
-}
-
-L:=$#-$insertion_pos-1
-
-u {crop(#$I,$insertion_pos+1,0,0,0,$L,1,1,1)|(crop(#$I,$insertion_pos+1,0,0,1,$L,1,1,1)<<24)}{`$post_insert_zero?',1'`}
+eval. >"
+	begin(
+		const maximum_possible_distance=$#-2;
+		distance_from_right=vector(#maximum_possible_distance);
+		polynomial_multiplications_vector=vector(#is#-1);
+		last_size=last_position=position_insertion=started=0;
+		insert_distance_pos=size(distance_from_right);
+		insert_distance_mode=0;
+	);
+	started?(
+		p=last_position;
+		copy_length=i[#-2,x];
+		repeat(last_size,q,
+				copy(polynomial_multiplications_vector[position_insertion+q],polynomial_multiplications_vector[p],copy_length,1,0,-1);
+				++p;
+		);
+		if(!insert_distance_mode?(polynomial_multiplications_vector[position_insertion+$1]>1),
+			insert_distance_mode=1;
+		);
+		if(insert_distance_mode,
+			distance_from_right[--insert_distance_pos]=polynomial_multiplications_vector[position_insertion+$1];
+		);
+	):(
+		copy(polynomial_multiplications_vector[0],1,i,1,0);
+		started=1;
+	);
+	last_size=i;
+	last_position=position_insertion;
+	position_insertion+=i;
+	end(
+		set('distance_from_right',v2s(distance_from_right));
+		set('insert_distance_pos',insert_distance_pos);
+	);
+	"
 
 rm[-2,-1]
+
+u {[$distance_from_right][$insert_distance_pos,$#-2-$insert_distance_pos]}{`$post_insert_zero?',1'`}
 #@cli rep_inc_combinations: size,_axis={x,y,z}
 #@cli : Generate all of the possible incremental combination.
 #@cli :
