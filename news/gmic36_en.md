@@ -450,7 +450,7 @@ We have already reached the fifth section of this post, which probably means it�
 
 The release of version **3.6** (and more generally the year 2025) represents an important milestone in the life of the _G'MIC_ project.
 
-Firstly, because after 17 years of development, it is clear that _G'MIC_ is now stable, and perhaps it is time to highlight its existing features rather than trying to implement new functionalities at all costs. Secondly, the loss of our friend Sébastien may make the maintenance and future evolution of the _G'MIC-Qt_ plugin difficult. And finally, with the widespread adoption of generative AI, the fields of image analysis, processing, and generation (especially for creative purposes) are undergoing deep changes, and _G'MIC_'s features could become obsolete in a few years (or not 😊).
+Firstly, because after 17 years of development, it is clear that _G'MIC_ is now stable, and perhaps it is time to highlight its existing features rather than trying to implement new functionalities at all costs. Secondly, the loss of our friend Sébastien may make the maintenance and future evolution of the _G'MIC-Qt_ plugin difficult. And finally, with the widespread adoption of generative AI, the fields of image analysis, processing, and generation (especially for creative purposes) are undergoing deep changes, and _G'MIC_ features could become obsolete in a few years (or not 😊).
 
 In the end, so many uncertainties and questions! This makes the directions for _G'MIC_ future evolution unclear, especially since managing such a project requires a huge time investment, while its financial return remains nonexistent.
 
