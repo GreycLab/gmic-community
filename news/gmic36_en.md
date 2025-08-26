@@ -21,7 +21,7 @@ Among its most popular variants are: [`gmic`](https://gmic.eu/reference/), a com
 
 ===
 [![Preview of the G'MIC-Qt plugin](https://gmic.eu/gmic36/thumbs/gmic_qt_360.png)](https://gmic.eu/gmic36/img/gmic_qt_360.jpg)
-_Fig. 1.1. The G'MIC-Qt plugin in version **3.6**, here used inside GIMP 2.10 with the “Paint With Brush” filter activated._
+_Fig. 1.1. The G'MIC-Qt plugin in version __3.6__, here used inside GIMP 2.10 with the “Paint With Brush” filter activated._
 ===
 
 # 2. What’s New in the _G'MIC-Qt_ Plugin
@@ -34,11 +34,11 @@ Everyone who knew him will tell you the same: Sébastien was, above all, a profo
 
 Even though he never sought the spotlight, we want to make an exception here and shine a light on his invaluable work and the crucial role he played in the development of _G'MIC_. Thanks to him, _G'MIC-Qt_ has become a plugin used and appreciated by thousands of people around the world.
 
-He also happened to be a regular reader of LinuxFr.org, which makes it even more important for us to honor him here. Sébastien is deeply missed. We will do our best to ensure that his work lives on. Rest in peace, Sébastien — our thoughts go to you and to your family.
+Sébastien is deeply missed. We will do our best to ensure that his work lives on. Rest in peace, Sébastien — our thoughts go to you and to your family.
 
 ===
 [![Tribute to Sébastien Fourey](https://gmic.eu/gmic36/thumbs/gmic_tribute_sebastien.png)](https://gmic.eu/gmic36/img/gmic_tribute_sebastien.jpg)
-_Fig. 2.1. Tribute to Sébastien Fourey, author of G'MIC-Qt, as shown in the “**About**” section of the plugin._
+_Fig. 2.1. Tribute to Sébastien Fourey, author of G'MIC-Qt, as shown in the “__About__” section of the plugin._
 ===
 
 ## 2.2. General Improvements to the Plugin
@@ -71,28 +71,28 @@ The main highlights of the _G'MIC-Qt_ plugin in this release come in the form of
 
 ===
 [![“Warp RBF” Filter](https://gmic.eu/gmic36/thumbs/gmic_warp_rbf.png)](https://gmic.eu/gmic36/img/gmic_warp_rbf.jpg)
-_Fig. 2.3.1. The **Deformations / Warp [RBF]** filter in action in G'MIC-Qt._
+_Fig. 2.3.1. The __Deformations / Warp [RBF]__ filter in action in G'MIC-Qt._
 ===
 
 The following video shows the filter being used within _G'MIC-Qt_ to warp a portrait:
 
 ===
 [![“Warp RBF” Filter – video](https://gmic.eu/gmic36/thumbs/gmic_warp_rbf_vid.png)](https://gmic.eu/gmic36/img/gmic_warp_rbf_vid.mp4)
-_Fig. 2.3.2. The **Deformations / Warp [RBF]** filter in action in G'MIC-Qt (video)._
+_Fig. 2.3.2. The __Deformations / Warp [RBF]__ filter in action in G'MIC-Qt (video)._
 ===
 
 - The **Repair / Upscale [CNN2x]** filter doubles the resolution of an image using a lightweight [convolutional neural network (CNN)](https://en.wikipedia.org/wiki/Convolutional_neural_network), trained to best preserve details and textures during upscaling. This module provides a simple and relatively effective alternative to more traditional upscaling methods (particularly those natively available in GIMP).
 
 ===
 [![“Upscale CNN2x” Filter](https://gmic.eu/gmic36/thumbs/gmic_upscale_cnn2x.png)](https://gmic.eu/gmic36/img/gmic_upscale_cnn2x.jpg)
-_Fig. 2.3.3. The **Repair / Upscale [CNN2x]** filter in action in G'MIC-Qt._
+_Fig. 2.3.3. The __Repair / Upscale [CNN2x]__ filter in action in G'MIC-Qt._
 ===
 
 The next figure compares classic upscaling methods with this new algorithm available in _G'MIC-Qt_ (result shown at bottom right):
 
 ===
 [![“Upscale CNN2x” Filter – Comparisons](https://gmic.eu/gmic36/thumbs/gmic_upscale_cnn2x_comp.png)](https://gmic.eu/gmic36/img/gmic_upscale_cnn2x_comp.jpg)
-_Fig. 2.3.4. Comparison of traditional upscaling methods with the new **Upscale [CNN2x]** algorithm._
+_Fig. 2.3.4. Comparison of traditional upscaling methods with the new __Upscale [CNN2x]__ algorithm._
 ===
 
 This filter also illustrates several recent improvements to [`nn_lib`](https://discuss.pixls.us/t/machine-learning-library-in-gmic), the small internal machine-learning library integrated into _G'MIC_. Gradient clipping, L2 weight regularization, a _Cosine Annealing LR_ learning-rate scheduler, a _Pixel Shuffling_ module… these are some of the new features that have been added. While this neural network library is not particularly powerful (it only runs on CPU, not GPU), it still makes it possible to design interesting filters based on deep learning techniques.
@@ -101,14 +101,14 @@ This filter also illustrates several recent improvements to [`nn_lib`](https://d
 
 ===
 [![“VHS Filter”](https://gmic.eu/gmic36/thumbs/gmic_vhs_filter.png)](https://gmic.eu/gmic36/img/gmic_vhs_filter.jpg)
-_Fig. 2.3.5. The **Degradations / VHS Filter** in action._
+_Fig. 2.3.5. The __Degradations / VHS Filter__ in action._
 ===
 
 Since this filter generates random noise, applying it multiple times to the same image always produces a different result. This makes it especially fun for creating small “analog 90s-style” animations. Fans of [Glitch Art](https://en.wikipedia.org/wiki/Glitch_art) will definitely appreciate it! (see [the original image](https://pixabay.com/photos/vcr-video-cassettes-film-1221156/) for comparison).
 
 ===
 [![“VHS Filter” – video](https://gmic.eu/gmic36/img/gmic_vhs_anim.gif)](https://gmic.eu/gmic36/img/gmic_vhs_anim.gif)
-_Fig. 2.3.6. The **Degradations / VHS Filter** applied several times on the same image, creating a VHS-style animation._
+_Fig. 2.3.6. The __Degradations / VHS Filter__ applied several times on the same image, creating a VHS-style animation._
 ===
 
 ## 2.4. New Rendering Effects
@@ -120,7 +120,7 @@ Some new effects have also been added to the plugin, not to modify an existing i
 ===
 [![“Organic Fibers” Filter – 1](https://gmic.eu/gmic36/thumbs/gmic_organic_fibers1.png)](https://gmic.eu/gmic36/img/gmic_organic_fibers1.jpg)
 [![“Organic Fibers” Filter – 2](https://gmic.eu/gmic36/thumbs/gmic_organic_fibers2.png)](https://gmic.eu/gmic36/img/gmic_organic_fibers2.jpg)
-_Fig. 2.4.1. The **Patterns / Organic Fibers** filter in action, with two different parameter sets._
+_Fig. 2.4.1. The __Patterns / Organic Fibers__ filter in action, with two different parameter sets._
 ===
 
 - The **Rendering / Speech Bubble** filter inserts a comic-style speech bubble on an additional image layer, with customizable features such as the bubble’s roundness or the shape of its “tail,” thanks to various control points. It’s a quick way to integrate typical comic book elements into any image, as shown below: first the filter’s preview in the plugin, then the final result in GIMP after adding some text inside the bubble.
@@ -128,14 +128,14 @@ _Fig. 2.4.1. The **Patterns / Organic Fibers** filter in action, with two differ
 ===
 [![“Speech Bubble” Filter – 1](https://gmic.eu/gmic36/thumbs/gmic_speech_bubble.png)](https://gmic.eu/gmic36/img/gmic_speech_bubble.jpg)
 [![“Speech Bubble” Filter – 2](https://gmic.eu/gmic36/thumbs/gmic_speech_bubble2_en.png)](https://gmic.eu/gmic36/img/gmic_speech_bubble2_fr.jpg)
-_Fig. 2.4.2. The **Rendering / Speech Bubble** filter adds customizable comic-style bubbles to your images._
+_Fig. 2.4.2. The __Rendering / Speech Bubble__ filter adds customizable comic-style bubbles to your images._
 ===
 
 The following video shows the filter in action on a photograph:
 
 ===
 [![“Speech Bubble” Filter – video](https://gmic.eu/gmic36/thumbs/gmic_speech_bubble_vid.png)](https://gmic.eu/gmic36/img/gmic_speech_bubble_vid.mp4)
-_Fig. 2.4.3. The **Rendering / Speech Bubble** filter in action in G'MIC-Qt (video)._
+_Fig. 2.4.3. The __Rendering / Speech Bubble__ filter in action in G'MIC-Qt (video)._
 ===
 
 - The **Rendering / 2.5D Extrusion** filter simulates a fake 3D extrusion effect from a binary input shape. It can quickly transform silhouettes or masks into more visually consistent objects with a sense of depth—without needing a dedicated 3D modeling program. The examples below show how it works: start by creating an opaque shape on a transparent background (here, some text), then apply the filter to produce a 3D-like extruded look. Rotation angle, extrusion depth, perspective strength, and face colors are all adjustable.
@@ -143,14 +143,14 @@ _Fig. 2.4.3. The **Rendering / Speech Bubble** filter in action in G'MIC-Qt (vid
 ===
 [![“2.5D Extrusion” Filter – 1](https://gmic.eu/gmic36/thumbs/gmic_extrusion_25D_1_en.png)](https://gmic.eu/gmic36/img/gmic_extrusion_25D_1_fr.jpg)
 [![“2.5D Extrusion” Filter – 2](https://gmic.eu/gmic36/thumbs/gmic_extrusion_25D_2_en.png)](https://gmic.eu/gmic36/img/gmic_extrusion_25D_2_fr.jpg)
-_Fig. 2.4.4. The **Rendering / 2.5D Extrusion** filter in action._
+_Fig. 2.4.4. The __Rendering / 2.5D Extrusion__ filter in action._
 ===
 
 - The **Rendering / Fluffy Cloud** filter automatically generates fluffy, cotton-like clouds inside your images. Perfect for creating synthetic skies, fog, vapor effects, and more. This filter was contributed by [Prawnsushi](http://prawnsushi.free.fr/), a regular G'MIC filter contributor whose work was also featured in our previous article. Here’s how the filter looks when first opened:
 
 ===
 [![“Fluffy Cloud” Filter – 1](https://gmic.eu/gmic36/thumbs/gmic_fluffy_cloud.png)](https://gmic.eu/gmic36/img/gmic_fluffy_cloud.jpg)
-_Fig. 2.4.5. The **Rendering / Fluffy Cloud** filter in the G'MIC-Qt plugin._
+_Fig. 2.4.5. The __Rendering / Fluffy Cloud__ filter in the G'MIC-Qt plugin._
 ===
 
 By tweaking the parameters, you can generate a wide variety of interesting results:
@@ -158,7 +158,7 @@ By tweaking the parameters, you can generate a wide variety of interesting resul
 ===
 [![“Fluffy Cloud” Filter – 2](https://gmic.eu/gmic36/thumbs/gmic_fluffy_cloud2.png)](https://gmic.eu/gmic36/img/gmic_fluffy_cloud2.jpg)
 [![“Fluffy Cloud” Filter – 3](https://gmic.eu/gmic36/thumbs/gmic_fluffy_cloud3.png)](https://gmic.eu/gmic36/img/gmic_fluffy_cloud3.jpg)
-_Fig. 2.4.6. Different cloud effects created with the **Rendering / Fluffy Cloud** filter._
+_Fig. 2.4.6. Different cloud effects created with the __Rendering / Fluffy Cloud__ filter._
 ===
 
 - The **Patterns / Stripes** filter makes it easy to generate striped patterns, whether simple or complex. It provides many parameters to adjust the geometry of the synthesized patterns: type of stripes (linear, radial, concentric), size, color, and even the opacity of each stripe individually.
@@ -167,21 +167,21 @@ _Fig. 2.4.6. Different cloud effects created with the **Rendering / Fluffy Cloud
 [![“Stripes” Filter – 1](https://gmic.eu/gmic36/thumbs/gmic_stripes.png)](https://gmic.eu/gmic36/img/gmic_stripes.jpg)
 [![“Stripes” Filter – 2](https://gmic.eu/gmic36/thumbs/gmic_stripes2.png)](https://gmic.eu/gmic36/img/gmic_stripes2.jpg)
 [![“Stripes” Filter – 3](https://gmic.eu/gmic36/thumbs/gmic_stripes3.png)](https://gmic.eu/gmic36/img/gmic_stripes3.jpg)
-_Fig. 2.4.7. Three examples of striped patterns generated with the **Patterns / Stripes** filter._
+_Fig. 2.4.7. Three examples of striped patterns generated with the __Patterns / Stripes__ filter._
 ===
 
 - The **Patterns / Gradient [from Curve]** filter is not entirely new, but rather an upgrade of the previous **Patterns / Gradient [from Line]**. This enhanced version extracts a color gradient from an image along a path, not just a straight line but a [piecewise cubic spline](https://en.wikipedia.org/wiki/Spline_interpolation) defined with up to 6 control points. This makes it possible to follow very curved structures within images, as shown in the example below:
 
 ===
 [![“Gradient From Curve” Filter](https://gmic.eu/gmic36/thumbs/gmic_gradient_from_curve.png)](https://gmic.eu/gmic36/img/gmic_gradient_from_curve.jpg)
-_Fig. 2.4.8. The **Patterns / Gradient [from Curve]** filter extracts colors along a spline path._
+_Fig. 2.4.8. The __Patterns / Gradient [from Curve]__ filter extracts colors along a spline path._
 ===
 
 - Finally, we should mention the **Rendering / Neon Carpet** filter, an original contribution by Claude (aka _Cli345_), a frequent G'MIC contributor who was [interviewed last September](https://linuxfr.org/news/interview-de-cli345-createur-de-filtres-pour-g-mic) on LinuxFr. This psychedelic filter generates colorful, glowing patterns reminiscent of fluorescent carpets, as shown below:
 
 ===
 [![“Neon Carpet” Filter](https://gmic.eu/gmic36/thumbs/gmic_neon_carpet.png)](https://gmic.eu/gmic36/img/gmic_neon_carpet.jpg)
-_Fig. 2.4.9. The **Rendering / Neon Carpet** filter, a contribution by Cli345._
+_Fig. 2.4.9. The __Rendering / Neon Carpet__ filter, a contribution by Cli345._
 ===
 
 That wraps up the main new features specific to the _G'MIC-Qt_ plugin.
@@ -243,12 +243,12 @@ _Fig. 3.5.1. Two possible outputs from the `pack_sprites` command._
 
 Sprites to be packed can have any shape—for instance, individual letters (top image above), full words (bottom), or anything else you can imagine.
 
-And what better way to demonstrate the command than with a quirky example? The goal here is to write the text “♥LinuxFR♥”, where each letter is itself packed with smaller versions of that same letter! A silly idea, maybe—but why not? The following _G'MIC_ script (`test_pack_sprites.gmic`), once made executable, does exactly that:
+And what better way to demonstrate the command than with a quirky example? The goal here is to write the text “♥G'MIC♥”, where each letter is itself packed with smaller versions of that same letter! A silly idea, maybe—but why not? The following _G'MIC_ script (`test_pack_sprites.gmic`), once made executable, does exactly that:
 
 ```
 #!/usr/bin/env gmic
 
-str="\20LinuxFR\20"
+str="\20G'MIC\20"
 repeat size(['$str']) {
   l:=['$str'][$>]
   0 text. {`$l`},0,0,${"font titanone,480"},1,1 ==. 0 channels. -3,0
@@ -263,7 +263,7 @@ display
 The generation takes only a few seconds, and produces something like this:
 
 ===
-[![`pack_sprites` command – 3](https://gmic.eu/gmic36/thumbs/gmic_pack_sprites3_fr.png)](https://gmic.eu/gmic36/img/gmic_pack_sprites3_fr.jpg)
+[![`pack_sprites` command – 3](https://gmic.eu/gmic36/thumbs/gmic_pack_sprites3_en.png)](https://gmic.eu/gmic36/img/gmic_pack_sprites3_fr.jpg)
 _Fig. 3.5.2. Output of the `test_pack_sprites.gmic` script._
 ===
 
