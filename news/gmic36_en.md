@@ -378,7 +378,7 @@ Watch this full screen for 20 minutes before going to bed, listening to [Pink Fl
 
 ===
 [![Rolling Cube - video](https://gmic.eu/gmic36/img/gmic_rolling_cube_small.gif)](https://gmic.eu/gmic36/img/gmic_rolling_cube_small.gif)
-_Fig. 4.1.3. 3D animation of a rolling cube._
+_Fig. 4.1.3. Animation of a 3D rolling cube._
 ===
 
 [The source code for this effect](https://gmic.eu/samples/cube3d.gmic) is a bit longer than the previous examples, so we don’t include it directly here. But at just 47 lines, it’s still quite reasonable 😊!
