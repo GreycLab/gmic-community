@@ -38,7 +38,7 @@ Sébastien is deeply missed. We will do our best to ensure that his work lives o
 
 ===
 [![Tribute to Sébastien Fourey](https://gmic.eu/gmic36/thumbs/gmic_tribute_sebastien.png)](https://gmic.eu/gmic36/img/gmic_tribute_sebastien.jpg)
-_Fig. 2.1. Tribute to Sébastien Fourey, author of G'MIC-Qt, as shown in the “__About__” section of the plugin._
+_Fig. 2.1. Tribute to Sébastien Fourey, author of G'MIC-Qt, as shown in the “About” section of the plugin._
 ===
 
 ## 2.2. General Improvements to the Plugin
