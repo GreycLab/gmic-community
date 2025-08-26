@@ -1,9 +1,9 @@
-# G'MIC *3.6*: The Art of Polishing Your (Digital) Image !
+# G'MIC *3.6* : The Art of Polishing Your (Digital) Image !
 _By [David Tschumperlé](https://tschumperle.users.greyc.fr/)._
 
 [_G'MIC_](https://gmic.eu), a free and open-source [framework](https://en.wikipedia.org/wiki/Software_framework) for [digital image processing](https://en.wikipedia.org/wiki/Digital_image_processing), has just released a significant update with the brand-new **3.6** version.
 
-This is a great opportunity to give you an overview of what’s been happening around the project recently — in particular, the main changes since our [previous announcement](https://gmic.eu/gmic340/), published a little over a year ago (June 2024).
+This is a great opportunity to give you an overview of what’s been happening around the project recently — in particular, the main changes since our [previous announcement](https://gmic.eu/gmic340/) (for the **3.4** release), published a little over a year ago (June 2024).
 
 [![G´MIC 3.6.0 Teaser](https://gmic.eu/gmic36/thumbs/gmic360_small.png)](https://gmic.eu/gmic36/img/gmic360.jpg)
 
@@ -102,7 +102,7 @@ _Fig. 2.4.1. The **Patterns / Organic Fibers** filter in action, with two differ
 - The **Rendering / Speech Bubble** filter inserts a comic-style speech bubble on an additional image layer, with customizable features such as the bubble’s roundness or the shape of its “tail,” thanks to various control points. It’s a quick way to integrate typical comic book elements into any image, as shown below: first the filter’s preview in the plugin, then the final result in GIMP after adding some text inside the bubble.
 
 [![“Speech Bubble” Filter – 1](https://gmic.eu/gmic36/thumbs/gmic_speech_bubble.png)](https://gmic.eu/gmic36/img/gmic_speech_bubble.jpg)
-[![“Speech Bubble” Filter – 2](https://gmic.eu/gmic36/thumbs/gmic_speech_bubble2_fr.png)](https://gmic.eu/gmic36/img/gmic_speech_bubble2_fr.jpg)
+[![“Speech Bubble” Filter – 2](https://gmic.eu/gmic36/thumbs/gmic_speech_bubble2_en.png)](https://gmic.eu/gmic36/img/gmic_speech_bubble2_fr.jpg)
 _Fig. 2.4.2. The **Rendering / Speech Bubble** filter adds customizable comic-style bubbles to your images._
 
 The following video shows the filter in action on a photograph:
@@ -112,8 +112,8 @@ _Fig. 2.4.3. The **Rendering / Speech Bubble** filter in action in G'MIC-Qt (vid
 
 - The **Rendering / 2.5D Extrusion** filter simulates a fake 3D extrusion effect from a binary input shape. It can quickly transform silhouettes or masks into more visually consistent objects with a sense of depth—without needing a dedicated 3D modeling program. The examples below show how it works: start by creating an opaque shape on a transparent background (here, some text), then apply the filter to produce a 3D-like extruded look. Rotation angle, extrusion depth, perspective strength, and face colors are all adjustable.
 
-[![“2.5D Extrusion” Filter – 1](https://gmic.eu/gmic36/thumbs/gmic_extrusion_25D_1_fr.png)](https://gmic.eu/gmic36/img/gmic_extrusion_25D_1_fr.jpg)
-[![“2.5D Extrusion” Filter – 2](https://gmic.eu/gmic36/thumbs/gmic_extrusion_25D_2_fr.png)](https://gmic.eu/gmic36/img/gmic_extrusion_25D_2_fr.jpg)
+[![“2.5D Extrusion” Filter – 1](https://gmic.eu/gmic36/thumbs/gmic_extrusion_25D_1_en.png)](https://gmic.eu/gmic36/img/gmic_extrusion_25D_1_fr.jpg)
+[![“2.5D Extrusion” Filter – 2](https://gmic.eu/gmic36/thumbs/gmic_extrusion_25D_2_en.png)](https://gmic.eu/gmic36/img/gmic_extrusion_25D_2_fr.jpg)
 _Fig. 2.4.4. The **Rendering / 2.5D Extrusion** filter in action._
 
 - The **Rendering / Fluffy Cloud** filter automatically generates fluffy, cotton-like clouds inside your images. Perfect for creating synthetic skies, fog, vapor effects, and more. This filter was contributed by [Prawnsushi](http://prawnsushi.free.fr/), a regular G'MIC filter contributor whose work was also featured in our previous article. Here’s how the filter looks when first opened:
