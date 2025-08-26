@@ -1,4 +1,4 @@
-# G'MIC *3.6* : The Art of Polishing Your (Digital) Image !
+# G'MIC *3.6* : The Art of Polishing Your Images !
 _By [David Tschumperlé](https://tschumperle.users.greyc.fr/)._
 
 [_G'MIC_](https://gmic.eu), a free and open-source [framework](https://en.wikipedia.org/wiki/Software_framework) for [digital image processing](https://en.wikipedia.org/wiki/Digital_image_processing), has just released a significant update with the brand-new **3.6** version.
@@ -458,4 +458,4 @@ Currently, _G'MIC_ is downloaded slightly over 1,000 times per day from the [mai
 
 In the short term, the focus will probably be on promoting and increasing the visibility of the framework, maintaining the code, and engaging the community—for example by writing tutorials illustrating its many potential applications in various fields of digital imaging: photo retouching, illustration, digital painting, scientific imaging (medical, astronomy, biology, materials), graphic design, generative art, etc.
 
-In the long term, can we reasonably hope to do more with _G'MIC_ given these limited resources? Time will tell!
+In the long term, can we reasonably hope to do more with _G'MIC_ given our limited resources? Time will tell!
