@@ -369,7 +369,7 @@ gaussians3d :
 
 ===
 [![3D Gaussians - video](https://gmic.eu/gmic36/img/gmic_gaussians3d.gif)](https://gmic.eu/gmic36/img/gmic_gaussians3d.gif)
-_Fig. 4.1.3. Volume of 3D gaussians, viewed as a video sequence._
+_Fig. 4.1.3. Volume of 3D anisotropic gaussians, viewed as a video sequence._
 ===
 
 Watch this full screen for 20 minutes before going to bed, listening to [Pink Floyd](https://en.wikipedia.org/wiki/Pink_Floyd), and I guarantee a good night’s sleep!
