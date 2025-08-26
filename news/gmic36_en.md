@@ -177,7 +177,7 @@ _Fig. 2.4.7. Three examples of striped patterns generated with the __Patterns / 
 _Fig. 2.4.8. The __Patterns / Gradient [from Curve]__ filter extracts colors along a spline path._
 ===
 
-- Finally, we should mention the **Rendering / Neon Carpet** filter, an original contribution by Claude (aka _Cli345_), a frequent G'MIC contributor who was [interviewed last September](https://linuxfr.org/news/interview-de-cli345-createur-de-filtres-pour-g-mic) on LinuxFr. This psychedelic filter generates colorful, glowing patterns reminiscent of fluorescent carpets, as shown below:
+- Finally, we should mention the **Rendering / Neon Carpet** filter, an original contribution by Claude (aka _Cli345_), a frequent G'MIC contributor. This psychedelic filter generates colorful, glowing patterns reminiscent of fluorescent carpets, as shown below:
 
 ===
 [![“Neon Carpet” Filter](https://gmic.eu/gmic36/thumbs/gmic_neon_carpet.png)](https://gmic.eu/gmic36/img/gmic_neon_carpet.jpg)
