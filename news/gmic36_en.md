@@ -6,7 +6,7 @@ _By [David Tschumperlé](https://tschumperle.users.greyc.fr/)._
 This is a great opportunity to give you an overview of what’s been happening around the project recently — in particular, the main changes since our [previous announcement](https://gmic.eu/gmic340/) (for the **3.4** release), published a little over a year ago (June 2024).
 
 ===
-[![G´MIC 3.6.0 Teaser](https://gmic.eu/gmic36/thumbs/gmic360_small.png)](https://gmic.eu/gmic36/img/gmic360.jpg)
+[![G´MIC 3.6.0 Teaser](https://gmic.eu/gmic36/thumbs/gmic36_teaser_small.png)](https://gmic.eu/gmic36/img/gmic36_teaser.jpg)
 ===
 
 _N.B.: Click on the images to view them in full resolution, or to watch the corresponding video when you see the ![‘Play Video’ icon](https://gmic.eu/gmic36/thumbs/icon_play_video.png)._
@@ -127,7 +127,7 @@ _Fig. 2.4.1. The __Patterns / Organic Fibers__ filter in action, with two differ
 
 ===
 [![“Speech Bubble” Filter – 1](https://gmic.eu/gmic36/thumbs/gmic_speech_bubble.png)](https://gmic.eu/gmic36/img/gmic_speech_bubble.jpg)
-[![“Speech Bubble” Filter – 2](https://gmic.eu/gmic36/thumbs/gmic_speech_bubble2_en.png)](https://gmic.eu/gmic36/img/gmic_speech_bubble2_fr.jpg)
+[![“Speech Bubble” Filter – 2](https://gmic.eu/gmic36/thumbs/gmic_speech_bubble2_en.png)](https://gmic.eu/gmic36/img/gmic_speech_bubble2_en.jpg)
 _Fig. 2.4.2. The __Rendering / Speech Bubble__ filter adds customizable comic-style bubbles to your images._
 ===
 
@@ -141,8 +141,8 @@ _Fig. 2.4.3. The __Rendering / Speech Bubble__ filter in action in G'MIC-Qt (vid
 - The **Rendering / 2.5D Extrusion** filter simulates a fake 3D extrusion effect from a binary input shape. It can quickly transform silhouettes or masks into more visually consistent objects with a sense of depth—without needing a dedicated 3D modeling program. The examples below show how it works: start by creating an opaque shape on a transparent background (here, some text), then apply the filter to produce a 3D-like extruded look. Rotation angle, extrusion depth, perspective strength, and face colors are all adjustable.
 
 ===
-[![“2.5D Extrusion” Filter – 1](https://gmic.eu/gmic36/thumbs/gmic_extrusion_25D_1_en.png)](https://gmic.eu/gmic36/img/gmic_extrusion_25D_1_fr.jpg)
-[![“2.5D Extrusion” Filter – 2](https://gmic.eu/gmic36/thumbs/gmic_extrusion_25D_2_en.png)](https://gmic.eu/gmic36/img/gmic_extrusion_25D_2_fr.jpg)
+[![“2.5D Extrusion” Filter – 1](https://gmic.eu/gmic36/thumbs/gmic_extrusion_25D_1_en.png)](https://gmic.eu/gmic36/img/gmic_extrusion_25D_1_en.jpg)
+[![“2.5D Extrusion” Filter – 2](https://gmic.eu/gmic36/thumbs/gmic_extrusion_25D_2_en.png)](https://gmic.eu/gmic36/img/gmic_extrusion_25D_2_en.jpg)
 _Fig. 2.4.4. The __Rendering / 2.5D Extrusion__ filter in action._
 ===
 
@@ -263,7 +263,7 @@ display
 The generation takes only a few seconds, and produces something like this:
 
 ===
-[![`pack_sprites` command – 3](https://gmic.eu/gmic36/thumbs/gmic_pack_sprites3_en.png)](https://gmic.eu/gmic36/img/gmic_pack_sprites3_fr.jpg)
+[![`pack_sprites` command – 3](https://gmic.eu/gmic36/thumbs/gmic_pack_sprites3_en.png)](https://gmic.eu/gmic36/img/gmic_pack_sprites3_en.jpg)
 _Fig. 3.5.2. Output of the `test_pack_sprites.gmic` script._
 ===
 
