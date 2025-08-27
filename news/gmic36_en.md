@@ -15,7 +15,7 @@ _N.B.: Click on the images to view them in full resolution, or to watch the corr
 
 [_G'MIC_](https://gmic.eu) (_GREYC's Magic for Image Computing_) is a free and open-source project dedicated to the processing, manipulation, and creation of [digital images](https://en.wikipedia.org/wiki/Digital_image). It is mainly developed within the [IMAGE research team](https://www.greyc.fr/equipes/image/) at the [GREYC laboratory](https://www.greyc.fr/) in Caen, France (a joint research unit [UMR](https://en.wikipedia.org/wiki/Joint_research_unit) supported by [CNRS](https://www.cnrs.fr/en), [ENSICAEN](https://www.ensicaen.fr/) and the [University of Caen](https://www.unicaen.fr/)).
 
-At the core of the project lies a dedicated script interpreter, the [_G'MIC language_](https://gmic.eu/reference/overall_context.html), designed to make it easy to prototype and implement new image processing algorithms. Around this core, several user interfaces have been built, providing access to hundreds of built-in image operators while also allowing users to design and share their own custom processing pipelines. _G'MIC_ is, by essence, an open and extensible framework.
+At the core of the project lies a dedicated script interpreter, the [_G'MIC language_](https://gmic.eu/reference/overall_context.html), designed to make it easy to prototype and implement new image processing algorithms. Around this core, several user interfaces have been built, providing access to hundreds of built-in image operators and filters while also allowing users to design and share their own custom processing pipelines. _G'MIC_ is, by essence, an open and extensible framework.
 
 Among its most popular variants are: [`gmic`](https://gmic.eu/reference/), a command-line tool comparable (and complementary) to [ImageMagick](https://www.imagemagick.org/) or [GraphicsMagick](http://www.graphicsmagick.org); the online service [_G'MIC Online_](https://gmicol.greyc.fr/); and most importantly, the [_G'MIC-Qt_ plugin](https://github.com/GreycLab/gmic-qt), which can be integrated into many popular image editing and creation tools such as [GIMP](https://www.gimp.org), [Krita](https://www.krita.org), [DigiKam](https://www.digikam.org), [Paint.NET](https://www.getpaint.net), [Adobe Photoshop](https://en.wikipedia.org/wiki/Adobe_Photoshop), or [Affinity Photo](https://en.wikipedia.org/wiki/Affinity_Photo). This plugin is by far the most widely used interface to _G'MIC_, providing fast access to more than **640 different filters**, dramatically expanding the range of effects and transformations available in these image editing softwares.
 
@@ -43,13 +43,11 @@ _Fig. 2.1. Tribute to Sébastien Fourey, author of G'MIC-Qt, as shown in the “
 
 ## 2.2. General Improvements to the Plugin
 
-As you can imagine, development specifically focused on the _G'MIC-Qt_ interface has been on hold since last October. Nevertheless, the last contributions made to the plugin code have enabled the following improvements:
+As you can imagine, development specifically focused on _G'MIC-Qt_ has been on hold since last October. Nevertheless, the last contributions made to the plugin code have enabled the following improvements:
 
 - The source code is now compatible with the new plugin API of latest GIMP’s major release (**3.0**). This made it possible to provide GIMP users with a fully functional _G'MIC-Qt_ plugin right from the release of GIMP 3. Not many plugins were updated in time for this milestone (the popular [Resynthesizer](https://github.com/bootchk/resynthesizer) plugin being another exception). Our warm thanks go to [Nils Philippsen](https://github.com/nphilipp) and [Daniel Berrangé](https://github.com/berrange), who submitted the patches enabling this compatibility with GIMP 3. At the same time, we continue to maintain support for the older (**2.10**) version of GIMP, which remains widely used.
-
 - The _G'MIC-Qt_ codebase is also now compatible with the API of the [Qt6](https://www.qt.io/product/qt6) library, the latest major version of this graphical toolkit.
-
-- The plugin interface now features a **native split-view preview** tool for filters. This functionality, accessible via the keyboard shortcut `CTRL` + `SHIFT` + `P`, allows you to directly compare the image before and after applying a filter, by displaying both versions side by side in the preview window. This feature already existed, but it is now much smoother to use: previously, it was implemented separately for each filter, treating the preview splitter as just another filter parameter — which meant that even moving the splitter required a full recomputation of the filter result.
+- The plugin interface now features a __native split-view preview__ tool for filters. This functionality, accessible via the keyboard shortcut `CTRL` + `SHIFT` + `P`, allows you to directly compare the image before and after applying a filter, by displaying both versions side by side in the preview window. This feature already existed, but it is now much smoother to use: previously, it was implemented separately for each filter, treating the preview splitter as just another filter parameter — which meant that even moving the splitter required a full recomputation of the filter result.
 
 ===
 [![Split-view Preview](https://gmic.eu/gmic36/thumbs/gmic_split_preview.png)](https://gmic.eu/gmic36/img/gmic_split_preview.jpg)
@@ -170,7 +168,7 @@ _Fig. 2.4.6. Different cloud effects created with the __Rendering / Fluffy Cloud
 _Fig. 2.4.7. Three examples of striped patterns generated with the __Patterns / Stripes__ filter._
 ===
 
-- The **Patterns / Gradient [from Curve]** filter is not entirely new, but rather an upgrade of the previous **Patterns / Gradient [from Line]**. This enhanced version extracts a color gradient from an image along a path, not just a straight line but a [piecewise cubic spline](https://en.wikipedia.org/wiki/Spline_interpolation) defined with up to 6 control points. This makes it possible to follow very curved structures within images, as shown in the example below:
+- The **Patterns / Gradient [from Curve]** filter is not entirely new, but rather an upgrade of the previous __Patterns / Gradient [from Line]__. This enhanced version extracts a color gradient from an image along a path, not just a straight line but a [piecewise cubic spline](https://en.wikipedia.org/wiki/Spline_interpolation) defined with up to 6 control points. This makes it possible to follow very curved structures within images, as shown in the example below:
 
 ===
 [![“Gradient From Curve” Filter](https://gmic.eu/gmic36/thumbs/gmic_gradient_from_curve.png)](https://gmic.eu/gmic36/img/gmic_gradient_from_curve.jpg)
@@ -192,9 +190,9 @@ Let’s now turn to the work done this year to improve the core of the project�
 
 ## 3.1. Interpreter Optimization
 
-The internal engine of _G'MIC_ has received a series of notable optimizations. Several internal tweaks—such as better string analysis, detection and concatenation, or faster min/max searches in large images (now parallelized with OpenMP)—have resulted in a modest performance boost (around 2.5% faster on average when running _G'MIC_ scripts). It’s not a jaw-dropping speedup, but we’ll take it! (After 17 years of coding this interpreter, getting a huge gain would have been almost suspicious anyway 😊).
+The internal engine of _G'MIC_ has received a series of notable optimizations. Several internal tweaks—such as better string analysis, detection and concatenation, or faster min/max searches in large images (now parallelized with [OpenMP](https://en.wikipedia.org/wiki/OpenMP)) — have resulted in a modest performance boost (around 2.5% faster on average when running _G'MIC_ scripts). It’s not a jaw-dropping speedup, but we’ll take it! (After 17 years of coding this interpreter, getting a huge gain would have been almost suspicious anyway 😊).
 
-On Windows, the interpreter now compiles with [Clang](https://en.wikipedia.org/wiki/Clang) and its associated libc, producing slightly more optimized executables.
+On Windows, the interpreter now compiles with [Clang](https://en.wikipedia.org/wiki/Clang) and its associated _libc_, producing slightly more optimized executables.
 
 ## 3.2. 3D Rendering Engine Improvements
 
@@ -432,7 +430,7 @@ All of these episodes demonstrate that _G'MIC_ is a versatile toolbox, quite fun
 
 We have already reached the fifth section of this post, which probably means it’s time to wrap it up 😉. To finish, here are some additional information and interesting links for further exploring the _G'MIC_ project:
 
-- First, let's mention the publication [“_G'MIC: An Open-Source Self-Extending Framework_”](https://joss.theoj.org/papers/10.21105/joss.06618) by D. Tschumperlé, S. Fourey, and G. Osgood, published in January 2025 in the journal JOSS ([The Journal of Open Source Software](https://joss.theoj.org/)). This article describes the general motivations of the project and provides an overview of its global architecture and some of its capabilities.
+- First, let's mention the publication [_“G'MIC: An Open-Source Self-Extending Framework”_](https://joss.theoj.org/papers/10.21105/joss.06618) by D. Tschumperlé, S. Fourey, and G. Osgood, published in January 2025 in the journal JOSS ([The Journal of Open Source Software](https://joss.theoj.org/)). This article describes the general motivations of the project and provides an overview of its global architecture and some of its capabilities. This also allows the G'MIC project to have its “reference” article in a scientific journal (and therefore be cited more easily).
 
 ===
 [![JOSS Article](https://gmic.eu/gmic36/thumbs/gmic_joss.png)](https://joss.theoj.org/papers/10.21105/joss.06618)
@@ -450,12 +448,26 @@ We have already reached the fifth section of this post, which probably means it�
 
 The release of version **3.6** (and more generally the year 2025) represents an important milestone in the life of the _G'MIC_ project.
 
-Firstly, because after 17 years of development, it is clear that _G'MIC_ is now stable, and perhaps it is time to highlight its existing features rather than trying to implement new functionalities at all costs. Secondly, the loss of our friend Sébastien may make the maintenance and future evolution of the _G'MIC-Qt_ plugin difficult. And finally, with the widespread adoption of generative AI, the fields of image analysis, processing, and generation (especially for creative purposes) are undergoing deep changes, and _G'MIC_ features could become obsolete in a few years (or not 😊).
+Firstly, because after 17 years of development, it is clear that _G'MIC_ is now stable, and perhaps it is time to highlight its existing features rather than trying to implement new functionalities at all costs. Secondly, the loss of our friend Sébastien, in addition to being a major emotional shock, may make the maintenance and future evolution of the _G'MIC-Qt_ plugin difficult. And finally, with the widespread adoption of generative AI, the fields of image analysis, processing, and generation (especially for creative purposes) are undergoing deep changes, and _G'MIC_ features could very well be considered obsolete in a few years (or not 😊).
 
 In the end, so many uncertainties and questions! This makes the directions for _G'MIC_ future evolution unclear, especially since managing such a project requires a huge time investment, while its financial return remains nonexistent.
 
-Currently, _G'MIC_ is downloaded slightly over 1,000 times per day from the [main project webpage](https://gmic.eu/download.html) (not counting third-party installations: via Krita, official distribution packages, etc.). This is a very respectable figure for a free software of this type, developed within a public research lab like GREYC, and moreover, maintained by a single person.
+Currently, _G'MIC_ is downloaded slightly over __1,000 times per day__ from the [main project webpage](https://gmic.eu/download.html) (not counting third-party installations: via Krita, official distribution packages, etc.). This is a very respectable figure for a free software of this kind, developed within a public research lab like GREYC, and moreover, maintained by a single person.
 
 In the short term, the focus will probably be on promoting and increasing the visibility of the framework, maintaining the code, and engaging the community—for example by writing tutorials illustrating its many potential applications in various fields of digital imaging: photo retouching, illustration, digital painting, scientific imaging (medical, astronomy, biology, materials), graphic design, generative art, etc.
 
-In the long term, can we reasonably hope to do more with _G'MIC_ given our limited resources? Time will tell!
+In the long term, can we reasonably hope to do more with _G'MIC_ given our limited resources?
+
+Time will tell!
+
+# 7. Previous G’MIC News Posts
+
+If you enjoyed this post and want to look back at the history of _G’MIC_ through earlier announcements, here are the previous news articles celebrating past milestones:
+
+- **G’MIC 2.3.6** - [10 Years of Open Source Image Processing!](https://pixls.us/blog/2018/08/g-mic-2-3-6/) - 10 years.
+- **G’MIC 2.7** - [Process Your Images with Style](https://pixls.us/blog/2019/09/g-mic-2-7-process-your-images-with-style/) - 11 years.
+- **G’MIC 3.0.0** - [A Third Dose to Process Your Images!](https://gmic.eu/gmic300/) -  13 years.
+- **G’MIC 3.2.5** - [15 Years of Development for Open and Reproducible Image Processing](https://gmic.eu/gmic325/) -  15 years.
+- **G’MIC 3.4.0** - [Image Processing in Its Prime!](https://gmic.eu/gmic340/) -  16 years.
+
+---
