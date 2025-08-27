@@ -1,5 +1,6 @@
 # G'MIC *3.6* : The Art of Polishing Your Images !
 _By [David Tschumperlé](https://tschumperle.users.greyc.fr/)._
+*August 27, 2025*
 
 [_G'MIC_](https://gmic.eu), a free and open-source [framework](https://en.wikipedia.org/wiki/Software_framework) for [digital image processing](https://en.wikipedia.org/wiki/Digital_image_processing), has just released a significant update with the brand-new **3.6** version.
 
