@@ -270,7 +270,7 @@ Fun, isn’t it? Now the real question: how would you achieve the same thing in 
 
 # 4. Using _G'MIC_ for Creative Coding
 
-The previous example is truly representative of the possibilities for writing custom scripts that _G'MIC_ allows. Did you know, for instance, that all 460 filters available in the _G'MIC-Qt_ plugin are written in this language?
+The previous example is truly representative of the possibilities for writing custom scripts that _G'MIC_ allows. Did you know, for instance, that all 640 filters available in the _G'MIC-Qt_ plugin are written in this language?
 
 _G'MIC_ can therefore be seen as a toolbox provided for those wishing to explore [creative coding](https://en.wikipedia.org/wiki/Creative_coding) and [generative art](https://en.wikipedia.org/wiki/Generative_art). Below we provide a few simple examples of image generation using _G'MIC_ scripts, to give a quick overview of the language’s capabilities and conciseness.
 
