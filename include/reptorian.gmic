@@ -7428,7 +7428,7 @@ rep_rde_combination_list2index:
 m __$0_args:${_rep_rde_validate_frequency\ $*}
 __$0_args um __$0_args
 
-($item_count_groups) ($item_selection) f. +max(i-j(-1),0)
+($item_count_groups) ($item_selection) sort. f. +max(i-j(-1),0)
 
 index=0
 repeat w#-1 {
@@ -7527,6 +7527,211 @@ eval. >"
 rm[-2,-1]
 
 u {[$distance_from_right][$insert_distance_pos,$#-2-$insert_distance_pos]}{`$post_insert_zero?',1'`}
+#@cli rep_rde_npr_permutations: selected_count,item_0_count>=1,item_1_count,...,_axis={x,y,z}
+#@cli : Generates all possible permutations of repeated distinct elements of different counts, and the total number of elements is equal to the selected_count.
+#@cli :
+#@cli : Default values: '_axis=x'
++rep_rde_npr_permutations:
+check "isint($1,1)&&$#>1"
+
+if isnum($-1)
+	items_counts=${2--1}
+	axis=0
+else
+	check "inrange(_'$-1',_'x',_'z',1,1)"
+	items_counts=${2--2}
+	axis={_'$-1'-_'x'}
+fi
+
+check "items_counts=["$items_counts"];
+       ( sum( isint(items_counts,1) ) == size(items_counts) ) && ($1 <= sum(items_counts) );"
+
+number_of_possible_permutations=${_rep_rde_npr_permutations_length\ $1,$items_counts}
+if $number_of_possible_permutations>(1<<24) error exc_combin_size:$number_of_possible_permutations fi
+
+out_dim={v=vector(#3,1);v[$axis]=$number_of_possible_permutations;v}
+
+$out_dim,$1,>"begin(
+		quantity_of_items_in_group=vmin(["$items_counts"],$1);
+		const cardinality_of_groups=size(quantity_of_items_in_group);
+		const last_group_id=cardinality_of_groups-1;
+		final_modify_pos=0;
+
+		result=vector(#$1);
+		const result_size=size(result);
+		const last_result_indice=result_size-1;
+
+		current_item_index=insertion_pos=0;
+		while(insertion_pos<result_size,
+			copy_count=min(quantity_of_items_in_group[current_item_index],result_size-insertion_pos);
+			copy(result[insertion_pos],current_item_index,copy_count,1,0);
+			quantity_of_items_in_group[current_item_index]-=copy_count;
+			if(!quantity_of_items_in_group[current_item_index],++current_item_index;);
+			insertion_pos+=copy_count;
+		);
+
+		started=0;
+	);
+	started?(
+		break_out=0;
+		for(insertion_pos=last_result_indice,insertion_pos>-1,--insertion_pos,
+			current_item_index=previous_item_index=result[insertion_pos];
+			while(++current_item_index<cardinality_of_groups,
+				if(quantity_of_items_in_group[current_item_index],
+					++quantity_of_items_in_group[previous_item_index];
+					--quantity_of_items_in_group[current_item_index];
+					result[insertion_pos]=current_item_index;
+					break_out=1;
+					break();
+				);
+			);
+			if(break_out,break(););
+			++quantity_of_items_in_group[previous_item_index];
+		);
+		if(++insertion_pos<result_size,
+			current_item_index=0;
+			while(insertion_pos<result_size,
+				while(current_item_index<cardinality_of_groups,
+					if(quantity_of_items_in_group[current_item_index],
+						copy_count=min(quantity_of_items_in_group[current_item_index],result_size-insertion_pos);
+						break();
+					);
+					++current_item_index;
+				);
+				copy(result[insertion_pos],current_item_index,copy_count,1,0);
+				quantity_of_items_in_group[current_item_index]-=copy_count;
+				++current_item_index;
+				insertion_pos+=copy_count;
+			);
+		);
+	):(
+		started=1;
+	);
+	result;"
+#@cli rep_rde_npr_permutation_index2list: selected_count,item_0_count,item_1_count,...,index
+#@cli : Return permutation of repeated distinct elements found at index.
+rep_rde_npr_permutation_index2list:
+item_count:=${2--2}
+
+check "item_count=["$item_count"];
+       ( sum( isint(item_count,1) ) == size(item_count) ) && ($1 <= sum(item_count) ) && (isint($1,1)&&$#>2);
+       "
+
+item_group_count,result_ind,selected_items,index:=$#-2,$!,$1,$-1
+dyn_img_ind,length_ind,new_dyn_ind={$result_ind+[1,2,3]}
+
+$selected_items
+1,{$#-1},1,2,>begin(v=vmin([$item_count,$selected_items]););y<h-1?[v[y],y]:[h-1,0]
+
+total_length=${_rep_rde_npr_permutations_length\ $selected_items,$item_count}
+index%=$total_length
+
+repeat $selected_items {
+	{da_size(#$dyn_img_ind)}
+	current_level=$<
+
+	repeat w#-1 {
+		[$dyn_img_ind]
+		eval i[#-1,$>]==1?da_remove(#-1,$>):--i[#-1,$>]
+		da_size={da_size(#-1)}
+		if $<
+			set[$length_ind] ${_rep_rde_npr_permutations_length\ $current_level,{crop(#-1,0,0,0,0,1,$da_size,1,1)}},{$>+1}
+		fi
+	}
+
+	p,index={"
+		v=cumulate(crop(#$length_ind));
+		index=$index;
+		for(p=size(v)-1,p>-1,--p,
+			if(index>=v[p],break(););
+		);
+		[p,index-v[p]];
+		"}
+
+	set[$result_ind] {i[#$dyn_img_ind,$p+h#$dyn_img_ind]},$>
+	reverse[$dyn_img_ind,{$new_dyn_ind+$p}]
+	rm[$length_ind--1]
+}
+
+u {crop(#$result_ind)} rm[$result_ind--1]
+#@cli rep_rde_npr_permutation_list2index: selected_count,item_0_count,item_1_count,...,item_id_0,item_id_1
+#@cli : Return the index which corresponds to the permutation of multiple repeated different elements of different counts given selected items counts being equal or less than  the sum of cardinalities of items.
+#@cli :
+#@cli : Note: There must be integer arguments in which the cardinality of integer arguments is less than or equal to the sum of cardinalities of items.
+#@cli :
+#@cli : Author: Reptorian.
+rep_rde_npr_permutation_list2index:
+m __$0_args:${_rep_rde_validate_frequency\ $*}
+__$0_args um __$0_args
+
+($item_count_groups,{narg($item_count_groups)}:;) dyn_img_ind={$!-1}
+{h#-1-1} => offset
+($item_selection) => item_selection final_item={i[#-1,w#-1-1]}
+
+current_index=0
+repeat w#-1-1 {
+	old_index,new_index=0
+
+	selected_item={i[#-1,$>]}
+
+	drf,rf:=($selected_item+i[#$offset,$selected_item])+[0,1]
+
+	current_level={$<+1}
+
+	repeat $rf {
+		old_index=$new_index
+
+		[$dyn_img_ind]
+
+		current_value={i[#-1,$>]}
+		eval i[#-1,$>]==1?da_remove(#-1,$>):--i[#-1,$>]
+
+		if $>==$drf
+
+			if $current_value==1
+				if $>
+					eval copy(i[#$offset,$selected_item],-1,w#$offset-$selected_item,1,0,-1)
+				else
+					eval copy(i[#$offset,$selected_item],1,$selected_item+1,-1,0,-1)
+				fi
+			fi
+
+			rv[$dyn_img_ind,-1] rm. break
+		fi
+
+		da_size={da_size(#-1)}
+		new_index+=${_rep_rde_npr_permutations_length\ $current_level,{crop(#-1,0,0,0,0,1,$da_size,1,1)}}
+
+		rm.
+	}
+
+	current_index+=$old_index
+}
+
+u {$current_index+$final_item+i[#$offset,$final_item]}
+rm[$dyn_img_ind--1]
+_rep_rde_npr_permutations_length:
+(${2--1})
+eval. <"begin(
+		const sec_size=$1+1;
+		dp=vector(#sec_size);
+		dp[0]=1;
+	);
+	new_dp=vector(#sec_size,0);
+	repeat(sec_size,t,
+		if(!dp[0],continue(););
+		maxj=min(i,$1-t);
+		repeat(maxj+1,j,
+			comb=perm(j,t+j,0);
+			new_dp[t+j]+=comb*dp[t];
+		);
+	);
+	dp=new_dp;
+	end(
+		set('{}',dp[$1]);
+	);
+	"
+rm.
 _rep_rde_validate_frequency:
 check "
 	const item_groups_and_selections_arg_count=$#-1;
@@ -7562,7 +7767,7 @@ check "
 
 				if(is_all_ints_valid,
 					set('A',v2s(vmin(frequency_of_items_per_group,selected_count)));
-					set('B',v2s(sort(selected_items)));
+					set('B',v2s(selected_items));
 					1; # <- Confirms all conditions is valid
 				);
 			);
