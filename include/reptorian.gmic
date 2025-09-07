@@ -1011,29 +1011,21 @@ else
 fi
 
 channels 0,$d_s
-#@cli rep_val2order: map_2_img={ 0=no | 1=yes},_keep_set_vals={ 0=no | 1=values | 2=values+count | 3=values+status_counts | 4=status_counts }
-#@cli : Change images to order of appearance representation(s). map_2_img simply convert values to the order of their appearance starting from zero. set_vals can contain unique values with optional count of unique values.
-#@cli : Default values: '_seed=0x10eab'
+#@cli rep_val2order: map_2_img={ 0=False | 1=True },value_mode={ 0=scalar | 1=vector },_keep_set_vals={ 0=no | 1=values | 2=values+count | 3=values+status_counts | 4=status_counts }
+#@cli : This command can change images to order of appearance representation(s). map_2_img simply convert values to the order of their appearance starting from zero. set_vals can contain unique values with optional count of unique values.
 rep_val2order:
-check "$! && $#<4"
+check "$! && isint($#,2,3) && sum(isbool([${1-2}])) && $#==3?isint($-1,0,4):1"
 
 if $#==3
-	map_2_img,set_val_mode,seed:=$*
+	map_2_img,use_vector_values,set_val_mode=$*
 else
-	seed:=0x10eab
-	map_2_img,set_val_mode:=$#==2?vector2($*):[$1,!$1]
+	map_2_img,use_vector_values=$*
+	set_val_mode={!$map_2_img}
 fi
 
 check "$map_2_img || $set_val_mode"
 
-output_status_mode:=$!>1
-
-set_val_mode:=min(abs($set_val_mode),4)
-use_count:=$set_val_mode>1
-use_values:=isint($set_val_mode,1,3)
-use_status:=$set_val_mode>=3
-mode_4:=$set_val_mode==4
-max_spec_size:=1+isint($set_val_mode,2,3)
+use_count,use_values,use_status,mode_4:=$set_val_mode>1,isint($set_val_mode,1,3),$set_val_mode>=3,$set_val_mode==4
 
 if $use_status
 	status_out,end=
@@ -1045,46 +1037,90 @@ if $mode_4
 	map_2_img=0
 fi
 
-remove_primary_image:=!$map_2_img&&!$mode_4
-
+remove_primary_image={!$map_2_img&&!$mode_4}
 bitshift_factor=10
 dictionary_size,end_hash_image_index,max_index={(1<<$bitshift_factor)+[0,1,-1]}
 
 foreach {
+	# Random Seed per iterations!
+	seed={v(0xffff,0xffffff)}
+
 	# Compute Hash Map
-	+f ${arg\ 1+(whds>0xffff),>,:}"begin(
-			const seed=max(1,int($seed)&0b11111111);
-			const bitshift_factor=$bitshift_factor;
+	100%,100%,100%,{$use_vector_values?1:s#-1},"
+		begin(
+			const seed=$seed;
 			const bit_mask=$max_index;
-			const multiplier=31*seed;
+			const multiplier=31*$seed;
 
-			n_start(n)=n>bit_mask?xor(n<<1,seed):n&bit_mask;
-			hash_value(n)=(
-				N=n_start(n);
-				hash_value=0;
-				while(N,
-					hash_value=(hash_value*multiplier+N)&bit_mask;
-					N>>=bitshift_factor;
+			$use_vector_values?(
+				hash_value(n)=(
+					hash_value=0;
+					repeat(s#-1,p,
+						hash_value=xor(((hash_value<<1)-hash_value)*seed,n[p]);
+						hash_value&=bit_mask;
+					);
+					hash_value+2;
 				);
-				hash_value+2;
+				process()=hash_value(I#-1);
+			):(
+				const bitshift_factor=$bitshift_factor;
+				n_start(n)=n>bit_mask?xor(n<<1,seed):n&bit_mask;
+				hash_value(n)=(
+					N=n_start(n);
+					hash_value=0;
+					while(N,
+						hash_value=(hash_value*multiplier+N)&bit_mask;
+						N>>=bitshift_factor;
+					);
+					hash_value+2;
+				);
+				process()=hash_value(i#-1);
 			);
-		);
-		hash_value(i);"
-
+	    );
+	    process();
+	    "
 	# Create Hash Table
 	0x$dictionary_size
 
 	# Optional image to store uniques values or counts of uniques values or both
 	if $set_val_mode
-		1,1,1,$max_spec_size
+		0
 	fi
 
-	# One or two Actions: Convert values into order of appearance ; Store uniques values with optional count inputs
-	f[0] >"begin(
+	fill[0] >"
+		begin(
 			const map_2_img=$map_2_img;
-			if(map_2_img
-			,result_value()=v;
-			,result_value()=i;
+			const uvv=$use_vector_values;
+			const dict_size=$dictionary_size;
+
+			sizes=vector(#dict_size,0);
+
+			map_2_img?(
+				uvv?(
+					result_value()=[v];
+				):(
+					result_value()=v;
+				);
+			):(
+				uvv?(
+					result_value()=I;
+				):(
+					result_value()=i;
+				);
+			);
+
+			uvv?(
+				const step_size=s+1;
+				const post_step=s-1;
+				return_value()=I;
+				last_value=vector(#s,nan);
+				0;
+			):(
+				const step_size=2;
+				const post_step=0;
+				return_value()=i;
+				last_value=vector(#1,nan);
+				0;
 			);
 
 			const set_val_mode=$set_val_mode;
@@ -1092,11 +1128,15 @@ foreach {
 				const use_values=$use_values;
 				const use_count=$use_count;
 				use_values&&use_count?(
-					action_1()=da_push(#-1,[i,1]);
-					action_2()=++i(#-1,0,v,0,1);
+					action_1()=da_push(#-1,[return_value(),1]);
+					uvv?(
+						action_2()=++i(#-1,0,v,0,s);
+					):(
+						action_2()=++i(#-1,0,v,0,1);
+					);
 				):
 				use_values?(
-					action_1()=da_push(#-1,i);
+					action_1()=da_push(#-1,return_value());
 					action_2()=0;
 				):
 				use_count?(
@@ -1108,19 +1148,50 @@ foreach {
 				action_2()=0;
 			);
 
-			id=0;
+			uvv?(
+				process()=(
+					ref_size_ind=key-2;
+					size_of_dyn_img=sizes[ref_size_ind];
+					(size_of_dyn_img?same(last_value,return_value()))?(
+						action_2();
+					):
+					(size_of_dyn_img?(p=find(#key,return_value(),(size_of_dyn_img-1)*step_size,-step_size)+1))?(
+						p+=post_step;
+						v=i[#key,p];
+						action_2();
+					):(
+						if(size_of_dyn_img==h(#key),
+							new_size=max(8,h(#key)<<1);
+							resize(#key,step_size,new_size,1,1,-1);
+						);
+						copy(i(#key,0,size_of_dyn_img,0,0),[return_value(),v=id++]);
+						p=size_of_dyn_img*step_size+post_step+1;
+						++sizes[ref_size_ind];
+						action_1();
+					);
+					last_value=return_value();
+				);
+			):(
+				process()=(
+					if(da_size(#key),p=find(#key,i,0,2)+1;)?(
+						v=i[#key,p];
+						action_2();
+					):(
+						da_push(#key,i,v=id++);
+						action_1();
+					);
+					result_value();
+				);
+			);
+
+			id=0;p=-1;v=nan;
 		);
 		key=i#1;
-		if(da_size(#key),p=find(#key,i,0,2)+1;)?(
-			v=i[#key,p];
-			action_2();
-		):(
-			da_push(#key,i,v=id++);
-			action_1();
-		);
+		process();
 		result_value();
-		end(da_freeze(#-1););
+		end(if($set_val_mode,da_freeze(#-1);););
 		"
+
 	rm[1-$end_hash_image_index]
 
 	# Remove if not used
@@ -1128,12 +1199,17 @@ foreach {
 		rm[0]
 	fi
 
+	# For multiple channel mapping
+	if $map_2_img&&$use_vector_values
+		channels[0] 0
+	fi
+
 	# Status output
 	if $use_status
-		part_status={crop(#-1,0,0,0,$set_val_mode&1,1,h#-1,1,1)}
+		part_status={crop(#-1,0,0,0,s#-1-1,1,h#-1,1,1)}
 
 		if $set_val_mode==4 rm.
-		else channels. 0
+		else channels. 0,{s-2}
 		fi
 
 		if $output_status_mode
