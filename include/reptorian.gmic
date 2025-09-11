@@ -48,6 +48,63 @@
 #
 #-------------------------------
 
+#@cli rep_txt2uints: string
+#@cli : Return the numerical decoding representation of unicode from string.
+#@cli : _CODEPAGE variable should define your encoding approach. Otherwise, fallback on auto-finding encoding method.
+rep_txt2uints:
+if narg($_CODEPAGE)
+	code_page=$_CODEPAGE
+	if isvarname($_CODEPAGE)||isint($_CODEPAGE)
+		i65001,iutf8,iutf_8=1
+		iibm437,i437=2
+		iibm850,i850=3
+		iibm858,i858=4
+		iwin1252,i1252=5
+		i28605,i8859_15=6
+		if narg(${i$_CODEPAGE})
+			id=${i$_CODEPAGE}
+		else
+			id=0
+		fi
+	else
+		if same('$_CODEPAGE','utf-8') id=1
+		else id=0
+		fi
+	fi
+else # Fallback
+	if same('$_host','cli')
+		if same('$_os','windows')
+			# 65001 = UTF-8
+			# 28605 = ISO-8859-15
+			#   858 = IBM 858
+			#   850 = IBM 850
+			#   437 = IBM 437
+			#  1252 = Windows-1252
+			exec 1,"powershell -Command \"exit [int]((chcp) -replace '\\D+(\\d+).*','"$"1')\""
+			id={p=find([65001,437,850,858,1252,28605],${},0,1)+1}
+		else
+			exec 1,"bash -c 'enc=\$(locale charmap); declare -A m=([UTF-8]=1 [IBM437]=2 [IBM850]=3 [IBM858]=4 [WINDOWS-1252]=5 [ISO-8859-15]=6); exit \${m[\$enc]:0}'"
+			id={${}>0xff?${}>>8:${}}
+		fi
+	else
+		exec 1,"python -c \"import locale,sys;enc=locale.getpreferredencoding(False).upper();m={'UTF-8':1,'IBM437':2,'IBM850':3,'IBM858':4,'WINDOWS-1252':5,'ISO-8859-15':6};sys.exit(m.get(enc,0))\""
+		id=${}
+	fi
+fi
+
+if $id==1 # UTF-8
+	utf8str2vint $1
+	return
+elif !$id
+	u {'$1'}
+	return
+fi
+
+id-=2
+b64_codepage_map2unicode crop. {[$id,$id]}
+256,1,1,1
+eval.. i[#-1,i]=y rm..
+u {map('$1',crop(#-1))} rm.
 #@cli rep_xp2b: base_pow2_a,base_pow2_b,str_a,str_b
 #@cli : Convert between bases of power of 2 bases. Only binary, quaternary, octal, hexadecimal, and triacontadecimal number is supported.
 #@cli : base_pow2_? can be number representing the base, or string.
