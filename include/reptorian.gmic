@@ -22075,8 +22075,8 @@ repeat $diff_dim_mode?$!-1:1 {
 }
 
 rm.
-#@cli : +rep_find_nonduplicate_angles mode,pw2_buckets,angle_0,...,angle_n
-#@cli : Return all unique angles in radians.
+#@cli rep_find_nonduplicate_angles mode,pw2_buckets,angle_0,...,angle_n
+#@cli : Return all unique angles in radians as a image.
 #@cli : 'mode'       : deg180, deg360, pi, tau (valid string arguments, input angle units, and near maximum value)
 #@cli : 'pw2_buckets': 2^input hash buckets
 #@cli : 'angle_0',.. : List of input angles
@@ -22087,8 +22087,12 @@ mode,T,H=$$1,$!,{$!+2}
 
 eval[$T] >"
 	begin(
-		const mod_factor="{[180,360,pi,pi*2][$mode]}";
-		const convert_2_rad=$mode<2;
+		const tau=pi*2;
+		const mode=$mode;
+		const convert_2_rad=mode<2;
+		const main_mod=convert_2_rad?360:tau;
+		const mod_factor=arg(mode+1,180,360,pi,tau);
+		const offset=convert_2_rad?180:pi;
 		const insertion_point=k+1;
 		const start_of_hash=k+2;
 		const D=$ds;
@@ -22096,13 +22100,14 @@ eval[$T] >"
 		const M=D/mod_factor;
 		coa=0; # count of angles
 	);
-	current_angle_mod=i%mod_factor;
-	H=((v*M)&bit_mask)+start_of_hash;
+	current_angle=(i+offset)%main_mod;
+	current_angle_mod=current_angle>mod_factor?current_angle-mod_factor:current_angle;
+	H=((current_angle_mod*M)&bit_mask)+start_of_hash;
 	if(find(#H,current_angle_mod,da_size(#H)-1,-1)==-1,
 		da_push(#H,current_angle_mod);
 		if(convert_2_rad
-		,i[#insertion_point,coa++]=deg2rad(current_angle_mod)-pi;
-		,i[#insertion_point,coa++]=current_angle_mod-pi;
+		,i[#insertion_point,coa++]=deg2rad(current_angle)-pi;
+		,i[#insertion_point,coa++]=current_angle-pi;
 		);
 	);
 	end(resize(#insertion_point,coa,1,1,1););"
