@@ -3926,6 +3926,100 @@ drawing : skip ${1=200}
 fx_pen_drawing :
   drawing $1
 
+
+# Those commands are there for keeping compatibility of old neural networks
+# with the latest version of the 'nn_lib'.
+#---------------------------------------------------------------------------
+
+#@cli nn_resconv2dnl : out,_in,_kernel_size>0,_dilation>0,_boundary_conditions,_activation,_learning_mode,\
+# _weight_decay>=0
+#@cli : Add a 'resconv2dnl' (residual 2D convolutional layer followed by a non-linearity) to the current network.
+#@cli : 'boundary_conditions' can be { 0:Dirichlet | 1:Neumann | 2:Periodic | 3:Mirror }.
+#@cli : 'learning_mode' can be { 0:No learning | 1:Weights only | 2:Biases only | 3:Weights+biases }.
+#@cli : Default values: 'in=. (previous layer)', 'kernel_size=3', 'dilation=1', 'boundary_conditions=1', \
+# 'activation=leakyrelu', 'learning_mode=3' and 'weight_decay=0'.
+nn_resconv2dnl : check "isvarname('$1') && isint(${3=3},1) && isint(${5=1},0,3) && isint(${7=3},0,3) && ${8=0}>=0"
+                 skip "${4=1}","${6=leakyrelu}"
+  net,out=$_nn_network,$1
+  if ['${2=.}']=='.' in=${_${net}_previous_layer} else in=$2 fi nn_check_layer $in
+  nout,nin=${net}_$out,${net}_$in
+  kernel_size,dilation,boundary_conditions,activation,learning_mode,weight_decay=${3-8}
+  s0,s1,s2,s3=dirichlet,neumann,periodic,mirror
+
+  e[^-1] "[nn_lib] Add 'resconv2dnl' layer '"$out"' to network '"$net"', with input '"$in"', "\
+         ${kernel_size}x${kernel_size}" kernels, dilation "$dilation", "\
+         ${s$boundary_conditions}" boundary conditions and '"$activation"' activation."
+  init=${_${net}_init}
+  nb_channels:=[${_${nin}_size}][3]
+  nn_conv2d ${out}_conv2d0,.,$nb_channels,$kernel_size,1,$dilation,0,$boundary_conditions,\
+            $learning_mode,$weight_decay,2
+  nn_nl ${out}_nl0,.,$activation
+  initialize_weights:=!isint(${${nout}_conv2d1})
+  nn_conv2d ${out}_conv2d1,.,$nb_channels,$kernel_size,1,$dilation,0,$boundary_conditions,\
+            $learning_mode,$weight_decay,2
+  if $initialize_weights /[${nout}_conv2d1] 10 fi
+  nn_add ${out}_add,.,$in
+  nn_nl $out,.,$activation
+  _${net}_init=${init}"$0 ${1--1} "
+  _${net}_previous_layer=$out
+
+#@cli nn_resconv3dnl : out,_in,_kernel_size>0,_dilation>0,_boundary_conditions,_activation,_learning_mode,\
+# _weight_decay>=0
+#@cli : Add a 'resconv3dnl' (residual 3D convolutional layer followed by a non-linearity) to the current network.
+#@cli : 'boundary_conditions' can be { 0:Dirichlet | 1:Neumann | 2:Periodic | 3:Mirror }.
+#@cli : 'learning_mode' can be { 0:No learning | 1:Weights only | 2:Biases only | 3:Weights+biases }.
+#@cli : Default values: 'in=. (previous layer)', 'kernel_size=3', 'dilation=1', 'boundary_conditions=1', \
+# activation='leakyrelu', 'learning_mode=3' and 'weight_decay=0'.
+nn_resconv3dnl : check "isvarname('$1') && isint(${3=3},1) && isint(${5=1},0,3) && isint(${7=1},0,3) && ${8=0}>=0"
+                 skip "${4=1}","${6=leakyrelu}"
+  net,out=$_nn_network,$1
+  if ['${2=.}']=='.' in=${_${net}_previous_layer} else in=$2 fi nn_check_layer $in
+  nout,nin=${net}_$out,${net}_$in
+  kernel_size,dilation,boundary_conditions,activation,learning_mode,weight_decay=${3-8}
+  s0,s1,s2,s3=dirichlet,neumann,periodic,mirror
+
+  e[^-1] "[nn_lib] Add 'resconv3dnl' layer '"$out"' to network '"$net"', with input '"$in"', "\
+         ${kernel_size}x${kernel_size}x${kernel_size}" kernels, dilation "$dilation", "\
+         ${s$boundary_conditions}" boundary conditions and '"$activation"' activation."
+  init=${_${net}_init}
+  nb_channels:=[${_${nin}_size}][3]
+  nn_conv3d ${out}_conv3d0,.,$nb_channels,$kernel_size,1,$dilation,0,$boundary_conditions,\
+            $learning_mode,$weight_decay,2
+  nn_nl ${out}_nl0,.,$activation
+  initialize_weights:=!isint(${${nout}_conv3d1})
+  nn_conv3d ${out}_conv3d1,.,$nb_channels,$kernel_size,1,$dilation,0,$boundary_conditions,\
+            $learning_mode,$weight_decay,2
+  if $initialize_weights /[${nout}_conv3d1] 10 fi
+  nn_add ${out}_add,.,$in
+  nn_nl $out,.,$activation
+  _${net}_init=${init}"$0 ${1--1} "
+  _${net}_previous_layer=$out
+
+#@cli nn_resfcnl : out,_in,_activation,_learning_mode,_weight_decay>=0
+#@cli : Add a 'resfcnl' (residual fully connecter layer followed by a non-linearity) to the current network.
+#@cli : 'learning_mode' can be { 0:No learning | 1:Weights only | 2:Biases only | 3:Weights+biases }.
+#@cli : Default values: 'in=. (previous layer)', 'activation=leakyrelu', 'learning_mode=3' and 'weight_decay=0'.
+nn_resfcnl : check "isvarname('$1') && isint(${4=3},0,3) && ${5=0}>=0" skip ${3=leakyrelu}
+  net,out=$_nn_network,$1
+  if ['${2=.}']=='.' in=${_${net}_previous_layer} else in=$2 fi nn_check_layer $in
+  nout,nin=${net}_$out,${net}_$in
+  activation,learning_mode,weight_decay=${3-5}
+
+  e[^-1] "[nn_lib] Add 'resfc+nl' layer '"$out"' to network '"$net"', with input '"$in"' and "\
+         "'"$activation"' activation."
+  init=${_${net}_init}
+  nb_channels:=prod(${_${nin}_size})
+  nn_fc ${out}_fc0,.,$nb_channels,$learning_mode,$weight_decay,2
+  nn_nl ${out}_nl0,.,$activation
+  initialize_weights:=!isint(${${nout}_conv3d1})
+  nn_fc ${out}_fc1,.,$nb_channels,$learning_mode,$weight_decay,2
+  if $initialize_weights /[${nout}_fc1] 10 fi
+  nn_add ${out}_add,.,$in
+  nn_nl $out,.,$activation
+  _${net}_init=${init}"$0 ${1--1} "
+  _${net}_previous_layer=$out
+
+
 # Local Variables:
 # mode: sh
 # End:
