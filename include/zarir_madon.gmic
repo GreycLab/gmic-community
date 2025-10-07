@@ -1,0 +1,172 @@
+#@gmic
+#
+#  Dream Smoothing Enhanced
+#  Based on Dream Smoothing by Arto Huotari
+#  Designed by Zarir Madon, coded with Claude Sonnet (October 2025)
+#  Licensed under GPL v3 (GNU General Public License v3)
+#
+
+#@gui _<b>Artistic</b>
+#@gui Dream Smoothing Enhanced : fx_dream_smoothing_enhanced, fx_dream_smoothing_enhanced_preview(1)
+#@gui : sep = separator()
+#@gui : note = note("<b>Dream Smoothing Enhanced</b>")
+#@gui : note = note("<small>Filter Design: Zarir Madon ,      Coded with: Claude Sonnet 4.5      [October 11, 2025]      </small>")
+#@gui : note = note("<small>Based on the original Dream Smoothing algorithm by Arto Huotari</small>")
+#@gui : note = note("<small>G'MIC Framework: David Tschumperlé and contributors</small>")
+#@gui : note = note("<small><b>License:</b> This filter is licensed under the GNU General Public License v3.0</small>")
+#@gui : sep = separator()
+#@gui : note = note("<b>Core Smoothing</b>")
+#@gui : Iterations = int(3,1,10)
+#@gui : Amplitude = float(430,50,2000)
+#@gui : Blend Opacity = float(0.8,0,1)
+#@gui : note = note("<small>Lower iterations and amplitude for speed</small>")
+#@gui : sep = separator()
+#@gui : note = note("<b>Anisotropic Parameters - Pass 1</b>")
+#@gui : Sharpness 1 = float(0.4,0.1,2)
+#@gui : Anisotropy 1 = float(0.5,0,1)
+#@gui : Alpha 1 = float(0.6,0,1)
+#@gui : Sigma 1 = int(2,0,10)
+#@gui : sep = separator()
+#@gui : note = note("<b>Anisotropic Parameters - Pass 2</b>")
+#@gui : Sharpness 2 = float(0.4,0.1,2)
+#@gui : Anisotropy 2 = float(1.0,0,2)
+#@gui : Alpha 2 = float(0.6,0,1)
+#@gui : Sigma 2 = int(4,0,10)
+#@gui : sep = separator()
+#@gui : note = note("<b>Dream Effects</b>")
+#@gui : Ethereal Glow = float(0,0,100)
+#@gui : Soft Light = float(0,0,100)
+#@gui : Halo = float(0,0,100)
+#@gui : sep = separator()
+#@gui : note = note("<b>Color</b>")
+#@gui : Brightness = float(0,-100,100)
+#@gui : Contrast = float(0,-100,100)
+#@gui : Saturation = float(0,-100,100)
+#@gui : Hue Shift = float(0,-180,180)
+#@gui : sep = separator()
+#@gui : note = note("<b>Atmosphere</b>")
+#@gui : Vignette = float(0,0,100)
+#@gui : Fog = float(0,0,100)
+#@gui : Grain = float(0,0,100)
+#@gui : sep = separator()
+#@gui : note = note("<b>Preview Quality</b>")
+#@gui : Preview Quality = choice(1,"Draft","Normal","High Quality")
+#@gui : sep = separator()
+#@gui : Preview Type = choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right")
+#@gui : Preview Split = point(50,50,0,0,200,200,200,0,10)_0
+
+fx_dream_smoothing_enhanced :
+  to_color
+
+  iterations=$1
+  amplitude=$2
+  opacity=$3
+  sharp1=$4
+  aniso1=$5
+  alpha1=$6
+  sigma1=$7
+  sharp2=$8
+  aniso2=$9
+  alpha2=${10}
+  sigma2=${11}
+  glow=${12}
+  soft_light=${13}
+  halo=${14}
+  brightness=${15}
+  contrast=${16}
+  saturation=${17}
+  hue_shift=${18}
+  vignette=${19}
+  fog=${20}
+  grain=${21}
+
+  # Core dream smoothing loop
+  repeat $iterations
+    +fx_smooth_anisotropic {$amplitude/$iterations},$sharp1,$aniso1,$alpha1,$sigma1,0.8,30,2,0,0,1,0,1,24,0
+    fx_smooth_anisotropic. {$amplitude*1.4/$iterations},$sharp2,$aniso2,$alpha2,$sigma2,0.8,15,5,0,1,1,0,1,24,0
+    blend alpha,$opacity,0
+  done
+
+  # Ethereal glow
+  if $glow>5
+    +blur {$glow/2}
+    n. 0,255
+    blend screen,{$glow/250},0
+  fi
+
+  # Soft light
+  if $soft_light>5
+    +blur {$soft_light/2}
+    blend softlight,{$soft_light/250},0
+  fi
+
+  # Halo
+  if $halo>5
+    +blur {$halo/1.5}
+    threshold. 60%
+    blur. {$halo/2}
+    n. 0,255
+    blend screen,{$halo/300},0
+  fi
+
+  # Vignette
+  if $vignette>5
+    w_img={w}
+    h_img={h}
+    +ellipse. {$w_img/2},{$h_img/2},{$w_img*0.7},{$h_img*0.7},0,1,255
+    blur. {$vignette*2}
+    n. 0,255
+    blend multiply,{1-$vignette/200},0
+  fi
+
+  # Fog
+  if $fog>5
+    add {$fog*2}
+    c 0,255
+  fi
+
+  # Grain - fine monochrome
+  if $grain>5
+    +noise {$grain/20}%,0
+    blur. 0.3
+    to_gray.
+    to_rgb.
+    blend overlay,{$grain/200},0
+  fi
+
+  # Color adjustments
+  if abs($brightness)>1||abs($contrast)>1||abs($hue_shift)>1||abs($saturation)>1
+    adjust_colors $brightness,$contrast,0,$hue_shift,$saturation
+  fi
+
+  n 0,255
+  c 0,255
+
+fx_dream_smoothing_enhanced_preview :
+  preview_quality=${22}
+  w_orig={w}
+  h_orig={h}
+
+  # Apply quality-based scaling
+  if $preview_quality==0
+    # Draft: 25% size
+    if $w_orig>800||$h_orig>800
+      resize2dx 25%,2
+      fx_dream_smoothing_enhanced ${1-21}
+      resize2dx. $w_orig,5
+    else
+      fx_dream_smoothing_enhanced ${1-21}
+    fi
+  elif $preview_quality==1
+    # Normal: 50% size
+    if $w_orig>800
+      resize2dx 50%,2
+      fx_dream_smoothing_enhanced ${1-21}
+      resize2dx. $w_orig,5
+    else
+      fx_dream_smoothing_enhanced ${1-21}
+    fi
+  else
+    # High Quality: full resolution
+    fx_dream_smoothing_enhanced ${1-21}
+  fi
