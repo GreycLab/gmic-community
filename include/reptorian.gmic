@@ -875,7 +875,8 @@ status $original_status
 um __$0_process_dictionary,__$0_header,__$0_finalize_single_thread
 #@cli rep_mode_blend
 #@cli : Blend Layers via statistical mode of colors.
-#@cli : Author: Reptorian.
+#@cli :
+#@cli : Author: Reptorian
 rep_mode_blend:
 
 is_dimensions_valid={"
@@ -900,176 +901,149 @@ is_dimensions_valid={"
 		dimension_valid;
 	"}
 
-if !$is_dimensions_valid    error inv_dim_det@[$img_checked] fi
-if $!==1 return fi
-if $!==2 100%,100%,100%,100%,I#-2==I#-1?I#-1:vector(#s,nan) rm[-3,-2] return fi
+if !$is_dimensions_valid
+	error inv_dim_det@[$img_checked]
+elif $!<3
+	if $!==2
+		100%,100%,100%,100%,I#-2==I#-1?I#-1:vector(#s,nan)
+		rm[-3,-2]
+	fi
+	return
+fi
 
-spectrum_size,number_of_images:=s,$!
-use_hashmap_processing:=$number_of_images>20
-d_s:=$spectrum_size-1
+use_hashmap_processing={$!>20}
 
 if $use_hashmap_processing
-	dictionary_buckets:=$_cpus<<8
+	bf,layers,d_s:=8,$!,s-1
+	dictionary_buckets,seed,bit_mask:=$_cpus<<$bf,v(0x1b3d,0xf1c3ef),(1<<$bf)-1
 
-	# Create Hash Values
-	100%,100%,100%,2,:"begin_t(
-			k=v(0x1b3d,0xf1c3ef)|0b101;
-			m=2+(t<<8);
+	100%,100%,100%,$!,:"begin(
+			const S=s#0;
+			const seed=$seed;
+			const bit_mask=$bit_mask;
+			V=vector(#S);
 		);
-		[k,m];"
-	s. c
+		copy(V[0],i(#c,x,y,z,0),S,1,whd);
+		hash_value=0;
+		repeat(S,p,
+			hash_value=xor(((hash_value<<1)-hash_value)*seed,V[p]);
+			hash_value&=bit_mask;
+		);
+		hash_value;
+		"
 
-	repeat $number_of_images {
-		+s[$>] c
-		&[-1] 0xff
-		repeat $d_s {
-			[-2]
-			<<[-2] 1
-			rv[-3,-2]
-			-[-3,-2]
-			*[-2] [$number_of_images] &[-2] 0xff
-			xor[-2,-1]
-		}
-	}
-
-	# Merge set of images
-	rm[$number_of_images]
-	a[-$number_of_images--1] c
-	+[-1] [-2]
-	rm[-2]
-	a[^-1] c
-
-	#Find Mode of Color
 	0x$dictionary_buckets
 
-	eval[1] :"begin_t(
-			const spec_size=$spectrum_size;
-			const inc_spec_size=spec_size+1;
-			const dec_spec_size=spec_size-1;
+	f[$layers] :"begin_t(
+			const S=s#0;
+			const inc_S=S+1;
+			const dec_S=S-1;
 			const count_boundary=s>>1;
-			const maximum_vector_size=spec_size*s;
-
-			offset_pos=(t<<8)+2;
-
-			chval(value)=if(value>=maxima_a,
-					current_maximum_color=current_color;
-					if(value>count_boundary,maxima_a=value;break());
-					maxima_b=maxima_a;
-					maxima_a=value;
-			);
-		);
-
-		size_table=vector(#0x100);
-		maxima_a=maxima_b=number_of_buckets=color_pos=last_p=0;
-
-		keys=I;
-		colors=I#0;
-
-		current_maximum_color=old_color=vector(#spec_size,nan);
-		repeat(s,v,
-			current_color=(colors)[color_pos,spec_size];
-
-			key=keys[v];
-			relative_key=key-offset_pos;
-
-			current_size=size_table[relative_key];
-			H=h(#key);
-
-			same_color=current_color==old_color;
-			(current_size?(p=same_color?last_p:find(#key,current_color,current_size-inc_spec_size,-inc_spec_size)+1))?(
-				if(!same_color,p+=dec_spec_size);
-				current_number_of_color=++i[#key,p];
-				chval(current_number_of_color);
-				last_p=p;
-			):(
-				if(inrange(H,0,maximum_vector_size,1,0),
-					if(current_size+inc_spec_size>=H,
-						new_size=cut(H<<1,inc_spec_size,maximum_vector_size);
-						resize(#key,1,new_size,1,1,-1);
-					);
+			offset=(t<<$bf)+k+1;
+			const dictionary_buckets=$dictionary_buckets;
+			current_color=v_NaN=last_color=maxima_color=vector(#S,nan);
+			chval(count_value)=(
+				current_count=count_value;
+				if(current_count>=current_maxima,
+					maxima_color=current_color;
+					if(current_count>count_boundary,break(););
+					old_maxima=current_maxima;
+					current_maxima=current_count;
 				);
-				copy(i[#key,current_size],[current_color,1]);
-				chval(1);
-				last_p=current_size+spec_size;
-				size_table[relative_key]+=inc_spec_size;
 			);
-
-
-			color_pos+=spec_size;
-			old_color=current_color;
+			last_ind=nan;
 		);
-
-		maxima_a>maxima_b?(
-			draw(#0,current_maximum_color,x,y,z,0,1,1,1,spec_size);
-		):(
-			draw(#0,vector(#spec_size,nan),x,y,z,0,1,1,1,spec_size);
+		hash=I;
+		sizes=vector(#dictionary_buckets);
+		current_maxima=old_maxima=0;
+		repeat(s,p,
+			copy(current_color[0],i(#p,x,y,z,0),S,1,whd);
+			current_hash=hash[p];
+			H=sizes[current_hash];
+			key=current_hash+offset;
+			same_color=same(current_color,last_color);
+			(H?(same_color?1:(last_ind=find(#key,current_color,(H-1)*inc_S,-inc_S)+1)))?(
+				if(!same_color,last_ind+=dec_S);
+				chval(++i[#key,last_ind]);
+			):(
+				if(H==h(#key),
+					new_size=min(max(8,h(#key)<<1),s);
+					resize(#key,inc_S,new_size,1,1,-1);
+				);
+				copy(i(#key,0,H,0,0),[current_color,1]);
+				++sizes[current_hash];
+				last_ind=(H+1)*inc_S-1;
+			);
+			last_color=current_color;
 		);
+		current_maxima>old_maxima?maxima_color:v_NaN;"
 
-		I;"
-
-	keep[0]
+	k[$layers] channels 0,$d_s
 else
-	a c
-
-	f "begin(
-			const S=$spectrum_size;
-			const layers=$number_of_images;
+	f[0] "begin(
+			const layers="$!";
 			const count_boundary=layers>>1;
+
+			init_color_collection=vector(#s*layers);
 			init_new_counts=vector(#layers);
 			init_new_counts[0]=1;
 
-			v_NaN=vector(#S,nan);
+			current_color=vector(#s);
+			v_NaN=vector(#s,nan);
 		);
-
-		colors=I;
-		counts=init_new_counts;
-		last_nonduplicate_pos=S;
+		last_color=I;
+		last_nonduplicate_pos=s;
 		current_maxima=old_maxima=1;
-		found_at_least_one_duplicate=0;
-		maxima_color=old_color=v_NaN;
+		maxima_color=v_NaN;
 
-		for(pos=S,pos<s,pos+=S,
-			current_color=(colors)[pos,S];
+		colors=init_color_collection;
+		copy(colors[0],last_color);
+		counts=init_new_counts;
 
-			same(current_color,old_color)?(
+		p=0;
+		q=[0,0];
+		while(++p<layers,
+			copy(current_color[0],i(#p,x,y,z,0),s,1,whd);
+
+			same(current_color,last_color)?(
 				found_duplicate=1;
 			):(
 				found_duplicate=0;
-				for(q_pos=[0,0],q_pos[0]<last_nonduplicate_pos,q_pos+=[S,1],
-					if( same( current_color , (colors)[q_pos[0],S] ),
+				q=[0,0];
+				while(q[0]<last_nonduplicate_pos,
+					if(same(current_color,colors[q[0],s]),
 						found_duplicate=1;
 						break();
 					);
+					q+=[s,1];
 				);
+				0;
 			);
 
-			old_color=current_color;
-			current_count=++counts[q_pos[1]];
+			last_color=current_color;
+			current_count=++counts[q[1]];
 
 			if(current_count>count_boundary,
-				maxima_color=current_color;
 				current_maxima=current_count;
+				maxima_color=current_color;
 				break();
 			);
 
 			found_duplicate?(
 				if(current_count>=current_maxima,
+					maxima_color=current_color;
 					old_maxima=current_maxima;
 					current_maxima=current_count;
-					maxima_color=current_color;
 				);
-				found_at_least_one_duplicate=1;
 			):(
-				copy(colors[q_pos[0]],current_color);
-				last_nonduplicate_pos+=S;
+				copy(colors[last_nonduplicate_pos],current_color);
+				last_nonduplicate_pos+=s;
 			);
 		);
 
-		current_maxima>old_maxima?maxima_color:v_NaN;
-		"
+		current_maxima>old_maxima?maxima_color:v_NaN;"
+	k[0]
 fi
-
-channels 0,$d_s
 #@cli rep_val2order: map_2_img={ 0=False | 1=True },value_mode={ 0=scalar | 1=vector },_keep_set_vals={ 0=no | 1=values | 2=values+count | 3=values+status_counts | 4=status_counts }
 #@cli : This command can change images to order of appearance representation(s). map_2_img simply convert values to the order of their appearance starting from zero. set_vals can contain unique values with optional count of unique values.
 rep_val2order:
