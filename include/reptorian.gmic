@@ -601,10 +601,6 @@ use_color_counts:=$1>-2
 
 original_status=${}
 
-bitshift_factor=8
-buckets_per_threads,mt_dictionary_buckets:=[1,$_cpus]<<$bitshift_factor
-t_buckets:=($buckets_per_threads<<3)
-
 if $use_color_counts
 	m __$0_process_dictionary:"permute yzcx s c,-{s-1}"
 else
@@ -635,9 +631,8 @@ else
 fi
 
 foreach {
-	spec_size:=s
+	bitshift_factor,buckets_per_threads,mt_dictionary_buckets,spec_size,mt_mode={bf=max(8,ceil(log2(whd/max(1,$_cpus>>1))-12));[bf,[1,$_cpus]<<bf,s,whd>0x8000]}
 	__$0_header
-	mt_mode:=whd>0x8000
 
 	if $mt_mode
 		dictionary_buckets,p_mode=$mt_dictionary_buckets,:
@@ -732,6 +727,8 @@ foreach {
 		__$0_finalize_single_thread
 		continue
 	fi
+
+	t_buckets={max(8,min(1<<16,1<<(ceil(log2(w))-8)))}
 
 	{w#0},1,1,1,"begin(
 			const mask=$t_buckets-1;
