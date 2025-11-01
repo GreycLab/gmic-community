@@ -598,281 +598,390 @@ _rep_colors_freqstat:
 check "isint($1,-2,1)"
 
 use_color_counts:=$1>-2
-
 original_status=${}
-
-if $use_color_counts
-	m __$0_process_dictionary:"permute yzcx s c,-{s-1}"
-else
-	m __$0_process_dictionary:"permute yzcx"
-fi
 
 if isbool($1)
 	highest_color_frequency_mode=1
-
-	if $1 m __$0_header:"output_dimensions:=[w#-1,h#-1,d#-1,s#-1]"
-	else  m __$0_header:"output_dimensions:=[1,1,1,s#-1]"
-	fi
-
-	m __$0_finalize_single_thread:"
-		eval[-1] begin(m=0);if(i==iM#-1,++m;);end(merge(m,+);set('t_color',m););
-		if $t_color>1 $output_dimensions,[{vector(#s#0,nan)}]
-		else     $output_dimensions,[{I[#0,xM#1]}]
-		fi
-		keep[-1]"
+	mt_cmd=fill
 else
 	highest_color_frequency_mode=0
-
-	m __$0_header:"skip ,"
-
-	if $use_color_counts m __$0_finalize_single_thread:"a[-2,-1] c"
-	else  m __$0_finalize_single_thread:"skip ,"
-	fi
+	mt_cmd=eval
 fi
 
 foreach {
-	bitshift_factor,buckets_per_threads,mt_dictionary_buckets,spec_size,mt_mode={bf=max(8,ceil(log2(whd/max(1,$_cpus>>1))-6));[bf,[1,$_cpus]<<bf,s,whd>0x8000]}
-	__$0_header
+	# Skip Empty Images
+	if !s continue fi
 
-	if $mt_mode
-		dictionary_buckets,p_mode=$mt_dictionary_buckets,:
-	else
-		dictionary_buckets,p_mode=$buckets_per_threads,>
+	# Set up important variables
+	cpus_to_use,direct_process_mode,mt_mode,pxs_to_process_per_threads,bitshift_factor,dictionary_buckets_per_threads,bit_mask:="
+		cpus_to_use=cut(int(whd#0/0x8000),1,$_cpus);
+		direct_process_mode=cpus_to_use==1||cpus_to_use==$_cpus;
+		mt_mode=cpus_to_use>1;
+		pxs_to_process_per_threads=ceil(whd/cpus_to_use);
+		bitshift_factor=cut(int(log2(sqrt(pxs_to_process_per_threads))),8,16);
+		dictionary_buckets_per_threads=1<<bitshift_factor;
+		bit_mask=dictionary_buckets_per_threads-1;
+		cpus_to_use,direct_process_mode,mt_mode,pxs_to_process_per_threads,bitshift_factor,dictionary_buckets_per_threads,bit_mask;
+	"
+
+	S={s}
+	if $highest_color_frequency_mode
+		if $1==1
+			od:=w,h,d
+		else
+			od={vector(#3,1)}
+
+		fi
 	fi
 
 	# Create Hashmap
-	100%,100%,100%,1,$p_mode"
-		begin_t(
+	100%,100%,100%,{1+$mt_mode}," # Second channel is used to post merge
+		begin(
 			const M=(1<<16)-1;
 			const bf=$bitshift_factor;
-			const bit_mask=(1<<bf)-1;
-			seed=v(0x1234,0xabcd);
-			offset=2+(t<<bf);
+			const bit_mask=$bit_mask;
+			const seed="{v(0x1234,0xabcd)}";
+			const S=s#0;
+			S==1?(
+				const second_seed=seed<<1;
+				const M=0x45d9f3b;
+				hash(v)=(
+					nv=v;
+					repeat(2,nv=xor(nv>>16,nv)*M;);
+					xor(nv>>16,nv);
+				);
+				hash_a(v)=hash(v+seed);
+				hash_b(v)=hash(v+second_seed);
+			):(
+				hash(v)=(C=v;isint(C)?C:C*M);
+				hash_a(v)=hash(v);
+				hash_b(v)=hash(v);
+			);
+
+			s==2?(
+				const lc=S-1;
+				init()=(hash_value_a=hash_value_b=0);
+				hash_color()=repeat(S,p,
+					hash_value_a=xor(((hash_value_a<<1)-hash_value_a)*seed,hash_a(c[p]));
+					hash_value_b=xor(((hash_value_b<<1)-hash_value_b)*seed,hash_b(c[lc-p]));
+					hash_value_a&=bit_mask;
+					hash_value_b&=bit_mask;
+				);
+				result()=[hash_value_a,hash_value_b];
+				0;
+			):(
+				init()=hash_value=0;
+				hash_color()=repeat(S,p,
+					hash_value=xor(((hash_value<<1)-hash_value)*seed,hash(c[p]));
+					hash_value&=bit_mask;
+				);
+				result()=hash_value;
+				0;
+			);
 		);
-		channels=I#0;
-		hash_value=0;
-		repeat($spec_size,p,
-			hash_value=xor(((hash_value<<1)-hash_value)*seed,C=channels[p];isint(C)?C:C*M);
-			hash_value&=bit_mask;
-		);
-		hash_value+offset;"
+		c=I#0;
+		init();
+		hash_color();
+		result();"
+
+	# Image to use for processing all the other images on the list
+	$cpus_to_use,1,1,2,v=whd#-1-(w-1-x)*int(whd#-1/w);[v>>24,v&0xffffff]
+
+	# Create dictionary buckets and reference image
+	total_num_of_buckets_per_section={($cpus_to_use*$dictionary_buckets_per_threads)}
+	0x$total_num_of_buckets_per_section
+	$dictionary_buckets_per_threads,$cpus_to_use
 
 	# Find Frequency of Colors
 
-	0x$dictionary_buckets
-	eval[0] $p_mode"
-		begin_t(
-			const use_color_counts=$use_color_counts;
-			const bf=$bitshift_factor;
-			const spec_size=$spec_size;
-			const vector_insertion_size=spec_size+use_color_counts;
-			sizes=found_vectors=vector(#$mt_dictionary_buckets);
-			count_of_found_vector=0;
-			last_color=vectors(nan);
-			offset=2+(t<<bf);
-			use_color_counts?(
-				const dec_spec_size=spec_size-1;
-				last_p=nan;
-				process()=(
-					(H?(p=same_color?last_p:find(#key,I,(H-1)*vector_insertion_size,-vector_insertion_size)+1))?(
-						if(!same_color,p+=dec_spec_size;);
-						++i[#key,p];
-						last_p=p;
-					):(
-						if(H==h(#key),
-							new_size=max(8,h(#key)<<1);
-							resize(#key,vector_insertion_size,new_size,1,1,-1);
-						);
-						copy(i(#key,0,H,0,0),[I,1]);
-						last_p=(H+1)*vector_insertion_size-1;
-						++sizes[ref_sizes_ind];
-					);
+	eval[2] :"
+		begin(
+			const S=s#0;
+			const mt_mode=$mt_mode;
+			const calculate_max_freq_num_mode=!mt_mode&&$highest_color_frequency_mode;
+			const color_count_mode=$use_color_counts;
+			const vector_insertion_size=S+color_count_mode+mt_mode;
+			const hash2_pos=S+color_count_mode;
+
+			calculate_max_freq_num_mode?(
+				maxima_a=maxima_b=0;
+				maxima_color=vector(#S,nan);
+				str_NaN=v2s(maxima_color);
+				chkfreq(count_value)=if((current_count=count_value)>=maxima_a,
+					maxima_color=current_color;
+					maxima_b=maxima_a;
+					maxima_a=current_count;
 				);
 			):(
-				process()=(
-					!(H?(same_color?1:find(#key,I,(H-1)*vector_insertion_size,-vector_insertion_size)+1))?(
-						if(H==h(#key),
-							new_size=max(8,h(#key)<<1);
-							resize(#key,vector_insertion_size,new_size,1,1,-1);
+				chkfreq(count_value)=count_value;
+			);
+
+			P1_off()=P+whd#0;
+		);
+
+		list_of_ins_pos=vector(#$dictionary_buckets_per_threads);
+		offset=$dictionary_buckets_per_threads*x+k+1;
+
+		O=J(-1);
+		P=O[0]<<24|O[1];
+		Q=i0<<24|i1;
+
+		last_color=I[#0,P];
+		key=i[#1,P];
+		door_pos=key+offset;
+		resize(#door_pos,vector_insertion_size,8,1,1,-1);
+		copy(i[#door_pos,0],last_color);
+		list_of_ins_pos[key]=vector_insertion_size;
+		i(#-1,key,x)=1;
+		if(color_count_mode,i[#door_pos,count_pos=S]=1);
+		if(mt_mode,i[#door_pos,hash2_pos]=i[#1,P1_off()]);
+
+		color_count_mode?(
+			while(++P<Q,
+				current_color=I[#0,P];
+				same_color=same(current_color,last_color);
+				same_color?(
+					chkfreq(++i[#door_pos,count_pos]);
+				):(
+					key=i[#1,P];
+					door_pos=key+offset;
+					H=i(#-1,key,x);
+					ins_pos=list_of_ins_pos[key];
+					(H?(count_pos=find(#door_pos,current_color,ins_pos-vector_insertion_size,-vector_insertion_size))!=-1)?(
+						count_pos+=S;
+						chkfreq(++i[#door_pos,count_pos]);
+					):(
+						ch=h(#door_pos);
+						if(H==ch,
+							new_size=max(8,ch<<1);
+							resize(#door_pos,vector_insertion_size,new_size,1,1,-1);
 						);
-						copy(i(#key,0,H,0,0),I);
-						++sizes[ref_sizes_ind];
+						copy(i[#door_pos,ins_pos],current_color);
+						count_pos=ins_pos+S;
+						chkfreq(i[#door_pos,count_pos]=1);
+						if(mt_mode,i[#door_pos,ins_pos+hash2_pos]=i[#1,P1_off()];);
+						list_of_ins_pos[key]+=vector_insertion_size;
+						++i(#-1,key,x);
 					);
 				);
+				last_color=current_color;
+			);
+		):(
+			while(++P<Q,
+				current_color=I[#0,P];
+				if(!same(current_color,last_color),
+					key=i[#1,P];
+					door_pos=key+offset;
+					H=i(#-1,key,x);
+					ins_pos=list_of_ins_pos[key];
+					!H||find(#door_pos,current_color,ins_pos-vector_insertion_size,-vector_insertion_size)==-1?(
+						ch=h(#door_pos);
+						if(H==ch,
+							new_size=max(8,ch<<1);
+							resize(#door_pos,vector_insertion_size,new_size,1,1,-1);
+						);
+						copy(i[#door_pos,ins_pos],current_color);
+						if(mt_mode,i[#door_pos,ins_pos+hash2_pos]=i[#1,P1_off()]);
+						list_of_ins_pos[key]+=vector_insertion_size;
+						++i(#-1,key,x);
+					);
+				);
+				last_color=current_color;
 			);
 		);
-		key=i#1;
-		ref_sizes_ind=key-offset;
-		H=sizes[ref_sizes_ind];
 
-		if(!H,
-			found_vectors[count_of_found_vector++]=key;
-		);
-
-		same_color=same(I,last_color);
-		process();
-		last_color=I;
 		I;
-
-		end_t(
-			repeat(count_of_found_vector,p,
-				img_pos=found_vectors[p];
-				resize(#img_pos,vector_insertion_size,sizes[img_pos-offset],1,1,-1);
+		end(
+			if(calculate_max_freq_num_mode,
+				if(maxima_a>maxima_b
+				,set('{}',v2s(maxima_color));
+				,set('{}',str_NaN);
+				);
 			);
 		);"
 
-	rm[0,1]
-	a y
-	__$0_process_dictionary
+	if $mt_mode
+		S={s#0} rm[0,1]
+		L={min($_cpus,$dictionary_buckets_per_threads)}
 
-	if !$mt_mode
-		__$0_finalize_single_thread
-		continue
-	fi
+		if $highest_color_frequency_mode
+			r[0] $L,100%,100%,{$S+2},-1
+		else
+			r[0] $L,100%,100%,1,-1
+		fi
 
-	t_buckets={max(8,min(1<<16,1<<(ceil(log2(w))-8)))}
+		T:=$! resize[-1] 100%,100%,100%,100%,-1
+		0x{$L*$dictionary_buckets_per_threads}
 
-	{w#0},1,1,1,"begin(
-			const M=(1<<16)-1;
-			const mask=$t_buckets-1;
-			const spec_size=$spec_size;
-			const offset=1+$!;
-			seed=v(0x1234,0xabcd);
-		);
-		channels=I#0;
-		hash_value=0;
-		repeat(spec_size,p,
-			hash_value=xor(((hash_value<<1)-hash_value)*seed,C=channels[p];isint(C)?C:C*M);
-			hash_value&=mask;
-		);
-		hash_value+offset;" => hashmap
+		eval[0] :"
+			begin(
+				const S=$S;
+				const d_S=S-1;
+				const cpus=$_cpus;
+				const calculate_max_freq_num_mode=$highest_color_frequency_mode;
+				const color_count_mode=$use_color_counts;
+				const hash2_pos=S+color_count_mode;
+				const D=$dictionary_buckets_per_threads;
+				const T=$T;
+				const img_ref=T-1;
+				const offset_bucket_size=w#img_ref;
+				const levels=h#img_ref;
+				const current_bucket_vector_size=hash2_pos+1;
 
-	0x$t_buckets
+				init_current_color=vector(#S);
+				init_number_of_keys=vector(#D);
 
-	if $highest_color_frequency_mode
-		eval[0] >"begin(
-				const hashmap=$hashmap;
-				const offset=hashmap+1;
-				const step_s=s+1;
-				const back_s=s-1;
-				current_maximum_color=vectors(nan);
-				maxima_a=maxima_b=0;
-				chval(value)=if(value>=maxima_a,
-					current_maximum_color=I;
-					maxima_b=maxima_a;
-					maxima_a=value;
+				if(calculate_max_freq_num_mode,
+					maxima_a=maxima_b=0;
+					maxima_color=vector(#S,nan);
+					str_NaN=v2s(maxima_color);
+					chkfreq(count_value)=if((current_count=count_value)>=maxima_a,
+						maxima_color=current_color;
+						maxima_b=maxima_a;
+						maxima_a=current_count;
+					);
 				);
-				last_color=vectors(nan);
-				last_p=nan;
-				sizes=found_vectors=vector(#$t_buckets);
 			);
-			key=i#hashmap;
-			ref_sizes_ind=key-offset;
-			H=sizes[ref_sizes_ind];
+			img_ind_of_start_of_secondary_dictionary=D*x+T;
+			for(current_bucket=x+1,current_bucket<=D,current_bucket+=w,
+				bucket_id=current_bucket-1;
+				current_bucket_ins_pos=current_level=0;
 
-			same_color=same(I,last_color);
-			(H?(p=same_color?last_p:find(#key,I,(H-1)*step_s,-step_s)+1))?(
-				if(!same_color,p+=back_s;);
-				current_number_of_color=i[#key,p]+=i#1;
-				chval(current_number_of_color);
-				last_p=p;
-			):(
-				if(H==h(#key),
-					new_size=max(8,h(#key)<<1);
-					resize(#key,step_s,new_size,1,1,-1);
+				secondary_insert_positions_list=init_number_of_keys;
+
+				current_color=init_current_color;
+
+				count_per_current_level=i(#img_ref,bucket_id,current_level);
+
+				current_bucket_pos=0;
+				repeat(count_per_current_level,current_bucket_pos,
+					copy(current_color,i[#current_bucket,current_bucket_ins_pos],S);
+
+					secondary_hash_pos=current_bucket_ins_pos+hash2_pos;
+					second_dictionary_key=i[#current_bucket,secondary_hash_pos];
+					secondary_dictionary_ind=second_dictionary_key+img_ind_of_start_of_secondary_dictionary;
+
+					current_secondary_ins_pos=secondary_insert_positions_list[second_dictionary_key];
+
+					secondary_dictionary_dimension=wh(#secondary_dictionary_ind);
+					if(current_secondary_ins_pos>=secondary_dictionary_dimension,
+						new_size=max(8,h(#secondary_dictionary_ind)<<1);
+						resize(#secondary_dictionary_ind,hash2_pos,new_size,1,1,-1);
+					);
+
+					copy(i[#secondary_dictionary_ind,current_secondary_ins_pos],current_color,S);
+
+					if(color_count_mode,
+						color_count_pos=current_bucket_ins_pos+S;
+						if(calculate_max_freq_num_mode,chkfreq(i[#current_bucket,color_count_pos]));
+						i[#secondary_dictionary_ind,current_secondary_ins_pos+S]=color_count_pos;
+					);
+
+					secondary_insert_positions_list[second_dictionary_key]+=hash2_pos;
+					current_bucket_ins_pos+=current_bucket_vector_size;
 				);
-				current_number_of_color=i#1;
-				chval(current_number_of_color);
-				copy(i(#key,0,H,0,0),[I,current_number_of_color]);
-				last_p=(H+1)*step_s-1;
-				++sizes[ref_sizes_ind];
-			);
-			last_color=I;
-			I;
 
-			end(
-				maxima_a>maxima_b?(
-					set('{}',v2s(current_maximum_color));
-				):(
-					set('{}',v2s(vectors(nan)););
-				);
-			);"
-		rm $output_dimensions,[${}]
-	else
-		eval[0] >"begin(
-				const hashmap=$hashmap;
-				const offset=hashmap+1;
-				const spec_size=$spec_size;
-				const use_color_counts=$use_color_counts;
-				const vector_insertion_size=spec_size+use_color_counts;
+				offset_bucket=current_bucket+offset_bucket_size;
+				while(++current_level<levels,
+					count_per_current_level=i(#img_ref,bucket_id,current_level);
+					current_offset_bucket_pos=0;
 
-				sizes=found_vectors=vector(#$t_buckets);
-				count_of_found_vector=0;
-				last_color=vectors(nan);
+					repeat(count_per_current_level,
+						copy(current_color,i[#offset_bucket,current_offset_bucket_pos],S);
+						if(color_count_mode,
+							current_count_in_offset_bucket=i[#offset_bucket,current_offset_bucket_pos+S];
+						);
 
-				use_color_counts?(
-					const color_counts_pos=hashmap-1;
-					const dec_spec_size=spec_size-1;
-					last_p=nan;
-					process()=(
-						(H?(p=same_color?last_p:find(#key,I,(H-1)*vector_insertion_size,-vector_insertion_size)+1))?(
-							if(!same_color,p+=dec_spec_size;);
-							i[#key,p]+=i#color_counts_pos;
-							last_p=p;
+						offset_hash_pos=current_offset_bucket_pos+hash2_pos;
+						second_dictionary_key=i[#offset_bucket,offset_hash_pos];
+						secondary_dictionary_ind=second_dictionary_key+img_ind_of_start_of_secondary_dictionary;
+
+						current_secondary_ins_pos=secondary_insert_positions_list[second_dictionary_key];
+						color_pos=find(#secondary_dictionary_ind,current_color,current_secondary_ins_pos-hash2_pos,-hash2_pos);
+
+						color_count_mode?(
+							color_pos!=-1?(
+								calculate_max_freq_num_mode?(
+									chkfreq(i[#current_bucket,i[#secondary_dictionary_ind,color_pos+S]]+=current_count_in_offset_bucket;);
+								):(
+									i[#current_bucket,i[#secondary_dictionary_ind,color_pos+S]]+=current_count_in_offset_bucket;
+								);
+							):(
+								if(calculate_max_freq_num_mode,chkfreq(current_count_in_offset_bucket););
+								secondary_dictionary_dimension=wh(#secondary_dictionary_ind);
+								if(current_secondary_ins_pos>=secondary_dictionary_dimension,
+									new_size=max(8,h(#secondary_dictionary_ind)<<1);
+									resize(#secondary_dictionary_ind,hash2_pos,new_size,1,1,-1);
+								);
+								copy(i[#secondary_dictionary_ind,current_secondary_ins_pos],current_color,S);
+								i[#secondary_dictionary_ind,current_secondary_ins_pos+S]=current_bucket_ins_pos+S;
+								secondary_insert_positions_list[second_dictionary_key]+=hash2_pos;
+								current_bucket_dimension=wh(#current_bucket);
+								if(current_bucket_ins_pos>=current_bucket_dimension,
+									new_size=max(8,h(#current_bucket)<<1);
+									resize(#current_bucket,current_bucket_vector_size,new_size,1,1,-1);
+								);
+								copy(i[#current_bucket,current_bucket_ins_pos],current_color,S);
+								i[#current_bucket,current_bucket_ins_pos+S]=current_count_in_offset_bucket;
+								current_bucket_ins_pos+=current_bucket_vector_size;
+								++current_bucket_pos;
+							);
 						):(
-							if(H==h(#key),
-								new_size=max(8,h(#key)<<1);
-								resize(#key,vector_insertion_size,new_size,1,1,-1);
+							color_pos==-1?(
+								secondary_dictionary_dimension=wh(#secondary_dictionary_ind);
+								if(current_secondary_ins_pos>=secondary_dictionary_dimension,
+									new_size=max(8,h(#secondary_dictionary_ind)<<1);
+									resize(#secondary_dictionary_ind,hash2_pos,new_size,1,1,-1);
+								);
+								copy(i[#secondary_dictionary_ind,current_secondary_ins_pos],current_color,S);
+								secondary_insert_positions_list[second_dictionary_key]+=hash2_pos;
+								current_bucket_dimension=wh(#current_bucket);
+								if(current_bucket_ins_pos>=current_bucket_dimension,
+									new_size=max(8,h(#current_bucket)<<1);
+									resize(#current_bucket,current_bucket_vector_size,new_size,1,1,-1);
+								);
+								copy(i[#current_bucket,current_bucket_ins_pos],current_color,S);
+								current_bucket_ins_pos+=current_bucket_vector_size;
+								++current_bucket_pos;
 							);
-							copy(i(#key,0,H,0,0),[I,i#color_counts_pos]);
-							last_p=(H+1)*vector_insertion_size-1;
-							++sizes[key-offset];
 						);
+
+						current_offset_bucket_pos+=current_bucket_vector_size;
 					);
-				):(
-					process()=(
-						!(H?(same_color?1:find(#key,I,(H-1)*vector_insertion_size,-vector_insertion_size)+1))?(
-							if(H==h(#key),
-								new_size=max(8,h(#key)<<1);
-								resize(#key,vector_insertion_size,new_size,1,1,-1);
-							);
-							copy(i(#key,0,H,0,0),I);
-							++sizes[ref_sizes_ind];
-						);
-					);
+
+					offset_bucket+=offset_bucket_size;
+				);
+
+				if(current_bucket_pos,
+					resize(#current_bucket,hash2_pos,current_bucket_pos,1,1,0);
 				);
 			);
-
-			key=i#hashmap;
-			ref_sizes_ind=key-offset;
-			H=sizes[ref_sizes_ind];
-
-			if(!H,
-				found_vectors[count_of_found_vector++]=key;
-			);
-
-			same_color=same(I,last_color);
-			process();
-			last_color=I;
 			I;
-
-			end(
-				repeat(count_of_found_vector,p,
-					img_pos=found_vectors[p];
-					resize(#img_pos,vector_insertion_size,sizes[img_pos-offset],1,1,-1);
-				);
-			);
 			"
 
-		rm[0-$hashmap]
-		a y
-		permute yzcx
+			# if $use_color_counts return fi
+
+			k[1-$dictionary_buckets_per_threads] a y permute yzcx
+	else
+		if $highest_color_frequency_mode
+			if $1
+				k[0]
+				f [${}]
+			else
+				S={s#0} rm
+				1,1,1,$S,[${}]
+			fi
+		else
+			k[3--1]
+			eval. :if(i,resize(#x,w#0,i,1,1,-1));
+			rm.
+			a y
+			permute yzcx
+		fi
 	fi
 }
 
 status $original_status
-
-um __$0_process_dictionary,__$0_header,__$0_finalize_single_thread
 #@cli rep_mode_blend
 #@cli : Blend Layers via statistical mode of colors.
 #@cli :
