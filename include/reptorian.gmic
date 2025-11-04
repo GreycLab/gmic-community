@@ -2371,47 +2371,7 @@ do {
 	if {*,ENTER}" || "{*,ESC} w[] 0,0 break fi
 	use_key=1
 
-	if {*,BACKSPACE}" && "da_size(#-1)&&$insertion_pos
-		use_key=0
-		eval da_remove(#-1,cut($insertion_pos-1,0,da_size(#-1)-1))
-		insertion_pos:=cut($insertion_pos-1,0,da_size(#-1))
-	fi
-
-	arrow_pressed={{*,ARROWLEFT}||{*,ARROWRIGHT}}
-
-	if $arrow_pressed
-		ARROWLEFT={*,ARROWLEFT}
-		ARROWRIGHT={*,ARROWRIGHT}
-		insertion_pos={cut($insertion_pos-$ARROWLEFT+$ARROWRIGHT,0,da_size(#-1))}
-	elif $use_key
-		__rep_cin_key2int
-		if ${}
-			eval da_insert(#-1,$insertion_pos,${})
-			insertion_pos+=1
-		fi
-	fi
-
-	if $insertion_pos!=$old_insertion_pos||da_size(#-1)!=$old_da_size
-		if !da_size(#-1)
-			M0=
-			M1=_
-		else
-			if ($insertion_pos>=(da_size(#-1)))||!$insertion_pos
-				M0=${_rep_cin_values2str\ {crop(#-1,0,0,0,0,1,{da_size(#-1)},1,1)}}
-				M1=$M0
-				if $insertion_pos
-					M1.=_
-				else
-					M1..=_
-				fi
-			else
-				left={`crop(#-1,0,0,0,0,1,$insertion_pos,1,1)`}
-				right=${_rep_cin_values2str\ {crop(#-1,0,$insertion_pos,0,0,1,{da_size(#-1)-$insertion_pos},1,1)}}
-				M0=$left$right
-				M1=${left}_$right
-			fi
-		fi
-	fi
+	__rep_cin_nstr
 
 	old_insertion_pos=$insertion_pos
 	old_da_size:=da_size(#-1)
@@ -2420,16 +2380,33 @@ do {
 		wait
 		w[] $screen_w,1,0,0,$message$M1
 	elif {*,BACKSPACE}
-		wait 100
 		w[] $screen_w,1,0,0,$message$M1
+		wait 150
 	else
 		do {
-			if $iteration==30||!$started
+			if {*,k}
+				__rep_cin_nstr
+
+				w[] $screen_w,1,0,0,$message$M1
+
+				if $arrow_pressed||$key
+					wait
+					w[] $screen_w,1,0,0,$message$M1
+				elif {*,BACKSPACE}
+					w[] $screen_w,1,0,0,$message$M1
+					wait 150
+				fi
+
+				break
+			fi
+
+			if $iteration==60||!$started
 				w[] $screen_w,1,0,0,$message${M$mode}
 				mode={!$mode}
 				iteration=0
 				started=1
 			fi
+
 			iteration+=1
 			wait 2
 		} while !{*,k}&&{*}
@@ -2439,6 +2416,48 @@ do {
 rm.
 
 u $M0
+__rep_cin_nstr:
+if {*,BACKSPACE}" && "da_size(#-1)&&$insertion_pos
+	use_key=0
+	eval da_remove(#-1,cut($insertion_pos-1,0,da_size(#-1)-1))
+	insertion_pos:=cut($insertion_pos-1,0,da_size(#-1))
+fi
+
+arrow_pressed={{*,ARROWLEFT}||{*,ARROWRIGHT}}
+
+if $arrow_pressed
+	ARROWLEFT={*,ARROWLEFT}
+	ARROWRIGHT={*,ARROWRIGHT}
+	insertion_pos={cut($insertion_pos-$ARROWLEFT+$ARROWRIGHT,0,da_size(#-1))}
+elif $use_key
+	__rep_cin_key2int
+	if ${}
+		eval da_insert(#-1,$insertion_pos,${})
+		insertion_pos+=1
+	fi
+fi
+
+if $insertion_pos!=$old_insertion_pos||da_size(#-1)!=$old_da_size
+	if !da_size(#-1)
+		M0=
+		M1=_
+	else
+		if ($insertion_pos>=(da_size(#-1)))||!$insertion_pos
+			M0=${_rep_cin_values2str\ {crop(#-1,0,0,0,0,1,{da_size(#-1)},1,1)}}
+			M1=$M0
+			if $insertion_pos
+				M1.=_
+			else
+				M1..=_
+			fi
+		else
+			left={`crop(#-1,0,0,0,0,1,$insertion_pos,1,1)`}
+			right=${_rep_cin_values2str\ {crop(#-1,0,$insertion_pos,0,0,1,{da_size(#-1)-$insertion_pos},1,1)}}
+			M0=$left$right
+			M1=${left}_$right
+		fi
+	fi
+fi
 
 # Below is the reference I used to help create the above code:
 # ;=,-./` [\]'
