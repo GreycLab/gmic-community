@@ -11416,101 +11416,90 @@ foreach {
 		if $13==3 hsv2rgb. fi
 		if $sub!=1 r. $ow,$oh,100%,100%,5 fi
 }
-#@cli rep_skew: angle,-100%<=_position_skew[%]<=100%,_axis={x|y|z},_boundary={0= 0=dirichlet | 1=neummann | 2=periodic | 3=mirror},_interpolation={ 0=nearest | 1=linear | 2=cubic },_enlarged_mode={ 0=preserve | 1=enlarge }
-#@cli : Skew Image Based on angle. Note that axis==z condition has not been tested!
-#@cli : Default values: _position_skew[%]=0%,_axis=0
-rep_skew:
-skip ${2=0},${3=0},${4=3},${5=1},${6=1}
+#@cli rep_shear: combined_axis={ 0,xy | 1,xz | 2,xc | 3,yx | 4,yz | 5,yc | 6,zx | 7,zy | 8,zc | 9,cx | 10,cy | 11,cz },angle,centre,_boundary={ 0=none | 1=neumann | 2=periodic | 3=mirror },_interpolation={ 0=nearest | 1=linear | 2=bicubic },_output_mode={ 0=cropped | 1=full }
+#@cli : Shear Image Based on angle.
+#@cli : Default values: '_boundary=2','_interpolation=2','_output_mode=0'
+rep_shear:
+skip ${4=2},${5=2},${6=0}
 
-check (abs($1)<90)&&(abs($2)<=1)&&((($3==0)||($3==1)||($3==2))||inrange(_'$3',_'x',_'z',1,1))
+check inrange($2,-90,90,0,0)&&isfinite($3)&&isint($4,0,3)&&isint($5,0,2)&&isbool($6)
+if !$2 return fi
 
-if $1==0 return fi
+x,y,z,c,centre=0,1,2,3,{ispercentage($3)?$3:($3+1)/2}
+
+check inrange($centre,0,1,1,1)
+
+if isnum($1)
+	check isint($1,0,11)
+	loc=${arg\ $1+1,xy,xz,xc,yx,yz,yc,zx,zy,zc,cx,cy,cz}
+else
+	loc={'xyzc'}
+	check v='$1';size(v)==2?(isin(v[0],$loc)&&isin(v[1],$loc)&&v[0]!=v[1]);
+	loc=$1
+fi
+
+d,l={`v='$loc';[v[0],_',',v[1]]`} # distance/distancia & line/linea
+
+t_length,t_mult=${arg0\ ${$l},w,h,d,s},{tan($2°)}
+ref_length,shift_scale=$t_length-1,$t_mult*half_ref_length
+c_interpolation_mode={${$d}==3}
+
+# Workaround as G'MIC JIT compiler doesn't support interpolation within non-spatial dimension c
+if $c_interpolation_mode&&$5
+	p_arg,s_arg=${arg0\ ${$l},xczy,cyzx,xycz},${arg0\ ${$l},yx,xy,zc}
+	permute $p_arg
+	rep_shear $s_arg,${2-6}
+	permute $p_arg
+	return
+fi
+
+contain_c={same(_'$d',_'c')||same(_'$l',_'c')}
+
+c0,c1,c2,c3=0
+d0,d1,d2,d3=w,h,d,s
 
 if $6
+	ins_l=#-1,
+	t_dim=${arg0\ ${$d},w,h,d,s}
+	df=ceil($t_dim+(abs($t_mult)*$t_length))
+	c${$d}=($l-half_ref_length)/half_ref_length*shift_scale-offset
+else
+	c${$d}=($l-centre)/half_ref_length*shift_scale
+fi
 
-	ang={($1/180)*pi}
-	tang={tan($ang)}
+if $contain_c
+	skew_expr=j($ins_l$c0,$c1,$c2,$c3,$5,$4)
+else
+	skew_expr=J($ins_l$c0,$c1,$c2,$5,$4)
+fi
 
+if $6
 	foreach {
-		if same('$3','z')||$3==2
-			echo[] "TODO: Add depth. Possible TODO: zx,zy,xz,zy" return
-		elif same('$3','y')||$3==1
+		dist={$df}
+		d${$d}=$dist
+		offset={($dist-$t_dim)/2}
 
-			dist={abs(w*$tang)}
-			new_height={h+$dist}
+		if prod($d0,$d1,$d2,$d3)/$_cpus>0x400000 error exc_dim_lim fi
 
-			100%,$new_height,100%,100%,"begin(
-					const ang=$ang*-1;
-					const offpos=(h-h#-1)/2;
-					const ww=w-1;
-					const half_w=(w-1)/2;
-					const dist=ww*tan(ang);
-				);
-				ypos=(x-half_w)/ww*dist-offpos;
-				I(#-1,x,y+ypos,z,$5,$4);"
+		{[$d0,$d1,$d2,$d3]},"begin(
+				const ref_length=max(1,"$ref_length");
+				const half_ref_length=ref_length/2;
+				const offset=$offset;
+				const shift_scale="$shift_scale";
+			);
+			"$skew_expr";
+			"
 
-		elif same('$3','x')||$3==0
-
-			dist={abs(h*$tang)}
-			new_width={w+$dist}
-
-			$new_width,100%,100%,100%,"begin(
-					const ang=$ang;
-					const offpos=(w-w#-1)/2;
-					const hh=h-1;
-					const half_h=(h-1)/2;
-					const dist=hh*tan(ang);
-				);
-				xpos=(y-half_h)/hh*dist-offpos;
-				I(#-1,x+xpos,y,z,$5,$4);"
-
-		else
-			error "Invalid input!"
-		fi
-
-		k.
+		rm..
 	}
 else
-
-	if same('$3','z')||$3==2
-
-		echo[] "Untested! Possible TODO: zx,zy,xz,zy"
-
-		f "begin(
-				const ang=($1/180)*pi;
-				const dd=d-1;
-				const pz=dd*($2*.5+.5);
-				const dist=dd*tan(ang);
-			);
-			zpos=(z-pz)/dd;
-			J(0,0,lerp(0,dist,zpos),$5,$4);"
-
-	elif same('$3','y')||$3==1
-
-		f "begin(
-				const ang=($1/180)*pi*-1;
-				const ww=w-1;
-				const px=ww*($2*.5+.5);
-				const dist=ww*tan(ang);
-			);
-			xpos=(x-px)/ww;
-			J(0,lerp(0,dist,xpos),0,$5,$4);"
-
-	elif same('$3','x')||$3==0
-
-		f "begin(
-				const ang=($1/180)*pi;
-				const hh=h-1;
-				const py=hh*(-$2*.5+.5);
-				const dist=hh*tan(ang);
-			);
-			ypos=(y-py)/hh;
-			J(lerp(0,dist,ypos),0,0,$5,$4);"
-
-	else
-		error "Invalid input!"
-	fi
-
+	fill "begin(
+			const ref_length="$ref_length";
+			const half_ref_length=ref_length/2;
+			const centre=ref_length*$centre;
+			const shift_scale="$shift_scale";
+		);
+		"$skew_expr";"
 fi
 #@cli rep_hpd: eq. to 'rep_henon_phase_diagram'
 rep_hpd:rep_henon_phase_diagram $*
@@ -31070,19 +31059,69 @@ foreach {
 }
 
 um __$0_average_per_channels
-#@gui Skew:rep_skew,rep_skew_preview
-#@gui:Angle=float(0,-89.99,89.99)
-#@gui:Position(%)=float(0,-100,100)
-#@gui:Axis=choice(0,"X","Y")
-#@gui:Boundary=choice(3,"None","Neumann","Periodic","Mirror")
-#@gui:Interpolation=choice(2,"Nearest","Linear","Bicubic")
-#@gui:Enlarge?=bool(0)
-#@gui:_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"),Preview Split=point(50,50,0,0,200,200,200,0,10)_0
-#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2021/4/16</i>.</small>")
-fx_rep_skew:
-rep_skew $1,$2%,${3-6}
-rep_skew_preview:
-gui_split_preview "fx_rep_skew ${1-6}",${-3--1}
+#@gui Shear: fx_rep_shear,fx_rep_shear_preview
+#@gui:_=note("Shears image within 3/4 dimensions")
+#@gui:_=separator()
+#@gui:Axis-by-Axis Shear=~choice(0,"XY","XZ","XC","YX","YZ","YC","ZX","ZY","ZC","CX","CY","CZ")
+#@gui:Axis-by-Axis Shear=~choice(0,"XY","XC","YX","YC","CX","CY")
+#@gui:Axis-string=value("place_string_here")
+#@gui:Angle=~float(45,-89,89)
+#@gui:Centre (%)=~float(50,0,100)
+#@gui:Boundary=~choice(2,"None","Neumann","Periodic","Mirror")
+#@gui:Interpolation=~choice(2,"Nearest Neighbor","Linear","Bicubic")
+#@gui:Output Mode=choice("Cropped","Full")
+#@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2025/11/10</i>.</small>")
+fx_rep_shear:
+use_full={v='$3';!(v[0]==_'c')}
+use_z_processing={isin(_'z',{'$3'})}
+if $use_z_processing a z fi
+to_automode
+rep_shear ${3-4},$5%,${6-7},{$8&&$use_full}
+if $use_z_processing s z fi
+fx_rep_shear_preview:
+__fx_rep_shear_preview_start
+
+if $is_all_dimensions_same
+	axis_string=${arg0\ $1,xy,xz,xc,yx,yz,yc,zx,zy,zc,cx,cy,cz}
+else
+	axis_string=${arg0\ $2,xy,xc,yx,yc,cx,cy}
+fi
+
+use_full={v='$axis_string';!(v[0]==_'c')}
+
+use_z_processing={isin(_'z',{'$axis_string'})}
+
+if $use_z_processing a z fi
+
+to_automode
+rep_shear $axis_string,$4,$5%,${6-7},{$8&&$use_full}
+
+if $use_z_processing s z fi
+
+u "{$1}_"$is_all_dimensions_same\
+  "{$2}_"$otherwise\
+  "{"$axis_string"}"\
+  "{$4}"\
+  "{$5}"\
+  "{$6}"\
+  "{$7}"\
+  "{$8}_"{$use_full+1}
+
+_persistent=$is_all_dimensions_same,$otherwise
+__fx_rep_shear_preview_start:
+if narg($_persistent)
+	is_all_dimensions_same,otherwise=$_persistent
+else
+	if $!>1
+		$!,1,1,4,[w#0,h#0,d#0,s#0]
+		rep_uniq_cols. 0
+		is_all_dimensions_same={(w#-1==1)<<1}
+		rm.
+	else
+		is_all_dimensions_same=0
+	fi
+	otherwise={2-$is_all_dimensions_same}
+fi
 #@gui Random Gradient Bars: fx_rep_randgradbar,fx_rep_randgradbar_preview
 #@gui:_=note("Create Random Gradient Bar.\n\n<b>Note -</b> Preview is only for giving a idea.")
 #@gui:_=separator(),_=note("<b>Main</b>")
