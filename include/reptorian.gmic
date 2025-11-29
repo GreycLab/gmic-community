@@ -586,18 +586,57 @@ eval.. >"begin(
 	end(da_freeze(#-1););
 	"
 rm..
+#@cli rep_colormap : nb_levels>=0,_method={ 0:Median-cut | 1:K-means },_sort_vectors
+#@cli : Estimate best-fitting colormap with 'nb_colors' entries, to index selected images.
+#@cli : Set 'nb_levels==0' to extract all existing colors of an image.
+#@cli : 'sort_vectors' can be { 0:Unsorted | 1:By increasing norm | 2:By decreasing occurrence }.
+#@cli : Default value: 'method=1' and 'sort_vectors=1'.
+rep_colormap:
+check isint($1,0)&&isbool(${2=1})&&isint(${3=1},0,2)
+
+m0,m1="median-cut","k-means"
+s0,s1,s2="",", sorted by increasing norm",", sorted by decreasing occurrence"
+
+if $1 e[0--3] "Estimate colormap with $1 entries for image$?, by "${m$2}" method"${s$3}"."
+else e[0--3] "Estimate full colormap for image$?"${s$3}"."
+fi
+
+add_mode,use_count_occurance:=$1>0&&$3,$3==2
+
+if $add_mode p=+ fi
+
+foreach {
+	S={s}
+	${p}_rep_colors_freqstat $1,$2,$use_count_occurance
+
+	if $3
+		if $use_count_occurance
+			if s>$S
+				rm..
+				s c,-$S
+				rv[-2,-1] a y
+				sort -,x rows 1
+			else
+				index.. .,0,0 histogram.. {[w,0,w-1]} a y sort -,x rows 1 # Sort by decreasing occurrence
+			fi
+		else
+			k. +norm rv a c sort +,x channels 1,100% # Sort by increasing norm
+		fi
+	fi
+}
 #@cli rep_uniq_cols: preserve_frequency={ 0=false | 1=true }
 #@cli : Find all colors, with the option to preserve frequency
 rep_uniq_cols:
-check isbool($1) _rep_colors_freqstat -$1
+check isbool($1)&&$#==1 _rep_colors_freqstat -$1
 #@cli rep_mode: fill_with_mode_color={ 0=false | 1=true }
 #@cli : Fill image with the most common color.
 rep_mode:
-check isbool($1) _rep_colors_freqstat {$1-3}
+check isbool($1)&&$#==1 _rep_colors_freqstat {$1-3}
 _rep_colors_freqstat:
+skip ${2=0},${3=0}
 check "isint($1,-3)&&$1<inf"
 
-use_color_counts={$1<0}
+col_cnt_mode,red_cols_mode:=$1<0||$3,$1>0 # color_count_mode / reduce color mode ;; mode de cuente de color / modo reducir color
 original_status=${}
 
 if $1<-1
@@ -606,6 +645,46 @@ if $1<-1
 else
 	highest_color_frequency_mode=0
 	mt_cmd=eval
+fi
+
+if $red_cols_mode
+	m __$0_red_cols_mode:"
+		keep[0]
+		+_colormap_median_cut $1
+
+		if $2 # Add k-means step
+			max_diff={iM-im+1}/8192
+
+			do
+				+index.. . # Find nearest cluster for each color
+				if $is_half
+					..,1,1,{1,s}
+
+					eval \"
+						csum = vector(#w*s#0);
+						cocc = vector(#w,0);
+						repeat (w#2,k,
+							ind = i[#2,k];
+							repeat (s#0,c,csum[ind + c*w]+=i(#0,k,0,0,c));
+							++cocc[ind];
+						);
+						off = 0;
+						repeat (s#0,c,
+							repeat (w,k,occ = cocc[k]; occ?(csum[off++]/=occ));
+						);
+						draw(#3,csum)\"
+				else
+					..,1,1,{1,s+1}
+					f.. \">I[#3,i]+=[ I[#0,x],1 ]\" rm..
+					f. \"s = i(x,0,0,s-1); s?I/s:[ I[#1,x],0]\"
+				fi
+
+				+-.. . abs. diff:=iM/w rm. # Compute colormap difference
+				j.. . rm.
+			while $diff>$max_diff
+		fi
+
+		rm.."
 fi
 
 foreach {
@@ -630,6 +709,11 @@ foreach {
 		else
 			od={vector(#3,1)}
 		fi
+	fi
+
+	if $red_cols_mode
+		is_half=${-is_half}
+		r[0] {whd},1,1,100%,-1
 	fi
 
 	# Create Hashmap
@@ -690,18 +774,33 @@ foreach {
 	0x$total_num_of_buckets_per_section
 	$dictionary_buckets_per_threads,$cpus_to_use
 
+	if $red_cols_mode
+		1,1,1,1,1 rv[-2,-1]
+	fi
+
 	# Find Frequency of Colors
 
 	eval[2] :"
 		begin(
 			const S=s#0;
 			const mt_mode=$mt_mode;
-			const calculate_max_freq_num_mode=!mt_mode&&$highest_color_frequency_mode;
-			const color_count_mode=$use_color_counts;
-			const vector_insertion_size=S+color_count_mode+mt_mode;
-			const hash2_pos=S+color_count_mode;
+			const urcmt=$red_cols_mode;
+			const calc_max_freq_num_mode=!mt_mode&&$highest_color_frequency_mode;
+			const col_cnt_mode=$col_cnt_mode;
+			const vector_insertion_size=S+col_cnt_mode+mt_mode;
+			const hash2_pos=S+col_cnt_mode;
 
-			calculate_max_freq_num_mode?(
+			urcmt?(
+				cond()=(++P<Q)&&i[#-2,0];
+				iter_fin()=if(++i(#-1,key,x)==$1,
+					i[#-2,0]=0;
+				);
+			):(
+				cond()=++P<Q;
+				iter_fin()=++i(#-1,key,x);
+			);
+
+			calc_max_freq_num_mode?(
 				maxima_a=maxima_b=0;
 				maxima_color=vector(#S,nan);
 				str_NaN=v2s(maxima_color);
@@ -731,8 +830,8 @@ foreach {
 		copy(i[#door_pos,0],last_color);
 		list_of_ins_pos[key]=vector_insertion_size;
 		i(#-1,key,x)=1;
-		if(color_count_mode,
-			if(calculate_max_freq_num_mode,
+		if(col_cnt_mode,
+			if(calc_max_freq_num_mode,
 				maxima_color=last_color;
 				maxima_a=1;
 			);
@@ -740,7 +839,7 @@ foreach {
 		);
 		if(mt_mode,i[#door_pos,hash2_pos]=i[#1,P1_off()]);
 
-		color_count_mode?(
+		col_cnt_mode?(
 			while(++P<Q,
 				current_color=I[#0,P];
 				same_color=same(current_color,last_color);
@@ -771,7 +870,7 @@ foreach {
 				last_color=current_color;
 			);
 		):(
-			while(++P<Q,
+			while(cond(),
 				current_color=I[#0,P];
 				if(!same(current_color,last_color),
 					key=i[#1,P];
@@ -787,7 +886,7 @@ foreach {
 						copy(i[#door_pos,ins_pos],current_color);
 						if(mt_mode,i[#door_pos,ins_pos+hash2_pos]=i[#1,P1_off()]);
 						list_of_ins_pos[key]+=vector_insertion_size;
-						++i(#-1,key,x);
+						iter_fin();
 					);
 				);
 				last_color=current_color;
@@ -796,7 +895,7 @@ foreach {
 
 		I;
 		end(
-			if(calculate_max_freq_num_mode,
+			if(calc_max_freq_num_mode,
 				if(maxima_a>maxima_b
 				,set('{}',v2s(maxima_color));
 				,set('{}',str_NaN);
@@ -804,34 +903,56 @@ foreach {
 			);
 		);"
 
+	if $red_cols_mode
+		if i[#-2,0]?sum(expr('max(crop(#-1,x,0,0,0,h#-1,1,1,1))',w#-1))>$1:1
+			__$0_red_cols_mode
+			continue
+		fi
+	fi
+
 	if $mt_mode
-		rm[0,1]
+		if $red_cols_mode
+			rm[1]
+		else
+			rm[0,1]
+		fi
+
 		L={max(1,min(int(is#-1/0x8000),$_cpus,$dictionary_buckets_per_threads))}
 
-		r[0] $L,100%,100%,{$highest_color_frequency_mode?$S+2:1},-1
+		r[$red_cols_mode] $L,100%,100%,{$highest_color_frequency_mode?$S+2:1},-1
 
 		T=$!
 		0x{$L*$dictionary_buckets_per_threads}
 
-		$mt_cmd[0] :"
+		$mt_cmd[$red_cols_mode] :"
 			begin(
 				const S=$S;
 				const d_S=S-1;
 				const cpus=$_cpus;
-				const calculate_max_freq_num_mode=$highest_color_frequency_mode;
-				const color_count_mode=$use_color_counts;
-				const hash2_pos=S+color_count_mode;
+				const urcmt=$red_cols_mode;
+				const calc_max_freq_num_mode=$highest_color_frequency_mode;
+				const col_cnt_mode=$col_cnt_mode;
+				const hash2_pos=S+col_cnt_mode;
 				const D=$dictionary_buckets_per_threads;
 				const T=$T;
 				const img_ref=T-1;
 				const offset_bucket_size=w#img_ref;
 				const levels=h#img_ref;
 				const current_bucket_vector_size=hash2_pos+1;
+				const offset_2_bucket_start=k+1;
+
+				urcmt?(
+					urcmt_state=T-2;
+					cond()=current_bucket<=D&&i[#urcmt_state,0];
+					count_of_color=0;
+				):(
+					cond()=current_bucket<=D;
+				);
 
 				init_current_color=vector(#S);
 				init_number_of_keys=vector(#D);
 
-				if(calculate_max_freq_num_mode,
+				if(calc_max_freq_num_mode,
 					maxima_a=maxima_b=0;
 					maxima_color=vector(#S,nan);
 					str_NaN=v2s(maxima_color);
@@ -843,7 +964,7 @@ foreach {
 				);
 			);
 			img_ind_of_start_of_secondary_dictionary=D*x+T;
-			for(current_bucket=x+1,current_bucket<=D,current_bucket+=w,
+			for(current_bucket=x+offset_2_bucket_start,current_bucket<=D,current_bucket+=w,
 				bucket_id=current_bucket-1;
 				current_bucket_ins_pos=current_level=0;
 
@@ -871,9 +992,9 @@ foreach {
 
 					copy(i[#secondary_dictionary_ind,current_secondary_ins_pos],current_color,S);
 
-					if(color_count_mode,
+					if(col_cnt_mode,
 						color_count_pos=current_bucket_ins_pos+S;
-						if(calculate_max_freq_num_mode,chkfreq(i[#current_bucket,color_count_pos]));
+						if(calc_max_freq_num_mode,chkfreq(i[#current_bucket,color_count_pos]));
 						i[#secondary_dictionary_ind,current_secondary_ins_pos+S]=color_count_pos;
 					);
 
@@ -888,7 +1009,7 @@ foreach {
 
 					repeat(count_per_current_level,
 						copy(current_color,i[#offset_bucket,current_offset_bucket_pos],S);
-						if(color_count_mode,
+						if(col_cnt_mode,
 							current_count_in_offset_bucket=i[#offset_bucket,current_offset_bucket_pos+S];
 						);
 
@@ -899,15 +1020,15 @@ foreach {
 						current_secondary_ins_pos=secondary_insert_positions_list[second_dictionary_key];
 						color_pos=find(#secondary_dictionary_ind,current_color,current_secondary_ins_pos-hash2_pos,-hash2_pos);
 
-						color_count_mode?(
+						col_cnt_mode?(
 							color_pos!=-1?(
-								calculate_max_freq_num_mode?(
+								calc_max_freq_num_mode?(
 									chkfreq(i[#current_bucket,i[#secondary_dictionary_ind,color_pos+S]]+=current_count_in_offset_bucket;);
 								):(
 									i[#current_bucket,i[#secondary_dictionary_ind,color_pos+S]]+=current_count_in_offset_bucket;
 								);
 							):(
-								if(calculate_max_freq_num_mode,chkfreq(current_count_in_offset_bucket););
+								if(calc_max_freq_num_mode,chkfreq(current_count_in_offset_bucket););
 								secondary_dictionary_dimension=wh(#secondary_dictionary_ind);
 								if(current_secondary_ins_pos>=secondary_dictionary_dimension,
 									new_size=max(8,h(#secondary_dictionary_ind)<<1);
@@ -955,23 +1076,45 @@ foreach {
 				if(current_bucket_pos,
 					resize(#current_bucket,hash2_pos,current_bucket_pos,1,1,0);
 				);
+
+				if(urcmt,
+					count_of_color+=current_bucket_pos;
+					if(count_of_color>$1,
+						i[#urcmt_state,0]=0;
+					);
+				);
 			);
-			calculate_max_freq_num_mode?([maxima_color,maxima_a,maxima_b]):(I);
+			calc_max_freq_num_mode?([maxima_color,maxima_a,maxima_b]):(I);
+			end(
+				if(urcmt&&i[#urcmt_state,0],
+					merge(count_of_color,+);
+					if(count_of_color>$1,
+						i[#urcmt_state,0]=0;
+					);
+				);
+			);
 			"
 
-			if $highest_color_frequency_mode
-				k[0]
-				$od,$S,[{"const s=$S;
-				    aM=argmax(crop(#0,0,0,0,s,w#0,1,1,1));
-				    am=argmax(crop(#0,0,0,0,s+1,w#0,1,1,1));
-				    vM=i(#0,aM,0,0,s);
-				    vm=i(#0,am,0,0,s+1);
-				    vM>vm?I[#0,aM][0,s]:vector(#s,nan);
-				"}]
-				k[1]
-			else
-				k[1-$dictionary_buckets_per_threads] a y permute yzcx
+		if $red_cols_mode
+			if !i[#{$T-2},0]
+				__$0_red_cols_mode
+				continue
 			fi
+		fi
+
+		if $highest_color_frequency_mode
+			k[$red_cols_mode]
+			$od,$S,[{"const s=$S;
+				aM=argmax(crop(#0,0,0,0,s,w#0,1,1,1));
+				am=argmax(crop(#0,0,0,0,s+1,w#0,1,1,1));
+				vM=i(#0,aM,0,0,s);
+				vm=i(#0,am,0,0,s+1);
+				vM>vm?I[#0,aM][0,s]:vector(#s,nan);
+			"}]
+			k[1]
+		else
+			k[1-$dictionary_buckets_per_threads] a y permute yzcx
+		fi
 	else
 		if $highest_color_frequency_mode
 			if $1==-2
@@ -982,8 +1125,9 @@ foreach {
 				1,1,1,$S,[${}]
 			fi
 		else
+			if $red_cols_mode rm.. fi
 			k[3--1]
-			eval. if(i,resize(#x,{$S+$use_color_counts},i,1,1,-1));
+			eval. if(i,resize(#x,{$S+$col_cnt_mode},i,1,1,-1));
 			rm.
 			a y
 			permute yzcx
@@ -992,6 +1136,18 @@ foreach {
 }
 
 status $original_status
+_colormap_median_cut: # Implementation of the median-cut algorithm done by David Tschumperlé.
+  m _$0": repeat s { sh[$""1] $> =.. {iM-im},$""1,0,0,$> rm. }"
+  1,1,1,{s} _$0 0 # Initialize image of box ranges
+  repeat $1-1 {
+    b,a:=xM,cM # b = box with highest range, a = axis with highest range
+    l[$b] { shift 0,0,0,-$a,2 sort +,x shift 0,0,0,$a,2 xm:=int(w/2) }
+    if {$b,w>1} +z[$b] $xm,100% z[$b] 0,{$xm-1} else 1,1,1,{$b,s} fi
+    rv[-2,-1] r. {w+1},1,1,100%,0
+    _$0 $b _$0 {$!-2} # Update box ranges
+  }
+  rm. r 1,1,1,100%,2 a x # Average value in each box and append as final colormap
+  um _$0
 #@cli rep_mode_blend
 #@cli : Blend Layers via statistical mode of colors.
 #@cli :
