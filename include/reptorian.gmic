@@ -345,155 +345,73 @@ eval "
 	"
 
 sortset_volumes:=[$sortset_volumes][0,$num_of_unique_volumes]
-
-imgs:=$!
-0
-{$num_of_unique_volumes}
+0x$num_of_unique_volumes
 
 eval "
-	img_inds=expr('x',$imgs);
-	sortset_volumes=["$sortset_volumes"];
+	sorted_list_of_volumes=["$sortset_volumes"];
+	const size_l=size(sorted_list_of_volumes);
 
-	const size_img_inds=size(img_inds);
-	const size_sortset_volumes=size(sortset_volumes);
-	const size_ranges_and_length=size(sortset_volumes)<<2;
-	const overlimit_num_of_available_volumes_per_section=size_img_inds*size_sortset_volumes;
-
-	total_num_of_available_indices=num_of_available_indices=size_img_inds;
-
-	ranges_and_length=vector(#size_ranges_and_length);
-	list_of_available_img_inds=vector(#overlimit_num_of_available_volumes_per_section,img_inds);
-	list_of_start_img_ind_pos=vector(#size_sortset_volumes);
-
-	t_sum=rl_pos=previous_pos=0;
-	repeat(size(sortset_volumes),p,
-		current_value_in_sortset_volumes=sortset_volumes[p];
-		p?(
-			temp_num_of_available_indices=0;
-			repeat(num_of_available_indices,q,
-				current_img_ind=img_inds[q];
-				if(whd#current_img_ind>previous_pos,
-					img_inds[temp_num_of_available_indices++]=img_inds[q];
-				);
-			);
-			num_of_available_indices=temp_num_of_available_indices;
-			area=num_of_available_indices*(current_value_in_sortset_volumes-previous_pos);
-			list_of_start_img_ind_pos[p]=total_num_of_available_indices;
-			copy(list_of_available_img_inds[total_num_of_available_indices],img_inds,num_of_available_indices);
-			total_num_of_available_indices+=num_of_available_indices;
-			copy(ranges_and_length[rl_pos],[t_sum,t_sum+area-1,previous_pos,num_of_available_indices]);
-			t_sum+=area;
-		):(
-			t_sum=size(img_inds)*sortset_volumes[0];
-			copy(ranges_and_length[rl_pos],[0,t_sum-1,0,size(img_inds)]);
-			0;
+	repeat($vol_of_images,p,
+		v=whd#p;
+		repeat(size_l,q,
+			if(v>=sorted_list_of_volumes[q],da_push(#$vol_of_images+q,p););
 		);
-
-		rl_pos+=4;
-		previous_pos=current_value_in_sortset_volumes;
 	);
-	resize(#-2,total_num_of_available_indices,1,1,1);
-	copy(i[#-2,0],list_of_available_img_inds,total_num_of_available_indices);
-	copy(i[#-1,0],list_of_start_img_ind_pos);
-	set('ranges_and_length',v2s(ranges_and_length));
 
-	if($2,
-		set('split_positions',v2s(ranges_and_length[4,size_sortset_volumes-1,4]));
-		set('subsplit_size',v2s(ranges_and_length[3,size_sortset_volumes,4]));
+	repeat(size_l,p,
+		da_freeze(#$vol_of_images+p);
 	);
 	"
-
-if $final_dimensions>0x10000 mode=: else mode=> fi
 
 {D=vector(#3,1);D[$axis_ind]=$final_dimensions;[D,s#0]}
 
-{_'$mode'==_':'?$_cpus:1},1,1,2,v=whd#-1-(w-1-x)*int(whd#-1/w);[v>>24,v&0xffffff]
-eval. $mode"
-	const S=s#-2;
+eval "
+	irp=rp=0;
+	ref=$vol_of_images;
+	sorted_list_of_volumes=["$sortset_volumes"];
+	const r_size=whd#-1;
+	const split_mode=$2;
 
-	dimensions=expr('whd#x',$imgs);
-	ranges_and_length=["$ranges_and_length"];
-
-	const min_range_pos=0;
-	const max_range_pos=1;
-	const start_img_ind_pos=2;
-	const target_volume=whd#-2;
-
-	range_min=range_max=img_ind_pos_start=img_ind_pos_boundary=-1;
-	rl_pos=start_img_ind_ref_pos=0;
-
-	generate_information()=(
-		start_img_pos=ranges_and_length[rl_pos+2];
-		number_of_available_indices=ranges_and_length[rl_pos+3];
-		relative_pos=p-range_min;
-		img_pos=start_img_pos+int(relative_pos/number_of_available_indices);
-		temp=i[#-3,start_img_ind_ref_pos];
-		img_ind_pos_start=temp;
-		img_ind_pos_boundary=temp+number_of_available_indices;
-		img_ind=img_ind_pos_start+(relative_pos%number_of_available_indices);
+	if(split_mode,
+		const end_v=size(sorted_list_of_volumes)-1;
+		subsplit_vector=sorted_list_of_volumes;
 	);
 
-	if(S>1
-	,copy_pixel()=copy(i[#-2,p],i[#select_img_ind,img_pos],S,target_volume,dimensions[select_img_ind]);
-	,copy_pixel()=i[#-2,p]=i[#select_img_ind,img_pos];
-	);
+	repeat($num_of_unique_volumes,p,
+		H=h(#ref);
+		W=sorted_list_of_volumes[p]-rp;
 
-	T=J(-1);
-	p=T[0]<<24|T[1];
-
-	p?(
-		left=0;
-		right=w#-3-1;
-		while(left<=right,
-			start_img_ind_ref_pos=left+((right-left)>>1);
-			rl_pos=start_img_ind_ref_pos<<2;
-			range_min=ranges_and_length[rl_pos];
-			range_max=ranges_and_length[rl_pos+1];
-			isint(p,range_min,range_max)?(
-				break();
-			):
-			p<range_min?(
-				right=start_img_ind_ref_pos-1;
-			):(
-				left=start_img_ind_ref_pos+1;
+		repeat(H,q,
+			t_irp=irp+q;
+			img_to_use=i[#ref,q];
+			dim_of_img_to_use=whd#img_to_use;
+			t_img_add=rp;
+			repeat(s#0,
+				copy(i[#-1,t_irp],i[#img_to_use,t_img_add],W,H,1);
+				t_irp+=r_size;
+				t_img_add+=dim_of_img_to_use;
 			);
 		);
-	):(
-		range_min=ranges_and_length[rl_pos];
-		range_max=ranges_and_length[rl_pos+1];
-	);
 
-	generate_information();
+		++ref;
+		sub_size=H*W;
+		irp+=sub_size;
+		rp=sorted_list_of_volumes[p];
 
-	select_img_ind=i[#-4,img_ind];
-	copy_pixel();
-	if(++img_ind==img_ind_pos_boundary,
-		++img_pos;
-		img_ind=img_ind_pos_start;
-	);
-
-	q=i0<<24|i1;
-	while(++p<q,
-		if(p>range_max,
-			++start_img_ind_ref_pos;
-			rl_pos+=4;
-			range_min=ranges_and_length[rl_pos];
-			range_max=ranges_and_length[rl_pos+1];
-			generate_information();
-		);
-
-		select_img_ind=i[#-4,img_ind];
-		copy_pixel();
-		if(++img_ind==img_ind_pos_boundary,
-			++img_pos;
-			img_ind=img_ind_pos_start;
+		if(split_mode,
+			sorted_list_of_volumes[p]=sub_size;
+			subsplit_vector[p]=H;
 		);
 	);
 
-	I;
+	if(split_mode,
+		sorted_list_of_volumes=cumulate(sorted_list_of_volumes);
+		set('split_positions',v2s(sorted_list_of_volumes[0,end_v]));
+		set('subsplit_size',v2s(subsplit_vector));
+	);
 	"
 
-k..
+k.
 
 if $2
 	rep_multisplit $1,$split_positions
