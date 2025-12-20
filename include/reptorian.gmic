@@ -2615,48 +2615,68 @@ if !same([$conditions],0)
 else
 	u 0
 fi
-#@cli rep_closest_number_in_ordered_list_of_numbers: number_to_search,number_a,number_b....
-#@cli : Find closest number in list of number
-rep_closest_number_in_ordered_list_of_numbers:
+#@cli rep_bisect_num_list: ref_num,num_a,num_b,...
+#@cli : Search closest number on list of numbers using binary search
+#@cli : Use '~' at the beginning of ref_num to return index instead.
+#@cli : List must be sorted ascending
+rep_bisect_num_list:
+use_index={('$1')[0]==_'~'}
+num={`N=('$1');N[$use_index,size(N)-$use_index]`}
+
+if $#==1 u nan return
+elif $num==nan u nan return
+fi
 
 eval "
-	const number_to_search=$1;
-	vn=sort([${2--1}]);
-	const size_vn=size(vn);
-	const last_index=size_vn-1;
-	diff(a,b)=abs(a-b);
+	const n2f=$num;
 
-	number_to_search==inf?(
-		last_index;
-	):
-	number_to_search==-inf?(
-		0;
-	):
-	number_to_search>vn[last_index]?(
-		vn[last_index];
-	):
-	number_to_search<vn[0]?(
-		0;
-	):
-	isnan(number_to_search)?(
-		nan;
-	):(
-		old_value=nan;
-		return_number=0;
-		repeat(size_vn,p,
-			value=vn[p];
-			if(value==number_to_search,return_number=vn[p];break(););
-			if(value>number_to_search,
-				if(p,
-					a=diff(number_to_search,value);
-					b=diff(number_to_search,old_value);
-					return_number=a<b?value:old_value;
-					break();
-				,0;);
-			);
-			old_value=value;
+	ln=[${2--1}];
+
+	left=0;
+	right=size(ln)-1;
+
+	while(left<=right,
+		mid=left+((right-left)>>1);
+
+		ln[mid]==n2f?(
+			right=mid;
+			break();
+		):
+		ln[mid]<=n2f?(
+			left=mid+1;
+		):(
+			right=mid-1;
 		);
-		return_number;
+	);
+
+	index=right<0?0:right;
+	$use_index?index:ln[index];"
+#@cli rep_lcn: ref_num,num_a,num_b,...
+#@cli : Find closest number on list of numbers. # localizer numero mas cercar
+#@cli : Use '~' at the beginning of ref_num to return index instead.
+rep_lcn:
+use_index={('$1')[0]==_'~'}
+num={`N=('$1');N[$use_index,size(N)-$use_index]`}
+
+if $#==1 u nan return fi
+
+eval "
+	const N=$num;
+	const use_idx=$use_index;
+	ln=[${2--1}];
+
+	isfinite(N)?(
+		a=argminabs(ln-N);
+		use_idx?a:ln[a];
+	):(
+		N==inf?(
+			use_idx?argmax(ln):max(ln);
+		):
+		N==-inf?(
+			use_idx?argmin(ln):min(ln);
+		):(
+			run('error nan_err');
+		);
 	);"
 #@cli rep_digamma:
 #@cli : Return the Logarithmic deritative of the Gamma function
@@ -30137,11 +30157,11 @@ fx_rep_array_random_jumble_by_px_preview:
         tile_dim=$tile_w
       fi
 
-      tile_dim=${rep_closest_number_in_ordered_list_of_numbers\ $tile_dim,$list_of_widths_and_heights_factors}
+      tile_dim=${rep_bisect_num_list\ $tile_dim,$list_of_widths_and_heights_factors}
       tile_w,tile_h=$tile_dim
     else
-      tile_w=${rep_closest_number_in_ordered_list_of_numbers\ $tile_w,$list_of_widths_factors}
-      tile_h=${rep_closest_number_in_ordered_list_of_numbers\ $tile_h,$list_of_heights_factors}
+      tile_w=${rep_bisect_num_list\ $tile_w,$list_of_widths_factors}
+      tile_h=${rep_bisect_num_list\ $tile_h,$list_of_heights_factors}
     fi
   else
     if $link_dimensions
