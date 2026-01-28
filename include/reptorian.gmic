@@ -258,148 +258,182 @@ u {map('$1',crop(#-1))} rm.
 #@cli : base_pow2_? can be number representing the base, or string.
 #@cli : - Accepted arguments for base_pow2_? -
 #@cli : - base - small_id - big_id
-#@cli : - 2  - bin - binary
-#@cli : - 4  - qua - quaternary
-#@cli : - 8  - oct - octal
-#@cli : - 16 - hex - hexadecimal
-#@cli : - 32 - duo - duotrigesimal
+#@cli : - 2  - bin        - binary
+#@cli : - 4  - qua        - quaternary
+#@cli : - 8  - oct        - octal
+#@cli : - 16 - hex        - hexadecimal
+#@cli : - 32 - duo/duotri - duotrigesimal
 #@cli : str_? are the number represented by base_pow2_a
 rep_xp2b:
-a,b,I,T,n0:=isnum($1),isnum($2),$!,$#-2,'0' # I = Number of Images ; T = Number of input strings to convert
-check ($a?isin($1,2,4,8,16,32):1)&&($b?isin($2,2,4,8,16,32):1)&&isint($#,3)
+I,T,n0:=$!,$#-2,'0' # I = Number of Images ; T = Number of input strings to convert
+check $#>2
 
-base_bin,base_binary=2
-base_qua,base_quaternary=4
-base_oct,base_octal=8
-base_hex,base_hexadecimal=16
-base_duo,duotrigesimal=32
+$=a
+a1,a2,b0,b1,b2,b3,b4,Abin,Abinary,A2,Aqua,Aquaternary,A4,Aoct,Aoctal,A8,Ahex,Ahexadecimal,A16,Aduo,Aduotri,Aduotrigesimal,A32=${strlowercase\ $a1},${strlowercase\ $a2},"bin,binary,2","qua,quaternary,4","oct,octal,8","hex,hexadecimal,16","duo,duotri,duotrigesimal,32",1,1,1,2,2,2,3,3,3,4,4,4,5,5,5,5
 
-if $a
-	base_a=$1
+__rep_xp2b_check_arg $a1,$1
+__rep_xp2b_check_arg $a2,$2
+
+B1,B2=${A$a1},${A$a2}
+
+if $B1>3
+	max_lower,max_higher={[_'a',_'A']+(1<<$B1)-11}
+	m __$0_validate_image_chars:"
+		+f. isint(i,_'0',_'9')||isint(i,_'a',$max_lower)||isint(i,_'A',$max_higher)
+		if !im error non_val_char\" \"@\" \"\\$$p fi
+		rm.
+	"
 else
-	base_a=${base_$1}
+	max_val={_'0'+(1<<$B1)-1}
+	m __$0_validate_image_chars:"
+		if isint([im,iM],_'0',$max_val)!=[1,1] error non_val_char\" \"@\" \"\\$$p fi
+	"
 fi
 
-if $b
-	base_b=$2
-else
-	base_b=${base_$2}
-fi
+if $B1==$B2
+	repeat $T {
+		p={3+$>}
 
-m "__$0_vars: $""=str"
-__$0_vars ${3--1}
-um __$0_vars
+		('${a$p}')
 
-b2,b4,b8,b16,b32=1,2,3,4,5
+		z. {repeat(w#-1,p,if(i[#-1,p]!=_'0',break();););p;},100%
 
-if $base_a==$base_b
-	if $base_a<$base_hex
-		max_val:=_'0'+$base_a-1
-		repeat $T {
-			('${str{$>+1}}')
-			if isint([im,iM],_'0',$max_val)!=[1,1] error non_val_char fi
+		if !im
+			t.=$S
+			t.=0
+			S=,
 			rm.
-		}
-	else
-		max_lower,max_higher={[_'a',_'A']-2+$base_a}
-		repeat $T {
-			('${str{$>+1}}')
-			f. isint(i,_'0',_'9')||isint(i,_'a',$max_lower)||isint(i,_'A',$max_higher)
-			if !im error non_val_char fi
-			rm.
-		}
-	fi
-	u ${3--1}
+			continue
+		fi
+
+		__$0_validate_image_chars
+
+		t.=$S{t}
+		S=,
+		rm.
+	}
+
+	u $t
 	return
 fi
 
-is_base_b_bin={$base_b==$base_bin}
-if $base_a>2
-	step=${b$base_a}
-	+rep_cartesian_product {vector(#$step,2)} => binaries
-	if $is_base_b_bin +. $n0 fi
+m __$0_var2img:"
+	if !narg(${a$p}) error noarg\" \"@\" \"\\$$p fi
+	('${a$p}')
+	z. {repeat(w#-1,p,if(i[#-1,p]!=_'0',break();););p;},100%
+	"
+
+if $B1>1
+	+rep_cartesian_product {vector(#$B1,2)}
 
 	repeat $T {
-		('${str{$>+1}}')
-		z. {repeat(w#-1,p,if(i[#-1,p]!=_'0',break();););p;},100%
-		{w*$step}
-		eval[-2] "begin(
-				p=started=0;
-				const _shift_lower=_'a'-10;
-				const _shift_higher=_'A'-10;
+		p={3+$>}
+		__$0_var2img
+
+		if !im
+			rm..
+			({vector($B2,_'0')})
+			continue
+		fi
+
+		__$0_validate_image_chars
+
+		{w*$B1},1,1,1,{_'0'}
+
+		eval.. "begin(
+				const B1=$B1;
+				const B2=$B2;
+				const Q0=_'a'-10;
+				const Q1=_'A'-10;
+				const R=$I;
+				const _0=_'0';
+				started=p=0;
 			);
 			started?(
-				p+=$step;
+				p+=B1;
 			):(
-				p=x*$step;
-				started=1;
+				p=x*B1;
 			);
-			ind=isint(i,_'0',_'9')?(
-					i-_'0';
-				):
-				isint(i,_'A',_'V')?(
-					i-_shift_higher;
-				):
-				isint(i,_'a',_'v')?(
-					i-_shift_lower;
-				):(
-					-1;
-				);
-			if(!isint(ind,0,w#$binaries-1),
-				run('error inval_char');
+			isint(i,_'0',_'9')?(
+				copy(i[#-1,p],i[#R,i-_0],B1,1,w#R,-1);
+			):
+			isint(i,_'a',_'v')?(
+				copy(i[#-1,p],i[#R,i-Q0],B1,1,w#R,-1);
+			):(
+				copy(i[#-1,p],i[#R,i-Q1],B1,1,w#R,-1);
 			);
-			copy(i[#-1,p],I[#$binaries,ind]);
+			i;
 			"
-		if $is_base_b_bin
-			z. {repeat(w-1,p,if(i[#-1,p]!=_'0',break();););p;},100%
-			res.=$sep{t}
-			sep=,
-			rm[-2,-1]
-		else
-			rm[-2]
-		fi
+		rm..
+
+		r. {p=0;while(!i[#-1,p],i[#-1,p++]=_'0';);W=w#-1-p;ceil(W/$B2)*$B2},1,1,1,0,0,1
+		eval p=0;while(!i[#-1,p],i[#-1,p++]=_'0';);
 	}
 
-	rm[binaries]
-
-	if $is_base_b_bin
-		u $res
-		return
-	fi
+	rm[$I]
 else
 	repeat $T {
-		('${str{$>+1}}')
-		check isint([im,iM],_'0',_'1')==[1,1]
-		z. {repeat(w#-1-1,p,if(i[#-1,p]!=_'0',break();););p;},100%
-		-. $n0
+		p={3+$>}
+
+		__$0_var2img
+
+		if !im
+			rm..
+			({vector($B2,_'0')})
+			continue
+		fi
+
+		__$0_validate_image_chars
+
+		r. {ceil(w/$B2)*$B2},1,1,1,0,0,1
+		eval p=0;while(!i[#-1,p],i[#-1,p++]=_'0';);
 	}
 fi
 
-chunks_size=${b$base_b}
-foreach[$I--1] {
-	{ceil(w/$chunks_size)},1,1,1,"begin(
-			const off=-(w#-1-w*$chunks_size);
-			const _0=_'0';
-			const _offset=(_'a')-10;
-			const _shift_lower=_'a'-10;
-			shift_factor=reverse(expr('x',$chunks_size));
-			p=started=0;
-		);
-		started?(
-			p+=$chunks_size;
-		):(
-			p=x*$chunks_size-off;
-		);
-		v=sum(crop(#-1,p,$chunks_size)<<shift_factor);
-		v<10?v+_0:v+_offset;
-		"
-	z. {repeat(w#-1-1,p,if(i[#-1,p]!=_'0',break();););p;},100%
-	res.=$sep{t}
-	sep=,
-	rm
-}
+um __$0_var2img,__$0_validate_image_chars
 
-u $res
+if $B2>1
+	foreach[$I--1] {
+		{w/$B2},1,1,1,"begin(
+				const B=$B2;
+				const _0=_'0';
+				const _m_a=_'a'-10;
+				started=p=0;
+			);
+			started?(
+				p+=B;
+			):(
+				p=x*B;
+				started=1;
+			);
+			v=s2v([['0b'],crop(#$I,p,B)]);
+			v<10?v+_0:v+_m_a;"
+		r.=$S{t}
+		S=,
+		rm
+	}
+else
+	foreach[$I--1] {
+		r.=$S{$I,t}
+		S=,
+		rm
+	}
+fi
+
+u $r
+__rep_xp2b_check_arg:
+l[] {
+	check narg(${A$1})
+	onfail
+		closest_arg=${rep_sug_args\ $1,,0,3,$b0,$b1,$b2,$b3,$b4}
+		repeat 5 {
+			L=${rep_pf_args\ ',',${b$>}}
+			if isin('$closest_arg',$L)
+				error "Invalid value '"$2"'. Expected one of (case-insensitive): "$L
+			fi
+		}
+		error no_closest_match_found
+}
 #@cli rep_pattern_str: 0<max_number_of_digits<=16,_use_padding={ 0=False | 1=True },_use_hex_ind={ 0=False | 1=True }
 #@cli : Creates a string utilized for pattern.
 #@cli : Default values: '_use_padding=0','_use_hex_ind=1'
