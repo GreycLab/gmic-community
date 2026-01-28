@@ -48,6 +48,152 @@
 #
 #-------------------------------
 
+#@cli rep_rm_dup
+#@cli : Remove duplicates images. Alternative to remove_duplicates in cases where remove_duplicates do not work.
+rep_rm_dup:
+e[^-1] "Remove duplicates images in selected list of image$?."
+
+p=0
+do {
+	q,not_removed={$p+1},1
+
+	do {
+		if [w#$p,h#$p,d#$p,s#$p]!=[w#$q,h#$q,d#$q,s#$q]
+			q+=1
+			continue
+		fi
+
+		+neq[$p,$q]
+
+		if !iM#-1
+			rm[$q,-1]
+			not_removed=0
+		else
+			rm[-1]
+		fi
+
+		q+=1
+	} while $q<$!
+
+	if $not_removed
+		p+=1
+	fi
+} while $p<($!-1)
+#@cli rep_pf_args: prefix,postfix,arg0,arg1,...
+#@cli : Return arguments with prefix/postfix applied.
+rep_pf_args:
+skip ${1=},${2=}
+
+check $#>=3&&(narg($1)||narg($2))
+
+$=a
+p=3
+
+repeat $#-2 {
+	r.=${S}$1${a$p}$2
+	S=,
+	p+=1
+}
+
+u $r
+#@cli rep_sug_args: inp,sep,return_all_arg={ 0=false | 1=true},1>=_int_score_threshold<=3,arg0,arg1,...
+#@cli : Suggest arguments given input using Levenshtein Distance algorithm.
+#@cli : Returns 1 if any match. Returns 0 if no close match is found. Returns suggestion when close matches are found.
+#@cli : Default values: '_int_score_threshold=2'
+rep_sug_args:
+# Set up defaults
+skip ${2=},${3=1},${4=2}
+check isint($4,1,3)
+
+# Set up variables
+$=vars
+input1,input2:=$!+[0,1]
+
+# Input as image
+('$vars1')
+p=5
+
+# Word to search from as images
+repeat $#-4 {
+	('${vars$p}')
+	p+=1
+}
+
+# Remove Duplicates
+rep_rm_dup[$input2--1]
+
+# Initialize variable to loop toward words and to put in score
+words_to_search={$!-$input2}
+
+eval "
+	const p=$input1;
+	q=$input2;
+	base_stats=[w#p,h#p,d#p,s#p];
+	found=0;
+	repeat($words_to_search,
+		if(same(base_stats,[w#q,h#q,d#q,s#q]),
+			if(same(crop(#p),crop(#q,0,0,0,0,w#p,h#p,d#p,s#p)),
+				found=1;
+				break();
+			);
+		);
+		++q;
+	);
+	found;
+	"
+
+if ${}
+	rm[$input1--1]
+	u 1
+	return
+fi
+
+# Hold image indices and score
+# Scores per images and keep scores only
+repeat $!-$input2 {
+	score=${-_$0_score[$input1,$input2]}
+	name[$input2] $score
+	input2+=1
+}
+
+rm[$input1]
+foreach[$input1--1] { if {0,n}>$4 rm fi }
+
+# If none match
+
+if $!==$input1
+	u 0
+	return
+fi
+
+# Final processing
+
+sort_list[$input1--1] +,n
+
+repeat $3?$!-$input1:1 {
+	r.=$S$2{$input1,t}$2
+	S=,
+	rm[$input1]
+}
+
+if $input1<$! rm[$input1--1] fi
+
+u $r
+_rep_sug_args_score:
+check $!==2
+{[whd#0,whd#1]+1},1,1,!y?x:!x?y
+
+{[w,h]-1},1,1,>"
+	X=x+1;
+	Y=y+1;
+	cost=!(lowercase(i[#0,X-1])==lowercase(i[#1,Y-1]));
+	i(#2,X,Y)=min(i(#2,X-1,Y)+1,i(#2,X,Y-1)+1,i(#2,X-1,Y-1)+cost);
+	i;
+	"
+
+u {i[#-2,whd#-2-1]}
+
+rm[-2,-1]
 #@cli rep_txt2uints: string
 #@cli : Return the numerical decoding representation of unicode from txt.
 #@cli : _CODEPAGE variable should define your encoding approach. Otherwise, fallback on auto-finding encoding method.
