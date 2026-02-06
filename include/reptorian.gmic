@@ -817,42 +817,57 @@ fi
 
 if $red_cols_mode
 	m __$0_red_cols_mode:"
-		keep[0]
-		+_colormap_median_cut $1
-
 		if $2 # Add k-means step
-			max_diff={iM-im+1}/8192
+			keep[0,2]
+			+_rep_colormap_median_cut[0] $1
+			max_diff={(iM-im+1)/8192}
 
-			do
-				+index.. . # Find nearest cluster for each color
-				if $is_half
-					..,1,1,{1,s}
+			eval.. :\"
+				O=J(-1);                   # Negative Offset Vector
+				SP=(O[0]<<24|O[1])-1;      # Start Point
+				Q=i0<<24|i1;               # End Point - Semi Const
+				const S=s#0;               # Spectrum size;
+				base_new=vector(whds#-1);
+				current_palette=crop(#-1);
+				new_palette=incremental_palette=current_palette * 0;
+				temp_vector=count=vector(#whd#-1);
+				const C=size(count);
 
-					eval \"
-						csum = vector(#w*s#0);
-						cocc = vector(#w,0);
-						repeat (w#2,k,
-							ind = i[#2,k];
-							repeat (s#0,c,csum[ind + c*w]+=i(#0,k,0,0,c));
-							++cocc[ind];
+				do(
+					P=SP;
+					while(++P<Q,
+						current_color=I[#0,P];
+						selected_index=[index(current_color,current_palette,S,0,0)][0];
+						copy(incremental_palette[selected_index],current_color,S,C,1,-1);
+						++count[selected_index];
+					);
+					critical(
+						merge(incremental_palette,+);
+						merge(count,+);
+						count=1/vmax(count,1);
+						p=0;
+						repeat(S,
+							copy(temp_vector[0],incremental_palette[p],C,1,1);
+							temp_vector*=count;
+							copy(new_palette[p],temp_vector[0],C,1,1);
+							p+=C;
 						);
-						off = 0;
-						repeat (s#0,c,
-							repeat (w,k,occ = cocc[k]; occ?(csum[off++]/=occ));
-						);
-						draw(#3,csum)\"
-				else
-					..,1,1,{1,s+1}
-					f.. \">I[#3,i]+=[ I[#0,x],1 ]\" rm..
-					f. \"s = i(x,0,0,s-1); s?I/s:[ I[#1,x],0]\"
-				fi
-
-				+-.. . abs. diff:=iM/w rm. # Compute colormap difference
-				j.. . rm.
-			while $diff>$max_diff
+						diff=maxabs(new_palette-current_palette);
+						current_palette=new_palette;
+						copy(count[0],0,size(count),1,0);
+						copy(incremental_palette[0],0,size(incremental_palette),1,0);
+					);
+				,diff>$max_diff);
+				end(
+					copy(i[#2,0],current_palette);
+				);
+				\"
+				rm[0,1]
+		else
+			rm[^0]
+			_rep_colormap_median_cut $1
 		fi
-
-		rm.."
+		"
 fi
 
 foreach {
@@ -935,7 +950,7 @@ foreach {
 		result();"
 
 	# Image to use for processing all the other images on the list
-	+rep_mt_f32v_map {whd#-1},$cpus_to_use,0
+	$cpus_to_use,1,1,2,v=whd#-1-(w-1-x)*int(whd#-1/w);[v>>24,v&0xffffff]
 
 	# Create dictionary buckets and reference image
 	total_num_of_buckets_per_section={($cpus_to_use*$dictionary_buckets_per_threads)}
@@ -1304,14 +1319,14 @@ foreach {
 }
 
 status $original_status
-_colormap_median_cut: # Implementation of the median-cut algorithm done by David Tschumperlé.
-  m _$0": repeat s { sh[$""1] $> =.. {iM-im},$""1,0,0,$> rm. }"
+_rep_colormap_median_cut: # Implementation of the median-cut algorithm done by David Tschumperlé.
+  m _$0": 1,1,1,100%,:C=crop(#$""1,0,0,0,c,w#$""1,h#$""1,d#$""1,1);max(C)-min(C) j.. .,$""1 rm."
   1,1,1,{s} _$0 0 # Initialize image of box ranges
   repeat $1-1 {
     b,a:=xM,cM # b = box with highest range, a = axis with highest range
     l[$b] { shift 0,0,0,-$a,2 sort +,x shift 0,0,0,$a,2 xm:=int(w/2) }
-    if {$b,w>1} +z[$b] $xm,100% z[$b] 0,{$xm-1} else 1,1,1,{$b,s} fi
-    rv[-2,-1] r. {w+1},1,1,100%,0
+    if {$b,w>1} +z[$b] $xm,100% z[$b] 0,{$xm-1} else 1,1,1,100% fi
+    rv[-2,-1] z. 0,{w}
     _$0 $b _$0 {$!-2} # Update box ranges
   }
   rm. r 1,1,1,100%,2 a x # Average value in each box and append as final colormap
