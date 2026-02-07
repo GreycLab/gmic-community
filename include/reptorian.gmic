@@ -857,6 +857,7 @@ if $red_cols_mode
 						copy(count[0],0,size(count),1,0);
 						copy(incremental_palette[0],0,size(incremental_palette),1,0);
 					);
+
 				,diff>$max_diff);
 				end(
 					copy(i[#2,0],current_palette);
@@ -875,14 +876,14 @@ foreach {
 	if whd<=1 continue fi
 
 	# Set up important variables
-	cpus_to_use,mt_mode,pxs_to_process_per_threads,bitshift_factor,dictionary_buckets_per_threads,bit_mask:="
+	cpus_to_use,mt_mode,pxs_to_process_per_threads,bitshift_factor,dictionary_buckets_per_threads,bit_mask,t_red_cols_mode:="
 		cpus_to_use=cut(int(whd#0/0x8000),1,$_cpus);
 		mt_mode=cpus_to_use>1;
 		pxs_to_process_per_threads=ceil(whd/cpus_to_use);
 		bitshift_factor=cut(int(log2(sqrt(pxs_to_process_per_threads)))+1,8,16);
 		dictionary_buckets_per_threads=1<<bitshift_factor;
 		bit_mask=dictionary_buckets_per_threads-1;
-		cpus_to_use,mt_mode,pxs_to_process_per_threads,bitshift_factor,dictionary_buckets_per_threads,bit_mask;
+		cpus_to_use,mt_mode,pxs_to_process_per_threads,bitshift_factor,dictionary_buckets_per_threads,bit_mask,$red_cols_mode;
 	"
 
 	S={s}
@@ -894,8 +895,7 @@ foreach {
 		fi
 	fi
 
-	if $red_cols_mode
-		is_half=${-is_half}
+	if $t_red_cols_mode
 		r[0] {whd},1,1,100%,-1
 	fi
 
@@ -957,7 +957,7 @@ foreach {
 	0x$total_num_of_buckets_per_section
 	$dictionary_buckets_per_threads,$cpus_to_use
 
-	if $red_cols_mode
+	if $t_red_cols_mode
 		1,1,1,1,1 rv[-2,-1]
 	fi
 
@@ -967,7 +967,7 @@ foreach {
 		begin(
 			const S=s#0;
 			const mt_mode=$mt_mode;
-			const urcmt=$red_cols_mode;
+			const urcmt=$t_red_cols_mode;
 			const calc_max_freq_num_mode=!mt_mode&&$highest_color_frequency_mode;
 			const col_cnt_mode=$col_cnt_mode;
 			const vector_insertion_size=S+col_cnt_mode+mt_mode;
@@ -1075,7 +1075,6 @@ foreach {
 				last_color=current_color;
 			);
 		);
-
 		I;
 		end(
 			if(calc_max_freq_num_mode,
@@ -1086,33 +1085,36 @@ foreach {
 			);
 		);"
 
-	if $red_cols_mode
-		if i[#-2,0]?sum(expr('max(crop(#-1,x,0,0,0,h#-1,1,1,1))',w#-1))>$1:1
+	if $t_red_cols_mode
+		if i[#-2,0]?sum(expr('max(crop(#-1,x,0,0,0,1,h#-1,1,1))',w#-1))>$1:1
 			__$0_red_cols_mode
 			continue
+		elif is#-1<=$1
+			rm..
+			t_red_cols_mode=0
 		fi
 	fi
 
 	if $mt_mode
-		if $red_cols_mode
-			rm[1]
-		else
+		if !$t_red_cols_mode
 			rm[0,1]
 		fi
 
 		L={max(1,min(int(is#-1/0x8000),$_cpus,$dictionary_buckets_per_threads))}
 
-		r[$red_cols_mode] $L,100%,100%,{$highest_color_frequency_mode?$S+2:1},-1
+		r[$t_red_cols_mode] $L,1,1,{$highest_color_frequency_mode?$S+2:1},-1
 
-		T=$!
+		T,I:=$!,1+($t_red_cols_mode?2)
+
+		F={$I+$dictionary_buckets_per_threads-1}
+
 		0x{$L*$dictionary_buckets_per_threads}
 
-		$mt_cmd[$red_cols_mode] :"
+		$mt_cmd[$t_red_cols_mode] >"
 			begin(
 				const S=$S;
 				const d_S=S-1;
-				const cpus=$_cpus;
-				const urcmt=$red_cols_mode;
+				const urcmt=$t_red_cols_mode;
 				const calc_max_freq_num_mode=$highest_color_frequency_mode;
 				const col_cnt_mode=$col_cnt_mode;
 				const hash2_pos=S+col_cnt_mode;
@@ -1122,14 +1124,14 @@ foreach {
 				const offset_bucket_size=w#img_ref;
 				const levels=h#img_ref;
 				const current_bucket_vector_size=hash2_pos+1;
-				const offset_2_bucket_start=k+1;
+				const offset_2_bucket_start=$I;
 
 				urcmt?(
-					urcmt_state=T-2;
-					cond()=current_bucket<=D&&i[#urcmt_state,0];
+					const urcmt_state=T-2;
+					color_collection_ok()=(current_bucket<=D)&&i[#urcmt_state,0];
 					count_of_color=0;
 				):(
-					cond()=current_bucket<=D;
+					color_collection_ok()=current_bucket<=D;
 				);
 
 				init_current_color=vector(#S);
@@ -1147,8 +1149,8 @@ foreach {
 				);
 			);
 			img_ind_of_start_of_secondary_dictionary=D*x+T;
-			for(current_bucket=x+offset_2_bucket_start,current_bucket<=D,current_bucket+=w,
-				bucket_id=current_bucket-1;
+			for(current_bucket=x+offset_2_bucket_start,color_collection_ok(),current_bucket+=w,
+				bucket_id=current_bucket-offset_2_bucket_start;
 				current_bucket_ins_pos=current_level=0;
 
 				secondary_insert_positions_list=init_number_of_keys;
@@ -1278,7 +1280,7 @@ foreach {
 			);
 			"
 
-		if $red_cols_mode
+		if $t_red_cols_mode
 			if !i[#{$T-2},0]
 				__$0_red_cols_mode
 				continue
@@ -1286,7 +1288,7 @@ foreach {
 		fi
 
 		if $highest_color_frequency_mode
-			k[$red_cols_mode]
+			k[$t_red_cols_mode]
 			$od,$S,[{"const s=$S;
 				aM=argmax(crop(#0,0,0,0,s,w#0,1,1,1));
 				am=argmax(crop(#0,0,0,0,s+1,w#0,1,1,1));
@@ -1296,7 +1298,7 @@ foreach {
 			"}]
 			k[1]
 		else
-			k[1-$dictionary_buckets_per_threads] a y permute yzcx
+			k[$I-$F] a y permute yzcx
 		fi
 	else
 		if $highest_color_frequency_mode
@@ -1308,7 +1310,7 @@ foreach {
 				1,1,1,$S,[${}]
 			fi
 		else
-			if $red_cols_mode rm.. fi
+			if $t_red_cols_mode rm.. fi
 			k[3--1]
 			eval. if(i,resize(#x,{$S+$col_cnt_mode},i,1,1,-1));
 			rm.
