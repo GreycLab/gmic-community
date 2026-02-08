@@ -1086,10 +1086,12 @@ foreach {
 		);"
 
 	if $t_red_cols_mode
-		if i[#-2,0]?sum(expr('max(crop(#-1,x,0,0,0,1,h#-1,1,1))',w#-1))>$1:1
+		min_cols_possible={sum(expr('max(crop(#-1,x,0,0,0,1,h#-1,1,1))',w#-1))}
+
+		if i[#-2,0]?$min_cols_possible>$1:1
 			__$0_red_cols_mode
 			continue
-		elif is#-1<=$1
+		elif is#-1<=$1 # Maximum possible number of colors is less than input means go straight to regular unique color collection
 			rm..
 			t_red_cols_mode=0
 		fi
@@ -1128,8 +1130,10 @@ foreach {
 
 				urcmt?(
 					const urcmt_state=T-2;
+					const remainder_color_count=$1-$min_cols_possible;
+					list_of_min_possible_per_bucket=expr('max(crop(#-1,x,0,0,0,1,h#-1,1,1))',w#-1);
 					color_collection_ok()=(current_bucket<=D)&&i[#urcmt_state,0];
-					count_of_color=0;
+					remainder_count_of_color=0;
 				):(
 					color_collection_ok()=current_bucket<=D;
 				);
@@ -1263,8 +1267,8 @@ foreach {
 				);
 
 				if(urcmt,
-					count_of_color+=current_bucket_pos;
-					if(count_of_color>$1,
+					remainder_count_of_color+=current_bucket_pos-list_of_min_possible_per_bucket[bucket_id];
+					if(remainder_count_of_color>remainder_color_count,
 						i[#urcmt_state,0]=0;
 					);
 				);
@@ -1272,8 +1276,8 @@ foreach {
 			calc_max_freq_num_mode?([maxima_color,maxima_a,maxima_b]):(I);
 			end(
 				if(urcmt&&i[#urcmt_state,0],
-					merge(count_of_color,+);
-					if(count_of_color>$1,
+					merge(remainder_count_of_color,+);
+					if(remainder_count_of_color>remainder_color_count,
 						i[#urcmt_state,0]=0;
 					);
 				);
@@ -1320,6 +1324,7 @@ foreach {
 	fi
 }
 
+um __$0_red_cols_mode
 status $original_status
 _rep_colormap_median_cut: # Implementation of the median-cut algorithm done by David Tschumperlé.
   m _$0": 1,1,1,100%,:C=crop(#$""1,0,0,0,c,w#$""1,h#$""1,d#$""1,1);max(C)-min(C) j.. .,$""1 rm."
