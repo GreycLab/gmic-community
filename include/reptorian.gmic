@@ -1491,38 +1491,33 @@ elif $!<3
 	return
 fi
 
-use_hashmap_processing={$!>21}
+if $!>21 # Use Hashmap. 22 layers seems to be the threshold to switch from linear scan to hashmap processing
+	cpus_to_use,bitshift_factor,layers:=cut(($!*whd)>>12,1,$_cpus),cut(ceil(log2($!))+1,6,10),$!
+	dictionary_buckets_per_threads,dictionary_buckets:=[1,$_cpus]<<$bitshift_factor
 
-if $use_hashmap_processing
-	bf,layers,d_s:=8,$!,s-1
-	dictionary_buckets,seed,bit_mask:=$_cpus<<$bf,v(0x1b3d,0xf1c3ef),(1<<$bf)-1
-
-	100%,100%,100%,$!,:"begin(
-			const M=(1<<16)-1;
-			const S=s#0;
-			const seed=$seed;
-			const bit_mask=$bit_mask;
-			V=vector(#S);
-		);
-		copy(V[0],i(#c,x,y,z,0),S,1,whd);
-		hash_value=0;
-		repeat(S,p,
-			hash_value=xor(((hash_value<<1)-hash_value)*seed,C=V[p];isint(C)?C:C*M);
-			hash_value&=bit_mask;
-		);
-		hash_value;
-		"
+	+rep_mt_f32v_map {whd},$cpus_to_use
 
 	0x$dictionary_buckets
 
-	eval[$layers] :"begin_t(
+	eval[$layers] :"begin(
+			const D=$dictionary_buckets_per_threads;
 			const S=s#0;
 			const inc_S=S+1;
 			const dec_S=S-1;
-			const count_boundary=s>>1;
-			offset=(t<<$bf)+k+1;
-			const dictionary_buckets=$dictionary_buckets;
-			current_color=v_NaN=last_color=maxima_color=vector(#S,nan);
+			const seed="{v(0x1b3d,0xf1c3ef)}";
+			const M=(1<<16)-1;
+			const bit_mask=D-1;
+			const WHD=whd#0;
+			const count_boundary=k>>1;
+			current_color=previous_color=v_NaN=maxima_color=vector(#S,nan);
+			hash(color)=(
+				current_hash=0;
+				repeat(S,p,
+					current_hash=xor(((current_hash<<1)-current_hash)*seed,C=color[p];isint(C)?C:C*M);
+					current_hash&=bit_mask;
+				);
+			);
+
 			chval(count_value)=(
 				current_count=count_value;
 				if(current_count>=current_maxima,
@@ -1532,33 +1527,61 @@ if $use_hashmap_processing
 					current_maxima=current_count;
 				);
 			);
-			last_ind=nan;
+
 		);
-		hash=I;
-		sizes=vector(#dictionary_buckets);
-		current_maxima=old_maxima=0;
-		repeat(s,p,
-			copy(current_color[0],i(#p,x,y,z,0),S,1,whd);
-			current_hash=hash[p];
-			H=sizes[current_hash];
-			key=current_hash+offset;
-			same_color=same(current_color,last_color);
-			(H?(same_color?1:(last_ind=find(#key,current_color,(H-1)*inc_S,-inc_S)+1)))?(
-				if(!same_color,last_ind+=dec_S);
-				chval(++i[#key,last_ind]);
-			):(
-				if(H==h(#key),
-					new_size=min(max(8,h(#key)<<1),s);
-					resize(#key,inc_S,new_size,1,1,-1);
-				);
-				copy(i(#key,0,H,0,0),[current_color,1]);
-				++sizes[current_hash];
-				last_ind=(H+1)*inc_S-1;
+		O=J(-1);
+		P=O[0]<<24|O[1];
+		Q=i0<<24|i1;
+
+		start_of_dict=k+1+D*x;
+
+		while(P<Q,
+			insertion_pos=vector(#D);
+
+			last_color=I[#0,P];
+			current_maxima=old_maxima=1;
+			hash(last_color);
+			key=start_of_dict+current_hash;
+
+			if(!h(#key),
+				resize(#key,inc_S,8,1,1);
 			);
-			last_color=current_color;
+
+			copy(i[#key,0],[last_color,1]);
+
+			insertion_pos[current_hash]=inc_S;
+			last_ind=S;
+
+			l=0;
+			while(++l<k,
+				copy(current_color,i[#l,P],S,1,WHD);
+				hash(current_color);
+				R=insertion_pos[current_hash];
+				key=start_of_dict+current_hash;
+
+				(R?((same_color=same(current_color,last_color))?1:(last_ind=find(#key,current_color,R-inc_S,-inc_S)+1)))?(
+					if(!same_color,
+						last_ind+=dec_S;
+					);
+					chval(++i[#key,last_ind]);
+				):(
+					if(R==wh(#key),
+						new_size=max(8,h(#key)<<1);
+						resize(#key,inc_S,new_size,1,1,-1);
+					);
+					copy(i[#key,R],[current_color,1]);
+					insertion_pos[current_hash]+=inc_S;
+					last_ind=insertion_pos[current_hash]-1;
+				);
+
+				last_color=current_color;
+			);
+
+			I[#0,P]=current_maxima>old_maxima?maxima_color:v_NaN;
+			++P;
 		);
-		copy(i(#0,x,y,z,0),current_maxima>old_maxima?maxima_color:v_NaN,S,whd,1);
-		_0;"
+		_0;
+		"
 else
 	f[0] "begin(
 			const layers="$!";
