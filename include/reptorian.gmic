@@ -19531,13 +19531,7 @@ fi
 
 if "last_update=date([0,1,2],'"{/$path}/fornax_void_1.gmz"');
     must_be_updated_date=[2026,3,9];
-    must_be_updated_date[0]>last_update[0]?1:
-    must_be_updated_date[0]==last_update[0]?(
-        must_be_updated_date[1]>last_update[1]?(1):
-        must_be_updated_date[1]==last_update[1]?(
-            must_be_updated_date[2]>last_update[2];
-        );
-    );"
+    (must_be_updated_date[0]*10000+must_be_updated_date[1]*100+must_be_updated_date[2]) > (last_update[0]*10000 + last_update[1]*100 + last_update[2]);"
 
 	# This code block is used to update 2 palettes
 
@@ -19550,15 +19544,9 @@ if "last_update=date([0,1,2],'"{/$path}/fornax_void_1.gmz"');
 	}
 fi
 
-if "last_update=[2026,4,15];
-    must_be_updated_date=date([0,1,2]);
-    must_be_updated_date[0]>last_update[0]?1:
-    must_be_updated_date[0]==last_update[0]?(
-        must_be_updated_date[1]>last_update[1]?(1):
-        must_be_updated_date[1]==last_update[1]?(
-            must_be_updated_date[2]>last_update[2];
-        );
-    );"
+if "deadline=[2026,4,15];
+    current_date=date([0,1,2]);
+    (current_date[0]*10000+current_date[1]*100+current_date[2]) > (deadline[0]*10000+deadline[1]*100+deadline[2]);"
 
     echo "NOTE TO DEVELOPER: Please remove this code block by 4/15/2026. Users can ignore this message."
 fi
@@ -19577,41 +19565,47 @@ repeat $# {
 	j_${var{$>+1}}={/$path}/${var{$>+1}}.gmz
 }
 
-repeat $# {
-	m=${var{$>+1}}
+l[] {
+	repeat $# {
+		m=${var{$>+1}}
+		strlowercase $m
 
-	if isnum($m)
-		if !isint($m)||!isfinite($m)
-			error inv_arg_{$>+1}
+		if isnum($m)
+			if !isint($m)||!isfinite($m)
+				error inv_arg_{$>+1}
+			fi
+
+			if !$vars_created
+				__pal_create_vars
+			fi
+
+			m=${i_{($m%$n_ids)+1}}
+
+			if narg(${r_$m})
+				if $rd continue fi
+			else
+				j_$m={/$path}/$m.gmz
+			fi
 		fi
 
-		if !$vars_created
-			__pal_create_vars
-		fi
+		${j_$m}
 
-		m=${i_{($m%$n_ids)+1}}
+		out.=$s$m
+		s=,
 
-		if narg(${r_$m})
-			if $rd continue fi
+		if $rd
+			j_$m=continue
 		else
-			j_$m={/$path}/$m.gmz
+			j_$m=__pal_load_previous_palette
 		fi
-	fi
 
-	${j_$m}
+		r_$m={$!-1}
+	}
 
-	out.=$s$m
-	s=,
-
-	if $rd
-		j_$m=continue
-	else
-		j_$m=__pal_load_previous_palette
-	fi
-
-	r_$m={$!-1}
+	onfail
+		closest_args=${rep_sug_args\ $m,,0,3,${-_pal_ids}}
+		error "Invalid value '"$m"'. Expected one of (case-insensitive): "$closest_args
 }
-
 e[^-1] "Created palette(s) '"$out"'."
 u $out
 __pal_load_previous_palette:
