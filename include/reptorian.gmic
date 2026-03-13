@@ -65,159 +65,230 @@ repeat $#-2 {
 }
 
 u $r
-#@cli rep_sug_args: inp,_sep,_return_all_arg={ 0=false | 1=true},0.5>=_int_score_threshold<=3,arg0,arg1,...
+#@cli rep_sug_args: inp,_sep,_sug_mul_args={ 0=false | 1=true},0<_sim_res[%]<=100,0<=_leven_jaro_blend[%]<=100,_exp,_case_insensitive={ 0=False | 1=True },arg0,arg1,...
 #@cli : Suggest arguments given input using Damerau-Levenshtein Distance algorithm.
 #@cli :
-#@cli : Returns '01e0' on exact match.
-#@cli : Returns '00e0' if no close match is found.
+#@cli : Returns '--0001e0' on exact match.
+#@cli : Returns '--0000e0' if no close match is found.
 #@cli :
-#@cli : Note: For '00e0' and '01e0'. They're intended to be that way to avoid conflict with 0 or 1. So, keep in mind these are meant to be treated as vector to be validated.
+#@cli : Note: For '--0001e0' and '--0000e0'. They're intended to be that way to avoid conflict with 0 or 1. So, keep in mind these are meant to be treated as vector to be validated.
 #@cli :
 #@cli : Returns suggestion when close matches are found.
 #@cli :
 #@cli : Errors when no valid input for argN is found.
-#@cli : Default values: 'sep=','_return_all_arg=1','_int_score_threshold=2'
+#@cli :
+#@cli : Developers notes: Do _SCORE_DEBUG=1 before executing this command to debug score result for fine-tuning.
+#@cli :
+#@cli : Parameters
+#@cli : #--------------------------------------------------#
+#@cli : 'inp' is the input word to compare against the list of arguments.
+#@cli : '_sep' is the separator between words (defaults to an empty string '').
+#@cli : '_sug_mul_args' (default: 1) returns all possible suggestions if set to 1; returns only the closest match if set to 0.
+#@cli : '_sim_res' defines the minimum similarity score for a match to be accepted.
+#@cli : '_leven_jaro_blend' is the factor to blend between the Levenshtein (0) and Jaro-Winkler (1) algorithms. A value between 0 and 1 will mix the two.
+#@cli : '_exp' scales the similarity score (default: 1).
+#@cli : '_case_insensitive' defines whether the algorithm is case-insensitive or not.
+#@cli : 'argN' is a list of words to compare the input against.
+#@cli : #--------------------------------------------------#
+#@cli :
+#@cli : Default values: 'sep=','_sug_mul_args=1','_sim_res=70%','_leven_jaro_blend=50%','_exp=1','_case_insensitive=1'
 rep_sug_args:
-# Set default values and validate threshold
-skip ${2=},${3=1},${4=2}
-check inrange($4,.5,3,1,1)
+check "isbool(${3=1})&&
+       inrange(${4=70%},10%,100%,0,1)&&
+       inrange(${5=50%},0%,100%,1,1)&&
+       ${6=1}>0&&
+       isbool(${7=1})"
+sep,one_args_only,sim_res,leven_jaro_blend,exp,case_insensitive,input1,input2=${2=},{!$3},${4-7},$!,{$!+1}
+__rep_sug_args_process $1,${_rep_sug_args_deduplicate\ ${8--1}}
+__rep_sug_args_process:
+skip ${2=}
 
-# Store input index and first argument index
-$=vars
-input1,input2:=$!+[0,1]
+use_fixes={narg($sep)}
 
-# Convert input argument to image
-('$vars1')
-p=5
+if narg($3)
+	m __$0_list:"$""=ent As={$""#+1}"
+	__$0_list ${3--1}
+	um __$0_list
+fi
+ent0=$2
 
-# Convert searchable arguments to images
-repeat $#-4 {
-	('${vars$p}')
-	if !w rm. fi
-	p+=1
-}
-
-# If only empty arguments are found
-if $!==$input2
-	error no_input
+('$1':,)
+if $case_insensitive
+	f. lowercase(i)
 fi
 
-# Remove duplicate searchable arguments
-remove_duplicates[$input2--1]
+return_eq=0
+repeat $As {
+	('${ent$>}':,)
 
-# Check for exact match using image comparison
-words_to_search={$!-$input2}
+	if $case_insensitive
+		f. lowercase(i)
+	fi
 
-eval "
-	const p=$input1;
-	q=$input2;
-	base_stats=[w#p,h#p,d#p,s#p];
-	found=0;
-	repeat($words_to_search,
-		if(same(base_stats,[w#q,h#q,d#q,s#q]),
-			if(same(crop(#p),crop(#q,0,0,0,0,w#p,h#p,d#p,s#p)),
-				found=1;
-				break();
-			);
-		);
-		++q;
-	);
-	found;
-	"
+	if same([w#$input1,h#$input1,d#$input2,s#$input1],[w#-1,h#-1,d#-1,s#-1])
 
-# If exact match found, clean up and return success
-if ${}
+		+-[$input1,-1]
+
+		if !im
+			return_eq=1
+			if $use_fixes
+				out.=$S${rep_pf_args\ $sep,$sep,${ent$>}}
+			else
+				out.=$S${ent$>}
+			fi
+			S=,
+		fi
+
+		rm.
+	fi
+
+	if $one_args_only&&$return_eq
+		break
+	fi
+}
+
+if $return_eq
 	rm[$input1--1]
-	u 01e0 # Unique success marker
+	u --0001e0
 	return
 fi
 
-# Compute Damerau-Levenshtein score for each candidate
-WHDi1={whd#$input1}
-repeat $!-$input2 {
-	if !find(#$input2,crop(#$input1),0,-1)
-		score=0
-	else
-		score=${-_$0_score[$input1,$input2]}
-		+resize[$input2] $WHDi1,1,1,1,-1
-		temp_score={sum(bool(crop(#$input1)-crop(#-1)))}
+S=
 
-		if $temp_score==1||$temp_score==2
-			temp_score=${-_$0_score[$input1,-1]}
-		fi
+$As,1,1,2,[0,x]
 
-		score={min($score,$temp_score)}
-		rm.
-	fi
-	name[$input2] $score
+repeat $As {
+	set. ${-__$0_score[$input1,$input2]},$>
 	input2+=1
 }
 
-# Remove input image and discard weak matches
-rm[$input1]
-foreach[$input1--1] { if {0,n}>$4 rm fi }
+sort. -,x
 
-# If no matches remain, return failure
-if $!==$input1
-	u 00e0 # Unique failure marker
+if narg($_SCORE_DEBUG)?1;$_SCORE_DEBUG
+	v +
+	e[0] "Debugging scores!"
+	T={_round($sim_res*100,.001)}%
+	repeat w {
+		e[0] $1" vs "${ent{i(#-1,$>,0,0,1)}}": "{_round(i[#-1,$>]*100,.001)}%{`i[#-1,$>]>=$sim_res?'" (Passed Threshold of "$T!)'`}
+	}
+	rm[$input1--1]
+	e[0] "Exit debug, and quit interpreter!" q
+fi
+
+found=0
+repeat w {
+	if i[#-1,$>]>=$sim_res
+		v={i(#-1,$>,0,0,1)}
+		if $use_fixes
+			out.=$S${rep_pf_args\ $sep,$sep,${ent$v}}
+		else
+			out.=$S${ent$v}
+		fi
+		S=,
+		found=1
+	fi
+}
+
+rm[$input1--1]
+
+if $found
+	u $out
+else
+	u --0000e0
+fi
+_rep_sug_args_deduplicate:
+$=arg I=$!
+repeat $# {
+	('${arg{$>+1}}':^)
+}
+max_chars_count=${-max_s[$I--1]}
+r[$I--1] 1,1,1,$max_chars_count,-1
+a[$I--1] x
+rep_val2order. 0,1,1
+repeat h#-1 {
+	r.=$S{`I[#-1,$>]`}
+	S=,
+}
+rm.
+u $r
+____rep_sug_args_process_score:
+if !whd#0||!whd#1
+	u 0
+	return
+elif same(crop(#0),crop(#1))
+	u 1
 	return
 fi
 
-# Sort results by score
-sort_list[$input1--1] +,n
+if $leven_jaro_blend<1
+	leven_score=${-$0_levenshtein[0,1]}
+	if !$leven_jaro_blend
+		u $leven_score
+		return
+	fi
+fi
 
-# Build output list (single or multiple based on return_all_arg)
-repeat $3?$!-$input1:1 {
-	r.=$S$2{$input1,t}$2
-	S=,
-	rm[$input1]
-}
+if $leven_jaro_blend
+	jaro_score=${-$0_jaro_winkler[0,1]}
+	if $leven_jaro_blend==1
+		u $jaro_score
+		return
+	fi
+fi
 
-# Clean up remaining images
-if $input1<$! rm[$input1--1] fi
+u {lerp($leven_score,$jaro_score,$leven_jaro_blend)^$exp}
+____rep_sug_args_process_score_jaro_winkler:
+eval "
+	const L0=whd#0;
+	const L1=whd#1;
+	const matchDistance=max((max(L0,L1)>>1)-1,0);
 
-# Return result
-u $r
-_rep_sug_args_score:
-# Ensure exactly two input images
-check $!==2
+	s0Matches=vector(#L0);
+	s1Matches=vector(#L1);
 
-# Initialize scoring matrix
-{[whd#0,whd#1]+1},1,1,!y?x:!x?y
+	matches=0;
+	repeat(L0,p,
 
-# Compute Damerau-Levenshtein distance
-{[w,h]-1},1,1,>"
-	X=x+1;
-	Y=y+1;
+		q0=max(0,p-matchDistance);
+		q1=max(p+matchDistance,L1-1);
 
-	a=lowercase(i[#0,X-1]);
-	b=lowercase(i[#1,Y-1]);
+		for(q=q0,q<=q1,++q,
+			if(s1Matches[q],continue(););
+			if(i[#0,p]!=i[#1,q],continue(););
 
-	cost=(a!=b);
+			s0Matches[p]=1;
+			s1Matches[q]=1;
 
-	# Standard Levenshtein
-	del = i(#2,X-1,Y) + 1;
-	ins = i(#2,X,Y-1) + 1.25;
-	sub = i(#2,X-1,Y-1) + cost;
+			++matches;
 
-	d = min(del,ins,sub);
-
-	# Adjacent transposition
-	if(X>1 && Y>1,
-		if( a==lowercase(i[#1,Y-2]) && lowercase(i[#0,X-2])==b,
-			d=min(d,i(#2,X-2,Y-2)+0.5);
+			break();
 		);
 	);
 
-	i(#2,X,Y)=d;
-	i;
+	if(matches,
+		t=k=0;
+		repeat(L1,p,
+			if(!s0Matches[p],continue(););
+			while(!s1Matches[k],++k;);
+			if(i[#0,p]!=i[#1,k],++t;);
+			++k;
+		);
+
+		t>>=1;
+		(matches/L0+
+		 matches/L1+
+		 (matches-t)/matches)/3;
+	);
 	"
-
-# Return final score
-u {i[#-2,whd#-2-1]}
-
-# Cleanup temporary images
-rm[-2,-1]
+____rep_sug_args_process_score_levenshtein:
+{[whd#0,whd#1]+1},1,1,!x?y:!y?x
+{[whd#0,whd#1]},1,1,>"
+	X=x+1;Y=y+1;
+	cost=i[#0,x]!=i[#1,y];
+	j(#-1,1,1)=min(i(#-1,x,Y)+1,i(#-1,X,y)+1,i(#-1,x,y)+cost);
+	_0;"
+eval M=max(w,h);1-i(#-2,w#-2-1,h#-2-1)/M;
+rm[-1,-2]
 #@cli rep_txt2uints: string
 #@cli : Return the numerical decoding representation of unicode from txt.
 #@cli : _CODEPAGE variable should define your encoding approach. Otherwise, fallback on auto-finding encoding method.
@@ -449,7 +520,7 @@ __rep_xp2b_check_arg:
 l[] {
 	check narg(${A$1})
 	onfail
-		closest_arg=${rep_sug_args\ $1,,0,3,$b0,$b1,$b2,$b3,$b4}
+		closest_arg=${rep_sug_args\ $1,,1,60%,50%,1,1,$b0,$b1,$b2,$b3,$b4}
 		repeat 5 {
 			L=${rep_pf_args\ ',',${b$>}}
 			if isin('$closest_arg',$L)
@@ -19621,8 +19692,8 @@ l[] {
 	}
 
 	onfail
-		closest_args=${rep_sug_args\ $m,,1,1.5,${-_pal_ids}}
-		if same('$closest_args','00e0')
+		closest_args=${rep_sug_args\ $m,,1,70%,97.5%,1,1,${-_pal_ids}}
+		if same('$closest_args','--0000e0')
 			e "ERROR: Invalid value '"$m"'. No close match found!"\n
 			h $0 q
 		fi
