@@ -65,7 +65,160 @@ repeat $#-2 {
 }
 
 u $r
-#@cli rep_sug_args: inp,_sep,_sug_mul_args={ 0=false | 1=true},0<_sim_res[%]<=100,0<=_leven_jaro_blend[%]<=100,_exp,_case_insensitive={ 0=False | 1=True },arg0,arg1,...
+#@cli rep_concat_imgs_vals_uniq
+#@cli : Deduplicate images based on their pixel values using a hash table, then output images describing the unique serialized values.
+#@cli :
+#@cli : Each image is internally serialized as a string of its values. Images
+#@cli : with identical value sequences are considered duplicates.
+#@cli :
+#@cli : Outputs a string-table representation of the unique images:
+#@cli :   • image[0]: concatenation of serialized image value strings
+#@cli :   • image[1]: [offset,length] per entry (ch0=offset, ch1=length)
+#@cli :
+#@cli : Also returns the length of the longest string.
+rep_concat_imgs_vals_uniq:
+_rep_dedup_dict 1,1
+#@cli rep_uniq_args: output_mode= 0=status | 1=string_table_images | ~0=randomized_status | ~1=randomized_string_table_images },[arg0,arg1,...]
+#@cli : Deduplicate input strings.
+#@cli :
+#@cli : output_mode=0 → returns the unique strings as a comma-separated list in
+#@cli : the `status` variable.
+#@cli :
+#@cli : output_mode=1 → outputs a string-table representation and returns the
+#@cli : length of the longest string in `status` variable.
+#@cli :
+#@cli : -- Details for output_mode=1 --
+#@cli : 1) First image: concatenation of all unique strings.
+#@cli : 2) Second image: for each string, `[offset,length]`
+#@cli :    - channel 0: position of the string in the first image
+#@cli :    - channel 1: length of the string.
+#@cli : 3) Status is set to the length of the longest string.
++rep_uniq_args:
+_rep_dedup_dict $1,0,${2--1}
+_rep_dedup_dict:
+check S='$1';(size(S)==1?isint($1))||size(S)==2
+start_point=$!
+$=arg
+
+size_of_dict_table,bit_mask:=(1<<cut(ceil(log2($#))+1,4,10))-[0,1]
+randomized,output_images:=S='$1';size(S)==2?[S[0]==_'~',S[1]-_'0']:[0,S[0]-_'0'];
+
+if $2
+	if $randomized
+		repeat $! { rv[$<,{v($<)}] }
+	fi
+	output_images=1
+else
+	if $randomized
+		Z={$#-2}
+		$Z,1,1,1,x+3 shuffle.
+		repeat $Z {
+			('${arg{i[#$start_point,$>]}}':^)
+		}
+		rm[$start_point]
+	else
+		repeat $#-2 {
+			('${arg{$>+3}}':^)
+		}
+	fi
+fi
+
+max_s=${-max_s[$start_point--1]}
+
+# Below code use modified DBJ2 algorithm
+start_of_hash_indice=$!
+{$!-$start_point},1,1,1,"begin(
+		const bit_mask=$bit_mask;
+		const start_seed="{v(0xff1,0x1c187)}";
+	);
+	hash_value=start_seed;
+	img_pos=$start_point+x;
+	repeat(s#img_pos,p,
+		hash_value=(hash_value*33)+i[#img_pos,p];
+		hash_value&=0xffffff;
+	);
+	hash_value&=bit_mask;
+	"
+# Above code use modified DBJ2 algorithm
+
+0x$size_of_dict_table
+
+N={$start_of_hash_indice-$start_point}
+{$max_s*$N+(!$output_images?$N-1)}
+if $output_images
+	$N,1,1,2
+fi
+
+eval[$start_of_hash_indice] >"begin(
+		const output_images=$output_images;
+		const info_start=$max_s;
+		const vector_size=info_start;
+		const Is=$start_point;
+		const start_of_dict_table=k+1;
+		insertion_pos_list=vector(#$size_of_dict_table);
+		count_of_unique_strings=str_ins=0;
+		output_images?(
+			insert_info()=(
+				copy(i[#-2,str_ins],i[#p,0],s#p);
+				I[#-1,count_of_unique_strings]=[str_ins,s#p];
+				str_ins+=s#p;
+			);
+		):(
+			const _comma=_',';
+			insert_info()=(
+				if(count_of_unique_strings,
+					i[#-1,str_ins++]=_comma;
+				);
+				copy(i[#-1,str_ins],i[#p,0],s#p);
+				str_ins+=s#p;
+			);
+		);
+
+	);
+	p=x+Is;
+	insertion_pos=insertion_pos_list[i];
+	door_pos=i+start_of_dict_table;
+	str_v=crop(#p,0,0,0,0,1,1,1,info_start);
+	s#p&&(insertion_pos?find(#door_pos,str_v,insertion_pos,-vector_size)==-1:1)?(
+		if(wh#door_pos==insertion_pos,
+			new_size=max(8,h(#door_pos)<<1);
+			resize(#door_pos,vector_size,new_size,1,1,-1);
+		);
+		copy(i[#door_pos,insertion_pos],str_v);
+		insertion_pos_list[i]+=vector_size;
+		insert_info();
+		++count_of_unique_strings;
+	);
+	end(
+		output_images?(
+
+			set('crop_point_str_col_info',str_ins-1);
+			set('crop_point_pos_info',count_of_unique_strings-1);
+		);
+	);
+	"
+
+if $output_images
+	if $2
+		rm[0--3]
+	else
+		rm[$start_point--3]
+	fi
+
+	if $crop_point_pos_info+1
+		crop[-2] 0,$crop_point_str_col_info
+		crop[-1] 0,$crop_point_pos_info
+	else
+		rm[-2,-1]
+		0
+	fi
+
+	u $max_s
+else
+	u {t}
+	rm[$start_point--1]
+fi
+#@cli rep_sug_args: inp,_sep,_sug_mul_args={ 0=false | 1=true},0<_sim_res[%]<=100,-100<=_leven_jaro_blend[%]<=100,_exp,0<=_prefix_boost_factor[%]<=100,_case_insensitive={ 0=False | 1=True },arg0,arg1,...
 #@cli : Suggest arguments given input using Damerau-Levenshtein Distance algorithm.
 #@cli :
 #@cli : Returns '--0001e0' on exact match.
@@ -77,218 +230,392 @@ u $r
 #@cli :
 #@cli : Errors when no valid input for argN is found.
 #@cli :
-#@cli : Developers notes: Do _SCORE_DEBUG=1 before executing this command to debug score result for fine-tuning.
+#@cli : Developers notes: _EXAM_SIM variable can be defined before executing rep_sug_args to debug. This controls how many entries to print out.
 #@cli :
 #@cli : Parameters
 #@cli : #--------------------------------------------------#
 #@cli : 'inp' is the input word to compare against the list of arguments.
 #@cli : '_sep' is the separator between words (defaults to an empty string '').
-#@cli : '_sug_mul_args' (default: 1) returns all possible suggestions if set to 1; returns only the closest match if set to 0.
+#@cli : '_sug_mul_args' : 1 = Multiple suggestions, 0 = Only the closest match.
 #@cli : '_sim_res' defines the minimum similarity score for a match to be accepted.
-#@cli : '_leven_jaro_blend' is the factor to blend between the Levenshtein (0) and Jaro-Winkler (1) algorithms. A value between 0 and 1 will mix the two.
+#@cli : '_leven_jaro_blend' : Sets mix of two fuzzy-match options. [1][2][3][4][5]*
 #@cli : '_exp' scales the similarity score (default: 1).
-#@cli : '_case_insensitive' defines whether the algorithm is case-insensitive or not.
+#@cli : '_prefix_boost_factor' defines how much to boost the prefix.
+#@cli : '_case_insensitive' defines whether the algorithm is case-insensitive.
 #@cli : 'argN' is a list of words to compare the input against.
 #@cli : #--------------------------------------------------#
 #@cli :
-#@cli : Default values: 'sep=','_sug_mul_args=1','_sim_res=70%','_leven_jaro_blend=50%','_exp=1','_case_insensitive=1'
+#@cli : [1] -1         : Alt Jaro-Winkler only
+#@cli : [2] -1<value<0 : Mix Levenshtein and alt Jaro-Winkler.
+#@cli : [3] 0          : Levenshtein only
+#@cli : [4] 0<value<1  : Mix Levenshtein and standard Jaro-Winkler.
+#@cli : [5] 1          : Standard Jaro-Winkler only
+#@cli :
+#@cli : * Closer to -1 or 1 favors selected Jaro-Winkler variant. Positive value favors more forgiving Jaro-Winkler variant.
+#@cli :
+#@cli : Default values: 'sep=','_sug_mul_args=1','_sim_res=70%','_leven_jaro_blend=50%','_exp=1','_prefix_boost_factor=5%','_case_insensitive=1'
 rep_sug_args:
-check "isbool(${3=1})&&
+skip "${1=}"
+check "isint('${2=}',0,2)&&
+       isbool(${3=1})&&
        inrange(${4=70%},10%,100%,0,1)&&
-       inrange(${5=50%},0%,100%,1,1)&&
+       inrange(abs(${5=50%}),0%,100%,1,1)&&
        ${6=1}>0&&
-       isbool(${7=1})"
-sep,one_args_only,sim_res,leven_jaro_blend,exp,case_insensitive,input1,input2=${2=},{!$3},${4-7},$!,{$!+1}
-__rep_sug_args_process $1,${_rep_sug_args_deduplicate\ ${8--1}}
-__rep_sug_args_process:
-skip ${2=}
+       inrange(${7=5%},0%,100%,1,1)&&
+       isbool(${8=1})"
 
-use_fixes={narg($sep)}
+sep,mul_args,sim_res,blend_between_levenshtein_and_jaro_winkler_algorithm,exp,prefix_boost_factor,case_insensitive,I=${2=},{[${3-8}]},$!
+abs_blend_between_levenshtein_and_jaro_winkler_algorithm,size_of_sep_chars,use_EXAM_SIM:=abs($blend_between_levenshtein_and_jaro_winkler_algorithm),size('$sep'),narg($_EXAM_SIM)?1;$_EXAM_SIM
+use_levenstein_dp_table={$prefix_boost_factor<1&&$abs_blend_between_levenshtein_and_jaro_winkler_algorithm<1}
 
-if narg($3)
-	m __$0_list:"$""=ent As={$""#+1}"
-	__$0_list ${3--1}
-	um __$0_list
+if !narg($1)
+	u --0000e0
+	return
 fi
-ent0=$2
 
-('$1':,)
+('$1')
+
 if $case_insensitive
 	f. lowercase(i)
 fi
 
-return_eq=0
-repeat $As {
-	('${ent$>}':,)
++rep_uniq_args ~1,${9--1}                   # ~ is used to denote that arguments to be checked against are in random positions. Used to avoid bias.
+concat_str,max_string_length={$!-2},${}     # Status variable returned from rep_uniq_args gives highest string length
 
-	if $case_insensitive
-		f. lowercase(i)
-	fi
-
-	if same([w#$input1,h#$input1,d#$input2,s#$input1],[w#-1,h#-1,d#-1,s#-1])
-
-		+-[$input1,-1]
-
-		if !im
-			return_eq=1
-			if $use_fixes
-				out.=$S${rep_pf_args\ $sep,$sep,${ent$>}}
-			else
-				out.=$S${ent$>}
-			fi
-			S=,
-		fi
-
-		rm.
-	fi
-
-	if $one_args_only&&$return_eq
-		break
-	fi
-}
-
-if $return_eq
-	rm[$input1--1]
-	u --0001e0
-	return
-fi
-
-S=
-
-$As,1,1,2,[0,x]
-
-repeat $As {
-	set. ${-__$0_score[$input1,$input2]},$>
-	input2+=1
-}
-
-sort. -,x
-
-if narg($_SCORE_DEBUG)?1;$_SCORE_DEBUG
-	v +
-	e[0] "Debugging scores!"
-	T={_round($sim_res*100,.001)}%
-	repeat w {
-		e[0] $1" vs "${ent{i(#-1,$>,0,0,1)}}": "{_round(i[#-1,$>]*100,.001)}%{`i[#-1,$>]>=$sim_res?'" (Passed Threshold of "$T!)'`}
-	}
-	rm[$input1--1]
-	e[0] "Exit debug, and quit interpreter!" q
-fi
-
-found=0
-repeat w {
-	if i[#-1,$>]>=$sim_res
-		v={i(#-1,$>,0,0,1)}
-		if $use_fixes
-			out.=$S${rep_pf_args\ $sep,$sep,${ent$v}}
-		else
-			out.=$S${ent$v}
-		fi
-		S=,
-		found=1
-	fi
-}
-
-rm[$input1--1]
-
-if $found
-	u $out
-else
+if !$max_string_length
+	rm.
 	u --0000e0
-fi
-_rep_sug_args_deduplicate:
-$=arg I=$!
-repeat $# {
-	('${arg{$>+1}}':^)
-}
-max_chars_count=${-max_s[$I--1]}
-r[$I--1] 1,1,1,$max_chars_count,-1
-a[$I--1] x
-rep_val2order. 0,1,1
-repeat h#-1 {
-	r.=$S{`I[#-1,$>]`}
-	S=,
-}
-rm.
-u $r
-____rep_sug_args_process_score:
-if !whd#0||!whd#1
-	u 0
-	return
-elif same(crop(#0),crop(#1))
-	u 1
 	return
 fi
 
-if $leven_jaro_blend<1
-	leven_score=${-$0_levenshtein[0,1]}
-	if !$leven_jaro_blend
-		u $leven_score
-		return
-	fi
+if $size_of_sep_chars==2
+	SL,SR:='$sep'
+elif $size_of_sep_chars
+	SL,SR={_'$sep'}
 fi
 
-if $leven_jaro_blend
-	jaro_score=${-$0_jaro_winkler[0,1]}
-	if $leven_jaro_blend==1
-		u $jaro_score
-		return
-	fi
+if $case_insensitive
+	+f[-2] lowercase(i)
+	mv. {$I+2}
 fi
 
-u {lerp($leven_score,$jaro_score,$leven_jaro_blend)^$exp}
-____rep_sug_args_process_score_jaro_winkler:
+score_img_ind={$!-1}
+100%,1,1,2
+rv[-2,-1]
+
+L0,L1:=whd#$I,$max_string_length
+if $use_levenstein_dp_table
+	{[$L0,$L1]+1},1,1,!x?y:!y?x
+fi
+
+if !$use_EXAM_SIM
+	{Args=$#-8;w(#$score_img_ind-1)+(Args<<bool($size_of_sep_chars))+Args-1}
+fi
+
 eval "
-	const L0=whd#0;
-	const L1=whd#1;
-	const matchDistance=max((max(L0,L1)>>1)-1,0);
+	const prefix_boost_factor=$prefix_boost_factor;
+	const prefix_only=prefix_boost_factor==1;
+	const prefix_blend=!prefix_only&&prefix_boost_factor;
+	const leven_jaro_blend=$abs_blend_between_levenshtein_and_jaro_winkler_algorithm;
+	const blend_both=!prefix_only?leven_jaro_blend>0&&leven_jaro_blend<1;
+	const use_levensthein=!prefix_only?leven_jaro_blend<1;
+	const use_jaro_winkler=!prefix_only?leven_jaro_blend;
+	const input_word_ind=$I;
+	const score_img_ind=$score_img_ind;
+	const num_of_words=w#$score_img_ind;
+	const pos_and_count_ind=score_img_ind+1;
+	const pos_channel=0;
+	const count_channel=1;
+	const str_col_ind=score_img_ind-1;
+	const L0=$L0;
+	const L1=$L1;
+	const max_possible_score=(L0*(L0+1))>>1;
+	const find_more_same=$mul_args&&$case_insensitive;
+	const use_EXAM_SIM=$use_EXAM_SIM;
 
-	s0Matches=vector(#L0);
-	s1Matches=vector(#L1);
+	if(use_jaro_winkler,
+		const jaro_version=$blend_between_levenshtein_and_jaro_winkler_algorithm<0;
+	);
 
-	matches=0;
-	repeat(L0,p,
+	if(use_levensthein,
+		const leven_img=-2+use_EXAM_SIM;
+		clear_image=crop(#leven_img);
+	);
 
-		q0=max(0,p-matchDistance);
-		q1=max(p+matchDistance,L1-1);
+	if(use_jaro_winkler,
+		jaro_winkler_score=0;
+	);
 
-		for(q=q0,q<=q1,++q,
-			if(s1Matches[q],continue(););
-			if(i[#0,p]!=i[#1,q],continue(););
+	if(!use_EXAM_SIM,
+		const sim_res=$sim_res;
+		score_and_ind_count=0;
+	);
 
-			s0Matches[p]=1;
-			s1Matches[q]=1;
+	same_word=same_word_count=0;
+	repeat(w#score_img_ind,ind,
+		TL1=i(#pos_and_count_ind,ind,0,0,count_channel);
+		L1_pos=i(#pos_and_count_ind,ind,0,0,pos_channel);
 
-			++matches;
+		if(TL1==L0,
+			if(!use_EXAM_SIM,same_word=1);
 
-			break();
+			repeat(L0,p,
+				if(i[#input_word_ind,p]!=i[#str_col_ind,L1_pos+p],
+					same_word=0;
+					break();
+				);
+			);
+
+			if(same_word,
+				use_EXAM_SIM?(
+					i[#score_img_ind,ind]=1;
+					continue();
+				):(
+					i[#score_img_ind,same_word_count++]=ind;
+					break();
+				);
+			);
+		);
+
+		if(prefix_boost_factor,
+			prefix_score=0;
+			repeat(min(L0,TL1),p,
+				if(i[#input_word_ind,p]==i[#str_col_ind,L1_pos+p],
+					prefix_score+=p+1;
+				);
+			);
+			prefix_score=prefix_score/max_possible_score;
+		);
+
+		if(use_levensthein,
+			X=Y=0;
+			while(++Y<=TL1,
+				while(++X<=L0,
+					dx=X-1;dy=Y-1;
+					cost=i[#input_word_ind,dx]!=i[#str_col_ind,L1_pos+dy];
+					i(#leven_img,X,Y)=min(i(#leven_img,dx,Y)+1,i(#leven_img,X,dy)+1,i(#leven_img,dx,dy)+cost);
+				);
+				X=0;
+			);
+			max_dim=max(L0,TL1);
+			levenshtein_score=1-i(#leven_img,L0,TL1)/max_dim;
+			copy(i[#leven_img,0],clear_image);
+		);
+
+		if(use_jaro_winkler,
+			matchDistance=max((max(L0,TL1)>>1)-1,0);
+			s0Matches=vector(#L0);
+			s1Matches=vector(#L1);
+			jaro_winkler_score=matches=0;
+
+			repeat(L0,p,
+
+				q0=max(0,p-matchDistance);
+				q1=jaro_version?min(p+matchDistance,TL1-1):max(p+matchDistance,TL1-1);
+
+				for(q=q0,q<=q1,++q,
+					char_2=jaro_version?i[#str_col_ind,L1_pos+q]:(q<TL1?i[#str_col_ind,L1_pos+q]);
+					if(s1Matches[q],continue(););
+					if(i[#input_word_ind,p]!=char_2,continue(););
+
+					s0Matches[p]=1;
+					s1Matches[q]=1;
+
+					++matches;
+
+					break();
+				);
+			);
+
+			if(matches,
+				t=k=0;
+				repeat(TL1,p,
+					char_2=i[#str_col_ind,L1_pos+k];
+					if(!s0Matches[p],continue(););
+					while(!s1Matches[k],++k;);
+					if(i[#input_word_ind,p]!=char_2,++t;);
+					++k;
+					if(k>=TL1,break(););
+				);
+
+				t>>=1;
+				jaro_winkler_score=(
+					matches/L0+
+					matches/TL1+
+					(matches-t)/matches
+				)/3;
+			);
+		);
+
+		blend_both?(
+			score=lerp(levenshtein_score,jaro_winkler_score,leven_jaro_blend);
+		):
+		use_jaro_winkler?(
+			score=jaro_winkler_score;
+		):
+		use_levensthein?(
+			score=levenshtein_score;
+		):(
+			score=prefix_score;
+		);
+
+		if(prefix_blend,
+			score=lerp(score,prefix_score,prefix_boost_factor);
+		);
+
+		use_EXAM_SIM?(
+			i[#score_img_ind,ind]=score;
+			0;
+		):(
+			if(score>=sim_res,
+				I[#score_img_ind,score_and_ind_count++]=[score,ind];
+			);
+			0;
 		);
 	);
 
-	if(matches,
-		t=k=0;
-		repeat(L1,p,
-			if(!s0Matches[p],continue(););
-			while(!s1Matches[k],++k;);
-			if(i[#0,p]!=i[#1,k],++t;);
-			++k;
-		);
+	same_word?(
+		if(find_more_same,
+			while(++ind<w#score_img_ind,
+				TL1=i(#pos_and_count_ind,ind,0,0,count_channel);
 
-		t>>=1;
-		(matches/L0+
-		 matches/L1+
-		 (matches-t)/matches)/3;
+				if(TL1==L0,
+					same_word=1;
+					L1_pos=i(#pos_and_count_ind,ind,0,0,pos_channel);
+
+					repeat(L0,p,
+						if(i[#input_word_ind,p]!=i[#str_col_ind,L1_pos+p],
+							same_word=0;
+							break();
+						);
+					);
+
+					if(same_word,
+						i[#score_img_ind,same_word_count++]=ind;
+					);
+				);
+			);
+		);
+		set('same_word',1);
+		resize(#score_img_ind,same_word_count,1,1,1,-1);
+	):(
+		use_EXAM_SIM?(
+			resize(#score_img_ind,w#score_img_ind,1,1,1,-1);
+		):(
+			resize(#score_img_ind,score_and_ind_count,1,1,2,0);
+		);
+		set('same_word',same_word);
 	);
 	"
-____rep_sug_args_process_score_levenshtein:
-{[whd#0,whd#1]+1},1,1,!x?y:!y?x
-{[whd#0,whd#1]},1,1,>"
-	X=x+1;Y=y+1;
-	cost=i[#0,x]!=i[#1,y];
-	j(#-1,1,1)=min(i(#-1,x,Y)+1,i(#-1,X,y)+1,i(#-1,x,y)+cost);
-	_0;"
-eval M=max(w,h);1-i(#-2,w#-2-1,h#-2-1)/M;
-rm[-1,-2]
+
+mode_ciw1={!$use_EXAM_SIM&&$case_insensitive&&s#$score_img_ind==1&&w#$score_img_ind==1}
+if !$mode_ciw1
+	rm[$I] score_img_ind-=1
+fi
+
+if $case_insensitive
+	rm[{$score_img_ind-1}]
+	score_img_ind-=1
+fi
+
+if $use_levenstein_dp_table
+	rm[-{1+!$use_EXAM_SIM}]
+fi
+
+if $use_EXAM_SIM
+	a[-2,-1] c
+
+	sort[-1] -,x
+
+	if isnum($_EXAM_SIM)?isfinite($_EXAM_SIM)?$_EXAM_SIM>=0
+		r[-1] {max(int(min($_EXAM_SIM,w)),1)},1,1,100%,0
+	fi
+
+	sim_res_message={_round($sim_res*100,.01)}%
+
+	debug_start_message="~ Debugged score result "
+
+	if $case_insensitive
+		debug_start_message.="(case-insensitive) ~"
+	else
+		debug_start_message.=~
+	fi
+
+	e[0] $debug_start_message
+
+	1,1,1,1,$sim_res sim_res={i[#-1,0]} rm.
+
+	repeat w {
+		score,offset,string_length:=I[#-1,$>]
+		string={`crop(#-2,$offset,0,0,0,$string_length,1,1,1)`}
+
+		if $score==1
+			M=" (Exact Match!)"
+		elif $score>=$sim_res
+			M=" (Passed similarity threshold of "$sim_res_message")"
+		else
+			M=
+		fi
+
+		score={_round($score*100,0.01)}%
+		e[0] $1" vs "$string": "$score$M
+	}
+
+	q
+else
+	if !s#-3
+		rm[$I--1]
+		u --0000e0
+	fi
+
+	if $same_word
+		map[-3] [-2]
+
+		rm[-2]
+
+		if $case_insensitive?($mode_ciw1?same(crop(#-4),crop(#-3,i(#-2,0,0,0,0),0,0,0,{i(#-2,0,0,0,1)},1,1,1))):1
+			u --0001e0
+			rm[$I--1]
+			return
+		fi
+	else
+		sort[-3] -,x
+		channels[-3] 1
+		map[-3] [-2]
+		rm[-2]
+	fi
+
+	if $mode_ciw1
+		rm[-4]
+	fi
+
+	if !$mul_args
+		crop[-2] 0,0
+	fi
+
+	eval[-2] >"
+		begin(
+			const _comma=_',';
+			const use_sep=$size_of_sep_chars;
+			if(use_sep,
+				const SL=$SL;
+				const SR=$SR;
+			);
+			place=0;
+		);
+		if(x,i[#-1,place++]=_comma;);
+		if(use_sep,i[#-1,place++]=SL;);
+		copy(i[#-1,place],i[#-3,i0],i1);
+		place+=i1;
+		if(use_sep,i[#-1,place++]=SR;);
+		end(
+			resize(#-1,place,1,1,1,-1);
+		);
+		_0;
+		"
+
+	u {t} rm[$I--1]
+fi
 #@cli rep_txt2uints: string
 #@cli : Return the numerical decoding representation of unicode from txt.
 #@cli : _CODEPAGE variable should define your encoding approach. Otherwise, fallback on auto-finding encoding method.
@@ -520,7 +847,7 @@ __rep_xp2b_check_arg:
 l[] {
 	check narg(${A$1})
 	onfail
-		closest_arg=${rep_sug_args\ $1,,1,60%,50%,1,1,$b0,$b1,$b2,$b3,$b4}
+		closest_arg=${rep_sug_args\ $1,,0,50%,50%,1,0%,0,$b0,$b1,$b2,$b3,$b4}
 		repeat 5 {
 			L=${rep_pf_args\ ',',${b$>}}
 			if isin('$closest_arg',$L)
@@ -19655,13 +19982,13 @@ fi
 
 repeat $# {
 	strlowercase ${var{$>+1}}
-	var{$>+1}=${}
+	lvar$>=${}
 	j_${}={/$path}/${}.gmz
 }
 
 l[] {
 	repeat $# {
-		m=${var{$>+1}}
+		M,m=${var{$>+1}},${lvar$>}
 
 		if same(isint('$m',_'0',_'9'),1)
 			if !$vars_created
@@ -19692,13 +20019,16 @@ l[] {
 	}
 
 	onfail
-		closest_args=${rep_sug_args\ $m,,1,70%,97.5%,1,1,${-_pal_ids}}
+		closest_args=${rep_sug_args\ $m,,1,66.66%,-97.5%,1,10%,0,${-_pal_ids}}
+
 		if same('$closest_args','--0000e0')
-			e "ERROR: Invalid value '"$m"'. No close match found!"\n
+			e "ERROR: Invalid value '"$M"'. No close match found!"\n
 			h $0 q
 		fi
-		error "Invalid value '"$m"'. Did you mean one of (case-insensitive): "$closest_args"?"
+
+		error "Invalid value '"$M"'. Did you mean one of (case-insensitive): "$closest_args"?"
 }
+
 e[^-1] "Created palette(s) '"$out"'."
 u $out
 __pal_load_previous_palette:
