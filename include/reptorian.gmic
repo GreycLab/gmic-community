@@ -75,17 +75,21 @@ u $r
 #@cli :   • image[0]: concatenation of serialized image value strings
 #@cli :   • image[1]: [offset,length] per entry (ch0=offset, ch1=length)
 #@cli :
-#@cli : Also returns the length of the longest string.
+#@cli : Warning! This should only be used for small images with different dimensions.
+#@cli :
+#@cli : Also returns the length of the longest image.
 rep_concat_imgs_vals_uniq:
-_rep_dedup_dict 1,1
-#@cli rep_uniq_args: output_mode= 0=status | 1=string_table_images | ~0=randomized_status | ~1=randomized_string_table_images },[arg0,arg1,...]
+_rep_dedup_strval_dict 1,0,1
+#@cli rep_uniq_args: output_mode={ 0=status | 1=string_table_images | 2=str2imgs },randomize_str_pos={ 0=False | 1=True },[arg0,arg1,...]
 #@cli : Deduplicate input strings.
 #@cli :
-#@cli : output_mode=0 → returns the unique strings as a comma-separated list in
+#@cli : output_mode=0 returns the unique strings as a comma-separated list in
 #@cli : the `status` variable.
 #@cli :
-#@cli : output_mode=1 → outputs a string-table representation and returns the
+#@cli : output_mode=1 outputs a string-table representation and returns the
 #@cli : length of the longest string in `status` variable.
+#@cli :
+#@cli : output_mode=2 output image representation per strings
 #@cli :
 #@cli : -- Details for output_mode=1 --
 #@cli : 1) First image: concatenation of all unique strings.
@@ -94,36 +98,50 @@ _rep_dedup_dict 1,1
 #@cli :    - channel 1: length of the string.
 #@cli : 3) Status is set to the length of the longest string.
 +rep_uniq_args:
-_rep_dedup_dict $1,0,${2--1}
-_rep_dedup_dict:
-check S='$1';(size(S)==1?isint($1))||size(S)==2
-start_point=$!
-$=arg
+_rep_dedup_strval_dict $1,0,$2,${3--1}
+_rep_dedup_strval_dict:
+skip ${1=0},${2=0},${3=1}
+check isint($1,0,2)&&isint($2,0)&&isbool($3)
+output,limit,randomize_str_pos,use_images:=${1-3},$#<4
 
-size_of_dict_table,bit_mask:=(1<<cut(ceil(log2($#))+1,4,10))-[0,1]
-randomized,output_images:=S='$1';size(S)==2?[S[0]==_'~',S[1]-_'0']:[0,S[0]-_'0'];
+# Output Mode
+# 0 : Status
+# 1 : Concatenated string + off/length image
+# 2 : Remove duplicate image values
 
-if $2
-	if $randomized
-		repeat $! { rv[$<,{v($<)}] }
-	fi
-	output_images=1
+if $use_images
+	start_point,size_of_dict_table,bit_mask:=0,(1<<cut(ceil(log2($!))+1,2,10))-[0,1]
+	if $2 foreach { if whds>$2 rm fi } fi
+	if $!&&$randomize_str_pos repeat $! { rv[$<,{v($<)}] } fi
 else
-	if $randomized
-		Z={$#-2}
-		$Z,1,1,1,x+3 shuffle.
-		repeat $Z {
-			('${arg{i[#$start_point,$>]}}':^)
-		}
+	start_point,size_of_dict_table,bit_mask:=$!,(1<<cut(ceil(log2($#-3))+1,2,10))-[0,1]
+	$=arg
+
+	if $randomize_str_pos
+		{$#-3},1,1,1,x+4
+
+		shuffle.
+
+		if $limit repeat w { ('${arg{i[#$start_point,$>]}}':^) if s<$limit rm. fi }
+		else      repeat w { ('${arg{i[#$start_point,$>]}}':^) }
+		fi
+
 		rm[$start_point]
 	else
-		repeat $#-2 {
-			('${arg{$>+3}}':^)
-		}
+		if $limit repeat $#-3 { ('${arg{$>+4}}':^) if s<$limit rm. fi }
+		else      repeat $#-3 { ('${arg{$>+4}}':^) }
+		fi
 	fi
 fi
 
-max_s=${-max_s[$start_point--1]}
+if $!==$start_point
+	if !$output u "" fi
+	return
+fi
+
+{$!-$start_point},1,1,1,whds#($start_point+x)
+total_chars,max_whds,add_commas:=is#-1,iM#-1,w#-1-1
+rm.
 
 # Below code use modified DBJ2 algorithm
 start_of_hash_indice=$!
@@ -140,24 +158,27 @@ start_of_hash_indice=$!
 	hash_value&=bit_mask;
 	"
 # Above code use modified DBJ2 algorithm
-
 0x$size_of_dict_table
 
-N={$start_of_hash_indice-$start_point}
-{$max_s*$N+(!$output_images?$N-1)}
-if $output_images
-	$N,1,1,2
+diff={$start_of_hash_indice-$start_point}
+
+{$output==2?$diff:($total_chars+(!$output?$add_commas))}
+if $output==1
+	$diff,1,1,2
 fi
 
 eval[$start_of_hash_indice] >"begin(
-		const output_images=$output_images;
-		const info_start=$max_s;
+		const output=$output;
+		const info_start=$max_whds;
 		const vector_size=info_start;
 		const Is=$start_point;
 		const start_of_dict_table=k+1;
 		insertion_pos_list=vector(#$size_of_dict_table);
 		count_of_unique_strings=str_ins=0;
-		output_images?(
+		output==2?(
+			insert_info()=i[#-1,count_of_unique_strings]=p-Is;
+		):
+		output==1?(
 			insert_info()=(
 				copy(i[#-2,str_ins],i[#p,0],s#p);
 				I[#-1,count_of_unique_strings]=[str_ins,s#p];
@@ -173,33 +194,43 @@ eval[$start_of_hash_indice] >"begin(
 				str_ins+=s#p;
 			);
 		);
-
 	);
 	p=x+Is;
 	insertion_pos=insertion_pos_list[i];
 	door_pos=i+start_of_dict_table;
 	str_v=crop(#p,0,0,0,0,1,1,1,info_start);
+
 	s#p&&(insertion_pos?find(#door_pos,str_v,insertion_pos,-vector_size)==-1:1)?(
 		if(wh#door_pos==insertion_pos,
 			new_size=max(8,h(#door_pos)<<1);
 			resize(#door_pos,vector_size,new_size,1,1,-1);
 		);
+
 		copy(i[#door_pos,insertion_pos],str_v);
 		insertion_pos_list[i]+=vector_size;
 		insert_info();
 		++count_of_unique_strings;
 	);
-	end(
-		output_images?(
 
+	end(
+		output==2?(
+			resize(#-1,count_of_unique_strings,1,1,1,-1);
+		):
+		output==1?(
 			set('crop_point_str_col_info',str_ins-1);
 			set('crop_point_pos_info',count_of_unique_strings-1);
 		);
 	);
 	"
 
-if $output_images
-	if $2
+if $output==2
+	l[$start_point-{$start_of_hash_indice-1},-1] {
+		k[{crop(#-1)}]
+		E={$start_point+$!}
+	}
+	rm[$E--1]
+elif $output==1
+	if $use_images
 		rm[0--3]
 	else
 		rm[$start_point--3]
@@ -213,7 +244,7 @@ if $output_images
 		0
 	fi
 
-	u $max_s
+	u $max_whds
 else
 	u {t}
 	rm[$start_point--1]
@@ -280,8 +311,8 @@ if $case_insensitive
 	f. lowercase(i)
 fi
 
-+rep_uniq_args ~1,${9--1}                   # ~ is used to denote that arguments to be checked against are in random positions. Used to avoid bias.
-concat_str,max_string_length={$!-2},${}     # Status variable returned from rep_uniq_args gives highest string length
++rep_uniq_args 1,1,${9--1}
+max_string_length=${}
 
 if !$max_string_length
 	rm.
