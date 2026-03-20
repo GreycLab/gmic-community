@@ -296,7 +296,7 @@ else
 	u {t}
 	rm[$start_point--1]
 fi
-#@cli rep_sug_args: inp,_sep,_sug_mul_args={ 0=false | 1=true},0<_sim_res[%]<=100,-100<=_leven_jaro_blend[%]<=100,_exp,0<=_prefix_boost_factor[%]<=100,_case_insensitive={ 0=False | 1=True },arg0,arg1,...
+#@cli rep_sug_args: inp,_sep,_sug_mul_args={ 0=false | 1=true},0<_sim_res[%]<=100,-100<=_leven_jaro_blend[%]<=100,_exp,0<=_prefix_sw_blend[%]<=100,0<=_prefix_sw_factor[%]<=100,_case_insensitive={ 0=False | 1=True },arg0,arg1,...
 #@cli : Suggest arguments given input using modified Winklestein algorithm, with prefix boost factor.
 #@cli : Source of Winklestein algorithm: https://github.com/xreeple/winklestein
 #@cli :
@@ -317,9 +317,10 @@ fi
 #@cli : '_sep' is the separator between words (defaults to an empty string '').
 #@cli : '_sug_mul_args' : 1 = Multiple suggestions, 0 = Only the closest match.
 #@cli : '_sim_res' defines the minimum similarity score for a match to be accepted.
-#@cli : '_leven_jaro_blend' : Sets mix of two fuzzy-match options. [1][2][3][4][5]*
+#@cli : '_leven_jaro_blend' sets mix of two fuzzy-match options. [1][2][3][4][5]*
 #@cli : '_exp' scales the similarity score (default: 1).
-#@cli : '_prefix_boost_factor' defines how much to boost the prefix.
+#@cli : '_prefix_sw_blend' set mix of prefix and smith-waterman algorithm.
+#@cli : '_prefix_sw_factor' defines how much to boost the prefix/smith-waterman scoring.
 #@cli : '_case_insensitive' defines whether the algorithm is case-insensitive.
 #@cli : 'argN' is a list of words to compare the input against.
 #@cli : #--------------------------------------------------#
@@ -332,7 +333,7 @@ fi
 #@cli :
 #@cli : * Closer to -1 or 1 favors selected Jaro-Winkler variant. Positive value favors more forgiving Jaro-Winkler variant.
 #@cli :
-#@cli : Default values: 'sep=','_sug_mul_args=1','_sim_res=70%','_leven_jaro_blend=50%','_exp=1','_prefix_boost_factor=5%','_case_insensitive=1'
+#@cli : Default values: 'sep=','_sug_mul_args=1','_sim_res=70%','_leven_jaro_blend=50%','_exp=1','_prefix_lcs_factor=5%','_case_insensitive=1'
 rep_sug_args:
 skip "${1=}"
 check "isint('${2=}',0,2)&&
@@ -340,12 +341,13 @@ check "isint('${2=}',0,2)&&
        inrange(${4=70%},10%,100%,0,1)&&
        inrange(abs(${5=50%}),0%,100%,1,1)&&
        ${6=1}>0&&
-       inrange(${7=5%},0%,100%,1,1)&&
-       isbool(${8=1})"
+       inrange(${7=0%},0%,100%,1,1)&&
+       inrange(${8=5%},0%,100%,1,1)&&
+       isbool(${9=1})"
 
-sep,mul_args,sim_res,blend_between_levenshtein_and_jaro_winkler_algorithm,exp,prefix_boost_factor,case_insensitive,I=${2=},{[${3-8}]},$!
+sep,mul_args,sim_res,blend_between_levenshtein_and_jaro_winkler_algorithm,exp,prefix_smith_waterman_blend,prefix_smith_waterman_factor,case_insensitive,I=${2=},{[${3-9}]},$!
 abs_blend_between_levenshtein_and_jaro_winkler_algorithm,size_of_sep_chars,use_EXAM_SIM:=abs($blend_between_levenshtein_and_jaro_winkler_algorithm),size('$sep'),narg($_EXAM_SIM)?1;$_EXAM_SIM
-use_levenstein_dp_table={$prefix_boost_factor<1&&$abs_blend_between_levenshtein_and_jaro_winkler_algorithm<1}
+use_levenstein_dp_table={$prefix_smith_waterman_factor<1&&$abs_blend_between_levenshtein_and_jaro_winkler_algorithm<1}
 
 if !narg($1)
 	u --0000e0
@@ -358,7 +360,7 @@ if $case_insensitive
 	f. lowercase(i)
 fi
 
-+rep_uniq_args 1,1,${9--1}
++rep_uniq_args 1,1,${10--1}
 max_string_length=${}
 
 if !$max_string_length
@@ -392,13 +394,12 @@ if !$use_EXAM_SIM
 fi
 
 eval "
-	const prefix_boost_factor=$prefix_boost_factor;
-	const prefix_only=prefix_boost_factor==1;
-	const prefix_blend=!prefix_only&&prefix_boost_factor;
+	const prefix_smith_waterman_factor=$prefix_smith_waterman_factor;
+	const prefix_smith_waterman_only=prefix_smith_waterman_factor==1;
 	const leven_jaro_blend=$abs_blend_between_levenshtein_and_jaro_winkler_algorithm;
-	const blend_both=!prefix_only?leven_jaro_blend>0&&leven_jaro_blend<1;
-	const use_levensthein=!prefix_only?leven_jaro_blend<1;
-	const use_jaro_winkler=!prefix_only?leven_jaro_blend;
+	const blend_both=!prefix_smith_waterman_only?leven_jaro_blend>0&&leven_jaro_blend<1;
+	const use_levensthein=!prefix_smith_waterman_only?leven_jaro_blend<1;
+	const use_jaro_winkler=!prefix_smith_waterman_only?leven_jaro_blend;
 	const input_word_ind=$I;
 	const score_img_ind=$score_img_ind;
 	const num_of_words=w#$score_img_ind;
@@ -412,6 +413,18 @@ eval "
 	const max_possible_score=(L0*(L0+1))>>1;
 	const find_more_same=$mul_args&&$case_insensitive;
 	const use_EXAM_SIM=$use_EXAM_SIM;
+
+	if(prefix_smith_waterman_factor,
+		const prefix_smith_waterman_blend=$prefix_smith_waterman_blend;
+		const use_prefix_smith_waterman_blend=!isint(prefix_smith_waterman_blend);
+		const use_prefix=prefix_smith_waterman_blend<1;
+		if(prefix_smith_waterman_blend,
+			const IL1=L1+1;
+			const match=2;
+			const mismatch=-1;
+			const gap=-1;
+		);
+	);
 
 	if(use_jaro_winkler,
 		const jaro_version=$blend_between_levenshtein_and_jaro_winkler_algorithm<0;
@@ -457,14 +470,47 @@ eval "
 			);
 		);
 
-		if(prefix_boost_factor,
-			prefix_score=0;
-			repeat(min(L0,TL1),p,
-				if(i[#input_word_ind,p]==i[#str_col_ind,L1_pos+p],
-					prefix_score+=p+1;
+		if(prefix_smith_waterman_factor,
+			if(use_prefix,
+				prefix_score=0;
+				repeat(min(L0,TL1),p,
+					if(i[#input_word_ind,p]==i[#str_col_ind,L1_pos+p],
+						prefix_score+=p+1;
+					);
+				);
+				prefix_score/=max_possible_score;
+			);
+
+			if(prefix_smith_waterman_blend,
+				smith_waterman_score=0;
+				if(TL1>=L0,
+					dp=vector(#IL1);
+					p=q=0;
+					while(++p<=L0,
+						prev=dp[0];q=0;
+						while(++q<=TL1,
+							temp=dp[q];
+							i[#input_word_ind,p-1]==i[#str_col_ind,L1_pos+q-1]?(
+								dp[q]=max(0,prev+match);
+							):(
+								dp[q]=max(0,prev+mismatch,dp[q-1]+gap,dp[q]+gap);
+							);
+							smith_waterman_score=max(smith_waterman_score,dp[q]);
+							prev=temp;
+						);
+					);
+					smith_waterman_score/=L0*match;
 				);
 			);
-			prefix_score/=max_possible_score;
+
+			use_prefix_smith_waterman_blend?(
+				prefix_smith_waterman_score=lerp(prefix_score,smith_waterman_score,prefix_smith_waterman_blend);
+			):
+			use_prefix?(
+				prefix_smith_waterman_score=prefix_score;
+			):(
+				prefix_smith_waterman_score=smith_waterman_score;
+			);
 		);
 
 		if(use_levensthein,
@@ -536,13 +582,13 @@ eval "
 		use_levensthein?(
 			score=levenshtein_score;
 		):(
-			score=prefix_score;
+			score=prefix_smith_waterman_score;
 		);
 
 		score^=power;
 
-		if(prefix_blend,
-			score=lerp(score,prefix_score,prefix_boost_factor);
+		if(prefix_smith_waterman_factor,
+			score=lerp(score,prefix_smith_waterman_score,prefix_smith_waterman_factor);
 		);
 
 		use_EXAM_SIM?(
@@ -929,7 +975,7 @@ __rep_xp2b_check_arg:
 l[] {
 	check narg(${A$1})
 	onfail
-		closest_arg=${rep_sug_args\ $1,,0,50%,50%,1,0%,0,$b0,$b1,$b2,$b3,$b4}
+		closest_arg=${rep_sug_args\ $1,,0,50%,50%,1,0,0%,0,$b0,$b1,$b2,$b3,$b4}
 		repeat 5 {
 			L=${rep_pf_args\ ',${b$>}}
 			if isin('$closest_arg',$L)
@@ -20101,7 +20147,7 @@ l[] {
 	}
 
 	onfail
-		closest_args=${rep_sug_args\ $m,,1,66%,-97.5%,.9,25%,0,${-_pal_ids}}
+		closest_args=${rep_sug_args\ $m,,1,66%,-97.5%,.9,0,25%,0,${-_pal_ids}}
 
 		if same('$closest_args','--0000e0')
 			e "ERROR: Invalid value '"$M"'. No close match found!"\n
