@@ -9111,7 +9111,151 @@ check "
 			);
 		);
 	);"
+#@cli rep_rde_compsel_poss_index2list: total_selection,number_of_item,index : number_of_item_group,total_selection,index
+#@cli : Return the possibility in which at least 1 item from each item group is selected given N size at index.
+#@cli : Author: Reptorian.
+rep_rde_compsel_poss_index2list:
+check isint($1,1)&&isint($2,1)&&isfinite($3)
+t,k:=$1>$2?[$1,$2]:[$2,$1]
 
+# total_possibilities={${-_rep_rde_lib_sterling_number_of_second_kind};fact($k)*sterling_number_of_second_kind($t,$k)}
+
+eval "
+	const H=$t;
+	const W=$k;
+	const iW=W+1;
+	const iH=H+1;
+	const dp_size=iW*iH;
+
+	dp=vector(#dp_size);
+	dp[0]=1;
+
+	idx(a,b)=a+b*iW;
+
+	iy=0;
+	while(++iy<=H,
+		repeat(iy+1,ix,
+			used=W-ix;
+			val=used*dp[idx(ix,iy-1)];
+			if(ix,
+				val+=ix*dp[idx(ix-1,iy-1)];
+			);
+			dp[idx(ix,iy)]=val;
+		);
+	);
+
+	seen=vector(#W);
+	used=0;
+	index=$3%dp[dp_size-1];
+	result=vector(#H);
+	rp=0;
+
+	repeat(H,p,
+		remaining=H-p-1;
+		Wu=(W-used)-[1,0];
+		repeat(iW,q,
+			new_missing=Wu[seen[q]];
+			count=dp[idx(new_missing,remaining)];
+			if(index<count,
+				result[rp++]=q;
+				if(!seen[q],
+					seen[q]=1;
+					++used;
+				);
+				break();
+			);
+			index-=count;
+		);
+		if(index<0,break(););
+	);
+
+	result;"
+#@cli rep_rde_compsel_poss_list2index: number_list
+#@cli : Return the rank of the possibility in which at least 1 item from each item group is selected given N size.
+rep_rde_compsel_poss_list2index:
+max_val={max($*)}
+
+check "nl=[$*];
+       const n_items=$max_val+1;
+       if(isfinite(n_items)&&n_items<=size(nl),
+           set_item=vector(#n_items);
+           group_checked=0;
+           repeat(size(nl),p,
+              v=nl[p];
+              if(isint(nl[p])&&isfinite(v),
+                  if(!set_item[v],
+                      set_item[v]=1;
+                      ++group_checked;
+                  );
+              );
+           );
+           group_checked==n_items;
+       );"
+
+if $max_val+1==$#
+	rep_permutation_list2index $*
+	return
+fi
+
+eval "
+	const H=$#;
+	const W=$max_val+1;
+	const iW=W+1;
+	const iH=H+1;
+	const dp_size=iW*iH;
+
+	dp=vector(#dp_size);
+	dp[0]=1;
+
+	idx(a,b)=a+b*iW;
+
+	iy=0;
+	while(++iy<=H,
+		repeat(iy+1,ix,
+			used=W-ix;
+			val=used*dp[idx(ix,iy-1)];
+			if(ix,
+				val+=ix*dp[idx(ix-1,iy-1)];
+			);
+			dp[idx(ix,iy)]=val;
+		);
+	);
+
+	seen=vector(#W);
+	used=index=0;
+	nl=[$*];
+
+	repeat(H,p,
+		remaining=H-p-1;
+		pv=nl[p];
+		Wu=(W-used)-[1,0];
+
+		repeat(pv,v,
+			new_missing=Wu[seen[v]];
+			index+=dp[idx(new_missing,remaining)];
+		);
+
+		if(!seen[pv],
+			seen[pv]=1;
+			++used;
+		);
+	);
+
+	index;"
+_rep_rde_lib_sterling_number_of_second_kind:
+u "sterling_number_of_second_kind(_a,_b)=(
+        ref(vector(##_a-_b+1,1),_arr);
+        _max_q=_a-_b;
+        _i_max_q=_max_q+1;
+        for(_p=2,_p<=_b,++_p,
+            for(_q=1,_q<_i_max_q,++_q,
+                _arr[_q]+=_p*_arr[_q-1];
+            );
+        );
+        _res=_arr[_max_q];
+        unref(_arr);
+        _res;
+    );"
 u item_count_groups,item_selection=\"$A\",\"$B\"
 #@cli rep_inc_combinations: size,_axis={x,y,z}
 #@cli : Generate all of the possible incremental combination.
