@@ -79,39 +79,31 @@ repeat $#-1 {
 }
 
 u $o
-#@cli rep_substr_ret_args: substr,_use_randomization,[arg0,arg1,....]
-#@cli : Return arguments contains substring.
-#@cli : Returns '--0000e0' if no substr is found within arguments.
-#@cli : Default values: '_use_randomization=1'
-rep_substr_ret_args:
-substr,I=$1,$!
-_rep_dedup_strval_dict 2,{size('$1')},0,${3--1}
-
-if $!==$I
-	u --0000e0
-	return
-fi
-
-{$!-$I}
-
-eval. >begin(p=0;);q=x+$I;if(find(#q,[{'$1'}],0,1)!=-1,i[#-1,p++]=q;);end(set('\{\}',p););_0;
-
-if ${}
-	crop. 0,{${}-1}
-
-	if ${2=1} shuffle. fi
-
-	repeat w {
-		o.=$S{`crop(#{i[#-1,$>]})`}
-		S=,
-	}
-
-	u $o
-else
-	u --0000e0
-fi
-
-rm[$I--1]
+#@cli rep_concat_imgs_vals_uniq
+#@cli : Deduplicate images based on their pixel values using a hash table, then output images describing the unique serialized values.
+#@cli :
+#@cli : Each image is internally serialized as a string of its values. Images
+#@cli : with identical value sequences are considered duplicates.
+#@cli :
+#@cli : Outputs a string-table representation of the unique images:
+#@cli :   - image[0]: concatenation of serialized image value strings
+#@cli :   - image[1]: [offset,length] per entry (ch0=offset, ch1=length)
+#@cli :
+#@cli : Warning! This should only be used for small images with different dimensions.
+#@cli :
+#@cli : Also returns the length of the longest image.
+rep_concat_imgs_vals_uniq:
+remove_duplicates I=$!
+{sum(expr('whds#x',$I))} $I,1,1,2
+eval "
+	p=0;
+	repeat($I,q,
+		copy(i[#-2,p],i[#q,0],whds#q);
+		I[#-1,q]=[p,whds#q];
+		p+=whds#q;
+	);
+	"
+k[-2,-1]
 #@cli rep_uniq_args: output_mode={ 0=status | 1=string_table_images | 2=str2imgs },randomize_str_pos={ 0=False | 1=True },[arg0,arg1,...]
 #@cli : Deduplicate input strings.
 #@cli :
