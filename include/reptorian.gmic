@@ -7662,25 +7662,35 @@ check "$8!=0"
 			yp=oscil_b(yp,txp);
 		);
 		norm(xp,yp);"
-#@cli rep_permutations: init_num,_axis={x,y,z}
+#@cli rep_permutations: init_num,(_axis={x,y,z})
 #@cli : Return all the permutations of set of numbers as a image.
 #@cli :
 #@cli : Finding the next permutation has been adapted from this link -> https://www.techiedelight.com/find-permutations-string-cpp-java-iterative/
 #@cli : Finding the permutation at point index within this code is of the author.
+#@cli : Note : If '_axis' is not x,y,or z, then returns quantity only.
 #@cli : Author : Reptorian.
 #@cli : Default values: '_axis=x'
 +rep_permutations:
 skip ${2=x}
 
-check "inrange($1,0,10,1,1)&&$1==int($1)&&inrange(('$2')[0],_'x',_'z',1,1)"
+fact={fact($1)}
+
+check isint($1,1)&&$#==2
+
+if !isint(_'$2',_'x',_'z')
+	u $fact
+	return
+fi
+
+check $1<10
 
 if $1==1 1 return fi
 
 old_status=${}
 
-axis,fact_size={_'$2'-_'x'},{fact($1)}
+axis={_'$2'-_'x'}
 
-{v=vector(#3,1);v[$axis]=$fact_size;v},$1
+{v=vector(#3,1);v[$axis]=$fact;v},$1
 
 if $1>7 mode=: else mode=> fi
 
@@ -7803,34 +7813,39 @@ if $#>1
 else
 	u 0
 fi
-#@cli rep_npr_permutations: number_of_items,selected_items_count,_axis={x|y|z}
+#@cli rep_npr_permutations: number_of_items,selected_items_count,(_axis={x|y|z}) :  selected_items_count,number_of_items,(_axis={x|y|z})
 #@cli : Generates partial combination. P(n,k)
 #@cli : Note - Code is taken from Alistairisrael pseudo-code - https://alistairisrael.wordpress.com/2009/09/22/simple-efficient-pnk-algorithm/
+#@cli : Note #2 - If '_axis' is not x,y,or z, then returns quantity only.
 #@cli : Default values: '_axis=x'
 +rep_npr_permutations:
 skip ${3=x}
 
-check "($1>=$2&&$1>0&&isint($1))&&($2>0&&isint($2))&&inrange(_'$3',_'x',_'z',1,1)"
+check isint($1,1)&&isint($2,1)&&$#==3
+
+k,n:=sort([${1-2}])
+
+N={perm($k,$n,1)}
+
+if !isint(_'$3',_'x',_'z')
+	u $N
+	return
+fi
 
 if [${1-2}]==[1,1] 1 return fi
 
-num_of_permutations,axis={perm($2,$1,1)},{_'$3'-_'x'}
-
-if $axis==2   out_dim=1,1,$num_of_permutations
-elif $axis==1 out_dim=1,$num_of_permutations,1
-else          out_dim=$num_of_permutations,1,1
-fi
-
-if $2==1 $out_dim,1,${arg0\ $axis,x,y,z} return fi
+axis={_'$3'-_'x'}
+out_dim={d=[1,1,1];d[$axis]=$N;d;}
+if $k==1 $out_dim,1,${arg0\ $axis,x,y,z} return fi
 
 old_status=${}
 
-$out_dim,$2
+$out_dim,$k
 +rep_mt_f32v_map {[whd#-1,whd#-1>>12]},0
 eval. :"
 	const s=s#-2;
 	const edge=s-1;
-	const n=$1;
+	const n=$n;
 	const dec_n=n-1;
 
 	output=expr('x',n);
@@ -7850,11 +7865,11 @@ eval. :"
 	);
 
 	division_numbers_arr=expr('begin(
-			const m=($1==$2?1:$1-$2)+1;
+			const m=($n==$k?1:$n-$k)+1;
 			v=m;
 		);
 		x>1?v=v*(m+x-1):(x?v:1);'
-	,1+($1==$2?$1-2:min($1-1,$2-1)));
+	,1+($n==$k?$n-2:min($n-1,$k-1)));
 
 	const size_dna=size(division_numbers_arr);
 
@@ -8013,11 +8028,19 @@ rep_cartesian_product_list2index {vector(#$#-1,$1)},${2--1}
 #@cli : Code has been adapted from sleeepjack's Python 2 code executing Algorithm 515 only in case when non-zero index is used to find combination at a point - https://github.com/sleeepyjack/alg515/blob/master/python/alg515.py
 #@cli :
 #@cli : Note: If $2 is greater than $1, then $2 is number of items and $1 is choices. Only positive integer numbers are accepted!
+#@cli : Note #2: If '_axis' is not x,y,or z, then returns quantity only.
 #@cli : Default values: '_axis=x'
 +rep_ncr_combinations:
 skip ${3=x}
 
-check "($1>0&&$2>0)&&(isint($1)&&isint($2))&&inrange(_'$3',_'x',_'z',1,1)"
+check isint($1,1)&&isint($2,1)&&$#==3
+
+num_combs={perm($choices,$n_items,0}
+
+if !isint(_'$3',_'x',_'z')
+	u $num_combs
+	return
+fi
 
 if $1==$2 1,1,1,$1,c return fi
 
@@ -8027,7 +8050,7 @@ if $choices==1 $n_items,1,1,1,x return fi
 
 old_status=${}
 
-num_combs,axis:=perm($choices,$n_items,0),_'$3'-_'x'
+axis={_'$3'-_'x'}
 
 if $num_combs>33554432 error excess_combs fi
 
@@ -8179,23 +8202,28 @@ eval "
 	);
 
 	idx;"
-#@cli rep_r_combinations: number_of_items>0,choices>0,_axis={x,y,z}
+#@cli rep_r_combinations: number_of_items>0,choices>0,(_axis={x,y,z})
 #@cli : Create image representing combinations given number of items and choices with repeating numbers. Empty item is a item by itself.
 #@cli : Code to find combinations given index is taken from Joseph Wood at codereview.stackexchange - https://codereview.stackexchange.com/questions/285415/find-the-list-of-combination-with-repetition-given-rank-and-number-of-items/287944#287944
+#@cli : Note #2: If '_axis' is not x,y,or z, then returns quantity only.
 #@cli : Author : Reptorian.
 +rep_r_combinations:
 skip ${3=x}
 
-check "($1>0&&$2>0)&&(isint($1)&&isint($2))&&inrange(_'$3',_'x',_'z',1,1)"
+check isint($1,1)&&isint($2,1)&&$#==3
 
 old_status=${}
 
 n_items,choices=$1,$2
-num_combs,axis:=perm($choices,$n_items+$choices-1,0),_'$3'-_'x'
+num_combs={perm($choices,$n_items+$choices-1,0)}
 
-out_dim={D=[1,1,1];D[$axis]=$num_combs;D;}
+if !isint(_'$3',_'x',_'z')
+	u $num_combs
+	return
+fi
 
-$out_dim,$choices
+axis={_'$3'-_'x'}
+{D=[1,1,1];D[$axis]=$num_combs;D;},$choices
 +rep_mt_f32v_map {[whd#-1,whd#-1>>13]},0
 eval. :"
 	const S=s#-2;
@@ -8309,28 +8337,39 @@ eval "
 	index;"
 #@cli rep_cartesian_product: number_of_items_a,number_of_items_b,...,_axis
 #@cli : Output image representing cartesian product based on input.
+#@cli : If _axis is not a number of one of the following chars (x,y,z), then it returns product of items_counts.
 #@cli : Default values: '_axis=x'
 +rep_cartesian_product:
 if isnum($-1)&&isint($-1)
-	axis,user_xyz=0
-elif inrange(_'$-1',_'x',_'z',1,1)
-	axis,user_xyz={_'$-1'-_'x'},1
+	axis,use_char_at_end,return_quantity=0
+elif isint($-1,_'x',_'z')
+	axis,use_char_at_end,return_quantity={_'$-1'-_'x'},1,0
+elif !isnum($-1)
+	use_char_at_end,return_quantity=1,1
 else
-	error invalid_char
+	error fin_inp
 fi
 
-vars2chk={$#-$user_xyz}
-v_list={abs(([$*])[0,$vars2chk])}
-n_vars_isint,all_valid={v=[$v_list];[sum(isint(v)),min(v)]}
+if $use_char_at_end
+	v_list:=abs([${1--2}])
+else
+	v_list:=abs([$*])
+fi
 
-if !$all_valid error var_0_error fi
-if $n_vars_isint!=$vars2chk invalid_var_inp fi
+check same(isint([$v_list],1),1)
 
-dims,s_size={v=[$v_list];[prod(v),size(v)];}
+prod_v:=prod($v_list)
 
-if $dims>33554432 error dims_lim_exc fi
+if $return_quantity
+	u $prod_v
+	return
+fi
 
-dims={v=vector(#3,1);v[$axis]=$dims;v;}
+s_size={narg($v_list)}
+
+if $prod_v>33554432 error dims_lim_exc fi
+
+dims={v=vector(#3,1);v[$axis]=$prod_v;v;}
 
 if max($v_list)==1 1,1,1,$s_size return
 elif $s_size==1 $dims,1,${arg0\ $axis,x,y,z} return
@@ -9111,17 +9150,26 @@ check "
 			);
 		);
 	);"
-#@cli rep_rde_compsel_poss: total_selection,number_of_item,_axis={ x | y | z} : number_of_item,total_selection,_axis={ x | y | z}
-#@cli : Return all the possibilities and arrangement where at least one copy of item is selected as a image.
+#@cli rep_rde_compsel_poss: total_selection,number_of_item,(_axis={x|y|z}) : number_of_item,total_selection,(_axis={x|y|z})
+#@cli : Return all arrangements of `total_selection` items over `number_of_item` types
+#@cli : where each type appears at least once. By default, outputs an image.
+#@cli : Note: If '_axis' is not x,y,or z, then returns quantity only.
 #@cli : Code generated by ChatGPT and Claude, guided by Reptorian. Rigorously tested and works.
 +rep_rde_compsel_poss:
 skip ${3=x}
-check isint($1,1)&&isint($2,1)&&isint(('$3')[0],_'x',_'z')
-t,k:=$1>$2?[$1,$2]:[$2,$1]
 
+check isint($1,1)&&isint($2,1)&&$#==3
+t,k:=$1>$2?[$1,$2]:[$2,$1]
 if $t==$k +rep_permutations $t,$3 return fi
 
-axis,total_possibilities={[(_'$3'-_'x'),${-_rep_rde_lib_sterling_number_of_second_kind};fact($k)*sterling_number_of_second_kind($t,$k)]}
+total_possibilities={${-_rep_rde_lib_sterling_number_of_second_kind};fact($k)*sterling_number_of_second_kind($t,$k)}
+
+if !isint(_'$3',_'x',_'z')
+	u $total_possibilities
+	return
+fi
+
+axis={_'$3'-_'x'}
 {d=[1,1,1];d[$axis]=$total_possibilities;d;},$t
 
 +rep_mt_f32v_map {$total_possibilities>>[0,8]}
