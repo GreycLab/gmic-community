@@ -9441,32 +9441,72 @@ fi
 
 axis={_'$3'-_'x'}
 
-{d=[1,1,1];d[$axis]=$N;d;},$t,>"begin(
+{v=vector(#3,1);v[$axis]=$N;v},$1
+
++rep_mt_f32v_map {$N>>[0,12]},0
+
+eval. :"begin(
+		const t=$t;
 		const k=$k;
 		const dk=k-1;
-		const P=s;
+		const dt=t-1;
+		const N=whd#-2;
+		gosper_hack()=(
+			g0=cn&-cn;
+			g1=cn+g0;
+			cn=int((xor(cn,g1)>>2)/g0)|g1;
+		);
+		step()=(
+			ik=dk;n=cn;
+
+			p=t;
+
+			while(n,
+				r[--p]=n&1?(ik--):ik;
+				n>>=1;
+			);
+
+			gosper_hack();
+			I[#-2,x]=r;
+		);
+	);
+
+	j=J(-1);
+	x=j[0]<<24|j[1];
+	i=i0<<24|i1;
+
+	r=vector(#t);
+
+	x?(
+		index=N-1-x;
+		p=ix=0;
+		ik=dk;
+		while(++p<t,
+			if(ik,
+				block=perm(ik-1,dt-p,0);
+				index<block?(
+					++ix;
+					--ik;
+				):(
+					index-=block;
+				);
+			);
+			r[p]=ix;
+		);
+		p=cn=0;
+		while(++p<t,if(r[p]>r[p-1],cn|=1<<(dt-p);););
+		gosper_hack();
+		I[#-2,x]=r;
+	):(
 		cn=(1<<dk)-1;
+		step();
 	);
 
-	ik=dk;n=cn;
+	while(++x<i,step(););
 
-	r=vector(#s);
-
-	p=P;
-
-	while(n,
-		r[--p]=n&1?(ik--):ik;
-		n>>=1;
-	);
-
-	# Gosper's Hack to change cn
-	g0=cn&-cn;
-	g1=cn+g0;
-
-	cn=int((xor(cn,g1)>>2)/g0)|g1;
-	# End of Hack
-
-	r;"
+	_0;
+	"
+rm.
 #@cli rep_rde_compsel_comb_index2list: total_selection>=1, group_items>=1,index : group_items>=1,total_selection>=1,index
 #@cli : Returns the combination that contains at least 1 items that corresponds to the index.
 rep_rde_compsel_comb_index2list:
