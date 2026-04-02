@@ -8489,7 +8489,7 @@ if $return_quantity
 fi
 
 if $number_of_possible_permutations>(1<<24)
-	error exc_permut_val:$number_of_string_permutations
+	error exc_permut_val:$number_of_possible_permutations
 fi
 
 if ($number_of_possible_permutations*$total_items_count)>0x20000
@@ -10084,6 +10084,299 @@ eval "
 		if(!S,break(););
 	);
 	index;
+	"
+#@cli rep_sum_combinations: limit>=0,size>0,(_axis={x|y|z})
+#@cli : Create a image representing every possible combinations of numbers of fixed size which sum of non-negative integers is up to integer limit.
+#@cli : Note: If '_axis' is not x,y,or z, then returns quantity only.
+#@cli : Author: Reptorian.
+rep_sum_combinations:
+skip ${3=x}
+
+check isint($1,0)&&isint($2,1)&&$2<=$1&&$#==3
+
++_rep_sum_combinations_create_dp_table ${1-2}
+q={i(#-1,$1,$2,0,0)<<24|i(#-1,$1,$2,0,1)} rm.
+
+if !isint(_'$3',_'x',_'z')
+	u $q
+	return
+fi
+
+axis={_'$3'-_'x'}
+
+{d=[1,1,1];d[$axis]=$q;d;},$2,>"begin(
+		const n=$1;
+		const k=$2;
+		const dk=k-1;
+		const d_dk=dk-1;
+		r=vector(#s);
+		prefix=vector(#k);
+		lim=n;
+		started=0;
+	);
+	started?(
+		if(++r[dk]>lim,
+			kp=[d_dk,2];
+
+			while(kp[0]>=0,
+				if((++r[kp[0]])*kp[1]+prefix[kp[0]]<=n,
+					break();
+				);
+
+				kp+=[-1,1];
+			);
+
+			copy(r[kp[0]+1],r[kp[0]],dk-kp[0],1,0);
+
+			for(p=kp[0],p<dk,++p,
+				prefix[p+1]=prefix[p]+r[p];
+			);
+
+			lim=n-prefix[dk];
+		);
+	):(
+		started=1;
+	);
+	r;
+	"
+#@cli rep_sum_combination_index2list: limit>=0,size>0,index
+#@cli : Return the list that corresponds to input.
+#@cli : Author: Reptorian.
+rep_sum_combination_index2list:
+check isint($1,0)&&isint($2,1)&&$2<=$1&&isfinite($3)&&isint($3)
+
++_rep_sum_combinations_create_dp_table ${1-2}
+
+eval "
+	f2i(V)=V[0]<<24|V[1];
+
+	const n=$1;
+	const k=$2;
+	const in=n+1;
+	const dk=k-1;
+
+	r=vector(#k);
+
+	idx=$3%f2i(I(#-1,n,k));
+	prefix_sum=min_val=0;
+
+	repeat(dk,p,
+		ck=k-p;
+
+		for(q=min_val,q<in,++q,
+			shifted = n - prefix_sum - q*ck;
+
+			if(shifted<0,break(););
+
+			count=f2i(I(#-1,shifted,ck-1));
+
+			if(idx<count,
+				r[p]=q;
+				prefix_sum+=q;
+				min_val=q;
+				break();
+			);
+
+			idx-=count;
+		);
+	);
+
+	r[dk]=min_val+idx;
+
+	r;"
+
+rm.
+#@cli rep_sum_combination_list2index: limit>=0,list_arg_1,list_arg_2,...
+#@cli : Return the index of combination that is less than or equal to limit.
+#@cli : Author: Reptorian.
+rep_sum_combination_list2index:
+list_size={$#-1}
+check isint($1,0)&&sum(${2--1})<=$1&&same(isint([${2--1}],0),1)&&$list_size<=$1&&$#>=2
++_rep_sum_combinations_create_dp_table $1,$list_size
+
+eval "
+	f2i(V)=V[0]<<24|V[1];
+	r=sort([${2--1}]);
+
+	const n=$1;
+	const k=$list_size;
+	const dk=k-1;
+
+	idx=0;
+	prefix_sum=min_val=0;
+
+	repeat(dk,p,
+		ck=k-p;
+		for(q=min_val,q<r[p],++q,
+			shifted=n-prefix_sum-q*ck;
+			if(shifted>=0,
+				idx+=f2i(I(#-1,shifted,ck-1));
+			);
+		);
+		prefix_sum+=r[p];
+		min_val=r[p];
+	);
+
+	idx+=r[dk]-min_val;
+
+	idx;
+	"
+
+rm.
++_rep_sum_combinations_create_dp_table:
+{[$1,$2]+1},1,2
+
+eval "
+	copy(i(#-1,0,0,0,1),1,w#-1,1,0);
+	expr('>begin(
+			const m=(1<<24)-1;
+			f2i(V)=V[0]<<24|V[1];
+			i2f(I)=[I>>24,I&m];
+		);
+		k=y+1;
+		a=f2i(I(#-1,x,k-1));
+		b=f2i(x>=k?I(#-1,x-k,k));
+		sum_ab=a+b;
+		I(#-1,x,k)=i2f(sum_ab);
+		_0;
+		',w+1,h,1,1);
+	0;
+	"
+#@cli rep_total_sum_combinations: limit>=0,size>0,(_axis={x|y|z})
+#@cli : Create a image representing every possible combinations of numbers of fixed size which sum of non-negative integers is up to integer limit.
+#@cli : Note: If '_axis' is not x,y,or z, then returns quantity only.
+#@cli : Author: Reptorian.
+rep_total_sum_combinations:
+skip ${3=x}
+
+check isint($1,0)&&isint($2,1)&&$2<=$1&&$#==3
+
++_rep_total_sum_combinations_create_dp_table ${1-2}
+q={i(#-1,$1,$2,0,0)<<24|i(#-1,$1,$2,0,1)} rm.
+
+if !isint(_'$3',_'x',_'z')
+	u $q
+	return
+fi
+
+axis={_'$3'-_'x'}
+
+{d=[1,1,1];d[$axis]=$q;d;},$2,>"begin(
+		const n=$1;
+		const k=$2;
+		const dk=k-1;
+		const d_dk=dk-1;
+		r=vector(#s);
+		r[dk]=n;
+		started=0;
+		prefix=vector(#k);
+	);
+	started?(
+		++r[d_dk];
+		r[dk]=n-(prefix[d_dk]+r[d_dk]);
+		if(r[d_dk]>r[dk],
+			kp=[d_dk,2];
+
+			while(kp[0]>=0,
+				if((++r[kp[0]])*kp[1]+prefix[kp[0]]<=n,
+					break();
+				);
+
+				kp+=[-1,1];
+			);
+
+			copy(r[kp[0]+1],r[kp[0]],dk-kp[0],1,0);
+
+			for(p=kp[0],p<dk,++p,
+				prefix[p+1]=prefix[p]+r[p];
+			);
+
+			r[dk]=n-prefix[dk];
+		);
+	):(
+		started=1;
+		0;
+	);
+	r;
+	"
+#@cli rep_total_sum_combination_index2list: limit>=0,size>0,(_axis={x|y|z})
+#@cli : Return the list of combination that matchs up exactly to limit corresponding to index.
+#@cli : Author: Reptorian.
+rep_total_sum_combination_index2list:
+check isint($1,0)&&isint($2,1)&&$2<=$1&&isfinite($3)&&isint($3)
++_rep_total_sum_combinations_create_dp_table ${1-2}
+
+eval "
+	f2i(V)=V[0]<<24|V[1];
+	const target_sum=$1;
+	const size=$2;
+	idx=$3%f2i(I(#-1,${1-2}));
+	r=vector(#size);
+	rem=target_sum;
+	min_val=0;
+	repeat(size-1,p,
+		ck=size-p;
+		for(q=min_val,q<rem+1,++q,
+			shifted=rem-q*ck;
+			count=shifted>=0?f2i(I(#-1,shifted,ck-1));
+			if(idx<count,
+				r[p]=q;
+				rem-=q;
+				min_val=q;
+				break();
+			);
+			idx-=count;
+		);
+	);
+	r[size-1]=rem;
+	r;
+	"
+rm.
+#@cli rep_total_sum_combination_list2index: list_arg_1,list_arg_2...
+#@cli : Return the index of list of combination of number that adds up exactly to the sum of list of numbers.
+#@cli : Author: Reptorian.
+rep_total_sum_combination_list2index:
+check same(isint([$*],0),1)
+t,k:=sum($*),$#
++_rep_total_sum_combinations_create_dp_table $t,$k
+
+eval "
+	f2i(V)=V[0]<<24|V[1];
+	const k=$#;
+	list=sort([$*]);
+	r=0;
+	rem=$t;
+	repeat(k-1,p,
+		min_val=p?list[p-1];
+		ck=k-p;
+		for(q=min_val,q<list[p],++q,
+			shifted=rem-q*ck;
+			if(shifted>=0,
+				r+=f2i(I(#-1,shifted,ck-1));
+			);
+		);
+		rem-=list[p];
+	);
+	r;
+	"
+rm.
++_rep_total_sum_combinations_create_dp_table:
+{[$1,$2]+1},1,2 =. 1,0,0,0,1
+
+eval "
+	expr('>begin(
+			const m=(1<<24)-1;
+			f2i(V)=V[0]<<24|V[1];
+			i2f(I)=[I>>24,I&m];
+		);
+		k=y+1;
+		a=f2i(I(#-1,x,k-1));
+		b=f2i(x>=k?I(#-1,x-k,k));
+		sum_ab=a+b;
+		I(#-1,x,k)=i2f(sum_ab);
+		_0;
+		',w+1,h,1,1);
+	0;
 	"
 #@cli rep_string_permutations: string,_axis,_sort_string={ 0=do_not_sort_string | 1=sort_string | 2=logical_sort_string }
 #@cli : Return all the unique permutations of characters of string as a image with values representing the unicode representation of characters in input string. Permutations is dependent on character appearance order.
