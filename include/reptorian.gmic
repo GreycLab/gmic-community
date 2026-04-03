@@ -10089,32 +10089,80 @@ eval "
 #@cli : Create a image representing every possible combinations of numbers of fixed size which sum of non-negative integers is up to integer limit.
 #@cli : Note: If '_axis' is not x,y,or z, then returns quantity only.
 #@cli : Author: Reptorian.
-rep_sum_combinations:
++rep_sum_combinations:
 skip ${3=x}
-
 check isint($1,0)&&isint($2,1)&&$2<=$1&&$#==3
 
 +_rep_sum_combinations_create_dp_table ${1-2}
-q={i(#-1,$1,$2,0,0)<<24|i(#-1,$1,$2,0,1)} rm.
+I,q:=$!-1,i(#-1,$1,$2,0,0)<<24|i(#-1,$1,$2,0,1)
 
 if !isint(_'$3',_'x',_'z')
+	rm.
 	u $q
 	return
 fi
 
 axis={_'$3'-_'x'}
 
-{d=[1,1,1];d[$axis]=$q;d;},$2,>"begin(
-		const n=$1;
-		const k=$2;
-		const dk=k-1;
-		const d_dk=dk-1;
-		r=vector(#s);
-		prefix=vector(#k);
-		lim=n;
-		started=0;
++rep_mt_f32v_map {$q>>[0,16]}
+
+if w==1 rm.. fi
+
+{d=[1,1,1];d[$axis]=$q;d;},$2
+
+eval.. :"
+	const use_dp_img=w>1;
+
+	const n=$1;
+	const k=$2;
+	const dk=k-1;
+	const d_dk=dk-1;
+	r=prefix=vector(#k);
+
+	if(use_dp_img,
+		const in=n+1;
+		f2i(V)=V[0]<<24|V[1];
 	);
-	started?(
+
+	t=J(-1);
+	P=t[0]<<24|t[1];
+	Q=i0<<24|i1;
+
+	if(use_dp_img&&P,
+		idx=P;
+		prefix_sum=min_val=0;
+		repeat(dk,p,
+			ck=k-p;
+
+			for(q=min_val,q<in,++q,
+				shifted = n - prefix_sum - q * ck;
+
+				if(shifted<0,break(););
+
+				count=f2i(I(#-3,shifted,ck-1));
+
+				if(idx<count,
+					r[p]=q;
+					prefix_sum+=q;
+					min_val=q;
+					break();
+				);
+
+				idx-=count;
+			);
+		);
+
+		r[dk]=min_val+idx;
+
+		repeat(dk,p,
+			prefix[p+1]=prefix[p]+r[p];
+		);
+	);
+
+	lim=n-prefix[dk];
+	I[#-1,P]=r;
+
+	while(++P<Q,
 		if(++r[dk]>lim,
 			kp=[d_dk,2];
 
@@ -10134,11 +10182,14 @@ axis={_'$3'-_'x'}
 
 			lim=n-prefix[dk];
 		);
-	):(
-		started=1;
+
+		I[#-1,P]=r;
 	);
-	r;
+
+	_0;
 	"
+
+rm[$I--2]
 #@cli rep_sum_combination_index2list: limit>=0,size>0,index
 #@cli : Return the list that corresponds to input.
 #@cli : Author: Reptorian.
@@ -10246,32 +10297,80 @@ eval "
 #@cli : Create a image representing every possible combinations of numbers of fixed size which sum of non-negative integers is up to integer limit.
 #@cli : Note: If '_axis' is not x,y,or z, then returns quantity only.
 #@cli : Author: Reptorian.
-rep_total_sum_combinations:
++rep_total_sum_combinations:
 skip ${3=x}
 
 check isint($1,0)&&isint($2,1)&&$2<=$1&&$#==3
 
 +_rep_total_sum_combinations_create_dp_table ${1-2}
-q={i(#-1,$1,$2,0,0)<<24|i(#-1,$1,$2,0,1)} rm.
+I,q:=$!-1,i(#-1,$1,$2,0,0)<<24|i(#-1,$1,$2,0,1)
 
 if !isint(_'$3',_'x',_'z')
+	rm.
 	u $q
 	return
 fi
 
 axis={_'$3'-_'x'}
 
-{d=[1,1,1];d[$axis]=$q;d;},$2,>"begin(
-		const n=$1;
-		const k=$2;
-		const dk=k-1;
-		const d_dk=dk-1;
-		r=vector(#s);
-		r[dk]=n;
-		started=0;
-		prefix=vector(#k);
++rep_mt_f32v_map {$q>>[0,16]}
+
+if w==1 rm.. fi
+
+{d=[1,1,1];d[$axis]=$q;d;},$2
+
+eval.. :"
+	const use_dp_img=w>1;
+
+	const n=$1;
+	const k=$2;
+	const dk=k-1;
+	const d_dk=dk-1;
+	r=prefix=vector(#k);
+
+	if(use_dp_img,
+		f2i(V)=V[0]<<24|V[1];
 	);
-	started?(
+
+	t=J(-1);
+	P=t[0]<<24|t[1];
+	Q=i0<<24|i1;
+
+	use_dp_img&&P?(
+		idx=P;
+		rem=n;
+		min_val=0;
+
+		repeat(dk,p,
+			ck=k-p;
+
+			for(q=min_val,q<rem+1,++q,
+				shifted=rem-q*ck;
+				count=shifted>=0?f2i(I(#-3,shifted,ck-1));
+
+				if(idx<count,
+					r[p]=q;
+					rem-=q;
+					min_val=q;
+					break();
+				);
+
+				idx-=count;
+			);
+		);
+
+		r[dk]=rem;
+
+		repeat(dk,p,
+			prefix[p+1]=prefix[p]+r[p];
+		);
+	):(
+		r[dk]=n;
+	);
+
+	I[#-1,P]=r;
+
+	while(++P<Q,
 		++r[d_dk];
 		r[dk]=n-(prefix[d_dk]+r[d_dk]);
 		if(r[d_dk]>r[dk],
@@ -10293,12 +10392,14 @@ axis={_'$3'-_'x'}
 
 			r[dk]=n-prefix[dk];
 		);
-	):(
-		started=1;
-		0;
+
+		I[#-1,P]=r;
 	);
-	r;
+
+	_0;
 	"
+
+rm[$I--2]
 #@cli rep_total_sum_combination_index2list: limit>=0,size>0,(_axis={x|y|z})
 #@cli : Return the list of combination that matchs up exactly to limit corresponding to index.
 #@cli : Author: Reptorian.
