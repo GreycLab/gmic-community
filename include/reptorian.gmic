@@ -4227,47 +4227,32 @@ repeat $# {
 #@cli : Return nearest ratio from 2 different values. Proposition number is only used when force_fit_proposition_number is true.
 #@cli : Note: The minimum number of arguments is 2. Maximum number of argument is 5. Defaults may change depending on the number of arguments.
 rep_nearest_ratio:
-size_of_vector:=max($#,3)
-proposition_number:=vector(#$size_of_vector,${1--1})[2]
+proposition_number:=vector(#max($#,3),${1--1})[2]
 
-check "isint($1,1) &&
-       isint($2,1) &&
-       isint($proposition_number,0) &&
-       ($#==5?isbool($-2)&&isbool($-1):
-        $#==4?isbool($-1):
-            1) &&
-       isint($#,2,5)"
+check "isint($1,1) && isint($2,1) && isint($proposition_number,0) &&
+       ($#<4||isbool($-1)) && ($#<5||isbool($-2)) && isint($#,2,5)"
 
 eval "
-	ratio=[${1-2}];
-	const proposition_number=$proposition_number;
-	const force_fit_proposition_number=($1!=$2)&&($#==5?$-2:$#>2)&&(proposition_number>1);
-	const final_vector_size=2+($#>3?bool($-1));
+    ratio=[${1-2}];
+    const proposition_number=$proposition_number;
+    const force_fit=($1!=$2)&&($#==5?$-2:$#>2)&&(proposition_number>1);
 
-	minval=min(ratio);
-	maxval=max(ratio);
-	ratio_divisor=gcd(ratio);
-	is_mode_force_fit=0;
-	is_true_ratio=1;
+    minval=min(ratio);
+    maxval=max(ratio);
+    ratio_divisor=gcd(ratio);
 
-	if(force_fit_proposition_number,
-		if(proposition_number!=(maxval/ratio_divisor),
-			is_mode_force_fit=1;
-			is_true_ratio=0;
-		);
-	);
+    force_fit&&(proposition_number!=(maxval/ratio_divisor))?(
+        a=max(round(minval/maxval*proposition_number),1);
+        ratio=ratio[0]<ratio[1]?[a,proposition_number]:[proposition_number,a];
+        ratio/=gcd(ratio);
+    ):(
+        ratio/=ratio_divisor;
+    );
 
-	is_mode_force_fit?(
-		a=round(minval/maxval*proposition_number);
-		ratio=ratio[0]<ratio[1]?[a,proposition_number]:[proposition_number,a];
-		ratio/=gcd(ratio);
-		if(!a,ratio=map(ratio,[1,proposition_number]));
-	):(
-		ratio/=ratio_divisor;
-	);
+    is_true_ratio=max(ratio)==maxval/ratio_divisor;
 
-	vector(#final_vector_size,ratio,is_true_ratio);
-	"
+    [ratio,is_true_ratio][0,(2+($#>3?bool($-1)))];
+    "
 #@cli rep_red_acrylic_filter: [source_image],_luminosity_blend_factor>=0%,_green_cut>=0%,_green_visibility>=0%
 #@cli : Alter a image so that target image would be visible using a red acrylic plastic sheet as cover.
 rep_red_acrylic_filter:
