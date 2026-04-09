@@ -6034,6 +6034,7 @@ else
 
 	digits_per_base_change:=int(log($bfm)/log($base))
 	new_base:=$base^$digits_per_base_change
+
 	{ceil((w*log(10))/log($new_base))+1},1,1,1,<"begin(
 			const base_10M=10e7;
 			const new_base=$new_base;
@@ -6147,66 +6148,33 @@ else
 		num_of_digits-=1
 	else
 		digits_per_base_change={int(log($bfm)/log($base))}
-		new_base={$base^$digits_per_base_change}
-		num_of_digits={size('$new_base')-1}
+		old_base_N={$base^$digits_per_base_change}
+		num_of_digits={size('$old_base_N')-1}
 		base_power_of_10={10^$num_of_digits}
+		T={$!-1}
 
-		# Convert into larger base
-		if $new_base>$base
-			{ceil(whd/$digits_per_base_change)},1,1,1,"begin(
-					const dpbc=$digits_per_base_change;
-					const scp=whd#-1%dpbc;   # Shift crop point;
-					const fcs=dpbc-scp;      # First crop_point
-					multipliers=expr('<begin(v=0;);v?(v*=$base):(v=1);',dpbc);
-					started=crop_point=0;
-					current_area=vector(#dpbc);
-					scp?(
-						first_multiplier=multipliers[fcs,scp];
-						temp_small=vector(#scp);
+		{ceil((ceil(whd#-1/$digits_per_base_change)*log($old_base_N))/log($base_power_of_10))+1},1,1,1,<"begin(
+				const old_base_N=$old_base_N;
+				const base_power_of_10=$base_power_of_10;
+				temp_process_area=expr('begin(
+						const offset=w%$digits_per_base_change;
+						M=expr(\'<begin(v=1;);tv=v;v*=$base;tv\',$digits_per_base_change);
 					);
-				);
-				started?(
-					crop_point+=dpbc;
-					copy(current_area,i[#-1,crop_point],dpbc,1,1);
-					dot(multipliers,current_area);
-				):(
-					started=1;
-					x?(
-						crop_point=x*dpbc-fcs;
-						copy(current_area,i[#-1,crop_point],dpbc,1,1);
-						dot(multipliers,current_area);
-					):(
-						crop_point=-fcs;
-						scp?(
-							copy(temp_small,i[#-1,0],scp,1,1);
-							dot(first_multiplier,temp_small);
-						):(
-							copy(current_area,i[#-1,0],dpbc,1,1);
-							dot(multipliers,current_area);
-						);
-					);
-				);"
-
-			rm..
-		fi
-
-		# Convert into base of power of 10
-		{ceil(log($new_base)/log($base_power_of_10)*w)}
-		eval "
-			start_point=insertion_point=0;
-			const divisor=$base_power_of_10;
-			const end_point=w#-2-1;
-			const operating_base=$new_base;
-			insertion_pos=w#-1;
-			temp_process_area=crop(#-2);
-			insert_valid=0;
-			while(start_point<end_point||temp_process_area[end_point],
-				remainder=carry_over=0;
+					dot(crop(#-1,x*$digits_per_base_change-offset,0,0,0,$digits_per_base_change,1,1,1),M);
+					',ceil(w#-1/$digits_per_base_change));
+				valid_digit_end=0;
+				start_of_res_digit=w;
+				start_point=0;
+				const end_point=size(temp_process_area)-1;
+			);
+			carry_over=0;
+			if(start_point<end_point||temp_process_area[end_point],
+				remainder=0;
 				find_start_point=1;
-				for(p=start_point,p<w#-2,++p,
-					current_value=carry_over*operating_base+temp_process_area[p];
-					carry_over=current_value%divisor;
-					remainder=temp_process_area[p]=int(current_value/divisor);
+				for(p=start_point,p<size(temp_process_area),++p,
+					current_value=carry_over*old_base_N+temp_process_area[p];
+					carry_over=current_value%base_power_of_10;
+					remainder=temp_process_area[p]=int(current_value/base_power_of_10);
 					if(find_start_point,
 						if(remainder,
 							start_point=p;
@@ -6214,25 +6182,18 @@ else
 						);
 					);
 				);
-				if(carry_over,
-					insert_valid=1;
-				);
-				if(insert_valid,
-					i[#-1,--insertion_pos]=carry_over;
-				);
+				--start_of_res_digit;
 			);
-			if(carry_over,i[#-1,--insertion_pos]=carry_over);
-			insertion_pos+1;
+			carry_over;
+			end(
+				set('start',start_of_res_digit);
+			);
 			"
+		rm..
 
-		rm.. crop. ${},100%
-
-		# End of base conversion
-
+		crop. $start,100%
 		FDC={int(log10(i[#-1,0]))+1} # First Digits Count
-
 	fi
-
 fi
 
 # Print out result!
