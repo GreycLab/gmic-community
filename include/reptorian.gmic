@@ -3745,116 +3745,124 @@ repeat $num_of_imgs {
 }
 
 foreach[$num_of_imgs--1] { eval da_freeze(#-1) }
-#@cli rep_sort_colors: _channel_a,_channel_b,_order={ 0=decreasing | 1=increasing }
+#@cli rep_sort_colors: _channel_a_start,_channel_b_start,_order={ 0=decreasing | 1=increasing },_copy_back={ 0=false | true }
 #@cli : Sort pixels by their color throughout all channels.
-#@cli : Default values: '_channel_a=0','_channel_b=100%','_order=1'
+#@cli : Default values: '_channel_a_start=0','_channel_b_start=100%','_order=1'
 #@cli : $ sp , rep_sort_colors 0,100%,1
 rep_sort_colors:
-l[] {
-	check isfinite(${1=0})&&isfinite(${2=100%})&&isbool(${3=1})
-	c0,c1,ord=${1-3}
-	onfail
-		noarg c0,c1,ord=0,100%,1
-}
+check isfinite(${1=0})&&isfinite(${2=100%})&&isbool(${3=1})&&isbool(${4=1})
+c0,c1,is_increasing,copy_back=${1-4}
 
 old_status=${}
 
 foreach {
 	if whd<=1 continue fi
 
-	C0,C1:=ds=s-1;sort(int([ispercentage($c0)?$c0*ds:$c0,ispercentage($c1)?$c1*ds:$c1])%s)
+	C0,C1,size_elt:=ds=s-1;sort(int([ispercentage($c0)?$c0*ds:$c0,ispercentage($c1)?$c1*ds:$c1])%s),s+$copy_back
 
-	+rep_uniq_cols 1 # Reduce the number of colors to sort, and preserve counts of colors
-
+	+rep_uniq_cols $copy_back # Reduce the number of colors to sort, and preserve counts of colors
 	permute. cyzx
 
-	1,{s#-1+1},1,4,!y?[0,0,(s#-1-1)>>[24,0]&0xffffff]
-	=. 1,0,{h#-1-1}
-
+	1,{s#-1<<1},1,4 # Contains sections
 
 	eval "
-		const size_elt=w#-2;
-		list_of_colors_and_freq=crop(#-2);
+		const size_elt=$size_elt;
+		const BM=(1<<24)-1;
+		const is_increasing=$is_increasing;
+		data=crop(#-2);
+		I[#-1,0]=[0,0,((s#-2-1)>>[24,0])&BM];
+		num_of_splits=1;
+		split_pos=0;
 
-		for(c=$C0,c<=$C1,++c,
-			da_size=da_size(#-1);
+		for(p=$C0,p<=$C1,++p, # Sort throughout all the channels.
+			if(!num_of_splits,break(););
 
-			# Make dynamic array size to 0 without clearing value
-			i[#-1,h(#-1)-1]=0;
+			end_point=split_pos+num_of_splits;
+			for(q=split_pos,q<end_point,++q,
+				s=I[#-1,q];
+				s0=s[0]<<24|s[1];
+				s1=s[2]<<24|s[3];
 
-			if(!da_size,break(););
+				elt_pos=s0*size_elt;
+				nb_elts=s1-s0+1;
 
-			# Sort section pt0 to pt1. That means sort color pt0 to color pt1.
-			repeat(da_size,p,
-				coords=I[#-1,p];
-				pt0=coords[0]<<24|coords[1];
-				pt1=coords[2]<<24|coords[3];
-				pt_elt_pos=pt0*size_elt;
-				nb_elts=pt1-pt0+1;
-				_sort(list_of_colors_and_freq,$ord,pt_elt_pos,nb_elts,size_elt,c);
+				_sort(data,is_increasing,elt_pos,nb_elts,size_elt,p); # This works
 			);
 
-			# Find subsection to sort and ignore the rest.
-			repeat(da_size,p,
-				coords=I[#-1,p];
-				pt_c0=pt0=coords[0]<<24|coords[1];
-				pt1=coords[2]<<24|coords[3];
-				pt_c=pt0*size_elt+c;
-				last_value=list_of_colors_and_freq[pt_c];
+			if(p==$C1,break());
+			t=end_point;
+			num_of_splits=0;
+			for(q=split_pos,q<end_point,++q,
+				s=I[#-1,q];
+				n_s0=s0=s[0]<<24|s[1];
+				s1=s[2]<<24|s[3];
+
+				pt_c=s0*size_elt+p;
+
+				last_value=data[pt_c];
+
 				elt_count=1;
-				while(++pt0<pt1,
+
+				while(++s0<=s1,
 					pt_c+=size_elt;
-					current_value=list_of_colors_and_freq[pt_c];
+					current_value=data[pt_c];
+
 					current_value==last_value?(
 						++elt_count;
 					):(
-						# Add Candidate section
 						if(elt_count>1,
-							temp_pt1=pt0-1;
-							pt_c02vf=(pt_c0>>[24,0])&0xffffff;
-							temp_pt12vf=(temp_pt1>>[24,0])&0xffffff;
-							da_push(#-1,[pt_c02vf,temp_pt12vf]);
+							++num_of_splits;
+							v_n_s0=(n_s0>>[24,0])&BM;
+							v_n_s1=((s0-1)>>[24,0])&BM;
+							I[#-1,t++]=[v_n_s0,v_n_s1];
 						);
-						elt_count=1;
-						pt_c0=pt0;
+
+						n_s0=s0;
 						last_value=current_value;
+						elt_count=1;
 					);
 				);
 
-				# Add Candidate section
 				if(elt_count>1,
-					temp_pt1=pt0-1;
-					pt_c02vf=(pt_c0>>[24,0])&0xffffff;
-					temp_pt12vf=(temp_pt1>>[24,0])&0xffffff;
-					da_push(#-1,[pt_c02vf,temp_pt12vf]);
+						++num_of_splits;
+						v_n_s0=(n_s0>>[24,0])&BM;
+						v_n_s1=((s0-1)>>[24,0])&BM;
+						I[#-1,t++]=[v_n_s0,v_n_s1];
 				);
 			);
+
+			split_pos=end_point;
 		);
 
-		# Copy sorted values back
-		copy(i[#-2,0],list_of_colors_and_freq);
-		"
-	rm.
+		copy(i[#-2,0],data);
+	"
 
-	permute. cyzx
+	if $copy_back
+		rm.
 
-	s. c,-{s-1}
-	100%,1,1,2,>begin(pv=0;);cv=pv;nv=cv>>[24,0]&0xffffff;pv=cv+i#-1;nv;
+		permute. cyzx
 
-	# Fill image with histogram count
-	eval[-3] >"
-		current_color=I;
-		count=i#-2;
-		position_vector=I#-1;
-		position=position_vector[0]<<24|position_vector[1];
-		whd=whd#-4;
-		repeat(s,p,
-			copy(i[#0,position],current_color[p],count,1,0);
-			position+=whd;
-		);
-		_0;
-		"
-	k[0]
+		s. c,-{s-1}
+		100%,1,1,2,>begin(pv=0;);cv=pv;nv=cv>>[24,0]&0xffffff;pv=cv+i#-1;nv;
+
+		eval[-3] >"
+			current_color=I;
+			count=i#-2;
+			position_vector=I#-1;
+			position=position_vector[0]<<24|position_vector[1];
+			whd=whd#-4;
+			repeat(s,p,
+				copy(i[#0,position],current_color[p],count,1,0);
+				position+=whd;
+			);
+			_0;
+			"
+
+		k[0]
+	else
+		k..
+		permute. cyzx
+	fi
 }
 
 u $old_status
