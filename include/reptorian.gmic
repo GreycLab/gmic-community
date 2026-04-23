@@ -3745,13 +3745,14 @@ repeat $num_of_imgs {
 }
 
 foreach[$num_of_imgs--1] { eval da_freeze(#-1) }
-#@cli rep_sort_colors: _channel_a,_channel_b,_order={ 0=decreasing | 1=increasing },_copy_back={ 0=false | true }
+#@cli rep_sort_colors: _channel_a,_channel_b,_order={ 0=decreasing | 1=increasing },_copy_back={ -1=skip_unique_and_false | 0=false | true }
 #@cli : Sort pixels by their color throughout all channels.
-#@cli : Default values: '_channel_a=0','_channel_b=100%','_order=1'
+#@cli : Default values: '_channel_a=0','_channel_b=100%','_order=1','_copy_back=1'
 #@cli : $ sp , rep_sort_colors 0,100%,1
 rep_sort_colors:
-check isfinite(${1=0})&&isfinite(${2=100%})&&isbool(${3=1})&&isbool(${4=1})
+check isfinite(${1=0})&&isfinite(${2=100%})&&isbool(${3=1})&&isint(${4=1},-1,1)
 c0,c1,is_increasing,copy_back=${1-4}
+use_reduced,copy_back_2_img:=$copy_back>[-1,0]
 
 old_status=${}
 
@@ -3760,7 +3761,10 @@ foreach {
 
 	C0,C1,size_elt:=ds=s-1;sort(int([ispercentage($c0)?$c0*ds:$c0,ispercentage($c1)?$c1*ds:$c1])%s),s+$copy_back
 
-	+rep_uniq_cols $copy_back # Reduce the number of colors to sort, and preserve counts of colors
+	if $use_reduced
+		+rep_uniq_cols $copy_back # Reduce the number of colors to sort, and preserve counts of colors
+	fi
+
 	permute. cyzx
 
 	1,{s#-1<<1},1,4 # Contains sections
@@ -3837,7 +3841,7 @@ foreach {
 		copy(i[#-2,0],data);
 	"
 
-	if $copy_back
+	if $copy_back_2_img
 		rm.
 
 		permute. cyzx
@@ -3861,7 +3865,7 @@ foreach {
 		k[0]
 	else
 		k..
-		permute. cyzx
+		permute cyzx
 	fi
 }
 
