@@ -1372,11 +1372,11 @@ original_status=${}
 if same(('$1')[0],'~')
 	num_of_cols_lim={a=s2v(('$1')[1,size('$1')-1]);a?abs(a):inf}
 	check isint($num_of_cols_lim)
-	mt_cmd,highest_color_frequency_mode,col_frq_mode,process_image_idx,finalize_mode,add_image,until_count=eval,0,0,1,2,{vector(#2,$num_of_cols_lim!=inf)}
+	mt_cmd,highest_color_frequency_mode,col_frq_mode,use_count_occurance,finalize_mode,add_image,until_count=eval,0,0,0,1,2,{vector(#2,$num_of_cols_lim!=inf)}
 else
 	check "isint($1,-3)&&$1<inf&&isbool($2)"
 
-	col_frq_mode,finalize_mode,use_k_mean,until_count,process_image_idx:=$1?(($2?$1:$1<0)||$2==2):$3==2,$1>0,$2,0,0
+	col_frq_mode,finalize_mode,use_k_mean,until_count,process_image_idx,use_count_occurance:=$1?($1||$2==2):$3==2,$1>0,$2,0,0,$1==-1
 
 	if $1<-1
 		add_image,highest_color_frequency_mode=1
@@ -1404,7 +1404,7 @@ foreach {
 		if $process_image_idx
 			res.=$sep{whd}
 			sep=,
-		elif $col_frq_mode&&whd
+		elif $use_count_occurance
 			(1) a c
 		fi
 
@@ -1881,10 +1881,7 @@ foreach {
 					a y
 					permute yzcx
 					if $finalize_mode&&$1<w
-						___rep_colors_freqstat_median_cut $1
-						if $use_k_mean
-							_rep_colors_freqstat_k_mean
-						fi
+						___rep_colors_freqstat_reduce_colors $1
 					fi
 				fi
 		else
@@ -1907,10 +1904,7 @@ foreach {
 				a y
 				permute yzcx
 				if $finalize_mode&&$1<w
-					___rep_colors_freqstat_median_cut $1
-					if $use_k_mean
-						_rep_colors_freqstat_k_mean
-					fi
+					___rep_colors_freqstat_reduce_colors $1
 				fi
 			fi
 		fi
@@ -1919,87 +1913,155 @@ foreach {
 if $process_image_idx u $res
 else u $old_status
 fi
-_rep_colors_freqstat_k_mean:
-sh[0] 0,{s#0-2} max_diff={(iM-im+1)/8192} rm.
-+rep_mt_f32v_map {w#0>>[0,12]}
+___rep_colors_freqstat_reduce_colors:
+# Weighted Median-cut Algorithm
++channels 0,{s#-1-2} # Extract color from [color,frequency]
 
-do
-	eval. :"
-		begin(
-			const S=s#1;
-			current_palette=crop(#1);
-			new_palette=count=vector(#whds#1);
-		);
-
-		O=J(-1);
-		P=(O[0]<<24|O[1])-1;
-		Q=i0<<24|i1;
-
-		while(++P<Q,
-			current_color_and_freq=I[#0,P];
-			idx=index(current_color_and_freq[0,S],current_palette,S,0,0)[0];
-			copy(new_palette[idx],current_color_and_freq,S,w#1,1,-current_color_and_freq[S]);
-			copy(count[idx],current_color_and_freq[S],S,w#1,0,-1);
-		);
-
-		end(
-			merge(new_palette,+);
-			merge(count,+);
-			count=vmax(count,1);
-			new_palette/=count;
-			diff=max(abs(new_palette-current_palette));
-			set('diff',max(abs(new_palette-current_palette)));
-			copy(i[#1,0],new_palette);
-		);
-		_0;
-		"
-while $diff>$max_diff
-
-k..
-___rep_colors_freqstat_median_cut:
-if $col_frq_mode
-	+channels 0,{s-2}
-fi
-
-+norm.
+norm.
 rv[-2,-1]
 a[-2,-1] y
-sort. -,x
+sort. +,x
 rows. 1
 
-l. { # Taken from David's code
-	$1,1,1,100%
-	eval "
-		const N = $1;
-		const bsiz = 2 + s;
-		box = vector(#N*bsiz,-1); # Each box is encoded as (ind0,ind1,range_0,range_1,...,range_s-1)
-		update_box(k,_ind0,_ind1) = (
-			ref(_ind0,ind0); ref(_ind1,ind1);
-			off = k*bsiz;
-			box[off++] = ind0; box[off++] = ind1;
-			repeat (s,a,box[off++] = run('+z.. ',ind0,',0,0,',a,',',ind1,',0,0,',a,' u {iM-im} rm.'));
-		);
-		n = 1; update_box(0,0,w#0 - 1); # Set up initial box.
-		while (n<N,
-			max_b = max_a = max_r = -1;
-			repeat (n,b,repeat (s,a,r = box[b*bsiz + a + 2]; r>max_r?(max_r = r; max_a = a; max_b = b)));
-			max_r<=0?break();
-			B = box[max_b*bsiz,2];
-			run('+z.. ',B[0],',',B[1],' shift. 0,0,0,-',max_a,',2 sort. +,x shift. 0,0,0,',max_a,
-			',2 j[0] .,',B[0],' rm.');
-			pivot = int(lerp(B[0],B[1],0.5));
-			update_box(max_b,B[0],pivot); update_box(n,pivot + 1,B[1]); ++n;
-		);
-		repeat (N,n,
-			off = n*bsiz;
-			ind0 = box[off];
-			delta = box[off + 1] - ind0 + 1;
-			C = vectors(0); repeat (delta,k,C+=I[#0,ind0 + k]);
-			I[#-1,n] = (C/=delta);
-		)"
-}
+0
+$1,1,1,{s#-2-1}
 
-rm..
+eval "
+	const N=$1;
+	const size_elt=s#0;
+	const box_size=2+s;
+
+	box=vector(#N*box_size,-1);  # Each box is encoded as (ind0,ind1,range_0,range_1,...,range_s-1). Ignores last channel as that is frequency.
+
+	img_ref=crop(#0);
+	_permute(img_ref,w#0,1,1,s#0,'cyzx');
+
+	update_box(v,p0,p1)=(
+		off=v*box_size;
+		box[off++]=p0;
+		box[off++]=p1;
+
+		len=p1-p0+1;
+		q=p0*size_elt;
+		resize(#1,len,1,1,1,-1);
+
+		repeat(s,
+			copy(i[#1,0],img_ref[q++],len,1,size_elt);
+			box[off++]=expr('iM#1-im#1',1)[0];
+		);
+	);
+
+	update_box(0,0,w#0-1);
+	n=1;
+
+	while(n<N,
+		max_b=max_a=max_r=-1;
+
+		repeat(n,b,
+			box_pos=b*box_size+2;
+			repeat(s,a,
+				r=box[box_pos++];
+				if(r>max_r,
+						max_r = r;
+						max_a = a;
+						max_b = b;
+				);
+			);
+		);
+
+		if(max_r<=0,break(););
+
+		B=box[max_b*box_size,2];
+		B_start_pos=B[0]*size_elt;
+		B_len=B[1]-B[0]+1;
+
+		_sort(img_ref,1,B_start_pos,B_len,size_elt,max_a); # inplace sort
+
+		n>1?(
+			B_start_pos+=s;
+			resize(#1,B_len,1,1,1,-1);
+			copy(i[#1,0],img_ref[B_start_pos],B_len,1,size_elt);
+			target=expr('is#1',1)[0]>>1;
+
+			sum=0;
+			repeat(B_len,p,
+				sum+=i[#1,p];
+				if(sum>=target,break(););
+			);
+			pivot=B[0]+p;
+		):(
+			pivot=(B[0]+B[1])>>1;
+		);
+
+		update_box(max_b,B[0],pivot);
+		update_box(n,pivot+1,B[1]);
+
+		++n;
+	);
+
+	repeat(N,n,
+		off=n*box_size;
+
+		p0=box[off];
+
+		len=box[off+1]-p0+1;
+
+		C=vectors(0);
+
+		p0*=size_elt;
+
+		opacity=-1/len;
+
+		repeat(s,p,
+			copy(C[p],img_ref[p0++],len,0,size_elt,opacity);
+		);
+
+		I[#-1,n]=C;
+	);
+	"
+if $use_k_mean # Implementation of k-means using preserved frequency
+	k[0,-1]
+	max_diff={(iM-im+1)/256} # max_diff doesn't need to be as much as stdlib colormap because of the use of occurance in median cut
+	+rep_mt_f32v_map {w#0>>[0,12]}
+
+	do
+		eval. :"
+			begin(
+				current_palette=crop(#1);
+				new_palette=count=vector(#whds#1);
+				const s=s#1;
+				const w=w#1;
+			);
+
+			O=J(-1);
+			P=(O[0]<<24|O[1])-1;
+			Q=i0<<24|i1;
+
+			while(++P<Q,
+				cf=I[#0,P]; # c=color ; f=frequency
+				c=cf[0,s];
+				f=cf[s];
+				idx=index(c,current_palette,s,0,0)[0];
+				copy(new_palette[idx],c[0],s,w,1,-f);
+				copy(count[idx],f,s,w,0,-1);
+			);
+
+			end(
+				merge(new_palette,+);
+				merge(count,+);
+				count=vmax(count,1);
+				new_palette/=count;
+				set('diff',max(abs(new_palette-current_palette)));
+				copy(i[#1,0],new_palette);
+			);
+			_0;
+			"
+	while $diff>$max_diff
+
+	k..
+else
+	k.
+fi
 #@cli rep_mode_blend
 #@cli : Blend Layers via statistical mode of colors.
 #@cli :
