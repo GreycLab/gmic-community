@@ -1309,26 +1309,31 @@ check isint(${1=0},0)
 if $1 e[0--3] "Count number of distinct colors in image$?, until it reaches $1."
 else e[0--3] "Count number of distinct colors in image$?."
 fi
+
 _rep_colors_freqstat ~$1
-#@cli rep_colormap : nb_levels>=0,_method={ 0:Median-cut | 1:K-means },_sort_vectors
+#@cli rep_colormap : nb_levels>=0,_alg_swap={ ('-'/'_')=regular | 0=frequency_weigh | >0=hybrid_alg },_method={ 0:Median-cut | 1:K-means },_sort_vectors : nb_levels>=0,_method={ 0:Median-cut | 1:K-means },_sort_vectors
 #@cli : Estimate best-fitting colormap with 'nb_colors' entries, to index selected images.
 #@cli : Set 'nb_levels==0' to extract all existing colors of an image.
 #@cli : 'sort_vectors' can be { 0:Unsorted | 1:By increasing norm | 2:By decreasing occurrence }.
-#@cli : Default value: 'method=1' and 'sort_vectors=1'.
 rep_colormap:
-check isint($1,0)&&isbool(${2=1})&&isint(${3=1},0,2)
+check isint($1,0)&&$1<inf&&($1?$#==3||$#==4:$#)
 
 m0,m1="median-cut","k-means"
 s0,s1,s2="",", sorted by increasing norm",", sorted by decreasing occurrence"
 
-if $1 e[0--3] "Estimate colormap with $1 entries for image$?, by "${m$2}" method"${s$3}"."
-else e[0--3] "Estimate full colormap for image$?"${s$3}"."
-fi
-
 if !$1
-	c={$3==2}
+	s={$#>1?$-1:1}
+	check isint($s,0,2)
+
+	e[0--3] "Estimate full colormap for image$?"${s$s}"."
+
+	c={$s==2}
+
 	_rep_colors_freqstat -$c
+
 	if $c
+		# Sort by decreasing occurrence
+
 		foreach {
 			s c,-{s-1}
 			rv
@@ -1336,24 +1341,54 @@ if !$1
 			sort -,x
 			rows 1
 		}
-	elif $3
+	elif $s
+		# Sort by increasing norm
+
 		foreach {
-			+norm rv a c sort +,x channels 1,100%
+			+norm
+			rv
+			a c
+			sort +,x
+			channels 1,100%
 		}
 	fi
 else
-	use_count_occurance={$3==2}
-	add_mode={$1>0&&$use_count_occurance}
+	if $#==4
+		alg_swap,method,sort=${2--1}
 
-	if $add_mode p=+ fi
+		if same('$alg_swap','-')||same('$alg_swap','_')
+			alg_swap=$1
+		fi
+	else
+		method,sort=${2--1}
+		alg_swap=3
+	fi
+
+	check isint($alg_swap,0)||isbool($method)||isint($sort,0,2)
+
+	e[0--3] "Estimate colormap with $1 entries for image$?, by "${m$method}" method"${s$sort}"."
+
+	sort_2={$sort==2}
+
+	if $sort_2 p=+ fi
 
 	foreach {
-		${p}_rep_colors_freqstat $1,$2
+		${p}_rep_colors_freqstat $1,$method,$alg_swap
 
-		if $use_count_occurance
-			index.. .,0,0 histogram.. {[w,0,w-1]} a y sort -,x rows 1 # Sort by decreasing occurrence
-		elif $3
-			+norm rv a c sort +,x channels 1,100%
+		if $sort_2
+			 # Sort by decreasing occurrence
+			index.. .,0,0
+			histogram.. {[w,0,w-1]}
+			a y
+			sort -,x
+			rows 1
+		elif $sort
+			# Sort by increasing norm
+			+norm
+			rv
+			a c
+			sort +,x
+			channels 1,100%
 		fi
 	}
 fi
@@ -1372,11 +1407,13 @@ original_status=${}
 if same(('$1')[0],'~')
 	num_of_cols_lim={a=s2v(('$1')[1,size('$1')-1]);a?abs(a):inf}
 	check isint($num_of_cols_lim)
-	mt_cmd,highest_color_frequency_mode,col_frq_mode,use_count_occurance,finalize_mode,add_image,until_count=eval,0,0,0,1,2,{vector(#2,$num_of_cols_lim!=inf)}
+	mt_cmd,highest_color_frequency_mode,col_frq_mode,use_count_occurance,process_image_idx,finalize_mode,add_image,until_count=eval,0,0,0,1,2,{vector(#2,$num_of_cols_lim!=inf)}
 else
-	check "isint($1,-3)&&$1<inf&&isbool($2)"
+	col_frq_mode,finalize_mode,use_k_mean,until_count,process_image_idx,use_count_occurance:=bool($1),$1>0,$2,0,0,$1==-1
 
-	col_frq_mode,finalize_mode,use_k_mean,until_count,process_image_idx,use_count_occurance:=$1?($1||$2==2):$3==2,$1>0,$2,0,0,$1==-1
+	if $finalize_mode
+		alg_switch_point=$3
+	fi
 
 	if $1<-1
 		add_image,highest_color_frequency_mode=1
@@ -1930,11 +1967,8 @@ eval "
 	const N=$1;
 	const size_elt=s#0;
 	const box_size=2+s;
-
-	box=vector(#N*box_size,-1);  # Each box is encoded as (ind0,ind1,range_0,range_1,...,range_s-1). Ignores last channel as that is frequency.
-
-	img_ref=crop(#0);
-	_permute(img_ref,w#0,1,1,s#0,'cyzx');
+	const w=w#0;
+	const alg_switch_point=$alg_switch_point;
 
 	update_box(v,p0,p1)=(
 		off=v*box_size;
@@ -1947,13 +1981,67 @@ eval "
 
 		repeat(s,
 			copy(i[#1,0],img_ref[q++],len,1,size_elt);
-			box[off++]=expr('iM#1-im#1',1)[0];
+			box[off++]=iM(#1)-im(#1);
 		);
 	);
 
-	update_box(0,0,w#0-1);
-	n=1;
+	freq_weighed_pivot()=(
+		B_start_pos+=s;
+		resize(#1,B_len,1,1,1,-1);
+		copy(i[#1,0],img_ref[B_start_pos],B_len,1,size_elt);
+		target=is(#1)>>1;
 
+		sum=0;
+		repeat(B_len,p,
+			sum+=i[#1,p];
+			if(sum>=target,break(););
+		);
+
+		pivot=B[0]+p;
+	);
+
+	update_boxes()=(
+		update_box(max_b,B[0],pivot);
+		update_box(n,pivot+1,B[1]);
+	);
+
+	update_boxes_alt()=
+		pivot==B[1]?(
+			update_box(max_b,B[0],pivot-1);
+			update_box(n,pivot,B[1]);
+		):(
+			update_boxes();
+		);
+
+	alg_switch_point>=N?(
+		update_box_collection()=(
+			pivot=(B[0]+B[1])>>1;
+			update_boxes();
+		);
+	):
+	!alg_switch_point?(
+		update_box_collection()=(
+			freq_weighed_pivot();
+			update_boxes_alt();
+		);
+	):(
+		update_box_collection()=(
+			n>alg_switch_point?(
+				freq_weighed_pivot();
+			):(
+				pivot=(B[0]+B[1])>>1;
+			);
+			update_boxes_alt();
+		);
+	);
+
+	img_ref=crop(#0);
+	_permute(img_ref,w#0,1,1,s#0,'cyzx');
+
+	box=vector(#N*box_size,-1);  # Each box is encoded as (ind0,ind1,range_0,range_1,...,range_s-1). Ignores last channel as that is frequency.
+	update_box(0,0,w#0-1);
+
+	n=1;
 	while(n<N,
 		max_b=max_a=max_r=-1;
 
@@ -1977,24 +2065,7 @@ eval "
 
 		_sort(img_ref,1,B_start_pos,B_len,size_elt,max_a); # inplace sort
 
-		n>1?(
-			B_start_pos+=s;
-			resize(#1,B_len,1,1,1,-1);
-			copy(i[#1,0],img_ref[B_start_pos],B_len,1,size_elt);
-			target=expr('is#1',1)[0]>>1;
-
-			sum=0;
-			repeat(B_len,p,
-				sum+=i[#1,p];
-				if(sum>=target,break(););
-			);
-			pivot=B[0]+p;
-		):(
-			pivot=(B[0]+B[1])>>1;
-		);
-
-		update_box(max_b,B[0],pivot);
-		update_box(n,pivot+1,B[1]);
+		update_box_collection();
 
 		++n;
 	);
@@ -2021,7 +2092,7 @@ eval "
 	"
 if $use_k_mean # Implementation of k-means using preserved frequency
 	k[0,-1]
-	max_diff={(iM-im+1)/256} # max_diff doesn't need to be as much as stdlib colormap because of the use of occurance in median cut
+	max_diff={(iM-im+1)/1024} # max_diff doesn't need to be as much as stdlib colormap because of the use of occurance in median cut
 	+rep_mt_f32v_map {w#0>>[0,12]}
 
 	do
