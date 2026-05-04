@@ -3663,6 +3663,145 @@ gcd_resize_for_fs : skip ${1=1920},${2=1080},${3=0},${4=0}
     gcd_noalpha c $mx
   done done
 
+#@cli gcd_nn_output : [input],_vector_start>=0,_vector_end>=0
+#@cli : Generate neural network output for specified input vectors.
+#@cli : Image selections **must** be network weights and nodes (in any order).
+#@cli : 'vector_start' and 'vector_end' specify output nodes for output vectors.
+#@cli : Default values: '_vector_start=0' and '_vector_end=0'.
+#@cli : $ 1 gcd_nn_train .,0,,20,8 f[0] "u(2)-1" 200,200,1,2,"[x,y]" n. -1,1 gcd_nn_output[0,1] .,0,2 k..
+gcd_nn_output : check ${"is_image_arg $1"}" && isnum(${2=0}) && isnum(${3=0})"
+  if $!<2 error[] "Command '$0': Requires two input images!" fi
+  if whds#1>whds#0 rv fi
+  pass$1 1 start,len:=[$2,max($2,$3)-$2+1]
+  l[-3--1] {
+    100%,100%,100%,$len,"+
+      S = I(#2);
+      copy(i(#1,0,0,0,0),S,s#2);
+      run('_gcd_nn_forwardpass[0,1]');
+      crop(#1,"$start",d#0,"$len",1);
+    " => OUTPUT
+  } rm..
+
+#@cli gcd_nn_train : [target],_nb_iters>=0,_learn_rate>0,_nb_nodes>=0,_nb_layers>=0
+#@cli : Train a neural network on selected input vectors and specified target vectors.
+#@cli : '_nb_layers' specifies the number of _hidden_ layers.
+#@cli : Input and target image dimensions must match.
+#@cli : Default values: '_nb_iters=40000', '_learn_rate=0.1', '_nb_nodes=18' and '_nb_layers=5'.
+#@cli : $ image.jpg 100%,100%,100%,2,"2*([x,y]+0.5)/w-1" +gcd_nn_train. .. gcd_nn_output[-2,-1] [1],0,2
+gcd_nn_train : check ${"is_image_arg $1"}
+  check "isnum(${2=40000}) && isnum(${3=0.1}) && isnum(${4=18}) && isnum(${5=5})"
+  if $!>1 error[] "Command '$0': Only one training input is supported!" fi
+  pass$1 0
+  # this range significantly affects output
+  n[1] -0.495,0.495
+  # randomise training data order
+  [0],[0],[0],3,[x,y,z] shuffle. warp[0,1] . rm.
+  _gcd_nn_create_network $4,{[$5+2,s#0]}
+  _gcd_nn_create_training_layer.
+  if $2==0 k[-3,-2] return fi # fast exit for 0 iters
+  eval "+
+    R = $2;
+    do (
+      repeat (min(R,whd#0),k,
+        S = I[#0,k];
+        T = I[#1,k];
+        copy(i(#-2),S,s#0);
+        copy(i(#-1),T,s#1);
+        run('_gcd_nn_forwardpass[-3,-2]');
+        run('_gcd_nn_backwardpass[-3--1] $3');
+      );
+      R -= whd#0;
+    ,R>0);"
+  k[-3,-2]
+
+# inputs: nodes, layers, vector size
+# note: layers includes input/output layers so should always be 2 or more
+_gcd_nn_create_network : skip ${1=18},${2=7},${3=3}
+  if $1<$3 error[] "Command '$0': Number of inputs exceeds layer width!" fi
+  l[] {
+    nodes,layers,nodespp,weights:=[$1,$2,$1+1,$1*($1+1)]
+    $nodes,$nodespp,{$layers-1} => WEIGHT
+    $nodes,$layers => NODE
+    # initialise weights
+    f[0] "y<(h-1)?u(0.9)-0.45:u(2)-1"
+    # don't combine inputs in first layer
+    sh[0] 0,$3,0,0 f. "floor(x/w*h)==y" rm.
+  }
+
+# selection: [0] = nodes
+_gcd_nn_create_training_layer : l. { 100%,1,100%,100% => TARGET }
+
+# selections: [0] = weights [1] = nodes
+_gcd_nn_forwardpass :
+    eval "+
+      const ML = d#0;
+      N = vector(#h#0);
+      W = vector(#wh#0);
+      A = vector(#w#0);
+      N[w#0] = 1; # bias
+
+      repeat (ML,L,
+        # get activations of this layer
+        copy(N,i(#1,0,L,0,0),w#0);
+        
+        # get outbound weights of this layer
+        copy(W,i(#0,0,0,L,0),wh#0);
+        
+        # weighted sum for next layer
+        A = mul(N,W,w#0);
+        
+        # activation function of next layer
+        fill(A,k, F=A[k]; abs(F)<0.5?F:0.01*F+sign(F)*0.495 );
+        
+        # output to next layer
+        copy(i(#1,0,L+1,0,0),A,w#0);
+      );"
+
+# selections:
+# [0] = weight [1] = nodes [2] = target
+_gcd_nn_backwardpass :
+    eval "+
+      const ML = d#0;
+      W = vector(#wh#0);
+      N = D = vector(#h#0);
+      A = E = vector(#w#0);
+      N[w#0] = 1; # bias learning factor for first layer
+      
+      # get activations of last layer
+      copy(A,i(#1,0,ML),w#0);
+      
+      # calculate error of last layer
+      copy(E,i(#2),w#0);
+      E -= A;
+      
+      # calculate derivatives and deltas of last layer
+      fill(A,k, abs(A[k])<0.5?1:0.01 );
+      E *= A;
+
+      L = ML;
+      repeat (ML,--L;
+        # get activations of this layer
+        copy(N,i(#1,0,L),w#0);
+
+        # get outbound weights of this layer
+        copy(W,i(#0,0,0,L),wh#0);
+
+        # sum the weighted deltas of next layer
+        D = mul(W,E,1);
+
+        # calculate and store outbound weight changes
+        W += $1 * mul(N,E,w#0);
+        copy(i(#0,0,0,L),W,wh#0);
+
+        # calculate derivatives and deltas of this layer
+        fill(A,k, abs(N[k])<0.5?1:0.01 );
+        copy(E,D,w#0);
+        E *= A;
+        
+        # disable bias learning for layers beyond first
+        N[w#0] = 0;
+      );"
+
 #=============================================
 
 #@gui _
