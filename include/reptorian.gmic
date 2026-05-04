@@ -23395,7 +23395,7 @@ if narg($11) ang_args=${11--1}
 else ang_args=45,135
 fi
 
-+rep_find_nonduplicate_angles deg180,5,$ang_args => rad_ang
++rep_find_nonduplicate_angles deg180,$ang_args => rad_ang
 num_angs={w#-1}
 
 if $num_angs==1
@@ -23790,15 +23790,14 @@ repeat $diff_dim_mode?$!-1:1 {
 }
 
 rm.
-#@cli rep_find_nonduplicate_angles mode,pw2_buckets,angle_0,...,angle_n
+#@cli rep_find_nonduplicate_angles: mode,angle_0,...,angle_n
 #@cli : Return all unique angles in radians as a image.
 #@cli : 'mode'       : deg180, deg360, pi, tau (valid string arguments, input angle units, and near maximum value)
-#@cli : 'pw2_buckets': 2^input hash buckets
 #@cli : 'angle_0',.. : List of input angles
 +rep_find_nonduplicate_angles:
-deg180,deg360,pi,tau,ds=0,1,2,3,{1<<$2} # ds=dict_size
+deg180,deg360,pi,tau,ds=0,1,2,3,{1<<(cut(int(log2($#-1))+1,1,8))} # ds=dict_size
 mode,T,H=$$1,$!,{$!+2}
-(${3--1}) {whd#-1} 0x$ds
+(${2--1}) {whd#-1} 0x$ds
 
 eval[$T] >"
 	begin(
@@ -23812,20 +23811,27 @@ eval[$T] >"
 		const start_of_hash=k+2;
 		const D=$ds;
 		const bit_mask=D-1;
-		const M=D/mod_factor;
+		const M=mod_factor/D;
+
 		coa=0; # count of angles
 	);
 	current_angle=(i+offset)%main_mod;
 	current_angle_mod=current_angle>mod_factor?current_angle-mod_factor:current_angle;
+
 	H=((current_angle_mod*M)&bit_mask)+start_of_hash;
+
 	if(find(#H,current_angle_mod,da_size(#H)-1,-1)==-1,
 		da_push(#H,current_angle_mod);
+
 		if(convert_2_rad
 		,i[#insertion_point,coa++]=deg2rad(current_angle)-pi;
 		,i[#insertion_point,coa++]=current_angle-pi;
 		);
 	);
-	end(resize(#insertion_point,coa,1,1,1););"
+
+	end(
+		resize(#insertion_point,coa,1,1,1,-1);
+	);"
 
 rm[$T,$H--1]
 #@cli rep_polkal: (eq. to rep_polar_kaleidoscope)
@@ -29462,7 +29468,6 @@ gui_split_preview "rep_sqrlogpindis_gui $*",${-3--1}
 #@gui:Angle #10=float(-30,-180,180)
 #@gui:Angle #11=float(5,-180,180)
 #@gui:Angle #12=float(-5,-180,180)
-#@gui:_=separator(),Preview Type=choice("Full","Forward Horizontal","Forward Vertical","Backward Horizontal","Backward Vertical","Duplicate Top","Duplicate Left","Duplicate Bottom","Duplicate Right","Duplicate Horizontal","Duplicate Vertical","Checkered","Checkered Inverse"),Preview Split=point(50,50,0,0,200,200,200,0,10)_0
 #@gui:_=separator(),_=note("<small>Author: Reptorian. Latest Update: <i>2022/4/16</i>.</small>")
 fx_rep_stitch:
 if $12 angles={expr('$13+x/w*180',$14);}
@@ -29475,11 +29480,11 @@ rep_stitch $cli_args
 
 u "rep_stitch "$cli_args
 fx_rep_stitch_preview:
-gui_split_preview "fx_rep_stitch ${1-27}",${-3--1}
+fx_rep_stitch ${1-27}
 more_than_one_ang=!$12?$15>1:1
 
 if !$12
- +rep_find_nonduplicate_angles {([${16-27}])[0,$15]}
+ +rep_find_nonduplicate_angles deg180,{([${16-27}])[0,$15]}
  if w#-1==1 more_than_one_ang=0 fi
  rm.
 fi
@@ -29513,9 +29518,7 @@ u "{$1}"\
 "{$24}_"{2*($activate_sym&&$15>8)}\
 "{$25}_"{2*($activate_sym&&$15>9)}\
 "{$26}_"{2*($activate_sym&&$15>10)}\
-"{$27}_"{2*($activate_sym&&$15>11)}\
-"{$28}"\
-"{$29,$30}"
+"{$27}_"{2*($activate_sym&&$15>11)}
 #@gui Kaleidoscope [Reptorian-Polar]:gui_rep_polkal,gui_rep_polkal
 #@gui:Angle Cut=float(2,.01,100)
 #@gui:Radius Cut=float(1,.01,100)
