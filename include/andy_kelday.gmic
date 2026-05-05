@@ -3682,6 +3682,36 @@ gcd_nn_output : check ${"is_image_arg $1"}" && isnum(${2=0}) && isnum(${3=0})"
     " => OUTPUT
   } rm..
 
+#@cli gcd_nn_output_fast : [input],_vector_start>=0,_vector_end>=0
+#@cli : Generate neural network output for specified input vectors.
+#@cli : Image selections **must** be network weights and nodes (in any order).
+#@cli : 'vector_start' and 'vector_end' specify output nodes for output vectors.
+#@cli : Default values: '_vector_start=0' and '_vector_end=0'.
+#@cli : $ 1 gcd_nn_train .,0,,20,8 f[0] "u(2)-1" 200,200,1,2,"[x,y]" n. -1,1 gcd_nn_output_fast[0,1] .,0,2 k..
+gcd_nn_output_fast : check ${"is_image_arg $1"}" && isnum(${2=0}) && isnum(${3=0})"
+  if $!<2 error[] "Command '$0': Requires two input images!" fi
+  if whds#1>whds#0 rv fi
+  pass$1 1 start,len:=[$2,max($2,$3)-$2+1]
+  l[-3--1] {
+    100%,100%,100%,$len,"
+    begin(
+      const ML = d#0;
+      N = vector(#h#0);
+      W = vector(#wh#0);
+      A = vector(#w#0);
+    );
+      # Forwardpass without image buffer
+      S = I#2; N = 0; copy(N,S); N[w#0] = 1;
+      repeat (ML,L,
+        copy(W,i(#0,0,0,L,0),wh#0);
+        A = mul(N,W,w#0);
+        fill(A,k, F=A[k]; abs(F)<0.5?F:0.01*F+sign(F)*0.495 );
+        copy(N,A);
+      );
+      A["$start","$len"];
+    " => OUTPUT
+  } rm..
+
 #@cli gcd_nn_train : [target],_nb_iters>=0,_learn_rate>0,_nb_nodes>=0,_nb_layers>=0
 #@cli : Train a neural network on selected input vectors and specified target vectors.
 #@cli : '_nb_layers' specifies the number of _hidden_ layers.
