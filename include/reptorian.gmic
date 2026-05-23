@@ -4624,38 +4624,37 @@ for $imgs_moved<$! {
 }
 #@cli rep_sort_images_by_order: number_a,number_b,....
 #@cli : Sort images accordingly to numerical arguments. The number of numerical arguments has to be equal to the number of images, and they have to be positive integer number starting from 0 until number that is equal to number of arguments minus one.
-#@cli : $ sample cat,dog,lena,david,house,flower,waterfall,tiger name {expr('x',$!)} rep_sort_images_by_order 5,1,7,0,4,2,3,6
+#@cli : $ sample cat,dog,car,david,house,flower,waterfall,tiger,lion,gmicky,tulips name {expr('x',$!)} rep_sort_images_by_order 10,1,4,3,2,5,6,8,9,7,0
 rep_sort_images_by_order:
-if $#!=$! error invalid_image_count fi
+check $#==$!
 
-input_v=[{[$*]%$#}]
-sorted_v=[{expr('x',$#)}]
+eval "
+	ord_pos=[$*];
+	orig_to_slot=vector(#$#);
 
-if $input_v==$sorted_v
-	return
-elif $input_v==reverse($sorted_v)
-	reverse
-else
+	const N=size(ord_pos);
+	const d_N=N-1;
 
-	$#,1,1,1,>"begin(
-			const max_index=w-1;
-			offset_position=index_counter=vector(#w,0);
-			order=[$*];
-		);
-		value_index=order[x]%w;
-		if(++index_counter[value_index]>1,run('error dup_ind_inp'););
-		off_position=value_index-offset_position[value_index];
-		copy(offset_position[value_index],1,w-value_index,1,0,-1);
-		off_position+x;
-		"
+	repeat(N,p,
+		idx=ord_pos[p]%N;
+		if(!isint(idx,0,d_N),run('error inv_num_det'););
+		if(++orig_to_slot[idx]>1,run('error dup_num_det'));
+		ord_pos[p]=idx;
+	);
 
-	repeat $# {
-		move[{i(#-1,$>)}] $>
-	}
+	orig_to_slot=slot_to_orig=expr('x',$#);
 
-	remove[-1]
-
-fi
+	repeat(N,p,
+		src=orig_to_slot[ord_pos[p]];
+		disp=slot_to_orig[p]; # displaced
+		ref(p,pos0);
+		ref(src,pos1);
+		run('rv[',pos0,',',pos1,']');
+		orig_to_slot[ord_pos[p]] = p;
+		orig_to_slot[disp] = src;
+		slot_to_orig[p] = ord_pos[p];
+		slot_to_orig[src] = disp;
+	);"
 #@cli rep_tuppers_self_K: apply_pre_negation={ 0=false | 1=true }
 #@cli : Generate K values from images. Also, threshold image for users to check what it would look like.
 #@cli : Default values: 'apply_pre_negation=1'
