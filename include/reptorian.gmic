@@ -81,25 +81,21 @@
 #@cli : Ignored characters:
 #@cli :   '/' , ' ' , '\n'
 #@cli :
-#@cli : Binary tree node layout:
+#@cli : Output Binary tree node layout:
 #@cli :   0 = parent index
 #@cli :   1 = left child index
 #@cli :   2 = right child index
-#@cli :   3 = branch direction
-#@cli :   4 = left-child stack position
-#@cli :   5 = right-child stack position
-#@cli :   6 = access state (if vector_size > 0)
-#@cli :   7+ = stored values (if vector_size > 0)
+#@cli :   3+ = stored values (if vector_size > 0)
 #@cli :
 #@cli : Author:Reptorian.
 +rep_str2bin_struct:
 check isint(${2=0},0)
-$0_start_of_image_list,$0_v_size,$0_access_mode,$0_char_limit:=$!,$2,bool($2),247
+$0_start_of_image_list,$0_v_size,$0_access_mode,$0_char_limit,$0_dict_size:=$!,$2,bool($2),247,256
 
 ('"$1"')                         # str
 _rep_str2bin_struct_exam_delimit # Validate bracket balance
 1,1,1,3             # root, root left child idx,root right child idx
-1,1,1,5,-1,0,0,0,0  # repeat_loop -> inserted_p,stop_mode,start_loop_idx,original_count,count
+1,1,1,2             # repeat bucket position stack
 1,2,1,1,0,1x2       # childfree_stack -> no left child, no right child
 
 1,1,1,{6+${$0_access_mode}},nan,0,0,nan,0,0,0,1 # parent,left,right,direction,left_child_stack_pos,right_child_stack_pos,access
@@ -111,6 +107,8 @@ fi
 
 (1)
 a[-2,-1] y
+
+0x${$0_dict_size}
 
 eval "
 	const access_mode=$rep_str2bin_struct_access_mode;
@@ -141,10 +139,11 @@ eval "
 	const skip_char_2=_'\n';
 	const str_img=$rep_str2bin_struct_start_of_image_list;
 	const square_bracket_stack=str_img+1;
-	const repeat_stack=str_img+2;
+	const repeat_index_stack=str_img+2;
 	const no_left_child_stack=str_img+3;
 	const no_right_child_stack=str_img+4;
 	const binary_tree_img=str_img+5;
+	const repeat_dict_table=str_img+6;
 	const str_len=whd#str_img;
 	const char_limit=$rep_str2bin_struct_char_limit;
 	const parent_pos=0;
@@ -165,8 +164,8 @@ eval "
 		vector_res=vector_nan;
 	);
 
-	repeat_level=-1;
-	cursor=current_branch=square_bracket_level=0;
+	repeat_bucket=repeat_pos=-1;
+	cursor=current_branch=square_bracket_level=repeat_level=0;
 
 	do(
 		current_char=i[#str_img,cursor];
@@ -437,15 +436,18 @@ eval "
 			++cursor;
 		):
 		is_num(current_char)?(
-			++repeat_level;
-
-			cursor==i[#repeat_stack,repeat_level]?(
-				c=i(#repeat_stack,repeat_level,0,0,3);
-				i(#repeat_stack,repeat_level,0,0,4)=c;
-				cursor=i(#repeat_stack,repeat_level,0,0,2);
-				if(!c,--repeat_level);
+			repeat_bucket=(cursor&0xff)+repeat_dict_table;
+			repeat_pos=find(#repeat_bucket,cursor,w(#repeat_bucket)-1,-1);
+			ws=w(#repeat_index_stack);
+			if(repeat_level==ws,resize(#repeat_index_stack,++ws,1,1,1,-1););
+			repeat_pos!=-1?(
+				c=i(#repeat_bucket,repeat_pos,0,0,3);
+				i(#repeat_bucket,repeat_pos,0,0,4)=c;
+				I[#repeat_index_stack,repeat_level++]=[repeat_bucket,repeat_pos];
+				cursor=i(#repeat_bucket,repeat_pos,0,0,2);
 			):(
 				repeat_count=current_char-_'0';
+				repeat_pos=w(#repeat_bucket);
 
 				for(p=cursor+1,p<str_len,++p,
 					p_char=i[#str_img,p];
@@ -464,11 +466,9 @@ eval "
 							c=i[#str_img,q];
 							c==expr_0?++balance:c==expr_1?--balance;
 						,q++<str_len&&balance);
-						wr=w(#repeat_stack);
-						if((wr++)==repeat_level,
-							resize(#repeat_stack,wr,1,1,3,0);
-						);
-						I(#repeat_stack,repeat_level--)=[cursor,stop_mode,q,repeat_count,repeat_count];
+						I[#repeat_index_stack,repeat_level++]=[repeat_bucket,w(#repeat_bucket)];
+						resize(#repeat_bucket,w(#repeat_bucket)+1,1,1,5,0);
+						copy(i[#repeat_bucket,repeat_pos],[cursor,stop_mode,q,repeat_count,repeat_count],5,w(#repeat_bucket),1);
 						cursor=q;
 						continue();
 					);
@@ -476,36 +476,33 @@ eval "
 					stop_mode=0;
 					if(!repeat_count,
 						q=find(#str_img,secondary_repeat_end,p,1)+1;
-						wr=w(#repeat_stack);
-						if((wr++)==repeat_level,
-							resize(#repeat_stack,wr,1,1,3,0);
-						);
-						I(#repeat_stack,repeat_level--)=[cursor,stop_mode,q,repeat_count,repeat_count];
+						I[#repeat_index_stack,repeat_level++]=[repeat_bucket,w(#repeat_bucket)];
+						resize(#repeat_bucket,w(#repeat_bucket)+1,1,1,5,0);
+						copy(i[#repeat_bucket,repeat_pos],[cursor,stop_mode,q,repeat_count,repeat_count],5,w(#repeat_bucket),1);
 						cursor=q;
 						continue();
+
 					);
 				);
 
-				wr=w(#repeat_stack);
-				if((wr++)==repeat_level,
-					resize(#repeat_stack,wr,1,1,3,0);
-				);
-
-				I(#repeat_stack,repeat_level)=[cursor,stop_mode,p,repeat_count,repeat_count];
-
+				I[#repeat_index_stack,repeat_level++]=[repeat_bucket,w(#repeat_bucket)];
+				resize(#repeat_bucket,w(#repeat_bucket)+1,1,1,5,0);
+				copy(i[#repeat_bucket,repeat_pos],[cursor,stop_mode,p,repeat_count,repeat_count],5,w(#repeat_bucket),1);
 				cursor=p;
 			);
 		):
-		repeat_level>-1?(
-			ri=i(#repeat_stack,repeat_level,0,0,1);
+		repeat_level?(
+			ri=i(#repeat_bucket,repeat_pos,0,0,1);
 			stop_char=ri?expr_1:secondary_repeat_end;
 
 			current_char==stop_char?(
-				--i(#repeat_stack,repeat_level,0,0,4)?(
-					cursor=i(#repeat_stack,repeat_level,0,0,2);
+				--i(#repeat_bucket,repeat_pos,0,0,4)?(
+					cursor=i(#repeat_bucket,repeat_pos,0,0,2);
 				):(
 					++cursor;
 					--repeat_level;
+					repeat_bucket=i(#repeat_index_stack,repeat_level,0,0,0);
+					repeat_pos=i(#repeat_index_stack,repeat_level,0,0,1);
 				);
 			):(
 				run('error inval_char_det');0;
@@ -515,9 +512,9 @@ eval "
 		);
 	,cursor<str_len);
 
-	da_freeze(#-1);
+	da_freeze(#binary_tree_img);
 	"
-
+rm[-${$0_dict_size}--1]
 rm[${$0_start_of_image_list}--2]
 
 if $2
@@ -561,11 +558,29 @@ eval "
 	const B1P0=_'{';
 	const B1P1=_'}';
 	const B2P1=_'`';
+	const _a=_'a';
+	const _z=_'z';
+	const _A=_'A';
+	const _Z=_'Z';
+	const __=_'_';
 	p=-1;
-	ignore=ignore_num=0;
+	ignore_var=ignore_expr=ignore_num=0;
+
+	is_alp(char)=isint(char,_a,_z)||isint(char,_A,_Z);
+	is_num(char)=isint(char,_'0',_'9');
+	is_valid_var_char(char)=is_alp(char)||is_num(char)||char==__;
+
 	while(++p<str_len,
 		c=i[#-2,p];
 
+		if(ignore_var&&is_valid_var_char(c)
+		,continue();
+		,ignore_var=0;
+		);
+
+		is_alp(c)?(
+			ignore_var=1;
+		):
 		c==B1P1?(
 			i[#-1,da_size(#-1)-1]!=B1P0?(
 				run('error mismatched_bracket_det');
@@ -573,13 +588,13 @@ eval "
 			if(--i[#-1,h(#-1)-1]==-1,
 				run('error mismatched_bracket_det');
 			);
-			ignore=ignore_num=0;
+			ignore_expr=ignore_num=0;
 		):
-		!(ignore||(ignore_num?isint(c,_'0',_'9')))?(
+		!(ignore_expr||(ignore_num?isint(c,_'0',_'9')))?(
 			c==B1P0?(
 				if(ignore_num
 				,ignore_num=0;
-				,ignore=1;
+				,ignore_expr=1;
 				);
 				da_push(#-1,B1P0);
 			):
