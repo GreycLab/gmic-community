@@ -102,11 +102,13 @@
 #@cli :   space, newline, '/'
 #@cli :
 #@cli : Output Binary tree node layout:
-#@cli :   0 = parent index
+#@cli :   0 = parent index*
 #@cli :   1 = left child index
 #@cli :   2 = right child index
-#@cli :   3+ = stored values (if vector_size > 0)
+#@cli :   3 = depth level
+#@cli :   4+ = stored values (if vector_size > 0)
 #@cli :
+#@cli :  *For the very first pixel at the top, parent index is actually maximum depth level
 #@cli : Example:
 #@cli :
 #@cli :   <>~:
@@ -131,7 +133,7 @@ _rep_str2bin_struct_exam_delimit # Validate bracket balance
 1,1,1,2             # repeat bucket position stack
 1,2,1,1,0,1x2       # childfree_stack -> no left child, no right child
 
-1,1,1,{6+${$0_access_mode}},nan,0,0,nan,0,0,0,1 # parent,left,right,direction,left_child_stack_pos,right_child_stack_pos,access
+1,1,1,{7+${$0_access_mode}},nan,0,0,0,nan,0,0,0,1 # parent,left,right,depth,direction,left_child_stack_pos,right_child_stack_pos,access
 
 if $2
 	1,1,1,$2,nan
@@ -182,10 +184,11 @@ eval "
 	const parent_pos=0;
 	const left_child_pos=1;
 	const right_child_pos=2;
-	const direction_pos=3;
-	const left_child_stack_pos=4;
-	const right_child_stack_pos=5;
-	const access_pos=6;
+	const depth_pos=3;
+	const direction_pos=4;
+	const left_child_stack_pos=5;
+	const right_child_stack_pos=6;
+	const access_pos=7;
 
 	is_alp(char)=isint(char,_a,_z)||isint(char,_A,_Z);
 	is_num(char)=isint(char,_'0',_'9');
@@ -199,6 +202,7 @@ eval "
 
 	repeat_bucket=repeat_pos=repeat_level=-1;
 	cursor=current_branch=square_bracket_level=0;
+	max_depth=0;
 
 	do(
 		current_char=i[#str_img,cursor];
@@ -211,6 +215,8 @@ eval "
 				if(!i(#binary_tree_img,0,current_branch,0,left_child_pos),
 					current_bin_tree_size=da_size(#binary_tree_img);
 					i(#binary_tree_img,0,current_branch,0,left_child_pos)=current_bin_tree_size;
+					child_depth=i(#binary_tree_img,0,current_branch,0,depth_pos)+1;
+					if(child_depth>max_depth,max_depth=child_depth;);
 
 					left_stack_pos=i(#binary_tree_img,0,current_branch,0,left_child_stack_pos);
 					left_stack_last=da_size(#no_left_child_stack)-1;
@@ -226,10 +232,10 @@ eval "
 
 					i(#binary_tree_img,0,current_branch,0,left_child_stack_pos)=nan;
 					access_mode?(
-						da_push(#binary_tree_img,[current_branch,0,0,0,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,1,vector_nan]);
+						da_push(#binary_tree_img,[current_branch,0,0,child_depth,0,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,1,vector_nan]);
 						_1;
 					):(
-						da_push(#binary_tree_img,[current_branch,0,0,0,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1]);
+						da_push(#binary_tree_img,[current_branch,0,0,child_depth,0,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1]);
 						_1;
 					);
 				);
@@ -239,6 +245,8 @@ eval "
 				if(!i(#binary_tree_img,0,current_branch,0,right_child_pos),
 					current_bin_tree_size=da_size(#binary_tree_img);
 					i(#binary_tree_img,0,current_branch,0,right_child_pos)=current_bin_tree_size;
+					child_depth=i(#binary_tree_img,0,current_branch,0,depth_pos)+1;
+					if(child_depth>max_depth,max_depth=child_depth;);
 
 					right_stack_pos=i(#binary_tree_img,0,current_branch,0,right_child_stack_pos);
 					right_stack_last=da_size(#no_right_child_stack)-1;
@@ -254,10 +262,10 @@ eval "
 
 					i(#binary_tree_img,0,current_branch,0,right_child_stack_pos)=nan;
 					access_mode?(
-						da_push(#binary_tree_img,[current_branch,0,0,1,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,1,vector_nan]);
+						da_push(#binary_tree_img,[current_branch,0,0,child_depth,1,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,1,vector_nan]);
 						_1;
 					):(
-						da_push(#binary_tree_img,[current_branch,0,0,1,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1]);
+						da_push(#binary_tree_img,[current_branch,0,0,child_depth,1,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1]);
 						_1;
 					);
 				);
@@ -297,6 +305,8 @@ eval "
 				if(!i(#binary_tree_img,0,current_branch,0,alternate_pos),
 					current_bin_tree_size=da_size(#binary_tree_img);
 					i(#binary_tree_img,0,current_branch,0,alternate_pos)=da_size(#binary_tree_img);
+					child_depth=i(#binary_tree_img,0,current_branch,0,depth_pos)+1;
+					if(child_depth>max_depth,max_depth=child_depth;);
 
 					no_child_stack=alternate_direction+no_left_child_stack;
 					child_stack_pos=alternate_direction+left_child_stack_pos;
@@ -315,10 +325,10 @@ eval "
 
 					i(#binary_tree_img,0,current_branch,0,child_stack_pos)=nan;
 					access_mode?(
-						da_push(#binary_tree_img,[current_branch,0,0,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,1,vector_nan]);
+						da_push(#binary_tree_img,[current_branch,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,1,vector_nan]);
 						_1;
 					):(
-						da_push(#binary_tree_img,[current_branch,0,0,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1]);
+						da_push(#binary_tree_img,[current_branch,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1]);
 						_1;
 					);
 				);
@@ -547,31 +557,32 @@ eval "
 		);
 	,cursor<str_len);
 	da_freeze(#binary_tree_img);
+	i[#binary_tree_img,0]=max_depth+1; # Set the very first unused pixel to the maximum depth found during creation to enable O(1) retrieval
 	"
 
 rm[-${$0_dict_size}--1]
 rm[${$0_start_of_image_list}--2]
 
 if $2
-	split c,-3,2
+	split c,-4,2
 	channels. {s-[${$0_v_size},1]}
 	a[-2,-1] c
 else
-	channels. 0,2
+	channels. 0,3
 fi
 __rep_str2bin_struct_expr:
 	res_str=dir()=$rep_str2bin_struct_direction;
 
 	if !isnan(i(#-1,0,$rep_str2bin_struct_current_branch,0,0))
-		res_str.=root()=crop(#-1,0,i(#-1,0,$rep_str2bin_struct_current_branch,0,0),0,7,1,1,1,$rep_str2bin_struct_v_size);
+		res_str.=root()=crop(#-1,0,i(#-1,0,$rep_str2bin_struct_current_branch,0,0),0,8,1,1,1,$rep_str2bin_struct_v_size);
 	fi
 
 	if i(#-1,0,$rep_str2bin_struct_current_branch,0,1)
-		res_str.=L()=crop(#-1,0,i(#-1,0,$rep_str2bin_struct_current_branch,0,1),0,7,1,1,1,$rep_str2bin_struct_v_size);
+		res_str.=L()=crop(#-1,0,i(#-1,0,$rep_str2bin_struct_current_branch,0,1),0,8,1,1,1,$rep_str2bin_struct_v_size);
 	fi
 
 	if i(#-1,0,$rep_str2bin_struct_current_branch,0,2)
-		res_str.=R()=crop(#-1,0,i(#-1,0,$rep_str2bin_struct_current_branch,0,2),0,7,1,1,1,$rep_str2bin_struct_v_size);
+		res_str.=R()=crop(#-1,0,i(#-1,0,$rep_str2bin_struct_current_branch,0,2),0,8,1,1,1,$rep_str2bin_struct_v_size);
 	fi
 
 	res={$res_str;[{`crop(#$rep_str2bin_struct_start_of_image_list,$rep_str2bin_struct_expr_start,$rep_str2bin_struct_expr_length)`}]}
