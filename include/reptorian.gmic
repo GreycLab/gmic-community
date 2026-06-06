@@ -5857,83 +5857,80 @@ fi
 #@cli : Return corrected file name for exporting files.
 #@cli : Note: Every single arguments applied to this command counts as a single string.
 rep_correct_exp_nm:
-base_file_name_loc=$!
-('{``"$*"}':;)
+u {`"
+	export_name='"{``"$*"}"';
+	const _dot=_'.';
+	const __=_' ';
+	const size_exp_nm=size(export_name);
 
-eval "
-	const bfnl=$base_file_name_loc;
-	const extl=bfnl+1;
-	const _period=_'.';
-
-	first_ext_char=find(#bfnl,_period,0,1); # Used to split from the very first dot
-
-	if(first_ext_char!=-1,
-		run('split. y,-',first_ext_char,',',2); # Split to work in different images.
-
-		if(l()==bfnl+1||expr('same(crop(#$base_file_name_loc),_\'.\')',1)[0],
-			run('error null_base');
-		);
-	);
-
-	# Note:
-	# Windows trims trailing spaces and periods when resolving path components.
-	# Filenames such as "CON " or "CON." may still be interpreted as reserved
-	# device names by Windows and are not explicitly detected here.
+	if(size_exp_nm==1&&export_name[0]=101,run('null_name'););
 
 	pos_char=-1;
 	write=0;
-	H=h(#bfnl);
-	while(++pos_char<H,
-		cur_char=i[#bfnl,pos_char];
+	length_of_export_name=size_exp_nm;
+	while(++pos_char<size_exp_nm,
+		cur_char=export_name[pos_char];
 		if(!(isint(cur_char,0x00,0x1f)||isin(cur_char,"{'\"#<>:/?*"\\"'}")),
 			if(write!=pos_char,
-				i[#bfnl,write]=i[#bfnl,pos_char];
+				export_name[write]=export_name[pos_char];
+			);
+			++write;
+		,--length_of_export_name;);
+	);
+
+	if(length_of_export_name<size_exp_nm,export_name[length_of_export_name]=0;);
+	sep_pos=find(export_name,_dot,0,1);
+
+	if(sep_pos==-1,sep_pos=length_of_export_name);
+	if(length_of_export_name>0xff,run('error exc_len'));
+	if(!length_of_export_name||!sep_pos,run('error null_name'););
+
+	rm_space_export_name=uppercase(export_name);
+
+	pos_char=-1;
+	write=0;
+	while(++pos_char<sep_pos,
+		cur_char=rm_space_export_name[pos_char];
+		if(rm_space_export_name[pos_char]!=__,
+			if(write!=pos_char,
+				rm_space_export_name[write]=rm_space_export_name[pos_char];
 			);
 			++write;
 		);
 	);
 
-	H=write;
-	if(H>0xff,run('error exc_chars_base'));
-	if(!H,run('error null_base'););
-	resize(#bfnl,1,H,1,1,-1);
+	if(write<length_of_export_name,rm_space_export_name[write]=0;);
 
-	H==4?(
-		f3c=uppercase(crop(#bfnl,0,0,0,0,1,3,1,1)); # First 3 chars
-		if(isin(f3c,'COM','LPT')&&isint(i[#bfnl,3],_'0',_'9'),
+	write==4?(
+		f3c=rm_space_export_name[0,3];
+		if(isin(f3c,'COM','LPT')&&isint(rm_space_export_name[3],_'0',_'9'),
 			run('error reserved_nm');
 		);
 	):
-	isint(H,3,7)?(
-		run('__rep_correct_exp_nm_check_reserved')?(
+	isint(write,3,7)?(
+		if(expr(string('isin(\'',rm_space_export_name,'\'',',\'CON\',\'PRN\',\'AUX\',\'NUL\',\'CLOCK\\\$\',\'CONIN\\\$\',\'CONOUT\\\$\')'),1)[0],
 			run('error reserved_nm');
 		);
 	);
 
-	if(first_ext_char!=-1,
-		pos_char=-1;
-		is_previous_period=write=0;
-		H=h(#extl);
-
-		while(++pos_char<H,
-			cur_char=i[#extl,pos_char];
-			if(!(isint(cur_char,0x00,0x1f)||(cur_char==_period&&is_previous_period)||isin(cur_char,"{'\ \"#<>:/?*"\\"'}")),
-				if(write!=pos_char,
-					i[#extl,write]=i[#extl,pos_char];
+	if(sep_pos<length_of_export_name,
+		is_previous_dot=1;
+		write=sep_pos+1;
+		while(++sep_pos<length_of_export_name,
+			cur_char=export_name[sep_pos];
+			if(!(cur_char==_dot&&is_previous_dot),
+				if(write!=sep_pos,
+					export_name[write]=export_name[sep_pos];
 				);
 				++write;
 			);
-			is_previous_period=cur_char==_period;
+			is_previous_dot=cur_char==_dot;
 		);
-
-		resize(#extl,1,write,1,1,-1);
+		if(write<length_of_export_name,export_name[write]=0;);
 	);
-	"
 
-a[$base_file_name_loc--1] y
-u {t} rm.
-__rep_correct_exp_nm_check_reserved:
-u {isin(uppercase(crop(#$base_file_name_loc)),'CON','PRN','AUX','NUL','CLOCK\$','CONIN\$','CONOUT\$')}
+	export_name;
+"`}
 #@cli rep_find_factors_of: num_0...
 #@cli : Return the factors found in all numbers at once.
 #@cli :
