@@ -5853,41 +5853,87 @@ if $alpha_mode==2&&!$contain_alpha
 else
 	crop[-1] 0,{$number_of_colors-1}
 fi
-#@cli rep_correct_exp_ne: string
+#@cli rep_correct_exp_nm: string
 #@cli : Return corrected file name for exporting files.
 #@cli : Note: Every single arguments applied to this command counts as a single string.
-rep_correct_exp_ne:
-('{``"$*"}':;) ({h}) a[-2,-1] y
+rep_correct_exp_nm:
+base_file_name_loc=$!
+('{``"$*"}':;)
 
 eval "
-	if(da_size(#-1)>=0x100,run('error \"Length exceeds maximum allowed (256 characters)\"'););
+	const bfnl=$base_file_name_loc;
+	const extl=bfnl+1;
+	const _period=_'.';
 
-	for(p=da_size(#-1)-1,p>=-1,--p,
-		char=i[#-1,p];
-		if(isin(i[#-1,p],"{'\"#<>:/?*"\\"'}"),da_remove(#-1,p););
-		if(same(char,_'~'),i[#-1,p]=_'-';);
-		if(same(char,_'.'),i[#-1,p]=_'_';);
+	first_ext_char=find(#bfnl,_period,0,1); # Used to split from the very first dot
+
+	if(first_ext_char!=-1,
+		run('split. y,-',first_ext_char,',',2); # Split to work in different images.
+
+		if(l()==bfnl+1||expr('same(crop(#$base_file_name_loc),_\'.\')',1)[0],
+			run('error null_base');
+		);
 	);
 
-	first_three_chars=uppercase(crop(#-1,0,0,0,0,1,3,1,1));
-	fs=da_size(#-1);
+	# Note:
+	# Windows trims trailing spaces and periods when resolving path components.
+	# Filenames such as "CON " or "CON." may still be interpreted as reserved
+	# device names by Windows and are not explicitly detected here.
 
-	(
-	 fs==3?(isin(first_three_chars,'AUX','CON','NUL','PRN') ):
-     fs==4?(isin(first_three_chars,'COM','LPT') && inrange(i[#-1,3],_'0',_'9',1,1) );
-	) ? run('error \"Cannot use Windows reserved filename.\"');
+	pos_char=-1;
+	write=0;
+	H=h(#bfnl);
+	while(++pos_char<H,
+		cur_char=i[#bfnl,pos_char];
+		if(!(isint(cur_char,0x00,0x1f)||isin(cur_char,"{'\"#<>:/?*"\\"'}")),
+			if(write!=pos_char,
+				i[#bfnl,write]=i[#bfnl,pos_char];
+			);
+			++write;
+		);
+	);
 
-	da_freeze(#-1);"
+	H=write;
+	if(H>0xff,run('error exc_chars_base'));
+	if(!H,run('error null_base'););
+	resize(#bfnl,1,H,1,1,-1);
 
+	H==4?(
+		f3c=uppercase(crop(#bfnl,0,0,0,0,1,3,1,1)); # First 3 chars
+		if(isin(f3c,'COM','LPT')&&isint(i[#bfnl,3],_'0',_'9'),
+			run('error reserved_nm');
+		);
+	):
+	isint(H,3,7)?(
+		run('__rep_correct_exp_nm_check_reserved')?(
+			run('error reserved_nm');
+		);
+	);
+
+	if(first_ext_char!=-1,
+		pos_char=-1;
+		is_previous_period=write=0;
+		H=h(#extl);
+
+		while(++pos_char<H,
+			cur_char=i[#extl,pos_char];
+			if(!(isint(cur_char,0x00,0x1f)||(cur_char==_period&&is_previous_period)||isin(cur_char,"{'\ \"#<>:/?*"\\"'}")),
+				if(write!=pos_char,
+					i[#extl,write]=i[#extl,pos_char];
+				);
+				++write;
+			);
+			is_previous_period=cur_char==_period;
+		);
+
+		resize(#extl,1,write,1,1,-1);
+	);
+	"
+
+a[$base_file_name_loc--1] y
 u {t} rm.
-
-if '$_host'=='cli'
-	name_a:='"$*"'
-	name_b:='"{t}"'
-	if !same([$name_a],[$name_b])
-		v + e[2] "File Name Changed!" v -
-	fi
-fi
+__rep_correct_exp_nm_check_reserved:
+u {isin(uppercase(crop(#$base_file_name_loc)),'CON','PRN','AUX','NUL','CLOCK\$','CONIN\$','CONOUT\$')}
 #@cli rep_find_factors_of: num_0...
 #@cli : Return the factors found in all numbers at once.
 #@cli :
@@ -27427,7 +27473,7 @@ else
 	output_name="$12"
 fi
 
-rep_correct_exp_ne {``$output_name}
+rep_correct_exp_nm {``$output_name}
 new_out=${}
 
 if $act_exp
