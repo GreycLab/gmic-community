@@ -196,8 +196,7 @@ static void runScript(PF_InData *in_data, string script, string& result)
 	AEGP_MemHandle resultMemH = NULL;
 	char* prompt = new char[16384];
 	memset(prompt, 0, 16384);
-	if (script.length() > 16380) script[16381] = '\0';
-	strcat(prompt, script.c_str());
+	snprintf(prompt, 16384, "%s", script.c_str());
 	A_char *resultAC = NULL;
 	ERR(suites.UtilitySuite5()->AEGP_ExecuteScript(NULL, prompt, FALSE, &resultMemH, NULL));
 	ERR(suites.MemorySuite1()->AEGP_LockMemHandle(resultMemH, reinterpret_cast<void**>(&resultAC)));
