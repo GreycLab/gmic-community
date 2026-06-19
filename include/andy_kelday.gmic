@@ -1378,7 +1378,7 @@ fx_gcd_crmt_tile :
   m "_crmt_tile_Fo : mirror. x"
   m "_crmt_tile_Fi : mirror. y"
   macros="sind(A)=sin(A/180*pi);cosd(A)=cos(A/180*pi);tand(A)=tan(A/180*pi);"
-  ('"_crmt_tiling_command : $1 {``$2},1,4 => _crmt_render $3"')
+  ('"_crmt_tiling_command : $1 {:$2},1,4 => _crmt_render $3"')
   replace_str. "C","_crmt_tile_C "
   replace_str. "Fo","_crmt_tile_Fo "
   replace_str. "Fi","_crmt_tile_Fi "
@@ -1396,7 +1396,7 @@ fx_gcd_crmt_tile :
   uncommand _crmt_tiling_command
 
 _crmt_tile_T : skip ${1=0},${2=0} # this command renders the tile
-  f. ":i3>0?I(#"{``${_crmt_render}}",$1+x,$2+y)=I;i" rm.
+  f. ":i3>0?I(#"{:${_crmt_render}}",$1+x,$2+y)=I;i" rm.
 
 #@gui Deblur Texture : fx_gcd_blur_deblur_texture, fx_gcd_blur_deblur_texture_preview(0)
 #@gui : note = note("<i>Variance-based edge preserving deblur or smooth</i>"), sep = separator()
@@ -3529,8 +3529,8 @@ fi
   cursor[0] 0 font={max(13,sqrt($w*$h)/48)} # font size
   info,hq,fs,cmdon,refresh,pid,wide,start={[1,0,1,0,1,0,0,0.5]}
   path_current path=${}
-  gcd_parentdir {``$path} files2img 1,${} => dirs
-  gcd_currentdir {``$path} gcd_argnum[dirs] ${}
+  gcd_parentdir {:$path} files2img 1,${} => dirs
+  gcd_currentdir {:$path} gcd_argnum[dirs] ${}
   dlim,dpos={dirs,[h,${}]} 0 => imgfiles 0 => vwimg
   $w,$h,1,3 => screen # screen buffer image
   1 store. cid # history of subfolder ids
@@ -3538,7 +3538,7 @@ fi
   do
     if $refresh
       rm[imgfiles]
-      gcd_filelist {``$path},$filespec
+      gcd_filelist {:$path},$filespec
       => imgfiles lim,pos={imgfiles,[h,1]}
       refresh={!$refresh}
     fi
@@ -3578,14 +3578,14 @@ fi
     if {*,ARROWLEFT}
       i $cid eval "da_push("$dpos")" store. cid
       i $pid eval "S=da_size();V=i[S-1]; S>0?da_remove(); V" nxt=${} store. pid
-      gcd_parentdir {``$path} path=${}
-      rm[dirs] gcd_parentdir {``$path} files2img 1,${} => dirs
-      if $nxt==0 gcd_currentdir {``$path} gcd_argnum[dirs] ${} nxt=${} fi
+      gcd_parentdir {:$path} path=${}
+      rm[dirs] gcd_parentdir {:$path} files2img 1,${} => dirs
+      if $nxt==0 gcd_currentdir {:$path} gcd_argnum[dirs] ${} nxt=${} fi
       dlim,dpos={dirs,[h,max($nxt,1)]}
       refresh=1 wait -1
     fi
     if {*,ARROWRIGHT}" && "$dlim>0
-      files2img 1,{``$path} => subdirs
+      files2img 1,{:$path} => subdirs
       if h>0
         i $pid eval "da_push("$dpos")" store. pid
         i $cid eval "S=da_size();V=i[S-1]; S>0?da_remove(); V" nxt=${} store. cid
@@ -3597,13 +3597,13 @@ fi
     fi
     if {*,ARROWUP}" && "$dpos>1
       1 store. cid # invalidate subfolder history
-      dpos-=1 gcd_parentdir {``$path} path=${}
+      dpos-=1 gcd_parentdir {:$path} path=${}
       gcd_imgarg[dirs] $dpos path.=${}"/"
       refresh=1 wait -1
     fi
     if {*,ARROWDOWN}" && "$dpos<$dlim
       1 store. cid # invalidate subfolder history
-      dpos+=1 gcd_parentdir {``$path} path=${}
+      dpos+=1 gcd_parentdir {:$path} path=${}
       gcd_imgarg[dirs] $dpos path.=${}"/"
       refresh=1 wait -1
     fi
@@ -3613,7 +3613,7 @@ fi
 
 #@cli gcd_imgarg : n>=1
 #@cli : Return the n-th argument of the specified string list image.
-gcd_imgarg : skip ${1=1} u {``{`I[$1-1]`}}
+gcd_imgarg : skip ${1=1} u {:{`I[$1-1]`}}
 
 #@cli gcd_argnum : "search_str"
 #@cli : Return the index of the first matching argument in the specified string list image.
@@ -3647,7 +3647,7 @@ gcd_filelist :
   path="$1" globs=${2--1} num={$#-1}
   repeat $num
     arg0 $>,$globs glob=${}
-    files2img 3,{``$path}$glob
+    files2img 3,{:$path}$glob
   done a[-$num--1] y
 
 #@cli gcd_resize_for_fs : width,_height,_is_filtered_edge
@@ -3777,16 +3777,16 @@ _gcd_nn_forwardpass :
       repeat (ML,L,
         # get activations of this layer
         copy(N,i(#1,0,L,0,0),w#0);
-        
+
         # get outbound weights of this layer
         copy(W,i(#0,0,0,L,0),wh#0);
-        
+
         # weighted sum for next layer
         A = mul(N,W,w#0);
-        
+
         # activation function of next layer
         fill(A,k, F=A[k]; abs(F)<0.5?F:0.01*F+sign(F)*0.495 );
-        
+
         # output to next layer
         copy(i(#1,0,L+1,0,0),A,w#0);
       );"
@@ -3801,14 +3801,14 @@ _gcd_nn_backwardpass :
       N = D = vector(#h#0);
       A = E = vector(#w#0);
       N[w#0] = 1; # bias learning factor for first layer
-      
+
       # get activations of last layer
       copy(A,i(#1,0,ML),w#0);
-      
+
       # calculate error of last layer
       copy(E,i(#2),w#0);
       E -= A;
-      
+
       # calculate derivatives and deltas of last layer
       fill(A,k, abs(A[k])<0.5?1:0.01 );
       E *= A;
@@ -3832,7 +3832,7 @@ _gcd_nn_backwardpass :
         fill(A,k, abs(N[k])<0.5?1:0.01 );
         copy(E,D,w#0);
         E *= A;
-        
+
         # disable bias learning for layers before last
         N[w#0] = 0;
       );"
