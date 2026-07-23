@@ -2895,9 +2895,12 @@ if l>9 # Use Hashmap. 10 layers seems to be the threshold to switch from linear 
 			const bit_mask=D-1;
 			const WHD=whd#0;
 			const count_boundary=k>>1;
+
 			current_color=previous_color=v_NaN=maxima_color=vector(#S,nan);
+
 			hash(color)=(
 				current_hash=0;
+
 				repeat(S,p,
 					current_hash=xor(((current_hash<<1)-current_hash)*seed,C=color[p];isint(C)?C:C*M);
 					current_hash&=bit_mask;
@@ -2906,6 +2909,7 @@ if l>9 # Use Hashmap. 10 layers seems to be the threshold to switch from linear 
 
 			chval(count_value)=(
 				current_count=count_value;
+
 				if(current_count>=current_maxima,
 					maxima_color=current_color;
 					if(current_count>count_boundary,break(););
@@ -2915,6 +2919,7 @@ if l>9 # Use Hashmap. 10 layers seems to be the threshold to switch from linear 
 			);
 
 		);
+
 		O=J(-1);
 		P=O[0]<<24|O[1];
 		Q=i0<<24|i1;
@@ -7064,7 +7069,7 @@ else
 			const new_base=$new_base;
 			temp_process_area=expr('begin(
 					const step_size=8;
-					step=(init_step=whd#-1%step_size;init_step?-(step_size-init_step):0);
+					step=whd#-1%-step_size;
 				);
 				selected_indice=crop(#-1,step,0,0,0,step_size,1,1,1);
 				step+=step_size;
@@ -7082,7 +7087,8 @@ else
 			for(p=start_point,p<size(temp_process_area),++p,
 				current_value=carry_over*base_10M+temp_process_area[p];
 				carry_over=current_value%new_base;
-				remainder=temp_process_area[p]=int(current_value/new_base);
+				temp_process_area[p]=int(current_value/new_base);
+				remainder=temp_process_area[p];
 				if(find_start_point,
 					if(remainder,
 						start_point=p;
@@ -7125,6 +7131,7 @@ else
 		rm[-1]
 	fi
 fi
+
 #@cli rep_altbase_num2posdec: base,digit_a,digit_b,...
 #@cli : Return the decimal number which corresponds to arguments. Accurately calculate the integer number for numbers bigger than the DOUBLE_MAX or 1.7976931348623157*10^308.
 rep_altbase_num2posdec:
@@ -7181,7 +7188,7 @@ else
 				const old_base_N=$old_base_N;
 				const base_power_of_10=$base_power_of_10;
 				temp_process_area=expr('begin(
-						const offset=whd#-1%$digits_per_base_change;
+						const offset=-(whd#-1%-$digits_per_base_change);
 						M=expr(\'<begin(v=1;);tv=v;v*=$base;tv\',$digits_per_base_change);
 					);
 					dot(crop(#-1,x*$digits_per_base_change-offset,0,0,0,$digits_per_base_change,1,1,1),M);
@@ -7198,7 +7205,8 @@ else
 				for(p=start_point,p<size(temp_process_area),++p,
 					current_value=carry_over*old_base_N+temp_process_area[p];
 					carry_over=current_value%base_power_of_10;
-					remainder=temp_process_area[p]=int(current_value/base_power_of_10);
+					temp_process_area[p]=int(current_value/base_power_of_10);
+					remainder=temp_process_area[p];
 					if(find_start_point,
 						if(remainder,
 							start_point=p;
@@ -7335,8 +7343,8 @@ u {"
 	init_state()=(
 		older_char_rank=char_rank=old_char_rank=ans=num=0;
 		old_char=-1;
-		char_freq_list=vector(#chars_count,0);
-		char_limits=expr('!(x&1)?3:1',7);
+		char_freq_list=[0,0,0,0,0,0,0];
+		char_limits=[3,1,3,1,3,1,3];
 		thres_length=pos_in_roman_num_collection;
 		if(is_strict,subtractive_mode=0;);
 	);
@@ -7344,8 +7352,7 @@ u {"
 	roman_num_collection='"${}"';
 
 	roman_chars='IVXLCDM';
-	const chars_count=size(roman_chars);
-	symbol_vals=expr('(x&1?5:1)*10^(x>>1)',chars_count);
+	symbol_vals=[1,5,10,50,100,500,1000];
 	ref_symbols_order=[2,0,3,4,5,6,1];
 
 	pos_in_roman_num_collection=size(roman_num_collection);
@@ -7374,12 +7381,12 @@ u {"
 			char_rank=ref_symbols_order[sel];
 
 			if(char!=roman_chars[char_rank],
-				run('error inv_char_det');
+				run('error inv_char_det\\ @\\ $',r_pos);
 			);
 
 			if(is_strict,
 				if(char_rank-old_char_rank<-2,
-					run('error inv_char_gap');
+					run('error inv_char_gap\\ @\\ $',r_pos);
 				);
 			);
 
@@ -7387,13 +7394,13 @@ u {"
 		);
 
 		if(++char_freq_list[char_rank]>char_limits[char_rank],
-			run('error excess_char');
+			run('error excess_char\\ @\\ $',r_pos);
 		);
 
 		if(is_strict,
 			if(subtractive_mode,
 				if(char_rank==old_char_rank||char_rank==old_char_rank+1,
-					run('error inval_sect_adj_sub');
+					run('error inval_sect_adj_sub\\ @\\ $',r_pos);
 				);
 			);
 		);
@@ -7401,7 +7408,7 @@ u {"
 		(old_char_rank>char_rank)?(
 			if(is_strict,
 				subtractive_mode=1;
-				if(char_rank&1,run('error inval_char_sub'););
+				if(char_rank&1,run('error inval_char_sub\\ @\\ $',r_pos););
 			);
 
 			if(!(old_char_rank&1),char_limits[old_char_rank]=4;);
@@ -7409,7 +7416,7 @@ u {"
 			check_forward_pos_in_roman_str=pos_in_roman_num_collection+2;
 			if(check_forward_pos_in_roman_str<thres_length,
 				if(char_rank==old_char_rank||older_char_rank>=char_rank,
-					run('error inval_sect_sub');
+					run('error inval_sect_sub\\ @\\ $',r_pos);
 				);
 			);
 
@@ -7423,7 +7430,7 @@ u {"
 		old_char=char;
 		old_char_rank=char_rank;
 
-		if(!isint(ans,1,3999),run('error out_of_bound_val'););
+		if(!isint(ans,1,3999),run('error out_of_bound_val\\ @\\ $',r_pos););
 	);
 
 	result[--r_pos]=ans;
@@ -14385,7 +14392,7 @@ foreach {
 #@cli : Shear Image Based on angle.
 #@cli : Default values: '_boundary=2','_interpolation=2','_output_mode=0'
 rep_shear:
-skip ${4=2},${5=2},${6=0}
+skip ${3=0},${4=2},${5=2},${6=0}
 
 check inrange($2,-90,90,0,0)&&isfinite($3)&&isint($4,0,3)&&isint($5,0,2)&&isbool($6)
 if !$2 return fi
@@ -14433,9 +14440,9 @@ else
 fi
 
 if $contain_c
-	skew_expr=j($ins_l$c0,$c1,$c2,$c3,$5,$4)
+	shear_expr=j($ins_l$c0,$c1,$c2,$c3,$5,$4)
 else
-	skew_expr=J($ins_l$c0,$c1,$c2,$5,$4)
+	shear_expr=J($ins_l$c0,$c1,$c2,$5,$4)
 fi
 
 if $6
@@ -14452,7 +14459,7 @@ if $6
 				const offset=$offset;
 				const shift_scale="$shift_scale";
 			);
-			"$skew_expr";
+			"$shear_expr";
 			"
 
 		rm..
@@ -14464,7 +14471,7 @@ else
 			const centre=ref_length*$centre;
 			const shift_scale="$shift_scale";
 		);
-		"$skew_expr";"
+		"$shear_expr";"
 fi
 #@cli rep_hpd: eq. to 'rep_henon_phase_diagram'
 rep_hpd:rep_henon_phase_diagram $*
