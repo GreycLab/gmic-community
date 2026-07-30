@@ -3047,61 +3047,80 @@ else
 fi
 
 k[0]
-#@cli rep_val2order: map_2_img={ 0=False | 1=True },value_mode={ 0=scalar | 1=vector },_keep_set_vals={ 0=no | 1=values | 2=values+count | 3=values+status_counts | 4=status_counts }
-#@cli : This command can change images to order of appearance representation(s). map_2_img simply convert values to the order of their appearance starting from zero. set_vals can contain unique values with optional count of unique values.
+#@cli rep_val2order: _map2img={ 0=F | 1=T },_value={ 0=scalar | 1=vector },_additional_image={ 0=n/a | 1=value | 2=count | 3=value+count},_status={ 0=n/a | 1=order | 2=value | 3=count}
+#@cli : This commands can change images to order of appearance representation(s), and provide information based on order.
+#@cli : Default values: '_map2img=1','_value=0','_additional_image=0','_status=0'
 rep_val2order:
-check "$! && isint($#,2,3) && sum(isbool([${1-2}])) && $#==3?isint($-1,0,4):1"
+if !l?1:same(expr('!s#x',l),1)
+	return
+fi
 
-if $#==3
-	map_2_img,use_vector_values,set_val_mode=$*
+# $1 map2image        : 0 = false  ; 1 = true
+# $2 value_mode       : 0 = scalar ; 1 = vector
+# $3 additional_image : 0 = n/a    ; 1 = value ; 2 = count ; 3 = value+count
+# $4 status           : 0 = n/a    ; 1 = order ; 2 = value ; 3 = count  ;  4=size_of_order
+
+check isbool(${1=1})&&isbool(${2=0})&&isint(${3=0},0,3)&&isint(${4=0},0,4)
+check l==1||!$4
+
+status_mode=$4
+
+if same([$1,$3,$4],0)
+	status_mode=1
+fi
+
+if $status_mode status=
+else status=${}
+fi
+
+use_count={$3>1||$status_mode==3}
+fill_mode={$1||$status_mode==1}
+process_mode={$use_count||$fill_mode}
+ui={$3||$status_mode==2||$status_mode==3}
+
+if $fill_mode
+	ef=fill
 else
-	map_2_img,use_vector_values=$*
-	set_val_mode={!$map_2_img}
+	ef=eval
 fi
-
-check "$map_2_img || $set_val_mode"
-
-use_count,use_values,use_status,mode_4:=$set_val_mode>1,isint($set_val_mode,1,3),$set_val_mode>=3,$set_val_mode==4
-
-if $use_status
-	status_out,end=
-else
-	original_status=${}
-fi
-
-if $mode_4
-	map_2_img=0
-fi
-
-remove_primary_image={!$map_2_img&&!$mode_4}
-bitshift_factor=10
-dictionary_size,end_hash_image_index,max_index={(1<<$bitshift_factor)+[0,1,-1]}
 
 foreach {
-	# Random Seed per iterations!
-	seed={v(0xffff,0xffffff)}
+	if !s
+		if $status_mode
+			if $status_mode==4 status.=${S}0
+			else status.=${S}nan
+			fi
+			S=,
+			continue
+		fi
+	fi
 
-	# Compute Hash Map
-	100%,100%,100%,{$use_vector_values?1:s#-1},"
-		begin(
+	dict_size,bit_mask:=(1<<(cut(ceil(log2($2?whd:whds)),6,13)-2))-[0,1]
+
+	100%,100%,100%,{$2?1:s},"begin(
 			const M=(1<<16)-1;
-			const seed=$seed;
-			const bit_mask=$max_index;
-			const multiplier=31*$seed;
+			const seed="{v(0xffff,0xffffff)}";
+			const bit_mask=$bit_mask;
+			const multiplier=31*seed;
 
-			$use_vector_values?(
-				hash_value(n)=(
+			$2&&s#0>1?(
+				hash(v)=(
 					hash_value=0;
-					repeat(s#-1,p,
-						hash_value=xor(((hash_value<<1)-hash_value)*seed,C=n[p];isint(C)?C:C*M);
+
+					repeat(size(v),p,
+						hash_value=xor(((hash_value<<1)-hash_value)*seed,C=v[p];isint(C)?C:C*M);
 						hash_value&=bit_mask;
 					);
+
 					hash_value+2;
 				);
-				process()=hash_value(I#-1);
+
+				process()=hash(I#-1);
 			):(
-				const bitshift_factor=$bitshift_factor;
+				const bitshift_factor=4;
+
 				n_start(n)=n>bit_mask?xor(n<<1,seed):n&bit_mask;
+
 				hash_value(n)=(
 					N=n_start(n);
 					hash_value=0;
@@ -3113,156 +3132,130 @@ foreach {
 				);
 				process()=hash_value(i#-1);
 			);
-	    );
-	    process();
-	    "
-	# Create Hash Table
-	0x$dictionary_size
-
-	# Optional image to store uniques values or counts of uniques values or both
-	if $set_val_mode
-		0
-	fi
-
-	f[0] >"
-		begin(
-			const map_2_img=$map_2_img;
-			const uvv=$use_vector_values;
-			const dict_size=$dictionary_size;
-
-			sizes=vector(#dict_size,0);
-
-			map_2_img?(
-				uvv?(
-					result_value()=[v];
-				):(
-					result_value()=v;
-				);
-			):(
-				uvv?(
-					result_value()=I;
-				):(
-					result_value()=i;
-				);
-			);
-
-			uvv?(
-				const step_size=s+1;
-				const post_step=s-1;
-				return_value()=I;
-				last_value=vector(#s,nan);
-				0;
-			):(
-				const step_size=2;
-				const post_step=0;
-				return_value()=i;
-				last_value=vector(#1,nan);
-				0;
-			);
-
-			const set_val_mode=$set_val_mode;
-			set_val_mode?(
-				const use_values=$use_values;
-				const use_count=$use_count;
-				use_values&&use_count?(
-					action_1()=da_push(#-1,[return_value(),1]);
-					uvv?(
-						action_2()=++i(#-1,0,v,0,s);
-					):(
-						action_2()=++i(#-1,0,v,0,1);
-					);
-				):
-				use_values?(
-					action_1()=da_push(#-1,return_value());
-					action_2()=0;
-				):
-				use_count?(
-					action_1()=da_push(#-1,1);
-					action_2()=++i[#-1,v];
-				);
-			):(
-				action_1()=0;
-				action_2()=0;
-			);
-
-			uvv?(
-				process()=(
-					ref_size_ind=key-2;
-					size_of_dyn_img=sizes[ref_size_ind];
-					(size_of_dyn_img?same(last_value,return_value()))?(
-						action_2();
-					):
-					(size_of_dyn_img?(p=find(#key,return_value(),(size_of_dyn_img-1)*step_size,-step_size)+1))?(
-						p+=post_step;
-						v=i[#key,p];
-						action_2();
-					):(
-						if(size_of_dyn_img==h(#key),
-							new_size=max(8,h(#key)<<1);
-							resize(#key,step_size,new_size,1,1,-1);
-						);
-						copy(i(#key,0,size_of_dyn_img,0,0),[return_value(),v=id++]);
-						p=size_of_dyn_img*step_size+post_step+1;
-						++sizes[ref_size_ind];
-						action_1();
-					);
-					last_value=return_value();
-				);
-			):(
-				process()=(
-					if(da_size(#key),p=find(#key,i,0,2)+1;)?(
-						v=i[#key,p];
-						action_2();
-					):(
-						da_push(#key,i,v=id++);
-						action_1();
-					);
-					result_value();
-				);
-			);
-
-			id=0;p=-1;v=nan;
 		);
-		key=i#1;
 		process();
-		result_value();
-		end(if($set_val_mode,da_freeze(#-1);););
 		"
 
-	rm[1-$end_hash_image_index]
+	0x$dict_size
 
-	# Remove if not used
-	if $remove_primary_image
-		rm[0]
-	fi
+	$ef[1] >"
+		begin(
+			modified_table_idx=table_size=vector(#$dict_size);
+			modified_table_count=0;
 
-	# For multiple channel mapping
-	if $map_2_img&&$use_vector_values
-		channels[0] 0
-	fi
+			const S=$2?s#0:1;
+			const use_count=$use_count;
+			const nvs=S+1+use_count;
 
-	# Status output
-	if $use_status
-		part_status={crop(#-1,0,0,0,s#-1-1,1,h#-1,1,1)}
+			$2?(
+				img_val()=I#0;
+			):(
+				img_val()=i#0;
+			);
 
-		if $set_val_mode==4 rm.
-		else channels. 0,{s-2}
+			$fill_mode?(
+				return_value()=id;
+			):(
+				return_value()=i;
+			);
+
+			$process_mode?(
+				process()=same_as_prev?(
+					if(use_count,++i[#i,pos];);
+				):
+				(H?(pos=find(#i,img_val(),mH-nvs,-nvs)))>0?(
+					id=i[#i,pos-1];
+					if(use_count,
+						pos+=S;
+						++i[#i,pos];
+					);
+				):(
+					if(H==h(#i),
+						new_size=max(h(#i)<<1,8);
+						resize(#i,nvs,new_size,1,1,-1);
+					);
+
+					if(use_count
+					,copy(i[#i,mH-1],[id=count++,img_val(),1]);0;
+					,copy(i[#i,mH-1],[id=count++,img_val()]);0;
+					);
+
+					pos=mH+S;
+					++table_size[K];
+				);
+			):(
+				process()=!(same_as_prev?1:(H?find(#i,img_val(),mH-nvs,-nvs)>0))?(
+					if(H==h(#i),
+						new_size=max(h(#i)<<1,8);
+						resize(#i,nvs,new_size,1,1,-1);
+					);
+					copy(i[#i,mH-1],[count++,img_val()]);
+					++table_size[K];
+				);
+			);
+
+			old_val=img_val()+1;
+			pos=count=id=0;
+		);
+		K=i-2;
+		H=table_size[K];
+		if(!H,modified_table_idx[modified_table_count++]=K;);
+
+		mH=H*nvs+1;
+		same_as_prev=old_val==img_val();
+		process();
+
+		old_val=img_val();
+
+		return_value();
+		end(
+			if($status_mode==4,set('size_of_order',count));
+
+			repeat(modified_table_count,K,
+				nK=modified_table_idx[K]+2;
+				resize(#nK,nvs,table_size[modified_table_idx[K]],1,1,-1);
+			);
+		);
+		"
+
+	if !$ui
+		rm[2--1]
+
+		if $status_mode==4
+			status.=${S}$size_of_order
+		elif $status_mode==1
+			status.=${S}{crop(#1)}
 		fi
 
-		if $output_status_mode
-			status_out.=$end\"$part_status\"
-			end=,
-		else
-			status_out=$part_status
+		S=,
+	else
+		a[2--1] y
+		permute. yzcx
+		sort. +,x
+		channels. 1,100%
+
+		if $status_mode==4
+			status.=${S}$size_of_order
+		elif $status_mode==3
+			status.=${S}{crop(#-1,0,0,0,s#-1-1,w#-1,1,1,1)}
+		elif $status_mode==2
+			status.=${S}{crop(#-1,0,0,0,0,w#-1,1,1,s#0)}
+		elif $status_mode==1
+			status.=${S}{crop(#1)}
+		fi
+
+		S=,
+
+		if $3==2 channels. {s-1}
+		elif $3==1 channels. 0,{s#0-1}
+		elif !$3 rm.
 		fi
 	fi
+
+	rm[{!$1}]
 }
 
-if $use_status
-	status $status_out
-else
-	status $original_status
-fi
+u $status
 #@cli rep_cbsoo: eq. to 'rep_channels_overblur_overline_blur_sharpen'.
 rep_cbsoo: rep_channels_blur_sharpen_overblur_overline $*
 #@cli rep_channels_overblur_overline_blur_sharpen: method_a={ 0=blur | 1=sharpen | 2=overblur | 3=overline },0%<_effect_factor_a[%]<=100%,_multiplication_factor>0,_blending_mode,0<_blending_opacity[%]<=100%...
