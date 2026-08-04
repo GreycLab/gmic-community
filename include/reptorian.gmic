@@ -749,8 +749,8 @@ eval "
 	M;
 	"
 k[-2,-1]
-#@cli rep_uniq_args: output_mode={ 0=status | 1=string_table_images | 2=str2imgs },randomize_str_pos={ 0=False | 1=True },[arg0,arg1,...]
-#@cli : Deduplicate input strings.
+#@cli rep_uniq_args: output_mode={ 0=status | 1=string_table_images | 2=str2imgs },randomize_str_pos={ 0=False | 1=True },sep,[arg0,arg1,...]
+#@cli : Deduplicate input strings. 'sep' parameter is optional, and it defines how to separate a string.
 #@cli :
 #@cli : output_mode=0 returns the unique strings as a comma-separated list in
 #@cli : the `status` variable.
@@ -767,12 +767,15 @@ k[-2,-1]
 #@cli :    - channel 1: length of the string.
 #@cli : 3) Status is set to the length of the longest string.
 +rep_uniq_args:
-skip $*
-_rep_dedup_strval_dict $1,0,$2,${3--1}
+skip "${3=}"
+_rep_dedup_strval_dict $1,0,$2,"$3",${4--1}
 _rep_dedup_strval_dict:
-skip $*
+skip "${4=}"
 check isint(${1=0},0,2)&&isint(${2=0},0)&&isbool(${3=1})
 output,limit,randomize_str_pos,use_images:=${1-3},$#<4
+
+use_sep={narg($4)}
+if $use_sep sep:='$4' fi
 
 # Output Mode
 # 0 : Status
@@ -780,9 +783,21 @@ output,limit,randomize_str_pos,use_images:=${1-3},$#<4
 # 2 : Remove duplicate image values
 
 if $use_images
+	if $1==1
+		if $use_sep split -,$sep
+		else split -,{_','}
+		fi
+	fi
 	start_point,size_of_dict_table,bit_mask:=0,(1<<cut(ceil(log2($!))+1,2,10))-[0,1]
 	if $2 foreach { if whds>$2 rm fi } fi
 	if $!&&$randomize_str_pos repeat $! { rv[$<,{v($<)}] } fi
+elif $use_sep&&!$use_images
+	start_point=$!
+	('${5--1}')
+	split. -,$sep
+	L={l-$start_point}
+	size_of_dict_table,bit_mask:=(1<<cut(ceil(log2($L))+1,2,10))-[0,1]
+	if $randomize_str_pos repeat $L-1 { rv[$start_point,{v($<)+$start_point}] } fi
 else
 	start_point,size_of_dict_table,bit_mask:=$!,(1<<cut(ceil(log2($#-3))+1,2,10))-[0,1]
 	$=arg
@@ -850,9 +865,9 @@ eval[$start_of_hash_indice] >"begin(
 		):
 		output==1?(
 			insert_info()=(
-				copy(i[#-2,str_ins],i[#p,0],s#p);
-				I[#-1,count_of_unique_strings]=[str_ins,s#p];
-				str_ins+=s#p;
+				copy(i[#-2,str_ins],i[#p,0],whds#p);
+				I[#-1,count_of_unique_strings]=[str_ins,whds#p];
+				str_ins+=whds#p;
 			);
 		):(
 			const _comma=_',';
@@ -860,7 +875,7 @@ eval[$start_of_hash_indice] >"begin(
 				if(count_of_unique_strings,
 					i[#-1,str_ins++]=_comma;
 				);
-				copy(i[#-1,str_ins],i[#p,0],s#p);
+				copy(i[#-1,str_ins],i[#p,0],whds#p);
 				str_ins+=s#p;
 			);
 		);
@@ -868,7 +883,8 @@ eval[$start_of_hash_indice] >"begin(
 	p=x+Is;
 	insertion_pos=insertion_pos_list[i];
 	door_pos=i+start_of_dict_table;
-	str_v=crop(#p,0,0,0,0,1,1,1,info_start);
+	str_v=vector(#info_start);
+	copy(str_v[0],i[#p,0],whds#p);
 
 	s#p&&(insertion_pos?find(#door_pos,str_v,insertion_pos,-vector_size)==-1:1)?(
 		if(wh#door_pos==insertion_pos,
@@ -919,8 +935,8 @@ else
 	u {t}
 	rm[$start_point--1]
 fi
-#@cli rep_sug_args: inp,_sep,_sug_mul_args={ 0=false | 1=true},0<_sim_res[%]<=100,-100<=_leven_jaro_blend[%]<=100,_exp,0<=_prefix_sw_blend[%]<=100,0<=_prefix_sw_factor[%]<=100,_case_insensitive={ 0=False | 1=True },arg0,arg1,...
-#@cli : Suggest arguments given input using hybrid of Jaro-Winkler and Levenshtein fuzzy matching algorithm with prefix to smith-waterman boost factor with consideration to boost of prefix.
+#@cli rep_sug_args: inp,_sep,_sug_mul_args={ 0=false | 1=true},10<_sim_res[%]<=100,-100<=_leven_jaro_blend[%]<=100,_exp>0,0<=_prefix_sw_blend[%]<=100,0<=_prefix_sw_factor[%]<=100,0<=_prefix_boost[%]<=100,_case_insensitive={ 0=false | 1=true },_split_sep,arg0,arg1,...
+#@cli : Suggest arguments given input using a hybrid of Jaro-Winkler and Levenshtein fuzzy matching, blended against a prefix/Smith-Waterman score.
 #@cli :
 #@cli : Returns '--0001e0' on exact match.
 #@cli : Returns '--0000e0' if no close match is found.
@@ -945,7 +961,8 @@ fi
 #@cli : '_prefix_sw_factor' defines how much to boost the prefix/smith-waterman scoring.
 #@cli : '_prefix_boost' defines how much to boost similarity using prefix.
 #@cli : '_case_insensitive' defines whether the algorithm is case-insensitive.
-#@cli : 'argN' is a list of words to compare the input against.
+#@cli : '_split_sep' is the delimiter to split along argNs.
+#@cli : 'argN' is a list of words to compare the input against. Also, when split_sep is active, the perceived arguments actually is dependent on split_sep.
 #@cli : #--------------------------------------------------#
 #@cli :
 #@cli : [1] -1         : Alt Jaro-Winkler only
@@ -956,9 +973,9 @@ fi
 #@cli :
 #@cli : * Closer to -1 or 1 favors selected Jaro-Winkler variant. Positive value favors more forgiving Jaro-Winkler variant.
 #@cli :
-#@cli : Default values: 'sep=','_sug_mul_args=1','_sim_res=70%','_leven_jaro_blend=50%','_exp=1','_prefix_sw_blend=0%','_prefix_sw_factor=5%','_prefix_boost=50%','_case_insensitive=1'
+#@cli : Default values: '_sep=','_sug_mul_args=1','_sim_res=70%','_leven_jaro_blend=50%','_exp=1','_prefix_sw_blend=0%','_prefix_sw_factor=5%','_prefix_boost=50%','_case_insensitive=1',_split_sep='
 rep_sug_args:
-skip "${1=}"
+skip "${1=}","${11=}"
 
 check "isint('${2=}',0,2)&&
        isbool(${3=1})&&
@@ -985,7 +1002,7 @@ if $case_insensitive
 	f. lowercase(i)
 fi
 
-+rep_uniq_args 1,1,${11--1}
++rep_uniq_args 1,1,"$11",${12--1}
 max_string_length=${}
 
 if !$max_string_length
@@ -1429,6 +1446,20 @@ else
 
 	u {t} rm[$I--1]
 fi
+#@cli rep_local_files: ext_1,ext_2,...
+#@cli : List local files against extension.
+rep_local_files:
+skip $*
+$=q
+
+repeat $# {
+	list_of_files.=$s${files\ ./*.${q{$>+1}}}
+	s=,
+}
+
+u {`"v=['"{:${}}"'];
+	v[2,size(v)-2];
+	"`}
 #@cli rep_txt2uints: string
 #@cli : Return the numerical decoding representation of unicode from txt.
 #@cli : _CODEPAGE variable should define your encoding approach. Otherwise, fallback on auto-finding encoding method.
@@ -1667,7 +1698,7 @@ l[] {
 	check narg(${A$1})
 
 	onfail
-		closest_arg=${rep_sug_args\ $1,,0,50%,50%,1,0,0%,100%,0,$b0,$b1,$b2,$b3,$b4}
+		closest_arg=${rep_sug_args\ $1,,0,50%,50%,1,0,0%,100%,0,,$b0,$b1,$b2,$b3,$b4}
 
 		if !same('$closest_arg','--0000e0')
 			group:=${A$closest_arg}-1
@@ -5648,7 +5679,7 @@ foreach {
 
 uncommand cmd_vibrance,cmd_$0_adj
 #@cli rep_import_pal: file_a...file_z
-#@cli : Import JASC-PAL Palette or Microsoft RIFF Palettes (.pal). What is imported is automatically based on header
+#@cli : Import JASC-PAL Palette or Microsoft RIFF Palettes (.pal) or assumed RGB triplets. What is imported is automatically based on header
 #@cli : There can be as many files. This import file relative to your current directory.
 +rep_import_pal:
 check $#
@@ -5662,7 +5693,8 @@ CRLF:=0xd,$newline
 
 repeat $#
 {
-	0 => ${files{$>+1}}
+	c_arg=${files{$>+1}}
+	0 => $c_arg
 	file_name={b}
 
 	l[-1]
@@ -5670,7 +5702,16 @@ repeat $#
 		rm.
 		ib ${file_name}
 		onfail
-			ib ${file_name}.pal
+			l[] {
+				ib ${file_name}.pal
+				onfail
+					closest_args=${rep_sug_args\ $c_arg,,1,75%,0%,1,0,100%,10%,1,\",./\",{:${rep_local_files\ ,pal}}}
+					if !same('$closest_args','--0000e0')
+						error[0--1] "File '"$c_arg"' does not exist! Expected one of the files (case-insensitive): "$closest_args
+					else
+						error[0--1] no_closest_match_found
+					fi
+			}
 	}
 
 	__$0_process_file[-1]
@@ -22044,7 +22085,7 @@ u $out
 __pal_error:
 rm
 
-closest_args=${rep_sug_args\ $T,,1,66%,-97.5%,.9,0,25%,100%,0,${-_pal_ids}}
+closest_args=${rep_sug_args\ $T,,1,66%,-97.5%,.9,0,25%,100%,0,,${-_pal_ids}}
 
 if same('$closest_args','--0000e0')
 	e "ERROR: Invalid value '"$t"'. No close match found!"\n
