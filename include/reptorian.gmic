@@ -5678,7 +5678,7 @@ foreach {
 }
 
 uncommand cmd_vibrance,cmd_$0_adj
-#@cli rep_import_pal: file_a...file_z
+#@cli rep_import_pal: `format,file_a....file_z : file_a...file_z
 #@cli : Import JASC-PAL Palette or Microsoft RIFF Palettes (.pal) or assumed RGB triplets. What is imported is automatically based on header
 #@cli : There can be as many files. This import file relative to your current directory.
 +rep_import_pal:
@@ -5705,12 +5705,16 @@ repeat $#
 			l[] {
 				ib ${file_name}.pal
 				onfail
-					closest_args=${rep_sug_args\ $c_arg,,1,75%,0%,1,0,100%,10%,1,\",./\",{:${rep_local_files\ ,pal}}}
-					if !same('$closest_args','--0000e0')
-						error[0--1] "File '"$c_arg"' does not exist! Expected one of the files (case-insensitive): "$closest_args
-					else
-						error[0--1] no_closest_match_found
-					fi
+					l[] {
+						ib ${file_name}.PAL
+						onfail
+							closest_args=${rep_sug_args\ $c_arg,,1,75%,0%,1,0,100%,10%,1,\",./\",{:${rep_local_files\ ,pal}}}
+							if !same('$closest_args','--0000e0')
+								error[0--1] "File '"$c_arg"' does not exist! Expected one of the files (case-insensitive): "$closest_args
+							else
+								error[0--1] no_closest_match_found
+							fi
+					}
 			}
 	}
 
@@ -5751,6 +5755,7 @@ if same(crop(#-1,0,0,0,0,1,8,1,1),'JASC-PAL')
 	k[$images_indices_contains_colors]
 	a x
 elif same(crop(#-1,0,0,0,0,1,4,1,1),'RIFF')
+	# Import Microsoft RIFF pal
 	total_bytes_size={sum(crop(#-1,0,4,0,0,1,4,1,1)<<[0,8,16,24])}                 # RIFF size offset is at 0x04
 	if (h-8)!=$total_bytes_size error inval_RIFF_pal_bytes_len fi
 	if !same(crop(#-1,0,8,0,0,1,8,1,1),'PAL\ data') error inval_RIFF_pal_header fi # Pal data header starts at 0x08
@@ -5764,6 +5769,23 @@ elif same(crop(#-1,0,0,0,0,1,4,1,1),'RIFF')
 	r 4,{h>>2},1,1,-1
 	r 3,$number_of_colors,1,1,0
 	permute yzcx
+elif i[#-1,0]==_'\"'&&i[#-1,0x22]==0x20&&i[#-1,0x26]==0x20&&i[#-1,0x2a]==0x20&&i[#-1,0x2e]==0x20&&i[#-1,0x32]==0x0d&&i[#-1,0x33]==0x0a
+	# Import CorelDraw PAL
+	4,{int((h+2-2*(i[#-1,h-2]==0x0d&&i[#-1,h-1]==0x0a))/52)}
+	eval "
+		const M=_'0'-0x20;
+		copy_2_img_pos=0;
+		for(main_cursor=0x23,main_cursor<h#-2,main_cursor+=0x34,
+			secondary_cursor=main_cursor;
+			repeat(4,
+				V=crop(#-2,0,secondary_cursor,0,0,1,3,1,1);
+				i[#-1,copy_2_img_pos++]=s2v(V+(!(V-0x20)*M));
+				secondary_cursor+=4;
+			);
+		);
+		"
+	permute yzcx
+	rm.. * {255/100} cmyk2rgb round.
 else # Seen this pattern in other .pal file, so this is a fallthrough. Works for Starcraft .pal
 	if whd%3 error inval_file fi
 	resize 3,{whd/3},1,1,-1
