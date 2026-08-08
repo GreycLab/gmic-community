@@ -3093,24 +3093,19 @@ else
 fi
 
 k[0]
-#@cli rep_val2order: _map2img={ -1=Remove | 0=F | 1=T },_value={ 0=scalar | 1=vector },_additional_image={ 0=n/a | 1=value | 2=count | 3=value+count},_status={ 0=n/a | 1=order | 2=value | 3=count}
+#@cli rep_val2order: _additional_image={ 0=n/a | 1=value | 2=count | 3=value+count},_map2img={ -1=Remove | 0=F | 1=T },_value={ 0=scalar | 1=vector },_status={ 0=n/a | 1=order | 2=value | 3=count}
 #@cli : This commands can change images to order of appearance representation(s), and provide information based on order.
-#@cli : Default values: '_map2img=1','_value=0','_additional_image=0','_status=0'
+#@cli : Default values: '_additional_image=0','_map2img=1','_value=0','_status=0'
 rep_val2order:
 if !l?1:same(expr('!s#x',l),1)
 	return
 fi
 
-# $1 map2image        : -1=remove  ; 0 = false  ; 1 = true
-# $2 value_mode       : 0 = scalar ; 1 = vector
-# $3 additional_image : 0 = n/a    ; 1 = value ; 2 = count ; 3 = value+count
-# $4 status           : 0 = n/a    ; 1 = order ; 2 = value ; 3 = count  ;  4=size_of_order
-
-check isint(${1=0},-1,1)&&isbool(${2=0})&&isint(${3=0},0,3)&&isint(${4=0},0,4)
+check isint(${1=1},0,3)&&isint(${2=1},-1,1)&&isbool(${3=1})&&isint(${4=0},0,4)
 
 status_mode=$4
 
-if same([$1,$3,$4],0)
+if same([$2,$1,$4],0)
 	status_mode=1
 fi
 
@@ -3118,11 +3113,11 @@ if $status_mode status=
 else status=${}
 fi
 
-use_count,fill_mode,ui,M:=$3>1||$status_mode==3,$1>0||$status_mode==1,$3||$status_mode==2||$status_mode==3,l>1
+use_count,fill_mode,ui,M:=$1>1||$status_mode==3,$2>0||$status_mode==1,$1||$status_mode==2||$status_mode==3,l>1
 process_mode={$use_count||$fill_mode}
-uvcm,add_mode_3:=(isin($4,2,3)?$4-1),$3==3
-mode={$3|$uvcm}
-cross={$3<3?($mode==3)}
+uvcm,add_mode_3:=(isin($4,2,3)?$4-1),$1==3
+mode={$1|$uvcm}
+cross={$1<3?($mode==3)}
 
 if $fill_mode
 	ef=fill
@@ -3141,15 +3136,15 @@ foreach {
 		fi
 	fi
 
-	dict_size,bit_mask:=(1<<(cut(ceil(log2(max(($2?whd:whds)>>10,1))),5,13)))-[0,1]
+	dict_size,bit_mask:=(1<<(cut(ceil(log2(max(($3?whd:whds)>>10,1))),5,13)))-[0,1]
 
-	100%,100%,100%,{$2?1:s},"begin(
+	100%,100%,100%,{$3?1:s},"begin(
 			const M=(1<<16)-1;
 			const seed="{v(0xffff,0xffffff)}";
 			const bit_mask=$bit_mask;
 			const multiplier=31*seed;
 
-			$2&&s#0>1?(
+			$3&&s#0>1?(
 				hash(v)=(
 					hash_value=0;
 
@@ -3192,14 +3187,14 @@ foreach {
 		begin(
 			table_size=vector(#$dict_size);
 
-			const S=$2?s#0:1;
+			const S=$3?s#0:1;
 			const use_count=$use_count;
 			const mode=$mode;
 			const fill_image=$fill_mode;
 			const internal_dict_size=S+(fill_image||mode>1);
 			const find_size_of_order=$status_mode==4;
 
-			$2?(
+			$3?(
 				img_val()=I#0;
 			):(
 				img_val()=i#0;
@@ -3300,7 +3295,7 @@ foreach {
 	if $cross
 		s. c,-{s-1}
 		__$0_push_vc_status
-		rm[{2+!($3-1)}]
+		rm[{2+!($1-1)}]
 	elif $status_mode
 		if $status_mode==4
 			status.=${S}$size_of_order
@@ -3316,11 +3311,11 @@ foreach {
 			status.=${S}\"${-rep_status_image_data[-1]}\"
 		fi
 
-		if !$3 rm. fi
+		if !$1 rm. fi
 	fi
 
-	if isbool($1)
-		rm[{!$1}]
+	if isbool($2)
+		rm[{!$2}]
 	else
 		rm[0,1]
 	fi
@@ -12055,7 +12050,6 @@ u {"str_a=lowercase('$1');
 			);
 			order[char_idx]=p;
 		):(
-			echo(100);
 			run('error inv_char@\$',1,'.(',p,')');
 		);
 	);
@@ -12068,7 +12062,6 @@ u {"str_a=lowercase('$1');
 			);
 			str_a[p]=order[char_idx];
 		):(
-			echo(200);
 			run('error inv_char@\$',2,'.(',p,')');
 		);
 	);
