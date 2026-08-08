@@ -12034,6 +12034,75 @@ for $p<$# {
 }
 
 u $output
+#@cli rep_colorstr_anagram_order: strvar_a,strvar_b
+#@cli : Get order of second anagram based on order of appearance. Assumed case-insensitive, and letter only. Duplicate chars are not allowed.
+#@cli : $ e ${rep_colorstr_anagram_order\ rgb,grb}
+#@cli : $ e ${rep_colorstr_anagram_order\ CMYK,KCMY}
+rep_colorstr_anagram_order:
+u {"str_a=lowercase('$1');
+	str_b=lowercase('$2');
+	const sa=size(str_a);
+	const sb=size(str_b);
+	const _a=_'a';
+	order=count_collection=vector(#26);
+	if(sa!=sb,run('error size(str_a)==size(str_b)=F'););
+
+	repeat(sa,p,
+		char_idx=str_a[p]-_a;
+		isint(char_idx,0,25)?(
+			if(++count_collection[char_idx]>1,
+				run('error inv_char@\$',1,'.(',p,')');
+			);
+			order[char_idx]=p;
+		):(
+			echo(100);
+			run('error inv_char@\$',1,'.(',p,')');
+		);
+	);
+
+	repeat(sa,p,
+		char_idx=str_b[p]-_a;
+		isint(char_idx,0,25)?(
+			if(--count_collection[char_idx]<0,
+				run('error inv_char@\$',2,'.(',p,')'); # I get error here.
+			);
+			str_a[p]=order[char_idx];
+		):(
+			echo(200);
+			run('error inv_char@\$',2,'.(',p,')');
+		);
+	);
+
+	str_a;"}
+#@cli rep_strvar_is_anagram: strvar_a,strvar_b
+#@cli : Validates if each strings are anagrams.
+rep_strvar_is_anagram:
+check $#==2&&narg($1)&&narg($2)
+
+eval "
+	idx_table=vector(#256);
+	str_a='$1';
+	str_b='$2';
+	const sa=size(str_a);
+	const sb=size(str_b);
+	uniques=0;
+	same(str_a,str_b)?(
+		1;
+	):
+	sa==sb?(
+		repeat(sa,p,
+			char_pos=str_a[p];
+			if(!idx_table[char_pos]++,++uniques;);
+		);
+		repeat(sb,p,
+			char_pos=str_b[p];
+			q=--idx_table[char_pos];
+			!q?(--uniques):
+			q<0?(break(););
+		);
+		!uniques;
+	);
+	"
 #@cli rep_chars_repetition: str_containing_chars,char_1_repeat,char_2_repeat,...
 #@cli : Generate string with characters to repeat and number of repeat per characters. The number of repetition must be integer!
 #@cli : $ echo ${rep_chars_repetition\ ABC,5,2,3}
