@@ -3188,6 +3188,7 @@ foreach {
 			table_size=vector(#$dict_size);
 
 			const S=$3?s#0:1;
+			const use_external=$ui;
 			const use_count=$use_count;
 			const mode=$mode;
 			const fill_image=$fill_mode;
@@ -3206,35 +3207,50 @@ foreach {
 				return_value()=i;
 			);
 
+			const E=arg0(mode,S,S,1,S+1); # E is for External Out
 			$process_mode?(
 				const dec_ids=internal_dict_size-1;
 				const use_id=fill_image||mode>1;
 
 				mode==3?(
-					external_process_found()=++i(#-1,0,id,0,S);
-					external_process_unique()=da_push(#-1,[img_val,1]);
-					internal_process_unique()=copy(i[#i,mH],[img_val,id=count++]);
+					external_process_unique()=(
+						if(count==h(#-1),
+							resize(#-1,E,cut(h(#-1)<<1,8,whds),1,1,-1);
+						);
+						copy(i(#-1,0,id=count++,0,0),[img_val,1]);
+					);
+					internal_process_unique()=copy(i[#i,mH],[img_val,id]);
+					external_process_found()=++i(#-1,S,id,0,0);
 				):
 				mode==2?(
+					external_process_unique()=(
+						if(count==h(#-1),
+							resize(#-1,E,cut(h(#-1)<<1,8,whds),1,1,-1);
+						);
+						i[#-1,id=count++]=1;
+					);
+					internal_process_unique()=copy(i[#i,mH],[img_val,id]);
 					external_process_found()=++i[#-1,id];
-					external_process_unique()=da_push(#-1,1);
-					internal_process_unique()=copy(i[#i,mH],[img_val,id=count++]);
 				):(
-					external_process_found()=0;
+					if(mode||fill_image
+					,ext_inside_mode()=id=count++;
+					,ext_inside_mode()=count++;
+					);
 
-					if(mode
-					,external_process_unique()=da_push(#-1,img_val);
-					,external_process_unique()=0;
+					external_process_unique()=(
+						if(count==h(#-1),
+							resize(#-1,E,cut(h(#-1)<<1,8,whds),1,1,-1);
+						);
+						copy(i(#-1,0,ext_inside_mode(),0,0),img_val);
 					);
 
 					fill_image?(
-						internal_process_unique()=copy(i[#i,mH],[img_val,id=count++]);
+						internal_process_unique()=copy(i[#i,mH],[img_val,id]);
 					):(
-						if(use_count||find_size_of_order
-						,internal_process_unique()=(++count;copy(i[#i,mH],img_val););
-						,internal_process_unique()=copy(i[#i,mH],img_val);
-						);
+						internal_process_unique()=copy(i[#i,mH],img_val);
 					);
+
+					external_process_found()=0;
 				);
 
 				process_current_color_and_perform_action()=same_as_prev?(
@@ -3248,13 +3264,21 @@ foreach {
 						new_size=max(h(#i)<<1,8);
 						resize(#i,internal_dict_size,new_size,1,1,-1);
 					);
-					internal_process_unique();
 					external_process_unique();
+					internal_process_unique();
 					++table_size[K];
 				);
 			):(
 				mode?(
-					internal_process()=da_push(#-1,img_val());
+					internal_process()=(
+						if(count==h(#-1),
+							resize(#-1,S,cut(h(#-1)<<1,8,whds),1,1,-1);
+						);
+						copy(i(#-1,0,count++,0,0),img_val);
+					);
+				):
+				find_size_of_order?(
+					internal_process()=++count;
 				):(
 					internal_process()=0;
 				);
@@ -3264,7 +3288,6 @@ foreach {
 						new_size=max(h(#i)<<1,8);
 						resize(#i,internal_dict_size,new_size,1,1,-1);
 					);
-					if(find_size_of_order,++count;);
 					copy(i[#i,mH],img_val);
 					internal_process();
 					++table_size[K];
@@ -3284,7 +3307,10 @@ foreach {
 		return_value();
 		end(
 			if(find_size_of_order,set('size_of_order',count););
-			if($ui,da_freeze(#-1););
+			if(use_external,
+				resize(#-1,E,count,1,1,-1);
+				run('permute. yzcx');
+			);
 		);
 		"
 
