@@ -2176,24 +2176,20 @@ foreach {
 	# Create Hashmap
 	100%,100%,100%,{1+$mt_mode}," # Second channel is used to post merge using a secondary dictionary structure
 		begin(
-			const M=(1<<16)-1;
 			const bit_mask=$bit_mask;
 			const S=s#0;
-			const seed="{v(0x1001,0xabcd)}"*.4; # Multiplier to make sure collision doesn't happen as much
-			const second_seed=xor(~seed&0xcaca,0b101010110101);
+			const seed="{v(0x1001,0xabcd)}"; # Multiplier to make sure collision doesn't happen as much
+			const second_seed=xor(0xffff,seed)|0x1000;
+			const Q=0xc8cb;
+			const Z=0x45d9;
 
 			S==1?(
-				const Z=0x45d9f;
-
-				hash(v)=(
-					nv=v;
-					repeat(2,nv=xor(nv>>16,nv)*Z;);
-					xor(nv>>16,nv);
-				);
-				hash_a(v)=hash(v+seed);
-				hash_b(v)=hash(v+second_seed);
+				rotl24(a,r)=(rol(a,r)|(a>>(24-r)));
+				hash(v)=xor(rotl24(v*Q,7),v*Z)&0xffffff;
+				hash_a(v)=hash(v*seed);
+				hash_b(v)=hash(v*second_seed);
 			):(
-				hash(v)=(C=v;isint(C)?C:C*M);
+				hash(v)=(v*Q)&0xffffff;
 				hash_a(v)=hash(v);
 				hash_b(v)=hash(v);
 			);
@@ -2202,17 +2198,15 @@ foreach {
 				const lc=S-1;
 				init()=hash_value=[0,0];
 				hash_color()=repeat(S,p,
-					hash_value=xor(((hash_value<<1)-hash_value)*[seed,second_seed],[hash_a(c[p]),hash_b(c[lc-p])]);
-					hash_value&=bit_mask;
+					hash_value=xor(hash_value*[seed,second_seed],[hash_a(c[p]),hash_b(c[lc-p])]);
 				);
-				result()=hash_value;
+				result()=hash_value&bit_mask;
 			):(
 				init()=hash_value=0;
 				hash_color()=repeat(S,p,
-					hash_value=xor(((hash_value<<1)-hash_value)*seed,hash_a(c[p]));
-					hash_value&=bit_mask;
+					hash_value=xor(hash_value*seed,hash_a(c[p]));
 				);
-				result()=hash_value;
+				result()=hash_value&bit_mask;
 			);
 		);
 		c=I#0;
