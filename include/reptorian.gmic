@@ -2151,7 +2151,7 @@ m __$0_init_vars:"
 		cpus_to_use=cut(whd#0>>16,1,"$_cpus");
 		mt_mode=cpus_to_use>1;
 		effective_pixels_per_threads=whd#0/sqrt(cpus_to_use);
-		bitshift_factor=cut(ceil(log2(sqrt(effective_pixels_per_threads)/2)),5,16);
+		bitshift_factor=cut(ceil(log2(sqrt(effective_pixels_per_threads)/2))+1,5,16);
 		dictionary_buckets_per_threads=1<<bitshift_factor;
 		bit_mask=dictionary_buckets_per_threads-1;
 		seed_0=v($seed_range_0,$seed_range_1);
@@ -2182,22 +2182,23 @@ foreach {
 		begin(
 			const bit_mask=$bit_mask;
 			const S=s#0;
-			const seed=$seed_0;
+			const seed_1=$seed_0;
+			const seed_2=$seed_1;
 
 			S==1?(
-				const Q=0xc8cb*seed;
-				const Z=0x45d9*seed;
+				const Q=0xc8cb*seed_2;
+				const Z=0x45d9*seed_1;
 				rotl24(a,r)=(rol(a,r)|(a>>(24-r)));
-				hash(v)=xor(rotl24(v*Q,7),v*Z);
+				hash(v)=xor(rotl24(v*Q,7),v*Z)&0xffffff;
 			):(
-				const Z=0x45d9;
-				hash(v)=v*Z*seed;
+				const Q=0x45d9;
+				hash(v)=(v*Q+seed_1)&0xffffff;
 			);
 
 			init()=hash_value=0;
-			hash_color()=repeat(S,p,
-				hash_value=xor(hash_value*seed,hash(c[p]))&bit_mask;
-			);
+			hash_color()=(repeat(S,p,
+				hash_value=xor(hash_value*seed_2,hash(c[p]));
+			);hash_value&=bit_mask;);
 		);
 		c=I#0;
 		init();
@@ -2217,7 +2218,6 @@ foreach {
 	fi
 
 	# Find Unique Colors or Frequency of Colors per dynamic num of threads
-
 	eval[2] :"
 		begin(
 			const S=s#0;
@@ -2231,22 +2231,23 @@ foreach {
 			if(mt_mode,
 				const lc=S-1;
 				const bit_mask=$bit_mask;
-				const seed=$seed_1;
+				const seed_1=$seed_0;
+				const seed_2=$seed_1;
 
 				S==1?(
-					const Q=0xc8cb*seed;
-					const Z=0x45d9*seed;
+					const R=0xc8cb*seed_2;
+					const Z=0x45d9*seed_2;
 					rotl24(a,r)=(rol(a,r)|(a>>(24-r)));
-					hash(v)=xor(rotl24(v*Q,7),v*Z);
+					hash(v)=xor(rotl24(v*R,7),v*Z)&0xffffff;
 				):(
-					const Z=0x45d9;
-					hash(v)=v*Z*seed;
+					const Z=0x213a;
+					hash(v)=(v*Z+seed_2)&0xffffff;
 				);
 
 				hash_color(color_var)=(
 					hash_value=0;
 					repeat(S,p,
-						hash_value=xor(hash_value*seed,hash(color_var[lc-p]))&bit_mask;
+						hash_value=xor(hash_value*seed_1,hash(color_var[lc-p]))&0xffffff;
 					);
 					hash_value;
 				);
@@ -2399,6 +2400,7 @@ foreach {
 		fi
 
 		if $mt_mode
+
 			if $process_image_idx
 				i_whd={whd#0}
 				rm[1]
@@ -2411,9 +2413,23 @@ foreach {
 				rm[0,1]
 			fi
 
-			L,T:=max(1,min(is#-1>>15,$_cpus,$dictionary_buckets_per_threads)),$!
+			$cpus_to_use,1,1,1,"
+				total_sum=0;
+				px=x;
+				while(px<w#-1,
+					total_sum+=sum(crop(#-1,px,0,0,0,h#-1,1,1,1));
+					px+=$dictionary_buckets_per_threads;
+				);
+				total_sum;
+				"
+
+			max_total_colors,max_total_buckets_possible:=is#-2,iM
+			secondary_dictionary_buckets_per_threads,bit_mask:=(1<<cut(ceil(log2(sqrt($max_total_buckets_possible)))+2,3,13))-[0,1]
+			L,T,dT:=cut($max_total_colors>>18,1,min($_cpus,$dictionary_buckets_per_threads)),l,l-2
+			LS={$L*$secondary_dictionary_buckets_per_threads}
 			r[$process_image_idx] $L,1,1,{$highest_color_frequency_mode?$S+2:1},-1
-			0x{$L*$dictionary_buckets_per_threads}
+			# init_bucket_size={1<<ceil(log2($max_total_buckets_possible))}
+			0x$LS
 			d0,d1:=$process_image_idx+1+[0,$dictionary_buckets_per_threads-1]
 
 			$mt_cmd[$process_image_idx] :"
@@ -2429,11 +2445,13 @@ foreach {
 					const hash2_pos=S+col_frq_mode;
 					const D=$d1;
 					const T=$T;
-					const img_ref=T-1;
+					const img_ref=T-2;
 					const offset_bucket_size=w#img_ref;
 					const levels=h#img_ref;
 					const current_bucket_vector_size=hash2_pos+1;
 					const offset_2_bucket_start=k+1;
+					const bit_mask=$bit_mask;
+					const B=32;
 
 					if(count_color_mode,
 						total_color_count=0;
@@ -2449,7 +2467,7 @@ foreach {
 							const lim_cols=$num_of_cols_lim;
 							const remainder_color_count=lim_cols-$min_cols_possible;
 							const i_lim_cols=lim_cols+1;
-							list_of_min_possible_per_bucket=expr('max(crop(#"{$T-1}",x,0,0,0,1,h#"{$T-1}",1,1))',w#img_ref);
+							list_of_min_possible_per_bucket=expr('max(crop(#img_ref,x,0,0,0,1,h#img_ref,1,1))',w#img_ref);
 						):( # Test Frequency of Color for Mode
 							maxima_a=maxima_b=0;
 							maxima_color=vector(#S,nan);
@@ -2472,13 +2490,13 @@ foreach {
 
 					current_color=vector(#S);
 				);
-				img_ind_of_start_of_secondary_dictionary=$dictionary_buckets_per_threads*x+T;
+				img_ind_of_start_of_secondary_dictionary=$secondary_dictionary_buckets_per_threads*x+T;
 				for(current_bucket=x+offset_2_bucket_start,color_collection_ok(),current_bucket+=w,
 					bucket_id=current_bucket-offset_2_bucket_start;
 
 					current_bucket_ins_pos=current_level=current_bucket_pos=0;
 
-					secondary_insert_positions_list=vector(#D);
+					secondary_insert_positions_list=vector(#$secondary_dictionary_buckets_per_threads);
 
 					count_per_current_level=i(#img_ref,bucket_id,current_level);
 
@@ -2486,14 +2504,14 @@ foreach {
 						copy(current_color,i[#current_bucket,current_bucket_ins_pos],S);
 
 						secondary_hash_pos=current_bucket_ins_pos+hash2_pos;
-						second_dictionary_key=i[#current_bucket,secondary_hash_pos];
+						second_dictionary_key=i[#current_bucket,secondary_hash_pos]&bit_mask;
 						secondary_dictionary_ind=second_dictionary_key+img_ind_of_start_of_secondary_dictionary;
 
 						current_secondary_ins_pos=secondary_insert_positions_list[second_dictionary_key];
 
 						secondary_dictionary_dimension=wh(#secondary_dictionary_ind);
 						if(current_secondary_ins_pos>=secondary_dictionary_dimension,
-							new_size=max(32,h(#secondary_dictionary_ind)<<1);
+							new_size=max(B,h(#secondary_dictionary_ind)<<1);
 							resize(#secondary_dictionary_ind,hash2_pos,new_size,1,1,-1);
 						);
 
@@ -2521,7 +2539,7 @@ foreach {
 							);
 
 							offset_hash_pos=current_offset_bucket_pos+hash2_pos;
-							second_dictionary_key=i[#offset_bucket,offset_hash_pos];
+							second_dictionary_key=i[#offset_bucket,offset_hash_pos]&bit_mask;
 							secondary_dictionary_ind=second_dictionary_key+img_ind_of_start_of_secondary_dictionary;
 
 							current_secondary_ins_pos=secondary_insert_positions_list[second_dictionary_key];
@@ -2538,7 +2556,7 @@ foreach {
 									if(add_image,chkfreq(current_count_in_offset_bucket););
 									secondary_dictionary_dimension=wh(#secondary_dictionary_ind);
 									if(current_secondary_ins_pos>=secondary_dictionary_dimension,
-										new_size=max(32,h(#secondary_dictionary_ind)<<1);
+										new_size=max(B,h(#secondary_dictionary_ind)<<1);
 										resize(#secondary_dictionary_ind,hash2_pos,new_size,1,1,-1);
 									);
 									copy(i[#secondary_dictionary_ind,current_secondary_ins_pos],current_color,S);
@@ -2546,7 +2564,7 @@ foreach {
 									secondary_insert_positions_list[second_dictionary_key]+=hash2_pos;
 									current_bucket_dimension=wh(#current_bucket);
 									if(current_bucket_ins_pos>=current_bucket_dimension,
-										new_size=max(32,h(#current_bucket)<<1);
+										new_size=max(B,h(#current_bucket)<<1);
 										resize(#current_bucket,current_bucket_vector_size,new_size,1,1,-1);
 									);
 									copy(i[#current_bucket,current_bucket_ins_pos],current_color,S);
@@ -2558,14 +2576,14 @@ foreach {
 								color_pos==-1?(
 									secondary_dictionary_dimension=wh(#secondary_dictionary_ind);
 									if(current_secondary_ins_pos>=secondary_dictionary_dimension,
-										new_size=max(32,h(#secondary_dictionary_ind)<<1);
+										new_size=max(B,h(#secondary_dictionary_ind)<<1);
 										resize(#secondary_dictionary_ind,hash2_pos,new_size,1,1,-1);
 									);
 									copy(i[#secondary_dictionary_ind,current_secondary_ins_pos],current_color,S);
 									secondary_insert_positions_list[second_dictionary_key]+=hash2_pos;
 									current_bucket_dimension=wh(#current_bucket);
 									if(current_bucket_ins_pos>=current_bucket_dimension,
-										new_size=max(32,h(#current_bucket)<<1);
+										new_size=max(B,h(#current_bucket)<<1);
 										resize(#current_bucket,current_bucket_vector_size,new_size,1,1,-1);
 									);
 									copy(i[#current_bucket,current_bucket_ins_pos],current_color,S);
