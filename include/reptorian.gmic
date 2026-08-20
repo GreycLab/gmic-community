@@ -2147,16 +2147,17 @@ else
 fi
 
 m __$0_init_vars:"
-	cpus_to_use,mt_mode,bitshift_factor,dictionary_buckets_per_threads,bit_mask,S,t_add_image,seed_0,seed_1:=\"
-		cpus_to_use=cut(whd#0>>16,1,"$_cpus");
+	cpus_to_use,mt_mode,bitshift_factor,dictionary_buckets_per_threads,bit_mask,S,t_add_image,seed_0,seed_1,init_bucket_size:=\"
+		WHD=whd#0;
+		cpus_to_use=cut(WHD>>16,1,"$_cpus");
 		mt_mode=cpus_to_use>1;
-		effective_pixels_per_threads=whd#0/sqrt(cpus_to_use);
+		effective_pixels_per_threads=WHD/sqrt(cpus_to_use);
 		bitshift_factor=cut(ceil(log2(sqrt(effective_pixels_per_threads)/2))+1,5,16);
 		dictionary_buckets_per_threads=1<<bitshift_factor;
 		bit_mask=dictionary_buckets_per_threads-1;
 		seed_0=v($seed_range_0,$seed_range_1);
 		seed_1=$seed_range_0+((seed_0-$seed_range_0+$seed_range_1)%($seed_diff+1));
-		cpus_to_use,mt_mode,bitshift_factor,dictionary_buckets_per_threads,bit_mask,s#0,$add_image,seed_0,seed_1;
+		cpus_to_use,mt_mode,bitshift_factor,dictionary_buckets_per_threads,bit_mask,s#0,$add_image,seed_0,seed_1,WHD>=0x1000000?128:WHD>=0x400000?64:WHD>=0x40000?32:WHD>=0x10000?16:8;
 	\"
 	"{`$highest_color_frequency_mode?($1==-2?(v=('od:=w,h,d');0):(v=('od=1,1,1');0);v);`}
 
@@ -2232,6 +2233,7 @@ foreach {
 			const col_frq_mode=$col_frq_mode;
 			const vector_insertion_size=S+col_frq_mode+mt_mode;
 			const hash2_pos=S+col_frq_mode;
+			const B=$init_bucket_size;
 
 			if(mt_mode,
 				const lc=S-1;
@@ -2313,7 +2315,7 @@ foreach {
 		last_color=I[#0,P];
 		key=i[#1,P];
 		door_pos=key+offset;
-		resize(#door_pos,vector_insertion_size,32,1,1,-1);
+		resize(#door_pos,vector_insertion_size,B,1,1,-1);
 		copy(i[#door_pos,0],last_color);
 		list_of_ins_pos[key]=vector_insertion_size;
 		i(#-1,key,x)=1;
@@ -2340,7 +2342,7 @@ foreach {
 					chkfreq(++i[#door_pos,count_pos]);
 				):(
 					if(ins_pos==wh(#door_pos),
-						new_size=max(32,h(#door_pos)<<1);
+						new_size=max(B,h(#door_pos)<<1);
 						resize(#door_pos,vector_insertion_size,new_size,1,1,-1);
 					);
 					copy(i[#door_pos,ins_pos],current_color);
@@ -2359,7 +2361,7 @@ foreach {
 				ins_pos=list_of_ins_pos[key];
 				!i(#-1,key,x)||find(#door_pos,current_color,ins_pos-vector_insertion_size,-vector_insertion_size)==-1?(
 					if(ins_pos==wh(#door_pos),
-						new_size=max(32,h(#door_pos)<<1);
+						new_size=max(B,h(#door_pos)<<1);
 						resize(#door_pos,vector_insertion_size,new_size,1,1,-1);
 					);
 					copy(i[#door_pos,ins_pos],current_color);
@@ -2448,7 +2450,7 @@ foreach {
 					const current_bucket_vector_size=hash2_pos+1;
 					const offset_2_bucket_start=k+1;
 					const bit_mask=$bit_mask;
-					const B=32;
+					const B=min($init_bucket_size,64);
 
 					if(count_color_mode,
 						total_color_count=0;
@@ -21391,7 +21393,7 @@ rep_recc: rep_reverse_engineer_color_curves $*
 rep_reverse_engineer_color_curves:
 skip ${1=}
 
-if !$!>1 error n(imgs)>2==F fi
+if l<2 error n(imgs)>2==F fi
 
 ww={w#0}
 hh={h#0}
