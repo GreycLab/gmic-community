@@ -2787,14 +2787,47 @@ foreach {
 			fi
 		elif $highest_color_frequency_mode
 			k[$process_image_idx]
-			$od,$S,[{"const s=$S;
-				aM=argmax(crop(#0,0,0,0,s,w#0,1,1,1));
-				am=argmax(crop(#0,0,0,0,s+1,w#0,1,1,1));
-				vM=i(#0,aM,0,0,s);
-				vm=i(#0,am,0,0,s+1);
-				vM>vm?I[#0,aM][0,s]:vector(#s,nan);
-			"}]
-			k.
+
+			$od,$S,"begin(
+					const s=$S;
+					const d_s=s-1;
+					const w=w#-1;
+					const q=(s+1)*w;
+
+					p=q-w;
+
+					max_pos=p;
+					max_num=i[#-1,p];
+					max_count=1;
+
+					out_num=nan;
+
+					output=vector(#s,nan);
+
+					while(++p<q,
+						i[#-1,p]>max_num?(
+							max_pos=p;
+							max_num=i[#-1,p];
+							max_count=1;
+						):
+						i[#-1,p]==max_num?(
+							++max_count;
+						);
+					);
+
+					max_count==1?(
+						if(find(#-1,max_num,q,1)==-1,
+							copy(output[d_s],i[#-1,max_pos-w],s,-1,-w);
+							out_num=max_num;
+						);
+					);
+
+					i[#-1,0]=out_num;
+				);
+				output;
+				"
+
+			name[-1] {i[#-2,0]} k.
 		else
 			k[$first_thread_bucket_init-$first_thread_bucket_id_endl]
 			a y
@@ -2867,7 +2900,7 @@ foreach {
 	fi
 }
 
-if $process_image_idx u $res
+if $process_image_idx==1 u $res
 else u $old_status
 fi
 ___rep_colors_inform_r_reduce_colors:
