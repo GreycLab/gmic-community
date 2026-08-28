@@ -2028,11 +2028,14 @@ eval.. >"begin(
 	end(da_freeze(#-1););
 	"
 rm..
-#@cli rep_dpim: _additional_output={ 0=count_status | 1=palette }
-#@cli : Decompose image into random index, and into palette (if requested)
+#@cli rep_dpim: _additional_output={ 0=count_status | 1=palette },_vector={ 0=false | 1=true},_ordered={ 0=unordered | 1=ordered }
+#@cli : Decompose image into index, and into palette (if requested)
 #@cli : Default values: '_additional_output=1'
 rep_dpim:
-check isbool(${1=1})
+check isbool(${1=1})&&isbool(${2=1})&&isbool(${3=0})
+
+s={!$2}
+
 if isint($^,0)
 	e[0] "Decompose image"$?" into indexed map"{`"
 		$1?(
@@ -2045,7 +2048,60 @@ if isint($^,0)
 		message_out;
 	"`}.
 fi
+
+if $s
+	if l>1
+		m __$0_d:"$""=d"
+		m __$0_s:"$""=s"
+		__$0_d {expr('d#(x+1)',l-1)}
+		__$0_s {expr('s#(x+1)',l-1)}
+		um __$0_d,__$0_s
+	fi
+
+	d0,s0:=d#0,s#0
+	foreach { r 100%,100%,{d*s},1,-1 }
+fi
+
 _rep_colors_inform_r @$1
+
+if $s
+	foreach[0--1:{1+$1}] { r 100%,100%,${d$>},${s$>},-1 }
+fi
+
+if $3
+	if $1
+		img,pal:=l-[2,1]
+		repeat l>>1 {
+			l[$img,$pal] {
+				100%
+				_rep_dpim_both_branch
+				rv[-2,-1] a[-2,-1] c sort. +,x channels. 1,{s-1}
+			}
+			img,pal-=2
+		}
+	else
+		foreach {
+			{0,n}
+			_rep_dpim_both_branch
+			k[0]
+		}
+	fi
+fi
+_rep_dpim_both_branch:
+eval[0] "begin(
+		min_coords=vector(#w#-1,inf);
+	);
+	min_coords[i]=min(c2o(#0,x,y,z,c),min_coords[i]);
+	end(
+		merge(min_coords,min);
+		order=resize(expr('x',w#-1),w#-1<<1,4);
+		copy(order[1],min_coords[0],w#-1,2,1);
+		order=sort(order,1,0,w#-1,2,1);
+		copy(i[#-1,0],order[0],w#-1,1,2);
+	);
+	"
+100%
+eval.. i[#-1,i]=x map[0] [-1] rm..
 #@cli rep_count_colors : _count_until={ 0:None | >0:Max number of counted colors }
 #@cli : Count number of distinct colors in selected images until it reaches the specified max number of counted colors.
 #@cli : Set 'count_until' to '0' to disable limit on counted colors.
