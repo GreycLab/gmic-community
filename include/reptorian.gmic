@@ -3185,11 +3185,23 @@ eval[0] "begin(
 rm[0,1]
 sort -,x
 channels 1,100%
-#@cli rep_mode_blend
-#@cli : Blend Layers via statistical mode of colors.
+#@cli rep_mode_blend: _tie_breaker={ 0=nan | 1=average }
+#@cli : Blend layers using the statistical mode of pixel colors.
 #@cli :
-#@cli : Author: Reptorian
+#@cli : '_tie_breaker' determines how to resolve pixels where two or more colors
+#@cli : share the highest frequency (i.e. there is no single mode).
+#@cli :   0 = output NaN for tied pixels
+#@cli :   1 = output the average of the tied colors
+#@cli : Author: Reptorian.
+#@cli : Default values: '_tie_breaker=0'
 rep_mode_blend:
+l[] {
+	check isbool(${1=0})
+	tie_breaker=$1
+
+	onfail noarg
+		tie_breaker=0
+}
 
 is_dimensions_valid={"
 	v=[w#0,h#0,d#0,s#0];
@@ -3213,7 +3225,10 @@ if !$is_dimensions_valid
 	error inv_dim_det@[$img_checked]
 elif l<3
 	if l==2
-		100%,100%,100%,100%,I#-2==I#-1?I#-1:vector(#s,nan)
+		if $tie_breaker + / 2
+		else 100%,100%,100%,100%,I#-2==I#-1?I#-1:vector(#s,nan)
+		fi
+
 		rm[-3,-2]
 	fi
 
@@ -3233,11 +3248,12 @@ if l>9 # Use Hashmap. 10 layers seems to be the threshold to switch from linear 
 		const seed_range_1=0xffff;
 		const seed_range_diff=seed_range_1-seed_range_0;
 		seed_0=v(seed_range_0,seed_range_1);
-		seed_1=$seed_range_0+((seed_0-seed_range_0+v(1,seed_range_diff))%(seed_range_diff+1));
+		seed_1=seed_range_0+((seed_0-seed_range_0+v(1,seed_range_diff))%(seed_range_diff+1));
 		seed_0,seed_1;
 		"
 
 	eval[$layers] :"begin(
+			const tie_breaker=$tie_breaker;
 			const D=$hash_table_buckets_per_threads;
 			const S=s#0;
 			const inc_S=S+1;
@@ -3278,6 +3294,29 @@ if l>9 # Use Hashmap. 10 layers seems to be the threshold to switch from linear 
 				);
 			);
 
+			tie_breaker?(
+				tie_breaker()=(
+					temp=maxima_color=vector(#S,0);
+					count_of_ties=0;
+					hash_table_pos=start_of_hash_table;
+					repeat(D,p,
+						G=insertion_pos[p]-1;
+
+						while(G>0,
+							if(i[#hash_table_pos,G]==current_maxima,
+								copy(maxima_color[0],i[#hash_table_pos,G-S],S,1,1,-1);
+								++count_of_ties;
+							);
+							G-=inc_S;
+						);
+
+						++hash_table_pos;
+					);
+					-maxima_color/count_of_ties; # I have to use minus for some reason
+				);
+			):(
+				tie_breaker()=v_NaN;
+			);
 		);
 
 		O=J(-1);
@@ -3328,7 +3367,7 @@ if l>9 # Use Hashmap. 10 layers seems to be the threshold to switch from linear 
 				last_color=current_color;
 			);
 
-			I[#0,P]=current_maxima>old_maxima?maxima_color:v_NaN;
+			I[#0,P]=current_maxima>old_maxima?maxima_color:tie_breaker();
 			++P;
 		);
 		_0;
@@ -3336,6 +3375,7 @@ if l>9 # Use Hashmap. 10 layers seems to be the threshold to switch from linear 
 else
 	f[0] "begin(
 			const count_boundary=l>>1;
+			const tie_breaker=$tie_breaker;
 
 			init_color_collection=vector(#s*l);
 			init_new_counts=vector(#l);
@@ -3343,6 +3383,23 @@ else
 
 			current_color=vector(#s);
 			v_NaN=vector(#s,nan);
+			tie_breaker?(
+				tie_breaker()=(
+					maxima_color=vector(#s,0);
+					count_of_ties=0;
+					q=[0,0];
+					while(q[0]<last_nonduplicate_pos,
+						if(counts[q[1]]==current_maxima,
+							copy(maxima_color[0],colors[q[0]],s,1,1,-1);
+							++count_of_ties;
+						);
+						q+=[s,1];
+					);
+					maxima_color/count_of_ties;
+				);
+			):(
+				tie_breaker()=v_NaN;
+			);
 		);
 		last_color=I;
 		last_nonduplicate_pos=s;
@@ -3394,7 +3451,7 @@ else
 			);
 		);
 
-		current_maxima>old_maxima?maxima_color:v_NaN;"
+		current_maxima>old_maxima?maxima_color:tie_breaker();"
 fi
 
 k[0]
