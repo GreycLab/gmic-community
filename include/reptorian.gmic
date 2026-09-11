@@ -3222,32 +3222,49 @@ fi
 
 if l>9 # Use Hashmap. 10 layers seems to be the threshold to switch from linear scan to hashmap processing
 	cpus_to_use,bitshift_factor,layers:=cut(($!*whd)>>12,1,$_cpus),cut(ceil(log2($!))+1,6,10),$!
-	dictionary_buckets_per_threads,dictionary_buckets:=[1,$_cpus]<<$bitshift_factor
+	hash_table_buckets_per_threads,hash_table_buckets:=[1,$_cpus]<<$bitshift_factor
 
 	+rep_mt_f32v_map {whd},$cpus_to_use
 
-	0x$dictionary_buckets
+	0x$hash_table_buckets
+
+	seed_1,seed_2:="
+		const seed_range_0=0x1001;
+		const seed_range_1=0xffff;
+		const seed_range_diff=seed_range_1-seed_range_0;
+		seed_0=v(seed_range_0,seed_range_1);
+		seed_1=$seed_range_0+((seed_0-seed_range_0+v(1,seed_diff))%(seed_diff+1));
+		seed_0,seed_1;
+		"
 
 	eval[$layers] :"begin(
-			const D=$dictionary_buckets_per_threads;
+			const D=$hash_table_buckets_per_threads;
 			const S=s#0;
 			const inc_S=S+1;
 			const dec_S=S-1;
-			const seed="{v(0x1b3d,0xf1c3ef)}";
-			const M=(1<<16)-1;
+			const seed_1=$seed_1;
+			const seed_2=$seed_2;
 			const bit_mask=D-1;
 			const WHD=whd#0;
 			const count_boundary=k>>1;
 
 			current_color=previous_color=v_NaN=maxima_color=vector(#S,nan);
 
+			const Q=xor(2654435761,0xc8cb*seed_1)|2147483649;
+			const max_mult=max(Q,seed_2,1);
+			const mod_factor=1<<int(log2((1<<53)/max_mult));
+			const M=mod_factor-1;
+			hash(v)=(v*Q+seed_2)&M;
+
 			hash(color)=(
+				color2hash=color%mod_factor;
 				current_hash=0;
 
 				repeat(S,p,
-					current_hash=xor(((current_hash<<1)-current_hash)*seed,C=color[p];isint(C)?C:C*M);
-					current_hash&=bit_mask;
+					current_hash=xor((current_hash&M)*seed_2,hash(color2hash[p]));
 				);
+
+				current_hash&=bit_mask;
 			);
 
 			chval(count_value)=(
@@ -3267,7 +3284,7 @@ if l>9 # Use Hashmap. 10 layers seems to be the threshold to switch from linear 
 		P=O[0]<<24|O[1];
 		Q=i0<<24|i1;
 
-		start_of_dict=k+1+D*x;
+		start_of_hash_table=k+1+D*x;
 
 		while(P<Q,
 			insertion_pos=vector(#D);
@@ -3275,7 +3292,7 @@ if l>9 # Use Hashmap. 10 layers seems to be the threshold to switch from linear 
 			last_color=I[#0,P];
 			current_maxima=old_maxima=1;
 			hash(last_color);
-			key=start_of_dict+current_hash;
+			key=start_of_hash_table+current_hash;
 
 			if(!h(#key),
 				resize(#key,inc_S,8,1,1);
@@ -3291,7 +3308,7 @@ if l>9 # Use Hashmap. 10 layers seems to be the threshold to switch from linear 
 				copy(current_color,i[#l,P],S,1,WHD);
 				hash(current_color);
 				R=insertion_pos[current_hash];
-				key=start_of_dict+current_hash;
+				key=start_of_hash_table+current_hash;
 
 				(R?((same_color=same(current_color,last_color))?1:(last_ind=find(#key,current_color,R-inc_S,-inc_S)+1)))?(
 					if(!same_color,
@@ -3318,11 +3335,10 @@ if l>9 # Use Hashmap. 10 layers seems to be the threshold to switch from linear 
 		"
 else
 	f[0] "begin(
-			const layers="$!";
-			const count_boundary=layers>>1;
+			const count_boundary=l>>1;
 
-			init_color_collection=vector(#s*layers);
-			init_new_counts=vector(#layers);
+			init_color_collection=vector(#s*l);
+			init_new_counts=vector(#l);
 			init_new_counts[0]=1;
 
 			current_color=vector(#s);
@@ -3339,7 +3355,7 @@ else
 
 		p=0;
 		q=[0,0];
-		while(++p<layers,
+		while(++p<l,
 			copy(current_color[0],i(#p,x,y,z,0),s,1,whd);
 
 			same(current_color,last_color)?(
