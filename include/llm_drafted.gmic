@@ -66,7 +66,7 @@
 #@gui : Surface Irregularity = float(20,0,100)
 #@gui : Texture Grain Size = float(1,0.5,10)
 #@gui : sep = separator()
-#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/10/02</i>.</small>")
+#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/10/2</i>.</small>")
 fx_glass_door :
   foreach { nm={n}
     b $12
@@ -214,34 +214,40 @@ fx_glass_door :
 # Curl up a corner of the image, as on a sheet of paper.
 #@gui : "}, sep = separator()
 #@gui : Corner = choice(0,"Top Left","Top Right","Bottom Left","Bottom Right")
-#@gui : Fold size (%) = float(35,5,95)
-#@gui : Fold direction (deg.) = float(45,15,75)
+#@gui : Fold corner position = point(40,40,0,1)
 #@gui : Curl radius (%) = float(10,1,40)
-#@gui : sep = separator(), Back side = choice(1,"Plain color","Mirrored image")
-#@gui : Back color = color(246,241,229)
-#@gui : Image tint (%) = float(35,0,100)
+#@gui : sep = separator(), Back side color = color(246,241,229,89)
 #@gui : sep = separator(), Shading (%) = float(100,0,250)
 #@gui : Shadow opacity (%) = float(60,0,100)
 #@gui : Shadow softness (%) = float(60,0,300)
 #@gui : Light azimuth (deg.) = float(30,-180,180)
 #@gui : Light elevation (deg.) = float(50,15,85)
-#@gui : sep = separator()
-#@gui : Background color = color(255,255,255,0)
+#@gui : sep = separator(), Background color = color(255,255,255,0)
 #@gui : sep = separator()
 #@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/10/3</i>.</small>")
 fx_page_curl :
   foreach {
-    to_rgb
+    nm={n} to_rgb
+
+    # The point is given in the original image: bring it back to the bottom-right corner frame.
+    cfx,cfy:=isin($1,0,2)
+    cvx,cvy:=(w-1)*cut($cfx*$2+(1-$cfx)*(100-$2),0,100)%,(h-1)*cut($cfy*$3+(1-$cfy)*(100-$3),0,100)%
+
+    # Fold direction, then fold size (in % of min(w,h)), deduced from the moved corner.
+    cangle:=atan2($cvy,$cvx)*180/pi
+    csize:=max(5,max(1,norm($cvx,$cvy))/(2-pi*$4%)/min(w,h)*100)
+
     if $1<3 axes=${"arg0 $1,xy,y,x"} mirror $axes fi
-    _$0 $2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18
+    _$0 $csize,$cangle,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
     if $1<3 mirror $axes fi
+    => $nm
   }
 
 # Render the page curl on the bottom-right corner of the RGB image [0].
 _fx_page_curl :
-  size,angle,radius,back_mode,bkr,bkg,bkb,tint,shading,sh_opacity,sh_soft,light_az,light_el,bgr,bgg,bgb,bga=$*
-  transp:=$bga<255
+  size,angle,radius,bkr,bkg,bkb,bka,shading,sh_opacity,sh_soft,light_az,light_el,bgr,bgg,bgb,bga=$*
   R:=max(0.75,$radius*$size*min(w,h)/10000)
+  transp:=$bga<255
 
   # Compute [1] = geometry. Layer 'T' = visible top surface of the flap (back side of the paper), layer 'F' = front side
   # of the paper, seen on the inner part of the roll. Channels: 0-5 = T (x,y,coverage,shade,specular,height),
@@ -272,7 +278,7 @@ _fx_page_curl :
     );
     ss = x*dx + y*dy; vv = -x*dy + y*dx;
     dd = cut((ss - t0)/R,-1,1);
-    a = asin(cut(dd,-1,1));
+    a = asin(dd);
     inflap = ss<=t0 + R;
     flat = ss<t0;
     uT = flat?2*t0 + pi*R - ss:t0 + R*(pi - a);
@@ -316,15 +322,15 @@ _fx_page_curl :
   100%,100%,1,1,"i(#1,x,y,0,2,0,0)>0.5 || i(#1,x,y,0,8,0,0)>0.5"
   sigma:=max(0.5,0.5*$R*$sh_soft%)
   +b[2] {3*$sigma} b[2] $sigma b[3] {1.2*$R}
-  f[2] "$sh_opacity/100*cut(0.85*(i + i(#4,x,y))/2 + 0.35*i(#3,x,y),0,1)"
+  f[2] "cut(0.85*(i + i(#4,x,y))/2 + 0.35*i(#3,x,y),0,1)*$sh_opacity%"
   rm[3,4]
 
-  # [3] = composition of all layers (premultiplied alpha).
- 100%,100%,1,{3+$transp},"
+  # [3] = composition of all layers (premultiplied alpha). Output is RGBA only if the background is not fully opaque.
+  100%,100%,1,{3+$transp},"
     begin(
       bk = [ $bkr,$bkg,$bkb ];
       bg = [ $bgr,$bgg,$bgb ];
-      const tn = $tint%;
+      const tn = $bka/255;
       const ba = $bga/255;
     );
     cc = min(c,2);
@@ -333,7 +339,7 @@ _fx_page_curl :
     Pg = (1 - dk)*lerp(bg[cc]*ba,i(#0,x,y,0,cc,0,0),cB);
     Ga = 1 - (1 - ba)*(1 - cB)*(1 - dk);
     CF = i(#0,i(#1,x,y,0,6,0,0),i(#1,x,y,0,7,0,0),0,cc,1,1)*i(#1,x,y,0,9,0,0)*(1 - dk) + 255*i(#1,x,y,0,10,0,0);
-    CT = $back_mode?(1 - tn)*i(#0,g0,g1,0,cc,1,1) + tn*bk[cc]:bk[cc];
+    CT = (1 - tn)*i(#0,g0,g1,0,cc,1,1) + tn*bk[cc];
     CT = CT*i(#1,x,y,0,3,0,0) + 255*i(#1,x,y,0,4,0,0);
     P = lerp(cF*CF + (1 - cF)*Pg,CT,cT);
     A = lerp(lerp(Ga,1,cF),1,cT);
@@ -410,7 +416,7 @@ fx_chladni_preview :
 #@gui : Spikes Size = float(1.0, 0.0, 5.0)
 #@gui : Spikes Orientations = int(2, 1, 8)
 #@gui : sep = separator()
-#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/09/29</i>.</small>")
+#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/09/29</i>.</small>")
 fx_cosmic_nebula :
   C1_R,C1_G,C1_B,C2_R,C2_G,C2_B,CC_R,CC_G,CC_B:=[${2-10}]/255
   pow_bg,pow_fg:=300/max(0.01,$12),2000/max(0.01,$12)
