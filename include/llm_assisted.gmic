@@ -66,7 +66,7 @@
 #@gui : Surface Irregularity = float(20,0,100)
 #@gui : Texture Grain Size = float(1,0.5,10)
 #@gui : sep = separator()
-#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/10/2</i>.</small>")
+#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/10/02</i>.</small>")
 fx_glass_door :
   foreach { nm={n}
     b $12
@@ -227,7 +227,7 @@ fx_glass_door :
 #@gui : sep = separator()
 #@gui : Background Color = color(255,255,255,0)
 #@gui : sep = separator()
-#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/10/3</i>.</small>")
+#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/10/03</i>.</small>")
 fx_page_curl :
   foreach {
     nm={n} to_rgb
@@ -349,6 +349,287 @@ _fx_page_curl :
     c<3?cut(P/max(A,1e-6),0,255):255*A"
   k[3]
 
+#----------------------
+#@gui _<b>Patterns</b>
+#----------------------
+
+#@gui Penrose Tiling : fx_penrose_tiling, fx_penrose_tiling_preview(0)
+#@gui : Description = note{"<span color=\"#EE5500\"><b>Description:</b></span> \
+# Generate Penrose tilings by Robinson-triangle deflation.
+#@gui : "}, sep = separator()
+#@gui : Tiling Type = choice(0,"P3 - Thick & thin rhombs","P2 - Kites & darts")
+#@gui : Previous X-Center = value(50)_0
+#@gui : Previous Y-Center = value(50)_0
+#@gui : Center = point(50,50,0,1,0,255,0)_0
+#@gui : Rotation & Zoom = point(75,50,0,1,255,0,255)_0
+#@gui : sep = separator()
+#@gui : Tile A Color (Thick Rhomb / Kite) = color(110,170,240)
+#@gui : Tile B Color (Thin Rhomb / Dart) = color(240,150,60)
+#@gui : Random Variation = float(0.3,0,1)
+#@gui : sep = separator()
+#@gui : Outline Thickness (% of Tile Edge) = float(4,0,50)
+#@gui : Outline Color = color(20,20,20)
+#@gui : sep = separator()
+#@gui : Anti-Aliasing = _choice(1,"None","x2","x3","x4")
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/10/4</i>.</small>")
+__fx_penrose_tiling :
+  tile_type,pcx,pcy,cx,cy,rx,ry,r_a,g_a,b_a,r_b,g_b,b_b,variation,outline,r_o,g_o,b_o,aa=${1-19}
+
+fx_penrose_tiling :
+  __$0 $*
+  foreach {
+    nm={n} ow,oh:=w,h rm {($aa+1)*[$ow,$oh]},1,3 fc $r_o,$g_o,$b_o
+    sw,sh:=w,h
+
+    # Automatic setting of the tile size and of the subdivision depth.
+    # zoom : from the length of the Center -> Rotation vector (25% of the width gives 1).
+    # edge : tile edge in pixels (zoom = 1 gives the tile size of the former default, depth 7).
+    # rcov : radius of the initial 'sun' needed to cover the whole image from the chosen center.
+    # depth: smallest depth such that edge*phi^depth >= rcov (then R0 = edge*phi^depth covers the image).
+    phi:=(1+sqrt(5))/2
+    zoom:=max(0.5,norm(($rx-$cx)*w%,($ry-$cy)*h%)/(0.075*w))
+    rcov:=sqrt(max(w*$cx%,w-w*$cx%)^2+max(h*$cy%,h-h*$cy%)^2)/cos(pi/10)
+    edge:=max($zoom*0.5/cos(pi/10)*$phi^(-7)*sqrt(w*w+h*h),$rcov*$phi^(-10))
+    depth:=min(10,max(2,2*ceil(log($rcov/$edge)/(2*log($phi)))))
+
+    # Buffers (upper bound on the number of triangles, no culling):
+    # [1],[2] = ping-pong triangle buffers, [3] = children scratch, [4] = polygon scratch,
+    # [5] = single-pixel image used to run the whole computation once, in begin(),
+    # [6] = mask of the tile edges (1 channel, same size as [0]): 1 = background, 0 = edge pixel.
+    nmax:="na = 10; nb = 0;
+      for (it = 0, it<$depth, ++it,
+        if ($tile_type==0, nn = na + nb; mm = na + 2*nb, nn = 2*na + nb; mm = na + nb);
+        na = nn; nb = mm
+      ); na + nb + 10"
+
+    {7*$nmax},1,1,1x2
+    21,1,1,1
+    8,1,1,1
+    1,1,1,1
+    $sw,$sh,1,1,1
+
+    f[5] "begin(
+      # Parameters and similarity transform (tiling space -> pixels).
+      const tp = $tile_type;
+      const nit = $depth;
+      const phi = (1 + sqrt(5))/2;
+      const W = w#0;
+      const H = h#0;
+
+      # Center and rotation given by the two interactive points (in % of the image size).
+      const tx = W*$cx%;
+      const ty = H*$cy%;
+      const vu = W*($rx - $cx)%;
+      const vv = H*($ry - $cy)%;
+
+      # Two deflations rotate the sun by 180 degrees (= 36 degrees by 5-fold symmetry):
+      # sg = -1 for depths 2, 6, 10 compensates for this, so the tiling keeps the same
+      # orientation whatever the (even) depth.
+      const sg = nit%4==2?-1:1;
+      const th = atan2(vv,vu) + (sg<0)*pi;
+      const ca = cos(th);
+      const sa = sin(th);
+
+      # Radius of the initial sun: the tile edge ($edge pixels) times phi^depth.
+      # hw is the half-width of the outline (in pixels). The outline itself is rendered
+      # afterwards from the edge mask, using a distance map.
+      const R0 = $edge*phi^nit;
+      const hw = $edge*$outline%/2;
+      const mg = hw + 1;
+
+      # Scanline filler for a convex polygon stored in image [4].
+      scan(nv,cr,cg,cb) = (
+        w0 = w#0;
+        h0 = h#0;
+        wh = w0*h0;
+        ymn = inf; ymx = -inf;
+        for (ee = 0,ee<nv, ++ee,
+          yv = i[#4, 2*ee + 1];
+          ymn = min(ymn, yv); ymx = max(ymx, yv)
+        );
+        for (yy = max(0,ceil(ymn)), yy<=min(h0 - 1,floor(ymx)), ++yy,
+          xl = inf; xr = -inf;
+          for (ee = 0, ee<nv, ++ee,
+            e2 = (ee + 1)%nv;
+            pxa = i[#4,2*ee]; pya = i[#4,2*ee + 1];
+            pxb = i[#4,2*e2]; pyb = i[#4,2*e2 + 1];
+            (pya<=yy && yy<pyb) || (pyb<=yy && yy<pya)?(
+              xi = pxa + (yy - pya)*(pxb - pxa)/(pyb - pya);
+              xl = min(xl,xi); xr = max(xr,xi)
+            )
+          );
+          xs = max(0,ceil(xl)); xe = min(w0 - 1,floor(xr));
+          off = yy*w0 + xs;
+          for (xx = xs, xx<=xe, ++xx,
+            i[#0,off] = cr; i[#0,off + wh] = cg; i[#0,off + 2*wh] = cb;
+            ++off
+          )
+        )
+      );
+
+      # put(q,type,x0,y0,x1,y1,x2,y2): store child number q in scratch image [3].
+      put(q,ty,x0,y0,x1,y1,x2,y2) = (
+        bs = 7*q;
+        i[#3,bs] = ty;
+        i[#3,bs + 1] = x0; i[#3,bs + 2] = y0;
+        i[#3,bs + 3] = x1; i[#3,bs + 4] = y1;
+        i[#3,bs + 5] = x2; i[#3,bs + 6] = y2;
+      );
+
+      # seg(xp,yp,xq,yq): draw a thin (1 pixel) line in the edge mask [6] (edge pixels set to 0).
+      seg(xp,yp,xq,yq) = (
+        w0 = w#0;
+        h0 = h#0;
+        ns = ceil(max(abs(xq - xp),abs(yq - yp)));
+        for (ks = 0, ks<=ns, ++ks,
+          tf = ns>0?ks/ns:0;
+          ix = round(xp + tf*(xq - xp));
+          iy = round(yp + tf*(yq - yp));
+          ix>=0 && ix<w0 && iy>=0 && iy<h0?(i[#6,iy*w0 + ix] = 0)
+        )
+      );
+
+      # Initial 'sun': 10 half-tiles around the origin (unit radius).
+      for (k = 0, k<10, ++k,
+        tp==0?(a1 = (2*k - 1)*pi/10; a2 = (2*k + 1)*pi/10):
+              (a1 = k*pi/5;          a2 = (k + 1)*pi/5);
+        sw = if (tp==0, k%2==0, k%2==1);
+        bx = cos(if (sw, a2, a1)); by = sin(if (sw, a2, a1));
+        cx = cos(if (sw, a1, a2)); cy = sin(if (sw, a1, a2));
+        i[#1, 7*k] = 0;
+        i[#1, 7*k + 1] = 0;  i[#1, 7*k + 2] = 0;
+        i[#1, 7*k + 3] = bx; i[#1, 7*k + 4] = by;
+        i[#1, 7*k + 5] = cx; i[#1, 7*k + 6] = cy
+      );
+      nin = 10;
+
+      # Deflation, with culling of the children lying outside the image.
+      for (it = 0, it<nit, ++it,
+        nout = 0;
+        for (k = 0, k<nin, ++k,
+          o = 7*k; tt = i[#1, o];
+          ax = i[#1, o + 1]; ay = i[#1, o + 2];
+          bx = i[#1, o + 3]; by = i[#1, o + 4];
+          cx = i[#1, o + 5]; cy = i[#1, o + 6];
+          if (tp==0,
+            # P3: thin half-rhomb -> thin + thick; thick half-rhomb -> 2 thick + 1 thin.
+            if (tt==0,
+              px = ax + (bx - ax)/phi; py = ay + (by - ay)/phi; nc = 2;
+              put(0, 0, cx, cy, px, py, bx, by);
+              put(1, 1, px, py, cx, cy, ax, ay),
+              qx = bx + (ax - bx)/phi; qy = by + (ay - by)/phi;
+              rx = bx + (cx - bx)/phi; ry = by + (cy - by)/phi; nc = 3;
+              put(0, 1, rx, ry, cx, cy, ax, ay);
+              put(1, 1, qx, qy, rx, ry, bx, by);
+              put(2, 0, rx, ry, qx, qy, ax, ay)
+            ),
+            # P2: half-kite -> 2 half-kites + 1 half-dart; half-dart -> half-kite + half-dart.
+            if (tt==0,
+              qx = ax + (bx - ax)/phi^2; qy = ay + (by - ay)/phi^2;
+              rx = ax + (cx - ax)/phi;   ry = ay + (cy - ay)/phi; nc = 3;
+              put(0, 1, qx, qy, rx, ry, ax, ay);
+              put(1, 0, bx, by, cx, cy, rx, ry);
+              put(2, 0, bx, by, qx, qy, rx, ry),
+              px = cx + (bx - cx)/phi; py = cy + (by - cy)/phi; nc = 2;
+              put(0, 1, px, py, ax, ay, bx, by);
+              put(1, 0, cx, cy, px, py, ax, ay)
+            )
+          );
+          for (q = 0, q<nc, ++q,
+            bs = 7*q;
+            x0 = i[#3, bs + 1]; y0 = i[#3, bs + 2];
+            x1 = i[#3, bs + 3]; y1 = i[#3, bs + 4];
+            x2 = i[#3, bs + 5]; y2 = i[#3, bs + 6];
+            xa = tx + R0*(ca*x0 - sa*y0); ya = ty + R0*(sa*x0 + ca*y0);
+            xb = tx + R0*(ca*x1 - sa*y1); yb = ty + R0*(sa*x1 + ca*y1);
+            xc = tx + R0*(ca*x2 - sa*y2); yc = ty + R0*(sa*x2 + ca*y2);
+            if (min(xa, xb, xc)<=W - 1 + mg && max(xa, xb, xc)>=-mg &&
+                min(ya, yb, yc)<=H - 1 + mg && max(ya, yb, yc)>=-mg,
+              ob = 7*nout;
+              i[#2, ob] = i[#3, bs];
+              i[#2, ob + 1] = x0; i[#2, ob + 2] = y0;
+              i[#2, ob + 3] = x1; i[#2, ob + 4] = y1;
+              i[#2, ob + 5] = x2; i[#2, ob + 6] = y2;
+              ++nout
+            )
+          )
+        );
+        for (u = 0, u<7*nout, ++u, i[#1, u] = i[#2, u]);
+        nin = nout
+      );
+
+      # Rendering. Pass 0: filled tiles. Pass 1: edges, drawn as thin lines in the edge mask [6]
+      # (the edge shared by the two halves of a tile is skipped: BC for P3, AC for P2).
+      for (pass = 0, pass<=(hw>0), ++pass,
+        for (k = 0, k<nin, ++k,
+          o = 7*k; tt = i[#1, o];
+          ax = i[#1, o + 1]; ay = i[#1, o + 2];
+          bx = i[#1, o + 3]; by = i[#1, o + 4];
+          cx = i[#1, o + 5]; cy = i[#1, o + 6];
+          xa = tx + R0*(ca*ax - sa*ay); ya = ty + R0*(sa*ax + ca*ay);
+          xb = tx + R0*(ca*bx - sa*by); yb = ty + R0*(sa*bx + ca*by);
+          xc = tx + R0*(ca*cx - sa*cy); yc = ty + R0*(sa*cx + ca*cy);
+          if (pass==0,
+            # Tile A = thick rhomb (P3) or kite (P2); tile B = the other one.
+            isA = if (tp==0, tt==1, tt==0);
+
+            # Hash of the midpoint of the diagonal shared by both halves (same for the 2 halves).
+            # Coordinates are expressed in units of the tile edge (multiplication by phi^nit),
+            # so that a given tile keeps the same color whatever the depth.
+            mx = sg*phi^nit*if (tp==0, (bx + cx)/2, (ax + cx)/2);
+            my = sg*phi^nit*if (tp==0, (by + cy)/2, (ay + cy)/2);
+            hv = abs(sin(round(mx*1024)*12.9898 + round(my*1024)*78.233)*43758.5453);
+            hv = hv - floor(hv);
+
+            dl = $variation*(hv - 0.5)*160;
+            cr = min(255, max(0, if (isA, $r_a, $r_b) + dl));
+            cg = min(255, max(0, if (isA, $g_a, $g_b) + dl));
+            cb = min(255, max(0, if (isA, $b_a, $b_b) + dl));
+            i[#4, 0] = xa; i[#4, 1] = ya;
+            i[#4, 2] = xb; i[#4, 3] = yb;
+            i[#4, 4] = xc; i[#4, 5] = yc;
+            scan(3, cr, cg, cb),
+            for (ed = 0, ed<2, ++ed,
+              if (tp==0,
+                if (ed==0, xp = xa; yp = ya; xq = xb; yq = yb,
+                           xp = xa; yp = ya; xq = xc; yq = yc),
+                if (ed==0, xp = xa; yp = ya; xq = xb; yq = yb,
+                           xp = xb; yp = yb; xq = xc; yq = yc)
+              );
+              seg(xp,yp,xq,yq)
+            )
+          )
+        )
+      )
+    ); 0"
+    rm[1-5]
+
+    # Outline rendering: Euclidean distance to the edge pixels, soft threshold at the half-width,
+    # then compositing of the outline color over the filled tiles.
+    if $outline
+      distance[1] 0,2
+      hw:=$edge*$outline%/2
+      f[1] "cut($hw + 0.5 - i,0,1)"
+      f[0] "a = i(#1,x,y,0,0); I*(1 - a) + [$r_o,$g_o,$b_o]*a"
+    fi
+    rm[1]
+
+    if $aa r $ow,$oh,1,3,2 fi
+  }
+
+fx_penrose_tiling_preview :
+  __fx_penrose_tiling $*
+  rx,ry+=$cx-$pcx,$cy-$pcy
+  fx_penrose_tiling $tile_type,$pcx,$pcy,$cx,$cy,$rx,$ry,\
+    $r_a,$g_a,$b_a,$r_b,$g_b,$b_b,$variation,$outline,$r_o,$g_o,$b_o,{min($aa,1)}
+  line $cx%,$cy%,$rx%,$ry%,1,0x0F0F0F0F,0
+  line $cx%,$cy%,$rx%,$ry%,1,0xF0F0F0F0,255
+  u "{"$tile_type"}"\
+    "{"$cx"}{"$cy"}{"$cx,$cy"}{"$rx,$ry"}"\
+    "{"$r_a,$g_a,$b_a"}{"$r_b,$g_b,$b_b"}{"$variation"}"\
+    "{"$outline"}{"$r_o,$g_o,$b_o"}{"$aa"}"
+
 #-----------------------
 #@gui _<b>Rendering</b>
 #-----------------------
@@ -365,8 +646,8 @@ _fx_page_curl :
 # "Spring","Summer","Winter")
 #@gui : Previous X-Center = value(50)
 #@gui : Previous Y-Center = value(50)
-#@gui : Center = point(50,50,0,1,0,255,0)
-#@gui : Zoom = point(75,50,0,1,255,0,255)
+#@gui : Center = point(50,50,0,1,0,255,0)_0
+#@gui : Zoom = point(75,50,0,1,255,0,255)_0
 #@gui : sep = separator()
 #@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/09/27</i>.</small>")
 __fx_chladni :
@@ -490,7 +771,91 @@ fx_cosmic_nebula :
     +- 150 max. 0 b. 20 *. 0.4 + c 0,255 => $nm
   }
 
+#@gui _<b>Testing</b>
+#@gui <i>Rajasegar Chandiran</i>
+#@gui Hexagon Grid : fx_hexagon_grid, fx_hexagon_grid(1)
+#@gui : Hexagon Radius = int(60,10,200)
+#@gui : Color mode = choice("Random", "Patterned")
+# Urban Garden color palette
+#@gui : Color 1 = ~color(9,70,72)
+#@gui : Color 2 = ~color(5,99,98)
+#@gui : Color 3 = ~color(75,132,75)
+#@gui : Color 4 = ~color(180,178,54)
+#@gui : Color 5 = ~color(220,226,192)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i>Rajasegar Chandiran</i>.
+#@gui :       Latest Update: <i>2026/09/29</i>.</small>")
+fx_hexagon_grid: skip ${1=50},${2=0},${3=2},${4=58},${5=56},${6=6},${7=88},${8=91},${9=183},${10=103},${11=174},\
+  ${12=255},${13=119},${14=66},${15=255},${16=200},${17=71}
 
+  # $1 = Hexagon radius (size)
+  # $2 = Color mode (0 = Random, 1 = Patterned)
+
+  # 1. Define canvas size based on current image or create a new one
+  if !l 800,600,1,3,255 fi
+
+  # 2. Define the 5 predefined colors as a single vector string
+  # Format: [R0,G0,B0, R1,G1,B1, ...]
+  # palette=[239,71,111,247,141,43,255,209,102,6,214,160,17,138,178]
+  # palette=[{$3},{$4},{$5},{$6},{$7},{$8},{$9},{$10},{$11},{$12},{$13},{$14},{$15},{$16},{$17}]
+
+  # getting the palette colors from the arguments
+  palette=[${3--1}] # getting all the other arguments except the first two
+
+  # 3. Grid geometry math
+  r=$1                         # Outer radius
+  h:=($r*sqrt(3))/2            # Half-height of the hexagon
+  cx:=$r*1.5                   # Horizontal spacing between columns
+  cy:=$h*2                     # Vertical spacing between rows
+
+  # Calculate how many columns/rows we need to fill the canvas
+  cols:=int(w/$cx)+2
+  rows:=int(h/$cy)+2
+
+  # 4. Loop through the grid
+  y=0
+  for $y<$rows {
+    x=0
+    for $x<$cols {
+
+      # Calculate center coordinates for the hexagon
+      # Every odd column needs to be shifted vertically by 'h' to interlock
+      cen_x:=$x*$cx
+      cen_y:=($y*$cy)+($x%2?$h:0)
+
+      # Pick one of the 5 colors
+      if $2==0
+        # Mode 0: Completely random choice
+        col_index:=int(u(0,5))
+      else
+        # Mode 1: Algorithmic pattern based on grid position
+        col_index:=($x+$y*2)%5
+      fi
+
+      # Correct G'MIC math parser syntax to extract RGB values from the palette vector
+      r_val,g_val,b_val:=$palette[3*$col_index,3]
+
+      # 5. Draw the hexagon using the 'polygon' command (6 vertices)
+      # Uses the parametric equation: x + r*cos(a), y + r*sin(a)
+      polygon 6,\
+               {$cen_x+$r},\
+               $cen_y,\
+               {$cen_x+$r*cos(pi/3)},\
+               {$cen_y+$r*sin(pi/3)},\
+               {$cen_x+$r*cos(2*pi/3)},\
+               {$cen_y+$r*sin(2*pi/3)},\
+               {$cen_x-$r},\
+               $cen_y,\
+               {$cen_x+$r*cos(4*pi/3)},\
+               {$cen_y+$r*sin(4*pi/3)},\
+               {$cen_x+$r*cos(5*pi/3)},\
+               {$cen_y+$r*sin(5*pi/3)},\
+                1,$r_val,$g_val,$b_val
+       x+=1
+    }
+    y+=1
+  }
+  fx_smooth_antialias 5,10,0.8
 
 
 # (End of G'MIC custom commands)
