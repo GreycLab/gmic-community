@@ -217,7 +217,9 @@ fx_glass_door :
 #@gui : Fold Corner Position = point(40,40,0,1)
 #@gui : Curl Radius (%) = float(10,1,40)
 #@gui : sep = separator()
-#@gui : Back Side Color = color(246,241,229,89)
+#@gui : Back Side = choice{0,"Uniform Color","Other Layer (Image)"}
+#@gui : Swap Layers = bool(0)
+#@gui : Back Side Tint Color / Opacity = color(246,241,229,89)
 #@gui : sep = separator()
 #@gui : Shading (%) = float(100,0,250)
 #@gui : Shadow Opacity (%) = float(60,0,100)
@@ -227,10 +229,21 @@ fx_glass_door :
 #@gui : sep = separator()
 #@gui : Background Color = color(255,255,255,0)
 #@gui : sep = separator()
-#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/10/03</i>.</small>")
+#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/10/05</i>.</small>")
 fx_page_curl :
+
+  # Back-side image mode: needs at least two images. Otherwise, fall back to the uniform color.
+  bmode:=$5&&$!>1
+  if $bmode
+    k[0,1]
+    if $6 reverse fi
+    to_rgb ri[1] [0],3
+    a[0,1] c # [0] = 6 channels : front RGB + back RGB
+  fi
+
   foreach {
-    nm={n} to_rgb
+    nm={n}
+    if !$bmode to_rgb fi
 
     # The point is given in the original image: bring it back to the bottom-right corner frame.
     cfx,cfy:=isin($1,0,2),isin($1,0,1)
@@ -241,14 +254,15 @@ fx_page_curl :
     csize:=max(5,max(1,norm($cvx,$cvy))/(2-pi*$4%)/min(w,h)*100)
 
     if $1<3 axes=${"arg0 $1,xy,y,x"} mirror $axes fi
-    _$0 $csize,$cangle,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
+    _$0 $csize,$cangle,$4,$bmode,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
     if $1<3 mirror $axes fi
     => $nm
   }
 
-# Render the page curl on the bottom-right corner of the RGB image [0].
+# Render the page curl on the bottom-right corner of image [0].
+# If bmode=1, image [0] has 6 channels (front RGB + back RGB), otherwise 3 channels.
 _fx_page_curl :
-  size,angle,radius,bkr,bkg,bkb,bka,shading,sh_opacity,sh_soft,light_az,light_el,bgr,bgg,bgb,bga=$*
+  size,angle,radius,bmode,bkr,bkg,bkb,bka,shading,sh_opacity,sh_soft,light_az,light_el,bgr,bgg,bgb,bga=$*
   R:=max(0.75,$radius*$size*min(w,h)/10000)
   transp:=$bga<255
 
@@ -342,7 +356,8 @@ _fx_page_curl :
     Pg = (1 - dk)*lerp(bg[cc]*ba,i(#0,x,y,0,cc,0,0),cB);
     Ga = 1 - (1 - ba)*(1 - cB)*(1 - dk);
     CF = i(#0,i(#1,x,y,0,6,0,0),i(#1,x,y,0,7,0,0),0,cc,1,1)*i(#1,x,y,0,9,0,0)*(1 - dk) + 255*i(#1,x,y,0,10,0,0);
-    CT = (1 - tn)*i(#0,g0,g1,0,cc,1,1) + tn*bk[cc];
+    src = i(#0,g0,g1,0,cc + 3*$bmode,1,1);
+    CT = (1 - tn)*src + tn*bk[cc];
     CT = CT*i(#1,x,y,0,3,0,0) + 255*i(#1,x,y,0,4,0,0);
     P = lerp(cF*CF + (1 - cF)*Pg,CT,cT);
     A = lerp(lerp(Ga,1,cF),1,cT);
@@ -372,7 +387,7 @@ _fx_page_curl :
 #@gui : sep = separator()
 #@gui : Anti-Aliasing = choice(1,"None","x2","x3","x4")
 #@gui : sep = separator()
-#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/10/4</i>.</small>")
+#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/10/04</i>.</small>")
 __fx_penrose_tiling :
   tile_type,pcx,pcy,cx,cy,rx,ry,r_a,g_a,b_a,a_a,r_b,g_b,b_b,a_b,variation,outline,r_o,g_o,b_o,a_o,aa=${1-22}
 
