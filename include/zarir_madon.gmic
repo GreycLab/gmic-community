@@ -170,3 +170,293 @@ fx_dream_smoothing_enhanced_preview :
     # High Quality: full resolution
     fx_dream_smoothing_enhanced ${1-21}
   fi
+
+# Dream Smoothing Enhanced v2 — a painterly anisotropic smoothing filter with resolution-aware Dream Scale and iterative merge shaping.
+#
+# Based on Dream Smoothing by Arto Huotari (CeCILL).
+# Filter design: Zarir Madon
+# Implementation: OpenAI GPT-5.6 Sol (07 October 2026)
+# DSE v2 additions: GPL-3.0 where compatible; Arto-derived code retains its original CeCILL provenance.
+
+#@gui Dream Smoothing Enhanced v2 : fx_dream_smoothing_enhanced_v2, fx_dream_smoothing_enhanced_v2_preview(0)
+#@gui : sep = separator()
+#@gui : note = note("<b>Dream Smoothing Enhanced v2</b>")
+#@gui : note = note("<small><b>Output:</b> New Layer(s). Source layer preserved.</small>")
+#@gui : sep = separator()
+#@gui : note = note("<b>DREAM PROCESSING</b>")
+#@gui : Passes (Iterations) = int(3,1,10)
+#@gui : Merging Option = choice(1,"Add","Alpha","And","Average","Blue","Burn","Darken","Difference","Divide","Dodge","Exclusion","Freeze","Grainextract","Grainmerge","Green","Hardlight","Hardmix","Hue","Interpolation","Lighten","Lightness","Linearburn","Linearlight","Luminance","Multiply","Negation","Or","Overlay","Pinlight","Red","Reflect","Saturation","Screen","Shapeaverage","Softburn","Softdodge","Softlight","Stamp","Subtract","Value","Vividlight","Xor","Edges")
+#@gui : Opacity = float(0.8,0,1)
+#@gui : Reverse Order = bool(0)
+#@gui : Smoothness = float(0.8,0,5)
+#@gui : Equalize = bool(0)
+#@gui : sep = separator()
+#@gui : note = note("<b>DREAM CHARACTER</b>")
+#@gui : Dream Scale = float(50,0,100)
+#@gui : sep = separator()
+#@gui : note = note("<b>PERFORMANCE</b>")
+#@gui : Parallel Processing = choice(0,"Auto","One Thread","Two Threads","Four Threads","Eight Threads","Sixteen Threads")
+#@gui : Spatial Overlap = int(24,0,256)
+#@gui : note = note("<small>Auto is convenient; manual thread counts may be faster. Increase overlap only if band boundaries appear.</small>")
+
+fx_dream_smoothing_enhanced_v2 :
+  _dsev2_engine_lock $1,$2,$3,$4,$5,$8,$9,0,$7,0,0,0,0,0,0,0,0,0,0,50,0,$6
+  name[0] "Dream Smoothing Enhanced v2"
+
+fx_dream_smoothing_enhanced_v2_preview :
+  fx_dream_smoothing_enhanced_v2 $*
+
+_dsev2_engine_lock :
+  passes=$1
+  merge_mode=$2
+  opacity=$3
+  reverse_order=$4
+  smoothness=$5
+  parallel=$6
+  overlap=$7
+  trail=$8
+  dream_scale=$9
+  detail=${10}
+  painterly=0
+  directional=${11}
+  structure=${12}
+  edge=${13}
+  diffusion=${14}
+  bloom=${15}
+  soft=${16}
+  color_bleed=${17}
+  surface=${18}
+  localdef=${19}
+  strength=${20}
+  original_look=${21}
+  equalize=${22}
+
+  input [0]
+
+  source_w={w#0}
+  source_h={h#0}
+  source_long={max($source_w,$source_h)}
+  dream_factor={2^(($dream_scale-50)/50)}
+  dream_long={round(min($source_long,max(512,min(2048,1024*$dream_factor))))}
+  dream_w={max(1,round($source_w*$dream_long/$source_long))}
+  dream_h={max(1,round($source_h*$dream_long/$source_long))}
+
+  input [0]
+  to_rgb[-1]
+
+  if $source_long>$dream_long
+    r[-1] $dream_w,$dream_h,1,3,5,1
+  fi
+
+  l[-1]
+    _dsev2_arto_dream. $passes,$equalize,$merge_mode,$opacity,$reverse_order,$smoothness,$parallel,$overlap,1,0.8,$trail,$strength,$painterly,$directional,$structure,$edge,$diffusion,$original_look
+    to_rgb.
+    r. $source_w,$source_h,1,3,5,1
+  done
+
+  rm[1]
+
+  if $detail>0
+    input [0]
+    input [0]
+    blur. {0.8+1.7*$detail/100}
+    sub[-2] [-1]
+    rm[-1]
+    mul. {0.22*$detail/100}
+    add[1] [-1]
+    rm[-1]
+  fi
+
+  if $soft>0
+    input [1]
+    blur. {0.35+2.65*$soft/100}
+    blend[1,-1] alpha,{0.45*$soft/100},0
+  fi
+
+  if $color_bleed>0
+    input [1]
+    srgb2lab.
+    split. c
+    blur[-2,-1] {0.35+3.65*$color_bleed/100}
+    append[-3--1] c
+    lab2srgb.
+    blend[1,-1] alpha,{0.55*$color_bleed/100},0
+  fi
+
+  if $bloom>0
+    input [1]
+    blur. {1+6*$bloom/100}
+    blend[1,-1] screen,{0.22*$bloom/100},0
+  fi
+
+  if $localdef>0
+    input [1]
+    input [1]
+    blur. {1.2+2.8*$localdef/100}
+    sub[-2] [-1]
+    rm[-1]
+    mul. {0.16*$localdef/100}
+    add[1] [-1]
+    rm[-1]
+  fi
+
+  if $surface>0
+    input [0]
+    input [0]
+    blur. 0.85
+    sub[-2] [-1]
+    rm[-1]
+    mul. {0.10*$surface/100}
+    add[1] [-1]
+    rm[-1]
+  fi
+
+  keep[1]
+
+# Arto Huotari-derived Dream Smoothing routine; CeCILL provenance retained.
+# DSE v2 modifies spatial scaling while preserving the iterative Dream architecture.
+_dsev2_arto_dream :
+  m "MergeChoise : $""=_mode" MergeChoise "add","alpha","and","average","blue","burn","darken","difference","divide","dodge","exclusion","freeze","grainextract","grainmerge","green","hardlight","hardmix","hue","interpolation","lighten","lightness","linearburn","linearlight","luminance","multiply","negation","or","overlay","pinlight","red","reflect","saturation","screen","shapeaverage","softburn","softdodge","softlight","stamp","subtract","value","vividlight","xor","edges","error"
+  to_color
+  Iterations=$1
+  Eqa=$2
+  MergingOption=$3
+  Opacity=$4
+  ReverseOrder=$5
+  Smoothness=$6
+  Threads=$7
+  Overlap=$8
+  Scale=$9
+  Trail=$10
+  Strength=$11
+  Painterly=$12
+  Directional=$13
+  Structure=$14
+  Edge=$15
+  Diffusion=$16
+  OriginalLook=$17
+
+  repeat $! l[$>] split_opacity l[0]
+
+    repeat $Iterations
+
+      IWidth={0,round(w/($<+1))}
+      IHeight={0,round(h/($<+1))}
+
+      if $>!=0
+        r. $IWidth,$IHeight,1,3,5,1
+      fi
+
+      +r[0] $IWidth,$IHeight,1,3,5,1
+
+      if {($Strength==50)*($Painterly==0)*($Directional==0)*($Structure==0)*($Edge==0)*($Diffusion==0)*($OriginalLook==0)}
+        fx_smooth_anisotropic. {430/$Iterations*($<+1)*$Scale},0.4,0.5,{0.6*$Scale},{2*$Scale},0.8,30,2,0,0,1,0,$Threads,$Overlap,0
+      else
+        StrengthA={max(0.20,1+($Strength-50)/100)}
+        PainterA={1+0.006*$Painterly}
+        AnisoA={min(1,0.5+0.004*$Directional)}
+        SigmaA={2*$Scale*(1+0.008*$Structure)}
+        SharpA={min(1,0.4+0.004*$Edge)}
+        AlphaA={0.6*$Scale*(1+0.006*$Diffusion)}
+        OriginalA={if($OriginalLook,min(1,1024/max(w,h)),1)}
+        fx_smooth_anisotropic. {430/$Iterations*($<+1)*$Scale*$StrengthA*$PainterA*$OriginalA},$SharpA,$AnisoA,$AlphaA,$SigmaA,0.8,30,2,0,0,1,0,$Threads,$Overlap,0
+      fi
+
+      if $Strength==50 && $Directional==0 && $Structure==0 && $Edge==0 && $Diffusion==0 && !$OriginalLook
+        BSharp=0.4
+        BAniso=1
+        BAlpha={0.6*$Scale}
+        BSigma={4*$Scale}
+        BAmp={600/$Iterations*($<+1)*$Scale}
+      else
+        StrengthB={max(0.20,1+($Strength-50)/100)}
+        BSharp={min(1,0.4+0.004*$Edge)}
+        BAniso=1
+        BAlpha={0.6*$Scale*(1+0.006*$Diffusion)}
+        BSigma={4*$Scale*(1+0.008*$Structure)}
+        OriginalB={if($OriginalLook,min(1,1024/max(w,h)),1)}
+        BAmp={600/$Iterations*($<+1)*$Scale*$StrengthB*$OriginalB}
+      fi
+
+      if $Trail==0
+        +diffusiontensors. $BSharp,$BAniso,$BAlpha,$BSigma
+        smooth[-2] [-1],$BAmp,0.8,15,5,0,1
+        rm[-1]
+
+      elif $Trail<50
+        +diffusiontensors. $BSharp,$BAniso,$BAlpha,$BSigma
+        eigen[-1]
+        eigen2tensor[-2,-1]
+        smooth[-2] [-1],$BAmp,0.8,15,5,0,1
+        rm[-1]
+
+      else
+        +diffusiontensors. $BSharp,$BAniso,$BAlpha,$BSigma
+        eigen[-1]
+
+        input [-2]
+        split[-1] c
+        sub[-2] [-1]
+        abs.
+        normalize. 0,1
+
+        blur. 0.6
+
+        input [-2]
+        split[-1] c
+        negate[-1]
+        reverse[-2,-1]
+        append[-2,-1] c
+
+        Endpoint={2*($Trail-50)}
+        mul. {1.25+1.75*$Endpoint/100}
+
+        input [-1]
+        mul. -1
+
+        input [-3]
+        warp[-1] [-3],1,1,1,1
+
+        input [-4]
+        warp[-1] [-3],1,1,1,1
+
+        sub[-2] [-1]
+        abs.
+
+        mul[-1] [-5]
+        normalize. 0,1
+
+        threshold. {max(0.10,0.34-0.0016*$Endpoint)}
+        blur. {0.45+0.004*$Endpoint}
+        normalize. 0,1
+
+        mul. {-0.60*$Endpoint/100}
+        add. 1
+
+        r[-1] 100%,100%,100%,2,0,1
+        mul[-6] [-1]
+
+        rm[-5--1]
+
+        eigen2tensor[-2,-1]
+        smooth[-2] [-1],$BAmp,0.8,15,5,0,1
+        rm[-1]
+      fi
+
+      if $>!=0
+        if $3!=42
+          blend[-1,-2] ${_mode{$MergingOption+1}},$Opacity,$ReverseOrder
+        fi
+        if $3==42
+          blend_edges[-1,-2] $Opacity,$Smoothness,$ReverseOrder
+        fi
+        if $Eqa
+          equalize. 256
+        fi
+      fi
+    done
+    k.
+  done a c done done
+
+fx_dream_smoothing_enhanced_v2_neutral_preview :
+  _dsev2_engine_lock $*
