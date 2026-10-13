@@ -68,10 +68,7 @@
 #@cli :   \% = Mirror a branch across a mirror point (left/right swapped at
 #@cli :       every level). If the current node has exactly one child, that
 #@cli :       child's branch is mirrored onto the empty side of the current
-#@cli :       node. If it is a leaf, it is mirrored onto the opposite side of
-#@cli :       its parent. Does nothing if the current node has two children
-#@cli :       or is a childless subtree root. Existing nodes on the target
-#@cli :       side are kept; missing ones are created.
+#@cli :       node.
 #@cli :
 #@cli :   *A subtree root is the node where the current local branch context began.
 #@cli :
@@ -137,6 +134,7 @@
 +rep_str2bin_struct:
 check isint(${2=0},0)
 $0_start_of_image_list,$0_v_size,$0_access_mode,$0_char_limit,$0_dict_size:=$!,$2,bool($2),247,256
+e $1
 ('"$1"')                         # str
 _rep_str2bin_struct_exam_delimit # Validate bracket balance
 1,1,1,3             # root, root left child idx,root right child idx
@@ -381,23 +379,17 @@ eval "
 				# Exactly one child is used: mirror along it, with the current node as the mirror point
 				mirror_root=current_branch;
 				mirror_src_dir=mirror_has_r;
-			,
-				# Leaf (or skipped two-child node): the parent is the mirror point
-				mirror_root=i(#binary_tree_img,0,current_branch,0,parent_pos);
-				mirror_src_dir=i(#binary_tree_img,0,current_branch,0,direction_pos);
-			);
 
-			if(i(#binary_tree_img,0,mirror_root,0,1+mirror_src_dir),
 				mirror_s=mirror_m=mirror_root;
 				mirror_try=mirror_src_dir; # At the subroot, only the source side is entered
 				mirror_result=current_branch;
 				mirror_done=0;
 
 				while(!mirror_done,
-					if(mirror_try<2,
+					mirror_try<2?(
 						mirror_child_s=i(#binary_tree_img,0,mirror_s,0,1+mirror_try);
 
-						if(mirror_child_s,
+						mirror_child_s?(
 							# Source child exists: ensure the mirrored child exists, then step into both
 							alternate_direction=!mirror_try;
 							alternate_pos=1+alternate_direction;
@@ -449,23 +441,21 @@ eval "
 
 							# Remember where the original current node was mirrored to
 							if(mirror_s==current_branch,mirror_result=mirror_m;);
-						,
+						):(
 							++mirror_try;
 						);
-					,
+					):(
 						# Both children handled: climb back up one level
 						mirror_back_dir=i(#binary_tree_img,0,mirror_s,0,direction_pos);
 						mirror_s=i(#binary_tree_img,0,mirror_s,0,parent_pos);
 						mirror_m=i(#binary_tree_img,0,mirror_m,0,parent_pos);
-						if(mirror_s==mirror_root,
-							mirror_done=1;
-						,
-							mirror_try=mirror_back_dir+1;
+
+						if(mirror_s==mirror_root
+						,mirror_done=1;
+						,mirror_try=mirror_back_dir+1;
 						);
 					);
 				);
-
-				current_branch=mirror_result;
 			);
 
 			++cursor;
