@@ -371,18 +371,14 @@ eval "
 			current_branch=i[#square_bracket_stack,square_bracket_level];
 			++cursor;
 		):
-		current_char==mirror_node?( # Needs Test, but it works.
+		current_char==mirror_node?(
 			mirror_has_l=i(#binary_tree_img,0,current_branch,0,left_child_pos)>0;
 			mirror_has_r=i(#binary_tree_img,0,current_branch,0,right_child_pos)>0;
 
 			if(mirror_has_l!=mirror_has_r,
 				# Exactly one child is used: mirror along it, with the current node as the mirror point
-				mirror_root=current_branch;
-				mirror_src_dir=mirror_has_r;
-
-				mirror_s=mirror_m=mirror_root;
-				mirror_try=mirror_src_dir; # At the subroot, only the source side is entered
-				mirror_result=current_branch;
+				mirror_root=mirror_s=mirror_m=current_branch;
+				mirror_try=mirror_has_r; # At the subroot, only the source side is entered
 				mirror_done=0;
 
 				while(!mirror_done,
@@ -390,57 +386,51 @@ eval "
 						mirror_child_s=i(#binary_tree_img,0,mirror_s,0,1+mirror_try);
 
 						mirror_child_s?(
-							# Source child exists: ensure the mirrored child exists, then step into both
+							# Mirror side is always empty here, so create without checking
 							alternate_direction=!mirror_try;
 							alternate_pos=1+alternate_direction;
-							mirror_branch=mirror_m;
 
-							if(!i(#binary_tree_img,0,mirror_branch,0,alternate_pos),
-								current_bin_tree_size=da_size(#binary_tree_img);
-								i(#binary_tree_img,0,mirror_branch,0,alternate_pos)=current_bin_tree_size;
-								child_depth=i(#binary_tree_img,0,mirror_branch,0,depth_pos)+1;
-								if(child_depth>max_depth,max_depth=child_depth;);
+							current_bin_tree_size=da_size(#binary_tree_img);
+							i(#binary_tree_img,0,mirror_m,0,alternate_pos)=current_bin_tree_size;
+							child_depth=i(#binary_tree_img,0,mirror_m,0,depth_pos)+1;
+							if(child_depth>max_depth,max_depth=child_depth;);
 
-								no_child_stack=alternate_direction+no_left_child_stack;
-								child_stack_pos=alternate_direction+left_child_stack_pos;
+							no_child_stack=alternate_direction+no_left_child_stack;
+							child_stack_pos=alternate_direction+left_child_stack_pos;
 
-								stack_pos=i(#binary_tree_img,0,mirror_branch,0,child_stack_pos);
-								stack_last=da_size(#no_child_stack)-1;
-								moved_node=i[#no_child_stack,stack_last];
+							stack_pos=i(#binary_tree_img,0,mirror_m,0,child_stack_pos);
+							stack_last=da_size(#no_child_stack)-1;
+							moved_node=i[#no_child_stack,stack_last];
 
-								swap(#no_child_stack,stack_pos,stack_last,0);
+							swap(#no_child_stack,stack_pos,stack_last,0);
 
-								i(#binary_tree_img,0,moved_node,0,child_stack_pos)=stack_pos;
+							i(#binary_tree_img,0,moved_node,0,child_stack_pos)=stack_pos;
 
-								da_remove(#no_child_stack,stack_last);
-								da_push(#no_left_child_stack,current_bin_tree_size);
-								da_push(#no_right_child_stack,current_bin_tree_size);
+							da_remove(#no_child_stack,stack_last);
+							da_push(#no_left_child_stack,current_bin_tree_size);
+							da_push(#no_right_child_stack,current_bin_tree_size);
 
-								i(#binary_tree_img,0,mirror_branch,0,child_stack_pos)=nan;
-								access_mode?(
-									da_push(#binary_tree_img,[mirror_branch,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,1,vector_nan]);
-									_1;
-								):(
-									da_push(#binary_tree_img,[mirror_branch,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1]);
-									_1;
-								);
+							i(#binary_tree_img,0,mirror_m,0,child_stack_pos)=nan;
+							access_mode?(
+								da_push(#binary_tree_img,[mirror_m,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,1,vector_nan]);
+								_1;
+							):(
+								da_push(#binary_tree_img,[mirror_m,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1]);
+								_1;
 							);
 
-							mirror_m=i(#binary_tree_img,0,mirror_branch,0,alternate_pos);
+							mirror_m=current_bin_tree_size; # index of the node just pushed
 							mirror_s=mirror_child_s;
 							mirror_try=0;
 
-							# Copy stored values onto mirrored nodes that are still unset
+							# Copy stored values onto the new mirrored node (always unset)
 							access_mode?(
-								if(!i(#binary_tree_img,0,mirror_s,0,access_pos)&&i(#binary_tree_img,0,mirror_m,0,access_pos),
+								if(!i(#binary_tree_img,0,mirror_s,0,access_pos),
 									tH=h(#binary_tree_img);
 									copy(i(#binary_tree_img,0,mirror_m,0,expr_pos),i(#binary_tree_img,0,mirror_s,0,expr_pos),$2,tH,tH);
 									i(#binary_tree_img,0,mirror_m,0,access_pos)=0;
 								);
 							);
-
-							# Remember where the original current node was mirrored to
-							if(mirror_s==current_branch,mirror_result=mirror_m;);
 						):(
 							++mirror_try;
 						);
