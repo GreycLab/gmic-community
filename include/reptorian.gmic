@@ -81,6 +81,7 @@
 #@cli :   ( = Move to random node missing a left child.
 #@cli :   ) = Move to random node missing a right child.
 #@cli :   | = Move to random node missing either child.
+#@cli :   ! = Move to random node with no children.
 #@cli :
 #@cli : Expressions and local branching:
 #@cli :   {...} = Evaluate expression and store result in node.
@@ -152,12 +153,12 @@ $0_start_of_image_list,$0_v_size,$0_access_mode,$0_char_limit,$0_dict_size:=$!,$
 
 ('"$1"')                         # str
 _rep_str2bin_struct_exam_delimit # Validate bracket balance
-1,1,1,3             # root, root left child idx,root right child idx
+1,1,1,4             # root, root left child idx,root right child idx, root both child idx
 1,1,1,2             # repeat bucket position stack
-1,2,1,1,0,1x2       # childfree_stack -> no left child, no right child
+1,2,1,1,0,1x3       # childfree_stack -> no left child, no right child, no both child
 
 $0_tree={l} # rep_str2bin_struct_tree
-1,1,1,{7+${$0_access_mode}},nan,0,0,0,nan,0,0,1,1 # parent,left,right,depth,direction,left_child_stack_pos,right_child_stack_pos,access
+1,1,1,{8+${$0_access_mode}},nan,0,0,0,nan,0,0,0,1,1 # parent,left,right,depth,direction,lstack,rstack,bstack,access
 
 if $2
 	1,1,1,$2,nan
@@ -189,6 +190,7 @@ eval "
 	const random_left_leaf=_'(';
 	const random_right_leaf=_')';
 	const random_leaf=_'|';
+	const random_no_child=_'!';
 	const secondary_repeat_end=_'`';
 	const mirror_node=_'%';
 	const clone_node=_'&';
@@ -205,8 +207,9 @@ eval "
 	const repeat_index_stack=str_img+2;
 	const no_left_child_stack=str_img+3;
 	const no_right_child_stack=str_img+4;
-	const binary_tree_img=str_img+5;
-	const repeat_dict_table=str_img+6;
+	const no_both_child_stack=str_img+5;
+	const binary_tree_img=str_img+6;
+	const repeat_dict_table=str_img+7;
 	const str_len=whd#str_img;
 	const char_limit=$rep_str2bin_struct_char_limit;
 	const parent_pos=0;
@@ -216,7 +219,8 @@ eval "
 	const direction_pos=4;
 	const left_child_stack_pos=5;
 	const right_child_stack_pos=6;
-	const access_pos=7;
+	const both_child_stack_pos=7;
+	const access_pos=8;
 
 	is_alp(char)=isint(char,_a,_z)||isint(char,_A,_Z);
 	is_num(char)=isint(char,_'0',_'9');
@@ -240,7 +244,7 @@ eval "
 		):
 		((child_mode=find([left_child,right_child,two_child,random_child],current_char,0,1))!=-1)?(
 			if(child_mode==3,
-				# '=' : pick left (0) or right (1)
+				# '.' : pick left (0) or right (1)
 				# Exactly one child exists -> take that one. Zero or two children -> random.
 				rc_has_l=i(#binary_tree_img,0,current_branch,0,left_child_pos)>0;
 				rc_has_r=i(#binary_tree_img,0,current_branch,0,right_child_pos)>0;
@@ -254,24 +258,36 @@ eval "
 					child_depth=i(#binary_tree_img,0,current_branch,0,depth_pos)+1;
 					if(child_depth>max_depth,max_depth=child_depth;);
 
+					# Remove current node from the "no left child" stack
 					left_stack_pos=i(#binary_tree_img,0,current_branch,0,left_child_stack_pos);
 					left_stack_last=da_size(#no_left_child_stack)-1;
 					left_moved_node=i[#no_left_child_stack,left_stack_last];
-
 					swap(#no_left_child_stack,left_stack_pos,left_stack_last,0);
-
 					i(#binary_tree_img,0,left_moved_node,0,left_child_stack_pos)=left_stack_pos;
-
 					da_remove(#no_left_child_stack,left_stack_last);
+					i(#binary_tree_img,0,current_branch,0,left_child_stack_pos)=nan;
+
+					# Remove current node from the "no children" stack (only if still in it)
+					both_stack_pos=i(#binary_tree_img,0,current_branch,0,both_child_stack_pos);
+					if(!isnan(both_stack_pos),
+						both_stack_last=da_size(#no_both_child_stack)-1;
+						both_moved_node=i[#no_both_child_stack,both_stack_last];
+						swap(#no_both_child_stack,both_stack_pos,both_stack_last,0);
+						i(#binary_tree_img,0,both_moved_node,0,both_child_stack_pos)=both_stack_pos;
+						da_remove(#no_both_child_stack,both_stack_last);
+						i(#binary_tree_img,0,current_branch,0,both_child_stack_pos)=nan;
+					);
+
+					# The new child has no children at all: push it onto all three stacks
 					da_push(#no_left_child_stack,current_bin_tree_size);
 					da_push(#no_right_child_stack,current_bin_tree_size);
+					da_push(#no_both_child_stack,current_bin_tree_size);
 
-					i(#binary_tree_img,0,current_branch,0,left_child_stack_pos)=nan;
 					access_mode?(
-						da_push(#binary_tree_img,[current_branch,0,0,child_depth,0,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,1,vector_nan]);
+						da_push(#binary_tree_img,[current_branch,0,0,child_depth,0,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1,1,vector_nan]);
 						_1;
 					):(
-						da_push(#binary_tree_img,[current_branch,0,0,child_depth,0,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1]);
+						da_push(#binary_tree_img,[current_branch,0,0,child_depth,0,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1]);
 						_1;
 					);
 				);
@@ -284,24 +300,36 @@ eval "
 					child_depth=i(#binary_tree_img,0,current_branch,0,depth_pos)+1;
 					if(child_depth>max_depth,max_depth=child_depth;);
 
+					# Remove current node from the "no right child" stack
 					right_stack_pos=i(#binary_tree_img,0,current_branch,0,right_child_stack_pos);
 					right_stack_last=da_size(#no_right_child_stack)-1;
 					right_moved_node=i[#no_right_child_stack,right_stack_last];
-
 					swap(#no_right_child_stack,right_stack_pos,right_stack_last,0);
-
 					i(#binary_tree_img,0,right_moved_node,0,right_child_stack_pos)=right_stack_pos;
-
 					da_remove(#no_right_child_stack,right_stack_last);
+					i(#binary_tree_img,0,current_branch,0,right_child_stack_pos)=nan;
+
+					# Remove current node from the "no children" stack (only if still in it)
+					both_stack_pos=i(#binary_tree_img,0,current_branch,0,both_child_stack_pos);
+					if(!isnan(both_stack_pos),
+						both_stack_last=da_size(#no_both_child_stack)-1;
+						both_moved_node=i[#no_both_child_stack,both_stack_last];
+						swap(#no_both_child_stack,both_stack_pos,both_stack_last,0);
+						i(#binary_tree_img,0,both_moved_node,0,both_child_stack_pos)=both_stack_pos;
+						da_remove(#no_both_child_stack,both_stack_last);
+						i(#binary_tree_img,0,current_branch,0,both_child_stack_pos)=nan;
+					);
+
+					# The new child has no children at all: push it onto all three stacks
 					da_push(#no_left_child_stack,current_bin_tree_size);
 					da_push(#no_right_child_stack,current_bin_tree_size);
+					da_push(#no_both_child_stack,current_bin_tree_size);
 
-					i(#binary_tree_img,0,current_branch,0,right_child_stack_pos)=nan;
 					access_mode?(
-						da_push(#binary_tree_img,[current_branch,0,0,child_depth,1,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,1,vector_nan]);
+						da_push(#binary_tree_img,[current_branch,0,0,child_depth,1,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1,1,vector_nan]);
 						_1;
 					):(
-						da_push(#binary_tree_img,[current_branch,0,0,child_depth,1,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1]);
+						da_push(#binary_tree_img,[current_branch,0,0,child_depth,1,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1]);
 						_1;
 					);
 				);
@@ -313,8 +341,8 @@ eval "
 
 			++cursor;
 		):
-		((random_leaf_mode=find([random_left_leaf,random_right_leaf,random_leaf],current_char,0,1))!=-1)?(
-			if(random_leaf_mode==2,
+		((random_leaf_mode=find([random_left_leaf,random_right_leaf,random_no_child,random_leaf],current_char,0,1))!=-1)?(
+			if(random_leaf_mode==3,
 				random_leaf_mode=v;
 			);
 
@@ -355,15 +383,19 @@ eval "
 					i(#binary_tree_img,0,moved_node,0,child_stack_pos)=stack_pos;
 
 					da_remove(#no_child_stack,stack_last);
-					da_push(#no_left_child_stack, current_bin_tree_size);
-					da_push(#no_right_child_stack,current_bin_tree_size);
-
 					i(#binary_tree_img,0,current_branch,0,child_stack_pos)=nan;
+
+					# The parent already has a child, so it isn't in the "no children" stack. Nothing to remove.
+
+					da_push(#no_left_child_stack,current_bin_tree_size);
+					da_push(#no_right_child_stack,current_bin_tree_size);
+					da_push(#no_both_child_stack,current_bin_tree_size);
+
 					access_mode?(
-						da_push(#binary_tree_img,[current_branch,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,1,vector_nan]);
+						da_push(#binary_tree_img,[current_branch,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1,1,vector_nan]);
 						_1;
 					):(
-						da_push(#binary_tree_img,[current_branch,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1]);
+						da_push(#binary_tree_img,[current_branch,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1]);
 						_1;
 					);
 				);
@@ -436,15 +468,28 @@ eval "
 							i(#binary_tree_img,0,moved_node,0,child_stack_pos)=stack_pos;
 
 							da_remove(#no_child_stack,stack_last);
+							i(#binary_tree_img,0,mirror_m,0,child_stack_pos)=nan;
+
+							# Remove mirror_m from the "no children" stack (only if still in it)
+							both_stack_pos=i(#binary_tree_img,0,mirror_m,0,both_child_stack_pos);
+							if(!isnan(both_stack_pos),
+								both_stack_last=da_size(#no_both_child_stack)-1;
+								both_moved_node=i[#no_both_child_stack,both_stack_last];
+								swap(#no_both_child_stack,both_stack_pos,both_stack_last,0);
+								i(#binary_tree_img,0,both_moved_node,0,both_child_stack_pos)=both_stack_pos;
+								da_remove(#no_both_child_stack,both_stack_last);
+								i(#binary_tree_img,0,mirror_m,0,both_child_stack_pos)=nan;
+							);
+
 							da_push(#no_left_child_stack,current_bin_tree_size);
 							da_push(#no_right_child_stack,current_bin_tree_size);
+							da_push(#no_both_child_stack,current_bin_tree_size);
 
-							i(#binary_tree_img,0,mirror_m,0,child_stack_pos)=nan;
 							access_mode?(
-								da_push(#binary_tree_img,[mirror_m,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,1,vector_nan]);
+								da_push(#binary_tree_img,[mirror_m,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1,1,vector_nan]);
 								_1;
 							):(
-								da_push(#binary_tree_img,[mirror_m,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1]);
+								da_push(#binary_tree_img,[mirror_m,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1]);
 								_1;
 							);
 
@@ -574,7 +619,7 @@ eval "
 				run('error inval_sub_node_idx');
 			);
 
-			repeat(2,p,
+			repeat(3,p,
 				child_stack=no_left_child_stack+p;
 				child_stack_pos=left_child_stack_pos+p;
 
@@ -585,10 +630,13 @@ eval "
 
 			ws=w(#square_bracket_stack);
 			if((ws++)==++square_bracket_level,
-				resize(#square_bracket_stack,ws,1,1,3,0);
+				resize(#square_bracket_stack,ws,1,1,4,0);
 			);
 
-			I(#square_bracket_stack,square_bracket_level)=[current_branch,i(#binary_tree_img,0,current_branch,0,left_child_stack_pos),i(#binary_tree_img,0,current_branch,0,right_child_stack_pos)];
+			I(#square_bracket_stack,square_bracket_level)=[current_branch,
+				i(#binary_tree_img,0,current_branch,0,left_child_stack_pos),
+				i(#binary_tree_img,0,current_branch,0,right_child_stack_pos),
+				i(#binary_tree_img,0,current_branch,0,both_child_stack_pos)];
 
 			++cursor;
 		):
@@ -712,20 +760,20 @@ __rep_str2bin_struct_expr:
 	if $rep_str2bin_struct_current_branch!=$rep_str2bin_struct_subroot
 		rep_str2bin_struct_sibling_idx={i(#-1,0,i(#$rep_str2bin_struct_tree,0,$rep_str2bin_struct_current_branch,0,0),0,2-$rep_str2bin_struct_direction)}
 		if $rep_str2bin_struct_sibling_idx
-			res_str.=sibling()=crop(#$rep_str2bin_struct_tree,0,$rep_str2bin_struct_sibling_idx,0,8,1,1,1,$rep_str2bin_struct_v_size);
+			res_str.=sibling()=crop(#$rep_str2bin_struct_tree,0,$rep_str2bin_struct_sibling_idx,0,9,1,1,1,$rep_str2bin_struct_v_size);
 		fi
 	fi
 
 	if !isnan(i(#$rep_str2bin_struct_tree,0,$rep_str2bin_struct_current_branch,0,0))
-		res_str.=root()=crop(#$rep_str2bin_struct_tree,0,i(#-1,0,$rep_str2bin_struct_current_branch,0,0),0,8,1,1,1,$rep_str2bin_struct_v_size);
+		res_str.=root()=crop(#$rep_str2bin_struct_tree,0,i(#-1,0,$rep_str2bin_struct_current_branch,0,0),0,9,1,1,1,$rep_str2bin_struct_v_size);
 	fi
 
 	if i(#-1,0,$rep_str2bin_struct_current_branch,0,1)
-		res_str.=L()=crop(#$rep_str2bin_struct_tree,0,i(#-1,0,$rep_str2bin_struct_current_branch,0,1),0,8,1,1,1,$rep_str2bin_struct_v_size);
+		res_str.=L()=crop(#$rep_str2bin_struct_tree,0,i(#-1,0,$rep_str2bin_struct_current_branch,0,1),0,9,1,1,1,$rep_str2bin_struct_v_size);
 	fi
 
 	if i(#-1,0,$rep_str2bin_struct_current_branch,0,2)
-		res_str.=R()=crop(#$rep_str2bin_struct_tree,0,i(#-1,0,$rep_str2bin_struct_current_branch,0,2),0,8,1,1,1,$rep_str2bin_struct_v_size);
+		res_str.=R()=crop(#$rep_str2bin_struct_tree,0,i(#-1,0,$rep_str2bin_struct_current_branch,0,2),0,9,1,1,1,$rep_str2bin_struct_v_size);
 	fi
 
 	res={$res_str;[{`crop(#$rep_str2bin_struct_start_of_image_list,$rep_str2bin_struct_expr_start,$rep_str2bin_struct_expr_length)`}]}
