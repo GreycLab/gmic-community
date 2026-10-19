@@ -109,9 +109,10 @@
 #@cli :   ??{cond}[...]        = While loop. Runs the body while cond is true (non-zero, not nan).
 #@cli :   ?{cond}[...];        = If. Runs the body only if cond is true.
 #@cli :   ?{cond}[...][...];   = If/else. First body if cond is true, second otherwise.
+#@cli :   ?{c1}[...]?{c2}[...]...[...]; = If/else-if chain. The final else body is optional.
 #@cli :   #{n}[...]           = Run the body n times (n is an expression, evaluated once).
 #@cli :
-#@cli :   Use '=' inside an if body to break out of a loop:  ??{1}[ < ?{depth()>=4}[=]; ]
+#@cli :   Use ',' or '=' inside an if body to continue/break out of a loop respectively:  ??{1}[ < ?{depth()>=4}[=]; ]
 #@cli :
 #@cli :   Here {...} is an expression returning a scalar, not a store-in-node expression.
 #@cli :   The ';' that ends an if statement is required.
@@ -229,8 +230,9 @@ eval "
 	const mirror_node=_'%';
 	const clone_node=_'&';
 	const break_loop=_'=';
-	const ctl_char_cond=_'?'; # question mark
-	const ctl_char_count=_'#'; # hash sign
+	const continue_loop=_',';
+	const ctl_char_cond=_'?';
+	const ctl_char_count=_'#';
 	const _A=_'A';
 	const _Z=_'Z';
 	const _a=_'a';
@@ -673,14 +675,17 @@ eval "
 				ctl_new_kind=ctl_is_while?1:3;
 				ctl_body=i(#jump_table,ctl_stmt,0,0,2);
 			):(
-				# Else block opening (0 if there is none, also always 0 for while loops)
+				# Else part: 0 = none (always 0 for while), >0 = else '[', <0 = else-if at -value
 				ctl_new_kind=4;
 				ctl_body=i(#jump_table,ctl_stmt,0,0,4);
 			);
 
-			ctl_enter=ctl_true||ctl_body;
-
-			ctl_enter?(
+			ctl_body<0?(
+				# Condition was false and the else part is an else-if: jump to its '?'.
+				# No frame is pushed, since the chain's later statements push their own.
+				cursor=-ctl_body;
+			):
+			(ctl_true||ctl_body)?(
 				I(#ctl_stack,ctl_sp)=[ctl_new_kind,ctl_stmt,0];
 				++ctl_sp;
 				cursor=ctl_body+1;
@@ -780,7 +785,9 @@ eval "
 				cursor=i(#jump_table,frame_stmt,0,0,6);
 			);
 		):
-		current_char==break_loop?(
+		(current_char==break_loop||current_char==continue_loop)?(
+			is_continue=current_char==continue_loop;
+
 			# Innermost enclosing while/count loop: search the frame stack from the top
 			brk_frame=-1;
 			for(brk_p=ctl_sp-1,brk_p>=0,--brk_p,
@@ -797,24 +804,27 @@ eval "
 				++cursor;
 			):
 			brk_rep_pos>brk_frame_pos?(
-				# The innermost loop is a repeat. Close every frame opened inside it.
 				while(ctl_sp>0&&i(#ctl_stack,ctl_sp-1,0,0,1)>brk_rep_pos,
 					--ctl_sp;
 					if(!i(#ctl_stack,ctl_sp,0,0,0),--square_bracket_level;);
 				);
-				# Resume after the closing '}' or '`', then leave the repeat level
-				brk_end=i(#jump_table,i(#repeat_bucket,repeat_pos,0,0,2),0,0,7);
-				cursor=brk_end+1;
-				--repeat_level;
-				repeat_bucket=i(#repeat_index_stack,repeat_level,0,0,0);
-				repeat_pos=i(#repeat_index_stack,repeat_level,0,0,1);
+				is_continue?(
+					# Land on the closing '}' or '`': the normal repeat logic counts the pass
+					cursor=i(#jump_table,i(#repeat_bucket,repeat_pos,0,0,2),0,0,7);
+				):(
+					brk_end=i(#jump_table,i(#repeat_bucket,repeat_pos,0,0,2),0,0,7);
+					cursor=brk_end+1;
+					--repeat_level;
+					repeat_bucket=i(#repeat_index_stack,repeat_level,0,0,0);
+					repeat_pos=i(#repeat_index_stack,repeat_level,0,0,1);
+				);
 			):(
-				# The innermost loop is a while/count loop. Pop down to and including its frame.
-				while(ctl_sp>brk_frame,
+				# Continue keeps the loop frame so that ']' can re-test or decrement
+				while(ctl_sp>brk_frame+is_continue,
 					--ctl_sp;
 					if(!i(#ctl_stack,ctl_sp,0,0,0),--square_bracket_level;);
 				);
-				cursor=i(#jump_table,brk_frame_pos,0,0,6);
+				cursor=is_continue?i(#jump_table,brk_frame_pos,0,0,3):i(#jump_table,brk_frame_pos,0,0,6);
 			);
 		):
 		is_num(current_char)?(
@@ -983,11 +993,16 @@ _rep_str2bin_struct_prepass:
 #   0 = local '['            1 = while body          2 = count body
 #   3 = then body            4 = else body
 #   5 = repeat block 'N{'    6 = repeat 'N...`' (closed by a backtick)
+#   7 = else-if link (pushed under the next statement of an if/else-if chain,
+#       popped when the chain's ';' is reached)
 #
 # Table channels, set at the position of the '?' or '#' that starts a statement:
-#   0 = first char of condition/count expression    1 = index of its closing brace
-#   2 = body '[' (then body for ifs)                 3 = body ']' (then body for ifs)
-#   4 = else '[' (0 if none)                         5 = else ']'
+#   0 = first char of condition/count expression
+#   1 = index of its closing brace
+#   2 = body '[' (then body for ifs)
+#   3 = body ']' (then body for ifs)
+#   4 = else '[' (0 if none, negative = else-if, stored as the negated position of its '?')
+#   5 = else ']'
 #   6 = index where execution resumes after the whole statement
 #   7 = for repeats only: index of the closing '}' or '`'. Stored at the body start
 #       (position after '{' for N{...}, first char after the digits for N...`)
@@ -1122,8 +1137,20 @@ eval "
 					++sp;
 					p=q;
 				):
+				(i[#-3,q]==char_cond&&i[#-3,q+1]!=char_cond)?(
+					# Else-if: the next statement is this one's else branch (stored negated)
+					i(#-1,stmt,0,0,4)=-q;
+					I(#-2,sp)=[7,stmt];
+					++sp;
+					p=q-1; # Next iteration parses the '?' as a regular statement
+				):
 				i[#-3,q]==char_end?(
-					i(#-1,stmt,0,0,6)=q+1;
+					chain_end=q+1;
+					i(#-1,stmt,0,0,6)=chain_end;
+					while(sp&&i(#-2,sp-1,0,0,0)==7,
+						--sp;
+						i(#-1,i(#-2,sp,0,0,1),0,0,6)=chain_end;
+					);
 					p=q;
 				):(
 					run('error ctl_expect_end');
@@ -1136,7 +1163,12 @@ eval "
 				i[#-3,q]!=char_end?(
 					run('error ctl_expect_end');
 				);
-				i(#-1,stmt,0,0,6)=q+1;
+				chain_end=q+1;
+				i(#-1,stmt,0,0,6)=chain_end;
+				while(sp&&i(#-2,sp-1,0,0,0)==7,
+					--sp;
+					i(#-1,i(#-2,sp,0,0,1),0,0,6)=chain_end;
+				);
 				p=q;
 			):(
 				# While or count body
