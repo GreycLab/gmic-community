@@ -74,6 +74,9 @@
 #@cli :   \& = Clone a branch onto the empty side of the current node
 #@cli :       (same as %, but without swapping left/right). Does nothing
 #@cli :       unless the node has exactly one child.
+#@cli :   = = Break out of the innermost enclosing loop (N{...}, N...`, ??{...}[...]
+#@cli :       or #{n}[...]) and resume right after it. Any if/else body or [...] local
+#@cli :       context being left is closed automatically. Error if used outside a loop.
 #@cli :
 #@cli :   *A subtree root is the node where the current local branch context began.
 #@cli :
@@ -107,6 +110,8 @@
 #@cli :   ?{cond}[...];        = If. Runs the body only if cond is true.
 #@cli :   ?{cond}[...][...];   = If/else. First body if cond is true, second otherwise.
 #@cli :   #{n}[...]           = Run the body n times (n is an expression, evaluated once).
+#@cli :
+#@cli :   Use '=' inside an if body to break out of a loop:  ??{1}[ < ?{depth()>=4}[=]; ]
 #@cli :
 #@cli :   Here {...} is an expression returning a scalar, not a store-in-node expression.
 #@cli :   The ';' that ends an if statement is required.
@@ -223,8 +228,9 @@ eval "
 	const secondary_repeat_end=_'`';
 	const mirror_node=_'%';
 	const clone_node=_'&';
-	const ctl_char_cond=63; # question mark
-	const ctl_char_count=35; # hash sign
+	const break_loop=_'=';
+	const ctl_char_cond=_'?'; # question mark
+	const ctl_char_count=_'#'; # hash sign
 	const _A=_'A';
 	const _Z=_'Z';
 	const _a=_'a';
@@ -726,8 +732,9 @@ eval "
 				i(#binary_tree_img,0,current_branch,0,right_child_stack_pos),
 				i(#binary_tree_img,0,current_branch,0,both_child_stack_pos)];
 
-			# Local context frame (kind 0)
-			I(#ctl_stack,ctl_sp)=[0,0,0];
+			# Local context frame (kind 0). The position is only used by '=' to tell
+			# which frames were opened inside a repeat loop.
+			I(#ctl_stack,ctl_sp)=[0,cursor,0];
 			++ctl_sp;
 
 			++cursor;
@@ -771,6 +778,43 @@ eval "
 			):(
 				# End of a then/else body: jump past the whole if statement
 				cursor=i(#jump_table,frame_stmt,0,0,6);
+			);
+		):
+		current_char==break_loop?(
+			# Innermost enclosing while/count loop: search the frame stack from the top
+			brk_frame=-1;
+			for(brk_p=ctl_sp-1,brk_p>=0,--brk_p,
+				brk_kind=i(#ctl_stack,brk_p,0,0,0);
+				if(brk_kind==1||brk_kind==2,brk_frame=brk_p;break(););
+			);
+			brk_frame_pos=brk_frame>=0?i(#ctl_stack,brk_frame,0,0,1):-1;
+
+			# Innermost enclosing repeat loop: start position of the current bucket entry
+			brk_rep_pos=repeat_level>-1?i(#repeat_bucket,repeat_pos,0,0,0):-1;
+
+			brk_frame<0&&brk_rep_pos<0?(
+				run('error break_outside_loop_det');
+				++cursor;
+			):
+			brk_rep_pos>brk_frame_pos?(
+				# The innermost loop is a repeat. Close every frame opened inside it.
+				while(ctl_sp>0&&i(#ctl_stack,ctl_sp-1,0,0,1)>brk_rep_pos,
+					--ctl_sp;
+					if(!i(#ctl_stack,ctl_sp,0,0,0),--square_bracket_level;);
+				);
+				# Resume after the closing '}' or '`', then leave the repeat level
+				brk_end=i(#jump_table,i(#repeat_bucket,repeat_pos,0,0,2),0,0,7);
+				cursor=brk_end+1;
+				--repeat_level;
+				repeat_bucket=i(#repeat_index_stack,repeat_level,0,0,0);
+				repeat_pos=i(#repeat_index_stack,repeat_level,0,0,1);
+			):(
+				# The innermost loop is a while/count loop. Pop down to and including its frame.
+				while(ctl_sp>brk_frame,
+					--ctl_sp;
+					if(!i(#ctl_stack,ctl_sp,0,0,0),--square_bracket_level;);
+				);
+				cursor=i(#jump_table,brk_frame_pos,0,0,6);
 			);
 		):
 		is_num(current_char)?(
@@ -933,7 +977,7 @@ else
 fi
 _rep_str2bin_struct_prepass:
 {w#-1},1,1,2,0 # Work stack: (kind,statement position) per open bracket
-{w#-2},1,1,7,0 # Jump table, one column per string position (see channel list below)
+{w#-2},1,1,8,0 # Jump table, one column per string position (see channel list below)
 
 # Work stack kinds:
 #   0 = local '['            1 = while body          2 = count body
@@ -945,6 +989,8 @@ _rep_str2bin_struct_prepass:
 #   2 = body '[' (then body for ifs)                 3 = body ']' (then body for ifs)
 #   4 = else '[' (0 if none)                         5 = else ']'
 #   6 = index where execution resumes after the whole statement
+#   7 = for repeats only: index of the closing '}' or '`'. Stored at the body start
+#       (position after '{' for N{...}, first char after the digits for N...`)
 
 eval "
 	const str_len=whd#-3;
@@ -972,6 +1018,7 @@ eval "
 	p=-1;
 	sp=0;
 	ignore_var=ignore_num=0;
+	num_key=0;
 
 	while(++p<str_len,
 		c=i[#-3,p];
@@ -981,6 +1028,14 @@ eval "
 		,ignore_var=0;
 		);
 
+		# Start the pending N...` repeat as soon as anything other than a digit or '{'
+		# follows the number
+		if(ignore_num&&!is_num(c)&&c!=B1P0,
+			I(#-2,sp)=[6,num_key];
+			++sp;
+			ignore_num=0;
+		);
+
 		is_alp(c)?(
 			ignore_var=1;
 		):
@@ -988,7 +1043,7 @@ eval "
 			ignore_num?(
 				# Repeat block N{...}
 				ignore_num=0;
-				I(#-2,sp)=[5,0];
+				I(#-2,sp)=[5,p+1];
 				++sp;
 			):(
 				# Plain expression: jump to its closing brace
@@ -1002,6 +1057,7 @@ eval "
 			i(#-2,sp,0,0,0)!=5?(
 				run('error mismatched_bracket_det');
 			);
+			i(#-1,i(#-2,sp,0,0,1),0,0,7)=p; # Record where this repeat ends
 			ignore_num=0;
 		):
 		(c==char_cond||c==char_count)?(
@@ -1094,9 +1150,11 @@ eval "
 			i(#-2,sp,0,0,0)!=6?(
 				run('error mismatched_rules');
 			);
+			i(#-1,i(#-2,sp,0,0,1),0,0,7)=p; # Record where this repeat ends
 		):
 		is_num(c)?(
 			ignore_num=1;
+			num_key=p+1;
 		):(
 			# Any other character after a number starts an N...` repeat
 			ignore_num?(
