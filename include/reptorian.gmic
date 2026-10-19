@@ -128,6 +128,18 @@
 #@cli :   isleaf() = Return 1 if the current node has no children,
 #@cli :              otherwise 0. Only reflects the tree built so far.
 #@cli :
+#@cli :   hasleft() = Return 1 if the current node has a left child,
+#@cli :              otherwise 0. Only reflects the tree built so far.
+#@cli :
+#@cli :   hasright() = Return 1 if the current node has a right child,
+#@cli :              otherwise 0. Only reflects the tree built so far.
+#@cli :
+#@cli :   hasparent() = Return 1 if the current node has a parent inside the
+#@cli :              current subtree root context, 0 at the subtree root.
+#@cli :
+#@cli :   hassibling() = Return 1 if the current node has a sibling, otherwise 0.
+#@cli :              Always 0 at the subtree root.
+#@cli :
 #@cli :   For this implementation, all G'MIC JIT expressions are supported.
 #@cli :
 #@cli : Ignored characters:
@@ -162,8 +174,7 @@ check isint(${2=0},0)
 $0_start_of_image_list,$0_v_size,$0_expr_enable_mode,$0_char_limit,$0_dict_size:=$!,$2,bool($2),247,256
 
 ('"$1"')                         # str
-_rep_str2bin_struct_exam_delimit # Validate bracket balance
-_rep_str2bin_struct_ctl_table    # Control-flow jump table (str+1) and control frame stack (str+2)
+_rep_str2bin_struct_prepass      # Validate brackets, build the control-flow jump table (str+1) and frame stack (str+2)
 1,1,1,4             # root, root left child idx,root right child idx, root both child idx
 1,1,1,2             # repeat bucket position stack
 1,2,1,1,0,1x3       # childfree_stack -> no left child, no right child, no both child
@@ -864,18 +875,25 @@ fi
 name[-1] BinArbor_Struct
 __rep_str2bin_struct_expr:
 res_str=dir()=$rep_str2bin_struct_direction;
-res_str.=depth()={i(#-257,0,$rep_str2bin_struct_current_branch,0,3)};
+res_str.=depth()={i(#-257,0,$rep_str2bin_struct_current_branch,0,3)-i(#-257,0,$rep_str2bin_struct_subroot,0,3)};
 res_str.=isleaf()={!(i(#-257,0,$rep_str2bin_struct_current_branch,0,1)||i(#-257,0,$rep_str2bin_struct_current_branch,0,2))};
+res_str.=hasleft()={i(#-257,0,$rep_str2bin_struct_current_branch,0,1)>0};
+res_str.=hasright()={i(#-257,0,$rep_str2bin_struct_current_branch,0,2)>0};
+res_str.=hasparent()={$rep_str2bin_struct_current_branch!=$rep_str2bin_struct_subroot};
+
+# Sibling index (0 if there is none, or at the subtree root)
+rep_str2bin_struct_sibling_idx=0
+if $rep_str2bin_struct_current_branch!=$rep_str2bin_struct_subroot
+	rep_str2bin_struct_sibling_idx={i(#-257,0,i(#-257,0,$rep_str2bin_struct_current_branch,0,0),0,2-$rep_str2bin_struct_direction)}
+fi
+res_str.=hassibling()={$rep_str2bin_struct_sibling_idx>0};
 
 # Functions reading stored values only exist when vector_size > 0
 if $rep_str2bin_struct_v_size
 	res_str.=self()=crop(#-257,0,$rep_str2bin_struct_current_branch,0,8,1,1,1,$rep_str2bin_struct_v_size);
 
-	if $rep_str2bin_struct_current_branch!=$rep_str2bin_struct_subroot
-		rep_str2bin_struct_sibling_idx={i(#-257,0,i(#-257,0,$rep_str2bin_struct_current_branch,0,0),0,2-$rep_str2bin_struct_direction)}
-		if $rep_str2bin_struct_sibling_idx
-			res_str.=sibling()=crop(#-257,0,$rep_str2bin_struct_sibling_idx,0,8,1,1,1,$rep_str2bin_struct_v_size);
-		fi
+	if $rep_str2bin_struct_sibling_idx
+		res_str.=sibling()=crop(#-257,0,$rep_str2bin_struct_sibling_idx,0,8,1,1,1,$rep_str2bin_struct_v_size);
 	fi
 
 	if !isnan(i(#-257,0,$rep_str2bin_struct_current_branch,0,0))
@@ -905,238 +923,9 @@ else
 
 	u {vector(#$rep_str2bin_struct_v_size,$res)}
 fi
-_rep_str2bin_struct_exam_delimit:
-1
-
-eval "
-	const str_len=whd#-2;
-	const B0P0=_'[';
-	const B0P1=_']';
-	const B1P0=_'{';
-	const B1P1=_'}';
-	const B2P1=_'`';
-	const _a=_'a';
-	const _z=_'z';
-	const _A=_'A';
-	const _Z=_'Z';
-	const __=_'_';
-	p=-1;
-	ignore_var=ignore_expr=ignore_num=0;
-
-	is_alp(char)=isint(char,_a,_z)||isint(char,_A,_Z);
-	is_num(char)=isint(char,_'0',_'9');
-	is_valid_var_char(char)=is_alp(char)||is_num(char)||char==__;
-
-	while(++p<str_len,
-		c=i[#-2,p];
-
-		if(ignore_var&&is_valid_var_char(c)
-		,continue();
-		,ignore_var=0;
-		);
-
-		is_alp(c)?(
-			ignore_var=1;
-		):
-		c==B1P1?(
-			i[#-1,da_size(#-1)-1]!=B1P0?(
-				run('error mismatched_bracket_det');
-			);
-			if(--i[#-1,h(#-1)-1]==-1,
-				run('error mismatched_bracket_det');
-			);
-			ignore_expr=ignore_num=0;
-		):
-		!(ignore_expr||(ignore_num?isint(c,_'0',_'9')))?(
-			c==B1P0?(
-				if(ignore_num
-				,ignore_num=0;
-				,ignore_expr=1;
-				);
-				da_push(#-1,B1P0);
-			):
-			c==B0P0?(
-				da_push(#-1,B0P0);
-			):
-			c==B0P1?(
-				i[#-1,da_size(#-1)-1]!=B0P0?(
-					run('error mismatched_bracket_det');
-				);
-				if(--i[#-1,h(#-1)-1]==-1,
-					run('error missing_bracket_det');
-				);
-			):
-			c==B2P1?(
-				i[#-1,da_size(#-1)-1]!=_'0'?(
-					run('error mismatched_rules');
-				);
-				if(--i[#-1,h(#-1)-1]==-1,
-					run('error missing_bracket_det');
-				);
-			):
-			isint(c,_'0',_'9')?(
-				ignore_num=1;
-			):
-			ignore_num?(
-				da_push(#-1,_'0');
-				ignore_num=0;
-			);
-		);
-	);
-
-	if(da_size(#-1),
-		run('error missing_brackets');
-	);
-	"
-
-rm.
-_rep_str2bin_struct_ctl_table:
+_rep_str2bin_struct_prepass:
 {w#-1},1,1,2,0 # Work stack: (kind,statement position) per open bracket
 {w#-2},1,1,7,0 # Jump table, one column per string position (see channel list below)
-
-# Table channels, set at the position of the '?' or '#' that starts a statement:
-#   0 = first char of condition/count expression    1 = index of its closing brace
-#   2 = body '[' (then body for ifs)                 3 = body ']' (then body for ifs)
-#   4 = else '[' (0 if none)                         5 = else ']'
-#   6 = index where execution resumes after the whole statement
-eval "
-	const str_len=whd#-3;
-	const _a=_'a';
-	const _z=_'z';
-	const _A=_'A';
-	const _Z=_'Z';
-	const __=_'_';
-	const skip_char_0=_'/';
-	const skip_char_1=_' ';
-	const skip_char_2=_'\n';
-	const B0P0=_'[';
-	const B0P1=_']';
-	const B1P0=_'{';
-	const B1P1=_'}';
-	const B2P1=_'`';
-	const char_cond=63; # question mark
-	const char_count=35; # hash sign
-	const char_end=59; # semicolon
-
-	is_alp(char)=isint(char,_a,_z)||isint(char,_A,_Z);
-	is_num(char)=isint(char,_'0',_'9');
-	is_valid_var_char(char)=is_alp(char)||is_num(char)||char==__;
-
-	p=-1;
-	sp=0;
-	ignore_var=ignore_num=0;
-
-	while(++p<str_len,
-		c=i[#-3,p];
-
-		if(ignore_var&&is_valid_var_char(c)
-		,continue();
-		,ignore_var=0;
-		);
-
-		is_alp(c)?(
-			ignore_var=1;
-		):
-		c==B1P0?(
-			ignore_num?(
-				ignore_num=0; # Repeat block N{...}
-			):(
-				# Plain expression: jump to its closing brace
-				p=find(#-3,B1P1,p+1,1);
-				if(p<0,run('error ctl_unclosed_expr'););
-			);
-		):
-		(c==char_cond||c==char_count)?(
-			stmt=p;
-			is_while=c==char_cond&&i[#-3,p+1]==char_cond;
-			q=p+1+is_while;
-			while(q<str_len&&isin(i[#-3,q],skip_char_0,skip_char_1,skip_char_2),++q;);
-			i[#-3,q]!=B1P0?(
-				run('error ctl_expect_expr');
-			);
-
-			e=find(#-3,B1P1,q+1,1);
-			if(e<0,run('error ctl_unclosed_expr'););
-			i(#-1,stmt,0,0,0)=q+1;
-			i(#-1,stmt,0,0,1)=e;
-
-			q=e+1;
-			while(q<str_len&&isin(i[#-3,q],skip_char_0,skip_char_1,skip_char_2),++q;);
-			i[#-3,q]!=B0P0?(
-				run('error ctl_expect_body');
-			);
-			i(#-1,stmt,0,0,2)=q;
-
-			kind=c==char_count?2:is_while?1:3;
-			I(#-2,sp)=[kind,stmt];
-			++sp;
-
-			p=q;
-			ignore_num=0;
-		):
-		c==B0P0?(
-			I(#-2,sp)=[0,0];
-			++sp;
-		):
-		c==B0P1?(
-			--sp;
-			kind=i(#-2,sp,0,0,0);
-			stmt=i(#-2,sp,0,0,1);
-
-			kind==0?(
-				0;
-			):
-			kind==3?(
-				i(#-1,stmt,0,0,3)=p;
-				q=p+1;
-				while(q<str_len&&isin(i[#-3,q],skip_char_0,skip_char_1,skip_char_2),++q;);
-
-				i[#-3,q]==B0P0?(
-					# Else body follows
-					i(#-1,stmt,0,0,4)=q;
-					I(#-2,sp)=[4,stmt];
-					++sp;
-					p=q;
-				):
-				i[#-3,q]==char_end?(
-					i(#-1,stmt,0,0,6)=q+1;
-					p=q;
-				):(
-					run('error ctl_expect_end');
-				);
-			):
-			kind==4?(
-				i(#-1,stmt,0,0,5)=p;
-				q=p+1;
-				while(q<str_len&&isin(i[#-3,q],skip_char_0,skip_char_1,skip_char_2),++q;);
-				i[#-3,q]!=char_end?(
-					run('error ctl_expect_end');
-				);
-				i(#-1,stmt,0,0,6)=q+1;
-				p=q;
-			):(
-				# While or count body
-				i(#-1,stmt,0,0,3)=p;
-				i(#-1,stmt,0,0,6)=p+1;
-			);
-		):
-		c==B2P1?(
-			0;
-		):
-		is_num(c)?(
-			ignore_num=1;
-		):(
-			ignore_num=0;
-		);
-	);
-
-	if(sp,
-		run('error ctl_unbalanced');
-	);
-	"
-
-rm[-2]
-{w#-2},1,1,3,0 # Control frame stack: (kind,statement position,remaining count)
 #@cli rep_str2bin_struct_fill_gradient: mode={ 0=exponential | 1=incremental } | 0<=mode<=1
 #@cli : Apply 2D gradient into BinArbor generated image, which is a 2D image representing a binary tree generated by the BinArbor interpretative language.
 #@cli : This means 2D gradient according to binary tree structure.
