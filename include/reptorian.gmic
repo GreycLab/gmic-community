@@ -158,7 +158,7 @@
 #@cli :   hassibling() = Return 1 if the current node has a sibling, otherwise 0.
 #@cli :              Always 0 at the subtree root.
 #@cli :
-#@cli :   index() = Return the index of the current node (0 is the tree root).
+#@cli :   idx() = Return the index of the current node (0 is the tree root).
 #@cli :
 #@cli :   nodes() = Return the number of nodes created so far in the whole tree.
 #@cli :
@@ -519,11 +519,14 @@ eval "
 			mirror_ext=i[#str_img,cursor+1]==current_char;
 			mirror_dst_root=current_branch;
 
-			if(mirror_ext,
+			mirror_ext?(
 				inc_cursor=cursor+2;
+				set('rep_str2bin_struct_err_pos',cursor);
 
 				if(!is_alp(i[#str_img,inc_cursor]),
-					run('error inval_char_det');
+					clone_mode
+						?run('error clone_ext_expects_var_name_at_$rep_str2bin_struct_err_pos')
+						:run('error mirror_ext_expects_var_name_at_$rep_str2bin_struct_err_pos');
 				);
 
 				for(p=inc_cursor+1,p<str_len,++p,
@@ -539,14 +542,26 @@ eval "
 					if narg(${$rep_str2bin_struct_var_pos})
 						u ${$rep_str2bin_struct_var_pos}
 					else
-						error no_var_${$rep_str2bin_struct_var_pos}
+						error no_var_for_graft_$rep_str2bin_struct_var_pos
 					fi
 				');
+
+				# Same check as '@name': the source must lie inside the current [...] context
+				if(square_bracket_level,
+					root_branch=i[#square_bracket_stack,square_bracket_level];
+
+					!(mirror_src_root==root_branch||
+					(i(#binary_tree_img,0,root_branch,0,left_child_pos)?mirror_src_root>=i(#binary_tree_img,0,root_branch,0,left_child_pos))||
+					(i(#binary_tree_img,0,root_branch,0,right_child_pos)?mirror_src_root>=i(#binary_tree_img,0,root_branch,0,right_child_pos))
+					)?(
+						run('error graft_src_outside_subtree_at_$rep_str2bin_struct_err_pos');
+					);
+				);
 
 				mirror_end=p;
 				mirror_try=0;
 				mirror_done=0;
-			,
+			):(
 				mirror_src_root=current_branch;
 				mirror_has_l=i(#binary_tree_img,0,current_branch,0,left_child_pos)>0;
 				mirror_has_r=i(#binary_tree_img,0,current_branch,0,right_child_pos)>0;
@@ -655,7 +670,7 @@ eval "
 				set('rep_str2bin_struct_node_count',da_size(#binary_tree_img));
 
 				run('__rep_str2bin_struct_expr');
-				vector_res=I[#-258,0];
+				vector_res=I[#result_img,0];
 
 				copy(i(#binary_tree_img,0,current_branch,0,expr_pos),vector_res[0],$2,h(#binary_tree_img),1);
 
@@ -711,7 +726,7 @@ eval "
 				if narg(${$rep_str2bin_struct_var_pos})
 					u ${$rep_str2bin_struct_var_pos}
 				else
-					error no_var_${$rep_str2bin_struct_var_pos}
+					error no_var_$rep_str2bin_struct_var_pos
 				fi
 			');
 
