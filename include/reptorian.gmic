@@ -158,6 +158,29 @@
 #@cli :   hassibling() = Return 1 if the current node has a sibling, otherwise 0.
 #@cli :              Always 0 at the subtree root.
 #@cli :
+#@cli :   index() = Return the index of the current node (0 is the tree root).
+#@cli :
+#@cli :   nodes() = Return the number of nodes created so far in the whole tree.
+#@cli :
+#@cli :   children() = Return the number of children of the current node (0, 1 or 2).
+#@cli :
+#@cli :   parent_dir() = Return the branch direction of the parent node.
+#@cli :              Error at the subtree root and at its direct children.
+#@cli :
+#@cli :   subtree_size() = Return the number of nodes in the subtree of the current
+#@cli :              node, itself included.
+#@cli :
+#@cli :   leaves() = Return the number of leaves at or below the current node.
+#@cli :
+#@cli :   height() = Return how many levels lie below the current node (0 for a leaf).
+#@cli :
+#@cli :   maxdepth() = Return the depth of the deepest node in the whole tree so far.
+#@cli :              Absolute depth, not relative to the subtree root.
+#@cli :
+#@cli :   subtree_size(), leaves(), height() and maxdepth() walk the tree, so their
+#@cli :   cost grows with the size of the walked subtree. Calling them in a long
+#@cli :   loop on a big tree is slow. index(), nodes() and children() are instant.
+#@cli :
 #@cli :   For this implementation, all G'MIC JIT expressions are supported.
 #@cli :
 #@cli : Ignored characters:
@@ -196,6 +219,7 @@ _rep_str2bin_struct_prepass      # Validate brackets, build the control-flow jum
 1,1,1,4             # root, root left child idx,root right child idx, root both child idx
 1,1,1,2             # repeat bucket position stack
 1,2,1,1,0,1x3       # childfree_stack -> no left child, no right child, no both child
+1,1,1,{max($2,1)}   # expression result buffer (one pixel, $2 channels)
 
 1,1,1,8,nan,0,0,0,nan,0,0,0 # parent,left,right,depth,direction,lstack,rstack,bstack
 
@@ -253,8 +277,9 @@ eval "
 	const no_left_child_stack=str_img+5;
 	const no_right_child_stack=str_img+6;
 	const no_both_child_stack=str_img+7;
-	const binary_tree_img=str_img+8;
-	const repeat_dict_table=str_img+9;
+	const result_img=str_img+8;
+	const binary_tree_img=str_img+9;
+	const repeat_dict_table=str_img+10;
 	const str_len=whd#str_img;
 	const char_limit=$rep_str2bin_struct_char_limit;
 	const parent_pos=0;
@@ -278,7 +303,8 @@ eval "
 		set('rep_str2bin_struct_direction',dr);
 		set('rep_str2bin_struct_subroot',sr);
 		set('rep_str2bin_struct_scalar_mode',1);
-		run('__rep_str2bin_struct_expr')
+		set('rep_str2bin_struct_node_count',da_size(#binary_tree_img));
+		run('__rep_str2bin_struct_expr');
 	);
 
 	if(expr_enable_mode,
@@ -626,8 +652,10 @@ eval "
 				set('rep_str2bin_struct_direction',i(#binary_tree_img,0,current_branch,0,direction_pos));
 				set('rep_str2bin_struct_subroot',i[#square_bracket_stack,square_bracket_level]);
 				set('rep_str2bin_struct_scalar_mode',0);
+				set('rep_str2bin_struct_node_count',da_size(#binary_tree_img));
 
-				vector_res=run('__rep_str2bin_struct_expr');
+				run('__rep_str2bin_struct_expr');
+				vector_res=I[#-258,0];
 
 				copy(i(#binary_tree_img,0,current_branch,0,expr_pos),vector_res[0],$2,h(#binary_tree_img),1);
 
@@ -966,7 +994,7 @@ eval "
 	i[#binary_tree_img,0]=max_depth+1; # Set the very first unused pixel to the maximum depth found during creation to enable O(1) retrieval
 	"
 
-rm[-265--258,-256--1]
+rm[-266--258,-256--1]
 
 if $2
 	split c,-4,2
@@ -991,6 +1019,58 @@ if $rep_str2bin_struct_current_branch!=$rep_str2bin_struct_subroot
 	rep_str2bin_struct_sibling_idx={i(#-257,0,i(#-257,0,$rep_str2bin_struct_current_branch,0,0),0,2-$rep_str2bin_struct_direction)}
 fi
 res_str.=hassibling()={$rep_str2bin_struct_sibling_idx>0};
+
+# Structural queries (available even when vector_size is 0)
+res_str.=idx()=$rep_str2bin_struct_current_branch;
+res_str.=nodes()=$rep_str2bin_struct_node_count;
+res_str.=children()={(i(#-257,0,$rep_str2bin_struct_current_branch,0,1)>0)+(i(#-257,0,$rep_str2bin_struct_current_branch,0,2)>0)};
+
+# Parent direction only exists when the parent is inside the subtree context
+if $rep_str2bin_struct_current_branch!=$rep_str2bin_struct_subroot
+	rep_str2bin_struct_parent_idx={i(#-257,0,$rep_str2bin_struct_current_branch,0,0)}
+	if $rep_str2bin_struct_parent_idx!=$rep_str2bin_struct_subroot
+		res_str.=parent_dir()={i(#-257,0,$rep_str2bin_struct_parent_idx,0,4)};
+	fi
+fi
+
+# Iterative subtree walk using parent pointers only.
+# Inputs are the globals bt_r (start node) and bt_m (0 = node count, 1 = leaf count, 2 = height).
+res_str.=bt_walk()=(\
+         bt_n=bt_r;\
+         bt_d0=i(#-257,0,bt_r,0,3);\
+         bt_cnt=bt_lf=bt_ht=0;bt_go=1;\
+         while(bt_go,\
+         	++bt_cnt;\
+         	bt_ht=max(bt_ht,i(#-257,0,bt_n,0,3)-bt_d0);\
+         	bt_a=i(#-257,0,bt_n,0,1);\
+         	bt_b=i(#-257,0,bt_n,0,2);\
+         	bt_a||bt_b?(\
+         		bt_n=(bt_a?bt_a:bt_b);\
+         	):(\
+         		++bt_lf;\
+         		bt_up=1;\
+         		while(bt_up,\
+         			bt_n==bt_r?(\
+         				bt_go=bt_up=0;\
+         			):(\
+         				bt_p=i(#-257,0,bt_n,0,0);\
+         				bt_s=i(#-257,0,bt_p,0,2);\
+         				(i(#-257,0,bt_n,0,4)==0&&bt_s)?(\
+         					bt_n=bt_s;\
+         					bt_up=0;\
+         				):(\
+         					bt_n=bt_p;\
+         				);\
+         			);\
+         		);\
+         	);\
+         );\
+         bt_m==0?bt_cnt:bt_m==1?bt_lf:bt_ht;\
+     );
+res_str.=subtree_size()=(bt_r=$rep_str2bin_struct_current_branch;bt_m=0;bt_walk());
+res_str.=leaves()=(bt_r=$rep_str2bin_struct_current_branch;bt_m=1;bt_walk());
+res_str.=height()=(bt_r=$rep_str2bin_struct_current_branch;bt_m=2;bt_walk());
+res_str.=maxdepth()=(bt_r=0;bt_m=2;bt_walk());
 
 # Functions reading stored values only exist when vector_size > 0
 if $rep_str2bin_struct_v_size
@@ -1025,7 +1105,7 @@ else
 
 	rep_str2bin_struct_expr_$rep_str2bin_struct_current_branch=$res
 
-	u {vector(#$rep_str2bin_struct_v_size,$res)}
+	eval I[#-258,0]=vector(#$rep_str2bin_struct_v_size,$res)
 fi
 _rep_str2bin_struct_prepass:
 {w#-1},1,1,2,0 # Work stack: (kind,statement position) per open bracket
