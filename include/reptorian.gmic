@@ -78,17 +78,28 @@
 #@cli :       and grafted onto the empty sides of the current node. Works on any node.
 #@cli :       Occupied sides are left alone, and the current node's own value is not changed.
 #@cli :   \&\&name = Like &, but the same way (no left/right swap) and from variable 'name'.
-#@cli :   = = Break out of the innermost enclosing loop (N{...}, N...`, ??{...}[...]
-#@cli :       or #{n}[...]) and resume right after it. Any if/else body or [...] local
-#@cli :       context being left is closed automatically. Error if used outside a loop.
+#@cli :   = = Break out of the innermost enclosing loop (N{...}, N...`, ??{...}[...],
+#@cli :       #{n}[...] or @!{...} and its siblings) and resume right after it. Any if/else
+#@cli :       body or [...] local context being left is closed automatically.
+#@cli :       Error if used outside a loop.
 #@cli :
 #@cli :   *A subtree root is the node where the current local branch context began.
 #@cli :
 #@cli : Random leaf navigation:
 #@cli :   ( = Move to random node missing a left child.
 #@cli :   ) = Move to random node missing a right child.
-#@cli :   | = Move to random node missing either child.
+#@cli :   | = Move to random node missing either child (every such node is equally likely).
 #@cli :   ! = Move to random node with no children.
+#@cli :
+#@cli : At-all constructs (the body is BinArbor code, NOT an expression):
+#@cli :   @!{...} = Run the body once at every node that has no children.
+#@cli :   @({...} = Same, for every node missing a left child.
+#@cli :   @){...} = Same, for every node missing a right child.
+#@cli :   @|{...} = Same, for every node missing either child.
+#@cli :       The set of nodes is fixed when the construct starts, so children created by the
+#@cli :       body are not visited. Inside [...] only nodes of the local subtree are used.
+#@cli :       The current node is restored afterwards. '=' leaves the construct, ',' continues
+#@cli :       with the next node. Nodes are visited in internal stack order, not by index.
 #@cli :
 #@cli : Expressions and local branching:
 #@cli :   {...} = Evaluate expression and store result in node.
@@ -114,12 +125,15 @@
 #@cli :   ?{cond}[...];        = If. Runs the body only if cond is true.
 #@cli :   ?{cond}[...][...];   = If/else. First body if cond is true, second otherwise.
 #@cli :   ?{c1}[...]?{c2}[...]...[...]; = If/else-if chain. The final else body is optional.
-#@cli :   #{n}[...]           = Run the body n times (n is an expression, evaluated once).
+#@cli :   #{n}[...]             = Run the body n times (n is an expression, evaluated once).
+#@cli :   ?@{n}[b0][b1]...[bx]; = Switch. Evaluates n once, floors it, and runs body number n
+#@cli :                          (0-based) in the CURRENT node context. If n is nan, negative or
+#@cli :                          past the last body, nothing runs. There is no default.
 #@cli :
 #@cli :   Use ',' or '=' inside an if body to continue/break out of a loop respectively:  ??{1}[ < ?{depth()>=4}[=]; ]
 #@cli :
 #@cli :   Here {...} is an expression returning a scalar, not a store-in-node expression.
-#@cli :   The ';' that ends an if statement is required.
+#@cli :   The ';' is requred for all constructs that mentions it.
 #@cli :   Nesting is allowed in all expression-based control flow codes.
 #@cli :
 #@cli : Expression Functions:
@@ -216,12 +230,12 @@ $0_start_of_image_list,$0_v_size,$0_expr_enable_mode,$0_char_limit,$0_dict_size:
 
 ('"$1"')                         # str
 _rep_str2bin_struct_prepass      # Validate brackets, build the control-flow jump table (str+1) and frame stack (str+2)
-1,1,1,4             # root, root left child idx,root right child idx, root both child idx
+1,1,1,5             # root, root left child idx, root right child idx, root both child idx, root either child idx
 1,1,1,2             # repeat bucket position stack
-1,2,1,1,0,1x3       # childfree_stack -> no left child, no right child, no both child
+1,2,1,1,0,1x4       # childfree_stack -> no left child, no right child, no both child, no either child
 1,1,1,{max($2,1)}   # expression result buffer (one pixel, $2 channels)
 
-1,1,1,8,nan,0,0,0,nan,0,0,0 # parent,left,right,depth,direction,lstack,rstack,bstack
+1,1,1,9,nan,0,0,0,nan,0,0,0,0 # parent,left,right,depth,direction,lstack,rstack,bstack,estack
 
 if $2
 	1,1,1,$2,nan
@@ -277,9 +291,10 @@ eval "
 	const no_left_child_stack=str_img+5;
 	const no_right_child_stack=str_img+6;
 	const no_both_child_stack=str_img+7;
-	const result_img=str_img+8;
-	const binary_tree_img=str_img+9;
-	const repeat_dict_table=str_img+10;
+	const no_either_child_stack=str_img+8;
+	const result_img=str_img+9;
+	const binary_tree_img=str_img+10;
+	const repeat_dict_table=str_img+11;
 	const str_len=whd#str_img;
 	const char_limit=$rep_str2bin_struct_char_limit;
 	const parent_pos=0;
@@ -290,6 +305,7 @@ eval "
 	const left_child_stack_pos=5;
 	const right_child_stack_pos=6;
 	const both_child_stack_pos=7;
+	const either_child_stack_pos=8;
 
 	is_alp(char)=isint(char,_a,_z)||isint(char,_A,_Z);
 	is_num(char)=isint(char,_'0',_'9');
@@ -308,7 +324,7 @@ eval "
 	);
 
 	if(expr_enable_mode,
-		const expr_pos=both_child_stack_pos+1;
+		const expr_pos=either_child_stack_pos+1;
 		vector_nan=vector(#$2,nan);
 		vector_res=vector_nan;
 	);
@@ -360,16 +376,28 @@ eval "
 						i(#binary_tree_img,0,current_branch,0,both_child_stack_pos)=nan;
 					);
 
-					# The new child has no children at all: push it onto all three stacks
+					# Remove current node from the "missing either child" stack once it has both children
+					if(i(#binary_tree_img,0,current_branch,0,right_child_pos)>0,
+						either_stack_pos=i(#binary_tree_img,0,current_branch,0,either_child_stack_pos);
+						either_stack_last=da_size(#no_either_child_stack)-1;
+						either_moved_node=i[#no_either_child_stack,either_stack_last];
+						swap(#no_either_child_stack,either_stack_pos,either_stack_last,0);
+						i(#binary_tree_img,0,either_moved_node,0,either_child_stack_pos)=either_stack_pos;
+						da_remove(#no_either_child_stack,either_stack_last);
+						i(#binary_tree_img,0,current_branch,0,either_child_stack_pos)=nan;
+					);
+
+					# The new child has no children at all: push it onto all four stacks
 					da_push(#no_left_child_stack,current_bin_tree_size);
 					da_push(#no_right_child_stack,current_bin_tree_size);
 					da_push(#no_both_child_stack,current_bin_tree_size);
+					da_push(#no_either_child_stack,current_bin_tree_size);
 
 					expr_enable_mode?(
-						da_push(#binary_tree_img,[current_branch,0,0,child_depth,0,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1,vector_nan]);
+						da_push(#binary_tree_img,[current_branch,0,0,child_depth,0,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1,da_size(#no_either_child_stack)-1,vector_nan]);
 						_1;
 					):(
-						da_push(#binary_tree_img,[current_branch,0,0,child_depth,0,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1]);
+						da_push(#binary_tree_img,[current_branch,0,0,child_depth,0,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1,da_size(#no_either_child_stack)-1]);
 						_1;
 					);
 				);
@@ -402,16 +430,28 @@ eval "
 						i(#binary_tree_img,0,current_branch,0,both_child_stack_pos)=nan;
 					);
 
-					# The new child has no children at all: push it onto all three stacks
+					# Remove current node from the "missing either child" stack once it has both children
+					if(i(#binary_tree_img,0,current_branch,0,left_child_pos)>0,
+						either_stack_pos=i(#binary_tree_img,0,current_branch,0,either_child_stack_pos);
+						either_stack_last=da_size(#no_either_child_stack)-1;
+						either_moved_node=i[#no_either_child_stack,either_stack_last];
+						swap(#no_either_child_stack,either_stack_pos,either_stack_last,0);
+						i(#binary_tree_img,0,either_moved_node,0,either_child_stack_pos)=either_stack_pos;
+						da_remove(#no_either_child_stack,either_stack_last);
+						i(#binary_tree_img,0,current_branch,0,either_child_stack_pos)=nan;
+					);
+
+					# The new child has no children at all: push it onto all four stacks
 					da_push(#no_left_child_stack,current_bin_tree_size);
 					da_push(#no_right_child_stack,current_bin_tree_size);
 					da_push(#no_both_child_stack,current_bin_tree_size);
+					da_push(#no_either_child_stack,current_bin_tree_size);
 
 					expr_enable_mode?(
-						da_push(#binary_tree_img,[current_branch,0,0,child_depth,1,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1,vector_nan]);
+						da_push(#binary_tree_img,[current_branch,0,0,child_depth,1,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1,da_size(#no_either_child_stack)-1,vector_nan]);
 						_1;
 					):(
-						da_push(#binary_tree_img,[current_branch,0,0,child_depth,1,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1]);
+						da_push(#binary_tree_img,[current_branch,0,0,child_depth,1,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1,da_size(#no_either_child_stack)-1]);
 						_1;
 					);
 				);
@@ -424,10 +464,7 @@ eval "
 			++cursor;
 		):
 		((random_leaf_mode=find([random_left_leaf,random_right_leaf,random_no_child,random_leaf],current_char,0,1))!=-1)?(
-			if(random_leaf_mode==3,
-				random_leaf_mode=v;
-			);
-
+			# The mode doubles as the stack offset: '(' = 0, ')' = 1, '!' = 2, '|' = 3
 			position_on_stack=i(#square_bracket_stack,square_bracket_level,0,0,1+random_leaf_mode);
 			stack=no_left_child_stack+random_leaf_mode;
 			current_branch=i[#stack,v(position_on_stack,da_size(#stack)-1)];
@@ -467,17 +504,27 @@ eval "
 					da_remove(#no_child_stack,stack_last);
 					i(#binary_tree_img,0,current_branch,0,child_stack_pos)=nan;
 
-					# The parent already has a child, so it isn't in the "no children" stack. Nothing to remove.
+					# The parent already has a child, so it isn't in the "no children" stack. Nothing to remove there.
+
+					# The parent had exactly one child, so it now has both: remove it from the "missing either child" stack
+					either_stack_pos=i(#binary_tree_img,0,current_branch,0,either_child_stack_pos);
+					either_stack_last=da_size(#no_either_child_stack)-1;
+					either_moved_node=i[#no_either_child_stack,either_stack_last];
+					swap(#no_either_child_stack,either_stack_pos,either_stack_last,0);
+					i(#binary_tree_img,0,either_moved_node,0,either_child_stack_pos)=either_stack_pos;
+					da_remove(#no_either_child_stack,either_stack_last);
+					i(#binary_tree_img,0,current_branch,0,either_child_stack_pos)=nan;
 
 					da_push(#no_left_child_stack,current_bin_tree_size);
 					da_push(#no_right_child_stack,current_bin_tree_size);
 					da_push(#no_both_child_stack,current_bin_tree_size);
+					da_push(#no_either_child_stack,current_bin_tree_size);
 
 					expr_enable_mode?(
-						da_push(#binary_tree_img,[current_branch,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1,vector_nan]);
+						da_push(#binary_tree_img,[current_branch,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1,da_size(#no_either_child_stack)-1,vector_nan]);
 						_1;
 					):(
-						da_push(#binary_tree_img,[current_branch,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1]);
+						da_push(#binary_tree_img,[current_branch,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1,da_size(#no_either_child_stack)-1]);
 						_1;
 					);
 				);
@@ -617,15 +664,27 @@ eval "
 							i(#binary_tree_img,0,mirror_m,0,both_child_stack_pos)=nan;
 						);
 
+						# Remove mirror_m from the "missing either child" stack once its other side is occupied too
+						if(i(#binary_tree_img,0,mirror_m,0,3-alternate_pos)>0,
+							either_stack_pos=i(#binary_tree_img,0,mirror_m,0,either_child_stack_pos);
+							either_stack_last=da_size(#no_either_child_stack)-1;
+							either_moved_node=i[#no_either_child_stack,either_stack_last];
+							swap(#no_either_child_stack,either_stack_pos,either_stack_last,0);
+							i(#binary_tree_img,0,either_moved_node,0,either_child_stack_pos)=either_stack_pos;
+							da_remove(#no_either_child_stack,either_stack_last);
+							i(#binary_tree_img,0,mirror_m,0,either_child_stack_pos)=nan;
+						);
+
 						da_push(#no_left_child_stack,current_bin_tree_size);
 						da_push(#no_right_child_stack,current_bin_tree_size);
 						da_push(#no_both_child_stack,current_bin_tree_size);
+						da_push(#no_either_child_stack,current_bin_tree_size);
 
 						expr_enable_mode?(
-							da_push(#binary_tree_img,[mirror_m,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1,vector_nan]);
+							da_push(#binary_tree_img,[mirror_m,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1,da_size(#no_either_child_stack)-1,vector_nan]);
 							_1;
 						):(
-							da_push(#binary_tree_img,[mirror_m,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1]);
+							da_push(#binary_tree_img,[mirror_m,0,0,child_depth,alternate_direction,da_size(#no_left_child_stack)-1,da_size(#no_right_child_stack)-1,da_size(#no_both_child_stack)-1,da_size(#no_either_child_stack)-1]);
 							_1;
 						);
 
@@ -704,6 +763,22 @@ eval "
 
 			cursor=p;
 		):
+		(current_char==move_to_var&&(at_mode=find([random_left_leaf,random_right_leaf,random_no_child,random_leaf],i[#str_img,cursor+1],0,1))!=-1)?(
+			# '@(' = 0, '@)' = 1, '@!' = 2, '@|' = 3. The mode is also the stack offset.
+			at_stmt=cursor;
+			at_stack=no_left_child_stack+at_mode;
+			at_pos=da_size(#at_stack)-1;
+
+			at_pos>=i(#square_bracket_stack,square_bracket_level,0,0,1+at_mode)?(
+				I(#ctl_stack,ctl_sp)=[5,at_stmt,at_pos];
+				i(#ctl_stack,ctl_sp,0,0,3)=current_branch; # Origin node, restored at the end
+				++ctl_sp;
+				current_branch=i[#at_stack,at_pos];
+				cursor=i(#jump_table,at_stmt,0,0,2)+1;
+			):(
+				cursor=i(#jump_table,at_stmt,0,0,6);
+			);
+		):
 		current_char==move_to_var?(
 			inc_cursor=cursor+1;
 
@@ -744,9 +819,10 @@ eval "
 			cursor=p;
 		):
 		current_char==ctl_char_cond?(
-			# ??{c}[body] is a while loop. ?{c}[then]; and ?{c}[then][else]; are if statements.
 			ctl_stmt=cursor;
 			ctl_is_while=i[#str_img,cursor+1]==ctl_char_cond;
+			ctl_is_switch=i[#str_img,cursor+1]==move_to_var;
+
 			ctl_val=ctl_eval(
 				current_branch,
 				i(#binary_tree_img,0,current_branch,0,direction_pos),
@@ -754,28 +830,45 @@ eval "
 				i(#jump_table,ctl_stmt,0,0,0),
 				i(#jump_table,ctl_stmt,0,0,1)-i(#jump_table,ctl_stmt,0,0,0)
 			);
-			ctl_true=!isnan(ctl_val)&&ctl_val!=0;
 
-			ctl_true?(
-				ctl_new_kind=ctl_is_while?1:3;
+			ctl_is_switch?(
+				ctl_n=isnan(ctl_val)?-1:floor(ctl_val);
 				ctl_body=i(#jump_table,ctl_stmt,0,0,2);
+				while(ctl_n>0&&ctl_body,
+					ctl_body=i(#jump_table,ctl_body,0,0,4);
+					--ctl_n;
+				);
+				(ctl_n==0&&ctl_body)?(
+					I(#ctl_stack,ctl_sp)=[3,ctl_stmt,0];
+					++ctl_sp;
+					cursor=ctl_body+1;
+				):(
+					cursor=i(#jump_table,ctl_stmt,0,0,6);
+				);
 			):(
-				# Else part: 0 = none (always 0 for while), >0 = else '[', <0 = else-if at -value
-				ctl_new_kind=4;
-				ctl_body=i(#jump_table,ctl_stmt,0,0,4);
-			);
+				ctl_true=!isnan(ctl_val)&&ctl_val!=0;
 
-			ctl_body<0?(
-				# Condition was false and the else part is an else-if: jump to its '?'.
-				# No frame is pushed, since the chain's later statements push their own.
-				cursor=-ctl_body;
-			):
-			(ctl_true||ctl_body)?(
-				I(#ctl_stack,ctl_sp)=[ctl_new_kind,ctl_stmt,0];
-				++ctl_sp;
-				cursor=ctl_body+1;
-			):(
-				cursor=i(#jump_table,ctl_stmt,0,0,6);
+				ctl_true?(
+					ctl_new_kind=ctl_is_while?1:3;
+					ctl_body=i(#jump_table,ctl_stmt,0,0,2);
+				):(
+					# Else part: 0 = none (always 0 for while), >0 = else '[', <0 = else-if at -value
+					ctl_new_kind=4;
+					ctl_body=i(#jump_table,ctl_stmt,0,0,4);
+				);
+
+				ctl_body<0?(
+					# Condition was false and the else part is an else-if: jump to its '?'.
+					# No frame is pushed, since the chain's later statements push their own.
+					cursor=-ctl_body;
+				):
+				(ctl_true||ctl_body)?(
+					I(#ctl_stack,ctl_sp)=[ctl_new_kind,ctl_stmt,0];
+					++ctl_sp;
+					cursor=ctl_body+1;
+				):(
+					cursor=i(#jump_table,ctl_stmt,0,0,6);
+				);
 			);
 		):
 		current_char==ctl_char_count?(
@@ -803,7 +896,9 @@ eval "
 				run('error inval_sub_node_idx');
 			);
 
-			repeat(3,p,
+			# Move the current node to the end of all four stacks, so that the stack
+			# range from here on contains only nodes of the new local subtree
+			repeat(4,p,
 				child_stack=no_left_child_stack+p;
 				child_stack_pos=left_child_stack_pos+p;
 
@@ -814,13 +909,14 @@ eval "
 
 			ws=w(#square_bracket_stack);
 			if((ws++)==++square_bracket_level,
-				resize(#square_bracket_stack,ws,1,1,4,0);
+				resize(#square_bracket_stack,ws,1,1,5,0);
 			);
 
 			I(#square_bracket_stack,square_bracket_level)=[current_branch,
 				i(#binary_tree_img,0,current_branch,0,left_child_stack_pos),
 				i(#binary_tree_img,0,current_branch,0,right_child_stack_pos),
-				i(#binary_tree_img,0,current_branch,0,both_child_stack_pos)];
+				i(#binary_tree_img,0,current_branch,0,both_child_stack_pos),
+				i(#binary_tree_img,0,current_branch,0,either_child_stack_pos)];
 
 			# Local context frame (kind 0). The position is only used by '=' to tell
 			# which frames were opened inside a repeat loop.
@@ -870,14 +966,32 @@ eval "
 				cursor=i(#jump_table,frame_stmt,0,0,6);
 			);
 		):
+		(current_char==expr_1&&ctl_sp>0&&i(#ctl_stack,ctl_sp-1,0,0,0)==5&&cursor==i(#jump_table,i(#ctl_stack,ctl_sp-1,0,0,1),0,0,3))?(
+			at_stmt=i(#ctl_stack,ctl_sp-1,0,0,1);
+			at_mode=find([random_left_leaf,random_right_leaf,random_no_child,random_leaf],i[#str_img,at_stmt+1],0,1);
+			at_stack=no_left_child_stack+at_mode;
+
+			# Go one position down. The stack may have shrunk during the body, so clamp.
+			at_pos=min(i(#ctl_stack,ctl_sp-1,0,0,2)-1,da_size(#at_stack)-1);
+
+			at_pos>=i(#square_bracket_stack,square_bracket_level,0,0,1+at_mode)?(
+				i(#ctl_stack,ctl_sp-1,0,0,2)=at_pos;
+				current_branch=i[#at_stack,at_pos];
+				cursor=i(#jump_table,at_stmt,0,0,2)+1;
+			):(
+				current_branch=i(#ctl_stack,ctl_sp-1,0,0,3);
+				--ctl_sp;
+				cursor=i(#jump_table,at_stmt,0,0,6);
+			);
+		):
 		(current_char==break_loop||current_char==continue_loop)?(
 			is_continue=current_char==continue_loop;
 
-			# Innermost enclosing while/count loop: search the frame stack from the top
+			# Innermost enclosing while/count/at-all loop: search the frame stack from the top
 			brk_frame=-1;
 			for(brk_p=ctl_sp-1,brk_p>=0,--brk_p,
 				brk_kind=i(#ctl_stack,brk_p,0,0,0);
-				if(brk_kind==1||brk_kind==2,brk_frame=brk_p;break(););
+				if(brk_kind==1||brk_kind==2||brk_kind==5,brk_frame=brk_p;break(););
 			);
 			brk_frame_pos=brk_frame>=0?i(#ctl_stack,brk_frame,0,0,1):-1;
 
@@ -904,11 +1018,18 @@ eval "
 					repeat_pos=i(#repeat_index_stack,repeat_level,0,0,1);
 				);
 			):(
-				# Continue keeps the loop frame so that ']' can re-test or decrement
+				brk_origin=i(#ctl_stack,brk_frame,0,0,3);
+				brk_is_atall=i(#ctl_stack,brk_frame,0,0,0)==5;
+
+				# Continue keeps the loop frame so that ']' (or the at-all '}') can re-test, decrement or advance
 				while(ctl_sp>brk_frame+is_continue,
 					--ctl_sp;
 					if(!i(#ctl_stack,ctl_sp,0,0,0),--square_bracket_level;);
 				);
+
+				# Leaving an at-all construct for good: restore the origin node
+				if(brk_is_atall&&!is_continue,current_branch=brk_origin;);
+
 				cursor=is_continue?i(#jump_table,brk_frame_pos,0,0,3):i(#jump_table,brk_frame_pos,0,0,6);
 			);
 		):
@@ -1009,7 +1130,7 @@ eval "
 	i[#binary_tree_img,0]=max_depth+1; # Set the very first unused pixel to the maximum depth found during creation to enable O(1) retrieval
 	"
 
-rm[-266--258,-256--1]
+rm[-267--258,-256--1]
 
 if $2
 	split c,-4,2
@@ -1087,24 +1208,25 @@ res_str.=leaves()=(bt_r=$rep_str2bin_struct_current_branch;bt_m=1;bt_walk());
 res_str.=height()=(bt_r=$rep_str2bin_struct_current_branch;bt_m=2;bt_walk());
 res_str.=maxdepth()=(bt_r=0;bt_m=2;bt_walk());
 
-# Functions reading stored values only exist when vector_size > 0
+# Functions reading stored values only exist when vector_size > 0.
+# Stored values start at channel 9, after the 9 bookkeeping channels.
 if $rep_str2bin_struct_v_size
-	res_str.=self()=crop(#-257,0,$rep_str2bin_struct_current_branch,0,8,1,1,1,$rep_str2bin_struct_v_size);
+	res_str.=self()=crop(#-257,0,$rep_str2bin_struct_current_branch,0,9,1,1,1,$rep_str2bin_struct_v_size);
 
 	if $rep_str2bin_struct_sibling_idx
-		res_str.=sibling()=crop(#-257,0,$rep_str2bin_struct_sibling_idx,0,8,1,1,1,$rep_str2bin_struct_v_size);
+		res_str.=sibling()=crop(#-257,0,$rep_str2bin_struct_sibling_idx,0,9,1,1,1,$rep_str2bin_struct_v_size);
 	fi
 
 	if !isnan(i(#-257,0,$rep_str2bin_struct_current_branch,0,0))
-		res_str.=root()=crop(#-257,0,i(#-257,0,$rep_str2bin_struct_current_branch,0,0),0,8,1,1,1,$rep_str2bin_struct_v_size);
+		res_str.=root()=crop(#-257,0,i(#-257,0,$rep_str2bin_struct_current_branch,0,0),0,9,1,1,1,$rep_str2bin_struct_v_size);
 	fi
 
 	if i(#-257,0,$rep_str2bin_struct_current_branch,0,1)
-		res_str.=L()=crop(#-257,0,i(#-257,0,$rep_str2bin_struct_current_branch,0,1),0,8,1,1,1,$rep_str2bin_struct_v_size);
+		res_str.=L()=crop(#-257,0,i(#-257,0,$rep_str2bin_struct_current_branch,0,1),0,9,1,1,1,$rep_str2bin_struct_v_size);
 	fi
 
 	if i(#-257,0,$rep_str2bin_struct_current_branch,0,2)
-		res_str.=R()=crop(#-257,0,i(#-257,0,$rep_str2bin_struct_current_branch,0,2),0,8,1,1,1,$rep_str2bin_struct_v_size);
+		res_str.=R()=crop(#-257,0,i(#-257,0,$rep_str2bin_struct_current_branch,0,2),0,9,1,1,1,$rep_str2bin_struct_v_size);
 	fi
 fi
 
@@ -1132,7 +1254,9 @@ _rep_str2bin_struct_prepass:
 #   5 = repeat block 'N{'    6 = repeat 'N...`' (closed by a backtick)
 #   7 = else-if link (pushed under the next statement of an if/else-if chain,
 #       popped when the chain's ';' is reached)
-#
+#   8 = match body (second value = the match statement position)
+#   9 = at-all body '@(' '@)' '@!' '@|' (closed by '}')
+
 # Table channels, set at the position of the '?' or '#' that starts a statement:
 #   0 = first char of condition/count expression
 #   1 = index of its closing brace
@@ -1143,6 +1267,13 @@ _rep_str2bin_struct_prepass:
 #   6 = index where execution resumes after the whole statement
 #   7 = for repeats only: index of the closing '}' or '`'. Stored at the body start
 #       (position after '{' for N{...}, first char after the digits for N...`)
+
+#   For a match statement, channels 2-4 are also set at each body '[':
+#     2 = owning statement ('?' position), 3 = this body's ']',
+#     4 = next body's '[' (0 if last)
+
+#   For an at-all statement, set at the position of its '@':
+#     2 = body '{', 3 = body '}', 6 = index where execution resumes after the '}'
 
 eval "
 	const str_len=whd#-3;
@@ -1162,6 +1293,11 @@ eval "
 	const char_cond=_'?';
 	const char_count=_'#';
 	const char_end=_';';
+	const char_match=_'@';
+	const char_at_0=_'(';
+	const char_at_1=_')';
+	const char_at_2=_'!';
+	const char_at_3=_'|';
 
 	is_alp(char)=isint(char,_a,_z)||isint(char,_A,_Z);
 	is_num(char)=isint(char,_'0',_'9');
@@ -1191,6 +1327,20 @@ eval "
 		is_alp(c)?(
 			ignore_var=1;
 		):
+		(c==char_match&&isin(i[#-3,p+1],char_at_0,char_at_1,char_at_2,char_at_3))?(
+			# '@(' '@)' '@!' '@|': the body is code, so its '{' is matched like a repeat block
+			stmt=p;
+			q=p+2;
+			while(q<str_len&&isin(i[#-3,q],skip_char_0,skip_char_1,skip_char_2),++q;);
+			i[#-3,q]!=B1P0?(
+				run('error atall_expect_body');
+			);
+			i(#-1,stmt,0,0,2)=q; # '{' position
+			I(#-2,sp)=[9,stmt];
+			++sp;
+			p=q;
+			ignore_num=0;
+		):
 		c==B1P0?(
 			ignore_num?(
 				# Repeat block N{...}
@@ -1206,14 +1356,20 @@ eval "
 		c==B1P1?(
 			if(!sp,run('error missing_bracket_det'););
 			--sp;
-			i(#-2,sp,0,0,0)!=5?(
-				run('error mismatched_bracket_det');
+			kind=i(#-2,sp,0,0,0);
+			stmt=i(#-2,sp,0,0,1);
+			kind==5?(
+				i(#-1,stmt,0,0,7)=p; # Record where this repeat ends
+			):
+			kind==9?(
+				i(#-1,stmt,0,0,3)=p;   # Closing '}' of the at-all body
+				i(#-1,stmt,0,0,6)=p+1; # Resume position
+			):(
+				run('error mismatched_bracket_det');0;
 			);
-			i(#-1,i(#-2,sp,0,0,1),0,0,7)=p; # Record where this repeat ends
 			ignore_num=0;
 		):
 		(c==char_cond||c==char_count)?(
-			# A number right before this starts an N...` repeat
 			ignore_num?(
 				I(#-2,sp)=[6,0];
 				++sp;
@@ -1221,7 +1377,8 @@ eval "
 
 			stmt=p;
 			is_while=c==char_cond&&i[#-3,p+1]==char_cond;
-			q=p+1+is_while;
+			is_switch=c==char_cond&&i[#-3,p+1]==char_match;
+			q=p+1+is_while+is_switch;
 			while(q<str_len&&isin(i[#-3,q],skip_char_0,skip_char_1,skip_char_2),++q;);
 			i[#-3,q]!=B1P0?(
 				run('error ctl_expect_expr');
@@ -1239,8 +1396,13 @@ eval "
 			);
 			i(#-1,stmt,0,0,2)=q;
 
-			kind=c==char_count?2:is_while?1:3;
-			I(#-2,sp)=[kind,stmt];
+			is_switch?(
+				i(#-1,q,0,0,2)=stmt; # Body column remembers its statement
+				I(#-2,sp)=[8,q];
+			):(
+				kind=c==char_count?2:is_while?1:3;
+				I(#-2,sp)=[kind,stmt];
+			);
 			++sp;
 
 			p=q;
@@ -1256,6 +1418,32 @@ eval "
 			kind=i(#-2,sp,0,0,0);
 			stmt=i(#-2,sp,0,0,1);
 
+			kind==8?(
+				i(#-1,stmt,0,0,3)=p; # This body's closing ']'
+				sw=i(#-1,stmt,0,0,2); # Owning statement
+				q=p+1;
+				while(q<str_len&&isin(i[#-3,q],skip_char_0,skip_char_1,skip_char_2),++q;);
+
+				i[#-3,q]==B0P0?(
+					# Another body follows
+					i(#-1,stmt,0,0,4)=q;
+					i(#-1,q,0,0,2)=sw;
+					I(#-2,sp)=[8,q];
+					++sp;
+					p=q;
+				):
+				i[#-3,q]==char_end?(
+					chain_end=q+1;
+					i(#-1,sw,0,0,6)=chain_end;
+					while(sp&&i(#-2,sp-1,0,0,0)==7,
+						--sp;
+						i(#-1,i(#-2,sp,0,0,1),0,0,6)=chain_end;
+					);
+					p=q;
+				):(
+					run('error ctl_expect_end');
+				);
+			):
 			kind>=5?(
 				run('error mismatched_bracket_det');0;
 			):
