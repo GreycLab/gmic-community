@@ -79,9 +79,9 @@
 #@cli :       Occupied sides are left alone, and the current node's own value is not changed.
 #@cli :   \&\&name = Like &, but the same way (no left/right swap) and from variable 'name'.
 #@cli :   = = Break out of the innermost enclosing loop (N{...}, N...`, ??{...}[...],
-#@cli :       #{n}[...] or @!{...} and its siblings) and resume right after it. Any if/else
-#@cli :       body or [...] local context being left is closed automatically.
-#@cli :       Error if used outside a loop.
+#@cli :       #{n}[...], @?0/@?1 path walks or @!{...} and its siblings) and resume right
+#@cli :       after it. Any if/else body or [...] local context being left is closed
+#@cli :       automatically. Error if used outside a loop.
 #@cli :
 #@cli :   *A subtree root is the node where the current local branch context began.
 #@cli :
@@ -100,6 +100,15 @@
 #@cli :       body are not visited. Inside {...} only nodes of the local subtree are used.
 #@cli :       The current node is restored afterwards. '=' leaves the construct, ',' continues
 #@cli :       with the next node. Nodes are visited in internal stack order, not by index.
+#@cli :
+#@cli : Path walks (the path is NOT an expression, and nothing is ever created):
+#@cli :   @?0{path}[...]  = Check once that 'path' (only ^ < > ~ + - * allowed) leads to existing
+#@cli :       nodes. If so, run the body once at the node reached after each step, then return
+#@cli :       to the starting node. Nothing happens if the path is invalid.
+#@cli :   @?1{path}[...]; = Same, but the current node becomes the path's end node afterwards.
+#@cli :   @?1{path};      = Only move to the path's end node (the body is optional for mode 1).
+#@cli :       '+' and '-' count as one step. '=' leaves the walk (mode 0 returns to the start
+#@cli :       node, mode 1 stays where the body left it), ',' continues with the next step.
 #@cli :
 #@cli : Expressions and local branching:
 #@cli :   {...} = Evaluate expression and store result in node.
@@ -122,6 +131,7 @@
 #@cli :
 #@cli : Control flow (the bodies run in the CURRENT node context, like N{...}):
 #@cli :   ??{cond}[...]        = While loop. Runs the body while cond is true (non-zero, not nan).
+#@cli :   ??[...]{cond}        = Do-while loop. Runs the body once, then repeats while cond is true.
 #@cli :   ?{cond}[...];        = If. Runs the body only if cond is true.
 #@cli :   ?{cond}[...][...];   = If/else. First body if cond is true, second otherwise.
 #@cli :   ?{c1}[...]?{c2}[...]...[...]; = If/else-if chain. The final else body is optional.
@@ -311,6 +321,13 @@ eval "
 	is_num(char)=isint(char,_'0',_'9');
 	is_valid_var_char(char)=is_alp(char)||is_num(char)||char==__;
 
+	# NEW: position of the first non-ignored character at or after sk_pos
+	skip_to(sk_pos)=(
+		sk_p=sk_pos;
+		while(sk_p<str_len&&isin(i[#-3,sk_p],skip_char_0,skip_char_1,skip_char_2),++sk_p;);
+		sk_p;
+	);
+
 	# Evaluate a scalar expression (control flow condition or count) at a given node
 	ctl_eval(br,dr,sr,st,ln)=(
 		set('rep_str2bin_struct_current_branch',br);
@@ -321,6 +338,61 @@ eval "
 		set('rep_str2bin_struct_scalar_mode',1);
 		set('rep_str2bin_struct_node_count',da_size(#binary_tree_img));
 		run('__rep_str2bin_struct_expr');
+	);
+
+	# NEW: path walk helpers (used by '@?0' and '@?1'). They never create or modify anything.
+	# Position of the first non-ignored character at or after pos (capped at pe)
+	next_pos(np_pos,np_end)=(
+		np_p=np_pos;
+		while(np_p<np_end&&isin(i[#str_img,np_p],skip_char_0,skip_char_1,skip_char_2),++np_p;);
+		np_p;
+	);
+
+	# NEW: one navigation step from node sn_n inside subtree root sn_root.
+	# Returns the new node, or -1 if the step needs a node that does not exist.
+	step_node(sn_n,sn_root,sn_c)=(
+		sn_r=sn_n;
+		if(sn_c==left_child,
+			sn_r=i(#binary_tree_img,0,sn_n,0,left_child_pos);
+			if(sn_r<=0,sn_r=-1;);
+		);
+		if(sn_c==right_child,
+			sn_r=i(#binary_tree_img,0,sn_n,0,right_child_pos);
+			if(sn_r<=0,sn_r=-1;);
+		);
+		if(sn_c==move_up_tree&&sn_n!=sn_root,
+			sn_r=i(#binary_tree_img,0,sn_n,0,parent_pos);
+		);
+		if(sn_c==sibling&&sn_n!=sn_root,
+			sn_r=i(#binary_tree_img,0,i(#binary_tree_img,0,sn_n,0,parent_pos),0,1+!i(#binary_tree_img,0,sn_n,0,direction_pos));
+			if(sn_r<=0,sn_r=-1;);
+		);
+		if(sn_c==top_of_binary_tree,sn_r=sn_root;);
+		if(sn_c==directional_move_up,
+			sn_d=i(#binary_tree_img,0,sn_n,0,direction_pos);
+			while(sn_r!=sn_root&&i(#binary_tree_img,0,sn_r,0,direction_pos)==sn_d,
+				sn_r=i(#binary_tree_img,0,sn_r,0,parent_pos);
+			);
+		);
+		if(sn_c==directional_move_down,
+			sn_d=i(#binary_tree_img,0,sn_n,0,direction_pos);
+			while(i(#binary_tree_img,0,sn_r,0,direction_pos)==sn_d&&i(#binary_tree_img,0,sn_r,0,1+sn_d),
+				sn_r=i(#binary_tree_img,0,sn_r,0,1+sn_d);
+			);
+		);
+		sn_r;
+	);
+
+	# NEW: dry run of a whole path (characters wp_ps..wp_pe-1 of the string).
+	# Returns the end node, or -1 if any step is missing.
+	walk_path(wp_from,wp_top,wp_ps,wp_pe)=(
+		wp_n=wp_from;
+		wp_q=next_pos(wp_ps,wp_pe);
+		while(wp_n>=0&&wp_q<wp_pe,
+			wp_n=step_node(wp_n,wp_top,i[#str_img,wp_q]);
+			wp_q=next_pos(wp_q+1,wp_pe);
+		);
+		wp_n;
 	);
 
 	if(expr_enable_mode,
@@ -763,6 +835,31 @@ eval "
 
 			cursor=p;
 		):
+		# NEW: path walk '@?0{path}[...]' and '@?1{path}[...];' / '@?1{path};'
+		(current_char==move_to_var&&i[#str_img,cursor+1]==ctl_char_cond)?(
+			wk_stmt=cursor;
+			wk_mode=i(#jump_table,wk_stmt,0,0,4);
+			wk_body=i(#jump_table,wk_stmt,0,0,2); # 0 = no body
+			wk_root=i[#square_bracket_stack,square_bracket_level];
+			wk_ps=i(#jump_table,wk_stmt,0,0,0);
+			wk_pe=i(#jump_table,wk_stmt,0,0,1);
+			wk_origin=current_branch;
+			wk_end=walk_path(current_branch,wk_root,wk_ps,wk_pe);
+			wk_np=next_pos(wk_ps,wk_pe);
+
+			(wk_end>=0&&wk_body&&wk_np<wk_pe)?(
+				wk_node=step_node(current_branch,wk_root,i[#str_img,wk_np]);
+				# Frame: kind, statement, next path position, path node, end node, restore node (-1 = none)
+				I(#ctl_stack,ctl_sp)=[6,wk_stmt,next_pos(wk_np+1,wk_pe),wk_node,wk_end,wk_mode?-1:wk_origin];
+				++ctl_sp;
+				current_branch=wk_node;
+				cursor=wk_body+1;
+			):(
+				# Invalid path, empty path, or no body
+				if(wk_end>=0&&wk_mode,current_branch=wk_end;);
+				cursor=i(#jump_table,wk_stmt,0,0,6);
+			);
+		):
 		(current_char==move_to_var&&(at_mode=find([random_left_leaf,random_right_leaf,random_no_child,random_leaf],i[#str_img,cursor+1],0,1))!=-1)?(
 			# '@(' = 0, '@)' = 1, '@!' = 2, '@|' = 3. The mode is also the stack offset.
 			at_stmt=cursor;
@@ -770,8 +867,7 @@ eval "
 			at_pos=da_size(#at_stack)-1;
 
 			at_pos>=i(#square_bracket_stack,square_bracket_level,0,0,1+at_mode)?(
-				I(#ctl_stack,ctl_sp)=[5,at_stmt,at_pos];
-				i(#ctl_stack,ctl_sp,0,0,3)=current_branch; # Origin node, restored at the end
+				I(#ctl_stack,ctl_sp)=[5,at_stmt,at_pos,current_branch,0,0]; # Channel 3 = origin node, restored at the end
 				++ctl_sp;
 				current_branch=i[#at_stack,at_pos];
 				cursor=i(#jump_table,at_stmt,0,0,2)+1;
@@ -818,6 +914,12 @@ eval "
 
 			cursor=p;
 		):
+		# NEW: do-while. Run the body first. The condition is tested by the ']' handler (frame kind 1).
+		(current_char==ctl_char_cond&&i[#str_img,cursor+1]==ctl_char_cond&&i(#jump_table,cursor,0,0,5)==1)?(
+			I(#ctl_stack,ctl_sp)=[1,cursor,0,0,0,0];
+			++ctl_sp;
+			cursor=i(#jump_table,cursor,0,0,2)+1;
+		):
 		current_char==ctl_char_cond?(
 			ctl_stmt=cursor;
 			ctl_is_while=i[#str_img,cursor+1]==ctl_char_cond;
@@ -839,7 +941,7 @@ eval "
 					--ctl_n;
 				);
 				(ctl_n==0&&ctl_body)?(
-					I(#ctl_stack,ctl_sp)=[3,ctl_stmt,0];
+					I(#ctl_stack,ctl_sp)=[3,ctl_stmt,0,0,0,0];
 					++ctl_sp;
 					cursor=ctl_body+1;
 				):(
@@ -863,7 +965,7 @@ eval "
 					cursor=-ctl_body;
 				):
 				(ctl_true||ctl_body)?(
-					I(#ctl_stack,ctl_sp)=[ctl_new_kind,ctl_stmt,0];
+					I(#ctl_stack,ctl_sp)=[ctl_new_kind,ctl_stmt,0,0,0,0];
 					++ctl_sp;
 					cursor=ctl_body+1;
 				):(
@@ -884,7 +986,7 @@ eval "
 			ctl_n=isnan(ctl_val)?0:floor(ctl_val);
 
 			ctl_n>0?(
-				I(#ctl_stack,ctl_sp)=[2,ctl_stmt,ctl_n];
+				I(#ctl_stack,ctl_sp)=[2,ctl_stmt,ctl_n,0,0,0];
 				++ctl_sp;
 				cursor=i(#jump_table,ctl_stmt,0,0,2)+1;
 			):(
@@ -920,7 +1022,7 @@ eval "
 
 			# Local context frame (kind 0). The position is only used by '=' to tell
 			# which frames were opened inside a repeat loop.
-			I(#ctl_stack,ctl_sp)=[0,cursor,0];
+			I(#ctl_stack,ctl_sp)=[0,cursor,0,0,0,0];
 			++ctl_sp;
 
 			++cursor;
@@ -961,6 +1063,25 @@ eval "
 				):(
 					cursor=i(#jump_table,frame_stmt,0,0,6);
 				);
+			):
+			# NEW: path walk body finished. Advance to the next path step, or finish.
+			frame_kind==6?(
+				wk_pos=i(#ctl_stack,ctl_sp,0,0,2);
+				wk_pe=i(#jump_table,frame_stmt,0,0,1);
+
+				wk_pos<wk_pe?(
+					wk_node=step_node(i(#ctl_stack,ctl_sp,0,0,3),i[#square_bracket_stack,square_bracket_level],i[#str_img,wk_pos]);
+					i(#ctl_stack,ctl_sp,0,0,2)=next_pos(wk_pos+1,wk_pe);
+					i(#ctl_stack,ctl_sp,0,0,3)=wk_node;
+					++ctl_sp; # Reopen the frame
+					current_branch=wk_node;
+					cursor=i(#jump_table,frame_stmt,0,0,2)+1;
+				):(
+					# Walk done: mode 0 restores the start node, mode 1 goes to the end node
+					wk_rs=i(#ctl_stack,ctl_sp,0,0,5);
+					current_branch=wk_rs>=0?wk_rs:i(#ctl_stack,ctl_sp,0,0,4);
+					cursor=i(#jump_table,frame_stmt,0,0,6);
+				);
 			):(
 				# End of a then/else body: jump past the whole if statement
 				cursor=i(#jump_table,frame_stmt,0,0,6);
@@ -987,11 +1108,12 @@ eval "
 		(current_char==break_loop||current_char==continue_loop)?(
 			is_continue=current_char==continue_loop;
 
-			# Innermost enclosing while/count/at-all loop: search the frame stack from the top
+			# Innermost enclosing while/count/at-all/path-walk loop: search the frame stack from the top
 			brk_frame=-1;
 			for(brk_p=ctl_sp-1,brk_p>=0,--brk_p,
 				brk_kind=i(#ctl_stack,brk_p,0,0,0);
-				if(brk_kind==1||brk_kind==2||brk_kind==5,brk_frame=brk_p;break(););
+				# CHANGED: kind 6 (path walk) is now a loop frame too
+				if(brk_kind==1||brk_kind==2||brk_kind==5||brk_kind==6,brk_frame=brk_p;break(););
 			);
 			brk_frame_pos=brk_frame>=0?i(#ctl_stack,brk_frame,0,0,1):-1;
 
@@ -1006,6 +1128,11 @@ eval "
 				while(ctl_sp>0&&i(#ctl_stack,ctl_sp-1,0,0,1)>brk_rep_pos,
 					--ctl_sp;
 					if(!i(#ctl_stack,ctl_sp,0,0,0),--square_bracket_level;);
+					# NEW: a mode 0 path walk being left restores its start node
+					if(i(#ctl_stack,ctl_sp,0,0,0)==6,
+						brk_rs2=i(#ctl_stack,ctl_sp,0,0,5);
+						if(brk_rs2>=0,current_branch=brk_rs2;);
+					);
 				);
 				is_continue?(
 					# Land on the closing '}' or '`': the normal repeat logic counts the pass
@@ -1029,6 +1156,13 @@ eval "
 
 				# Leaving an at-all construct for good: restore the origin node
 				if(brk_is_atall&&!is_continue,current_branch=brk_origin;);
+
+				# NEW: leaving a mode 0 path walk for good: restore the start node.
+				# Mode 1 stays wherever the body left the current node.
+				if(i(#ctl_stack,brk_frame,0,0,0)==6&&!is_continue,
+					brk_rs=i(#ctl_stack,brk_frame,0,0,5);
+					if(brk_rs>=0,current_branch=brk_rs;);
+				);
 
 				cursor=is_continue?i(#jump_table,brk_frame_pos,0,0,3):i(#jump_table,brk_frame_pos,0,0,6);
 			);
@@ -1256,6 +1390,9 @@ _rep_str2bin_struct_prepass:
 #       popped when the chain's ';' is reached)
 #   8 = match body (second value = the match statement position)
 #   9 = at-all body '@(' '@)' '@!' '@|' (closed by '}')
+#  10 = path walk body of '@?1' (closed by ']' and then needs ';').
+#       The body of '@?0' uses kind 1, since it needs no ';'.
+#  11 = do-while body '??[' (closed by ']', which is followed by '{cond}')
 
 # Table channels, set at the position of the '?' or '#' that starts a statement:
 #   0 = first char of condition/count expression
@@ -1274,6 +1411,16 @@ _rep_str2bin_struct_prepass:
 
 #   For an at-all statement, set at the position of its '@':
 #     2 = body '{', 3 = body '}', 6 = index where execution resumes after the '}'
+
+#   For a path walk statement '@?0' / '@?1', set at the position of its '@':
+#     0 = first char of the path, 1 = index of the path's closing '}',
+#     2 = body '[' (0 if there is no body), 3 = body ']',
+#     4 = mode (0 = restore start node, 1 = move to end node),
+#     6 = index where execution resumes after the whole statement
+
+#   For a do-while statement '??[...]{cond}', set at the position of its first '?':
+#     0/1 = condition start / closing '}', 2 = body '[', 3 = body ']',
+#     5 = 1 (do-while marker), 6 = index where execution resumes
 
 eval "
 	const str_len=whd#-3;
@@ -1302,6 +1449,12 @@ eval "
 	is_alp(char)=isint(char,_a,_z)||isint(char,_A,_Z);
 	is_num(char)=isint(char,_'0',_'9');
 	is_valid_var_char(char)=is_alp(char)||is_num(char)||char==__;
+
+	skip_to(sk_pos)=(
+		sk_p=sk_pos;
+		while(sk_p<str_len&&isin(i[#-3,sk_p],skip_char_0,skip_char_1,skip_char_2),++sk_p;);
+		sk_p;
+	);
 
 	p=-1;
 	sp=0;
@@ -1341,6 +1494,50 @@ eval "
 			p=q;
 			ignore_num=0;
 		):
+		# NEW: '@?0{path}[...]' and '@?1{path}[...];' / '@?1{path};'
+		(c==char_match&&i[#-3,p+1]==char_cond)?(
+			stmt=p;
+			q=p+2;
+			atq_mode=i[#-3,q]-_'0';
+			if(atq_mode!=0&&atq_mode!=1,run('error atq_expect_mode'););
+			++q;
+			while(q<str_len&&isin(i[#-3,q],skip_char_0,skip_char_1,skip_char_2),++q;);
+			i[#-3,q]!=B1P0?(
+				run('error atq_expect_path');
+			);
+			e=find(#-3,B1P1,q+1,1);
+			if(e<0,run('error missing_bracket_det'););
+
+			# Only pure navigation characters are allowed in the path
+			for(vp=q+1,vp<e,++vp,
+				pc=i[#-3,vp];
+				if(!isin(pc,_'<',_'>',_'^',_'~',_'+',_'-',_'*',skip_char_0,skip_char_1,skip_char_2),
+					run('error atq_inval_path_char');
+				);
+			);
+
+			i(#-1,stmt,0,0,0)=q+1;      # path start
+			i(#-1,stmt,0,0,1)=e;        # path end ('}')
+			i(#-1,stmt,0,0,4)=atq_mode; # 0 = restore start node, 1 = move to end node
+
+			q=e+1;
+			while(q<str_len&&isin(i[#-3,q],skip_char_0,skip_char_1,skip_char_2),++q;);
+
+			i[#-3,q]==B0P0?(
+				i(#-1,stmt,0,0,2)=q;
+				I(#-2,sp)=[atq_mode?10:1,stmt]; # 10 = mode 1 body (needs ';'), 1 = loop-style body
+				++sp;
+				p=q;
+			):(
+				# No body: only valid for mode 1, and it needs ';'
+				if(!atq_mode,run('error atq_expect_body'););
+				if(i[#-3,q]!=char_end,run('error ctl_expect_end'););
+				i(#-1,stmt,0,0,2)=0;
+				i(#-1,stmt,0,0,6)=q+1;
+				p=q;
+			);
+			ignore_num=0;
+		):
 		c==B1P0?(
 			ignore_num?(
 				# Repeat block N{...}
@@ -1367,6 +1564,16 @@ eval "
 			):(
 				run('error mismatched_bracket_det');0;
 			);
+			ignore_num=0;
+		):
+		(c==char_cond&&i[#-3,p+1]==char_cond&&i[#-3,skip_to(p+2)]==B0P0)?(
+			stmt=p;
+			q=skip_to(p+2);
+			i(#-1,stmt,0,0,2)=q; # Body '['
+			i(#-1,stmt,0,0,5)=1; # Marks a do-while (channel 5 is unused for plain whiles)
+			I(#-2,sp)=[11,stmt];
+			++sp;
+			p=q;
 			ignore_num=0;
 		):
 		(c==char_cond||c==char_count)?(
@@ -1444,6 +1651,31 @@ eval "
 					run('error ctl_expect_end');
 				);
 			):
+			# NEW: body of '@?1', which needs a ';' after its ']'
+			kind==10?(
+				i(#-1,stmt,0,0,3)=p;
+				q=p+1;
+				while(q<str_len&&isin(i[#-3,q],skip_char_0,skip_char_1,skip_char_2),++q;);
+				i[#-3,q]!=char_end?(
+					run('error ctl_expect_end');
+				);
+				i(#-1,stmt,0,0,6)=q+1;
+				p=q;
+			):
+			# NEW: end of a do-while body. The condition follows in braces.
+			kind==11?(
+				i(#-1,stmt,0,0,3)=p; # Body ']'
+				q=skip_to(p+1);
+				i[#-3,q]!=B1P0?(
+					run('error dowhile_expect_cond');
+				);
+				e=find(#-3,B1P1,q+1,1);
+				if(e<0,run('error missing_bracket_det'););
+				i(#-1,stmt,0,0,0)=q+1; # Condition start
+				i(#-1,stmt,0,0,1)=e;   # Condition end ('}')
+				i(#-1,stmt,0,0,6)=e+1; # Resume after the condition
+				p=e;
+			):
 			kind>=5?(
 				run('error mismatched_bracket_det');0;
 			):
@@ -1496,7 +1728,7 @@ eval "
 				);
 				p=q;
 			):(
-				# While or count body
+				# While or count body (also the body of '@?0')
 				i(#-1,stmt,0,0,3)=p;
 				i(#-1,stmt,0,0,6)=p+1;
 			);
@@ -1528,7 +1760,7 @@ eval "
 	"
 
 rm[-2]
-{w#-2},1,1,3,0 # Control frame stack: (kind,statement position,remaining count)
+{w#-2},1,1,6,0 # Control frame stack: (kind,statement position,remaining count / path position,origin / path node,end node,restore node)
 #@cli rep_str2bin_struct_fill_gradient: mode={ 0=exponential | 1=incremental } | 0<=mode<=1
 #@cli : Apply 2D gradient into BinArbor generated image, which is a 2D image representing a binary tree generated by the BinArbor interpretative language.
 #@cli : This means 2D gradient according to binary tree structure.
