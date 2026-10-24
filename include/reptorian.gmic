@@ -79,9 +79,10 @@
 #@cli :       Occupied sides are left alone, and the current node's own value is not changed.
 #@cli :   \&\&name = Like &, but the same way (no left/right swap) and from variable 'name'.
 #@cli :   = = Break out of the innermost enclosing loop (N{...}, N...`, ??{...}[...],
-#@cli :       #{n}[...], @?0/@?1 path walks or @!{...} and its siblings) and resume right
-#@cli :       after it. Any if/else body or [...] local context being left is closed
-#@cli :       automatically. Error if used outside a loop.
+#@cli :       #{n}[...], @?0/@?1 path walks, @<0/@>0/@.0/@:0/@^0 directional loops or
+#@cli :       @!{...} and its siblings) and resume right after it. Any if/else body or
+#@cli :       [...] local context being left is closed automatically. Error if used
+#@cli :       outside a loop.
 #@cli :
 #@cli :   *A subtree root is the node where the current local branch context began.
 #@cli :
@@ -109,6 +110,20 @@
 #@cli :   @?1{path};      = Only move to the path's end node (the body is optional for mode 1).
 #@cli :       '+' and '-' count as one step. '=' leaves the walk (mode 0 returns to the start
 #@cli :       node, mode 1 stays where the body left it), ',' continues with the next step.
+#@cli :
+#@cli : Directional loops (the body is BinArbor code, nothing is ever created, no ';' needed):
+#@cli :   @<0{skip}[...]  = Run the body at the current node, then step to the left child again and
+#@cli :       again, running the body at every node reached. Stops when there is no further left child.
+#@cli :   @\>0{skip}[...] = Same, toward right children.
+#@cli :   @\.0{skip}[...] = Same, but each step picks a random side. Stops when that side has no child.
+#@cli :   @:0{skip}[...]  = Same, but each step picks randomly among existing children. Stops when none.
+#@cli :   @^0{skip}[...]  = Same, toward the parent. Stops after reaching the subtree root.
+#@cli :       The digit is mandatory. 0 = return to the start node afterwards, 1 = stay at the last
+#@cli :       node reached. '=' leaves the loop (mode 1 stays where the body left the node),
+#@cli :       ',' continues with the next step.
+#@cli :       {skip} is optional. It is evaluated at a node before the body, including the starting
+#@cli :       node. If it gives n, that node and the next n-1 nodes are skipped, and the body runs at
+#@cli :       the node after them. The expression is not evaluated again until the body has run.
 #@cli :
 #@cli : Expressions and local branching:
 #@cli :   {...} = Evaluate expression and store result in node.
@@ -205,6 +220,13 @@
 #@cli :   cost grows with the size of the walked subtree. Calling them in a long
 #@cli :   loop on a big tree is slow. index(), nodes() and children() are instant.
 #@cli :
+#@cli :   x_ind() = Return the 0-based pass/step index of the innermost enclosing loop.
+#@cli :              Error outside a loop.
+#@cli :
+#@cli :   X_ind() = Return how many times the body of the innermost enclosing loop has been
+#@cli :              executed so far, minus 1. Differs from x_ind() only when a skip count is used.
+#@cli :              Error outside a loop.
+#@cli :
 #@cli :   For this implementation, all G'MIC JIT expressions are supported.
 #@cli :
 #@cli : Ignored characters:
@@ -242,8 +264,9 @@ $0_start_of_image_list,$0_v_size,$0_expr_enable_mode,$0_char_limit,$0_dict_size:
 _rep_str2bin_struct_prepass      # Validate brackets, build the control-flow jump table (str+1) and frame stack (str+2)
 1,1,1,5             # root, root left child idx, root right child idx, root both child idx, root either child idx
 1,1,1,2             # repeat bucket position stack
-1,2,1,1,0,1x4       # childfree_stack -> no left child, no right child, no both child, no either child
-1,1,1,{max($2,1)}   # expression result buffer (one pixel, $2 channels)
+1,2,1,1,0,1x4       # childfree_stack -> ...
+{w#$rep_str2bin_struct_start_of_image_list},1,1,2,0   # loop index stack: (x_ind,X_ind), parallel to the control frame stack
+1,1,1,{max($2,1)}   # expression result buffer
 
 1,1,1,9,nan,0,0,0,nan,0,0,0,0 # parent,left,right,depth,direction,lstack,rstack,bstack,estack
 
@@ -302,9 +325,10 @@ eval "
 	const no_right_child_stack=str_img+6;
 	const no_both_child_stack=str_img+7;
 	const no_either_child_stack=str_img+8;
-	const result_img=str_img+9;
-	const binary_tree_img=str_img+10;
-	const repeat_dict_table=str_img+11;
+	const loop_ind_stack=str_img+9;
+	const result_img=str_img+10;
+	const binary_tree_img=str_img+11;
+	const repeat_dict_table=str_img+12;
 	const str_len=whd#str_img;
 	const char_limit=$rep_str2bin_struct_char_limit;
 	const parent_pos=0;
@@ -328,8 +352,43 @@ eval "
 		sk_p;
 	);
 
+	# Predeclared so the helper functions below can read them
+	ctl_sp=0;
+	repeat_level=repeat_pos=repeat_bucket=-1;
+
+	bump_loop_ind(bl_sp)=(
+		++i(#loop_ind_stack,bl_sp,0,0,0);
+		++i(#loop_ind_stack,bl_sp,0,0,1);
+	);
+
+	# Find the innermost enclosing loop (control frame or repeat) and hand its indices to __rep_str2bin_struct_expr
+	loop_ctx()=(
+		lc_sp=-1;
+		for(lc_p=ctl_sp-1,lc_p>=0,--lc_p,
+			lc_k=i(#ctl_stack,lc_p,0,0,0);
+			if(lc_k==1||lc_k==2||lc_k==5||lc_k==6||lc_k==7,lc_sp=lc_p;break(););
+		);
+		lc_fpos=lc_sp>=0?i(#ctl_stack,lc_sp,0,0,1):-1;
+		lc_rpos=repeat_level>-1?i(#repeat_bucket,repeat_pos,0,0,0):-1;
+		lc_x=nan;
+		lc_X=nan;
+		if(lc_rpos>lc_fpos,
+			lc_x=i(#repeat_bucket,repeat_pos,0,0,3)-i(#repeat_bucket,repeat_pos,0,0,4);
+			lc_X=lc_x;
+		,
+			if(lc_sp>=0,
+				lc_x=i(#loop_ind_stack,lc_sp,0,0,0);
+				lc_X=i(#loop_ind_stack,lc_sp,0,0,1);
+			);
+		);
+		set('rep_str2bin_struct_in_loop',lc_rpos>=0||lc_fpos>=0);
+		set('rep_str2bin_struct_x_ind',lc_x);
+		set('rep_str2bin_struct_X_ind',lc_X);
+	);
+
 	# Evaluate a scalar expression (control flow condition or count) at a given node
 	ctl_eval(br,dr,sr,st,ln)=(
+		loop_ctx();
 		set('rep_str2bin_struct_current_branch',br);
 		set('rep_str2bin_struct_expr_start',st);
 		set('rep_str2bin_struct_expr_length',ln);
@@ -393,6 +452,24 @@ eval "
 			wp_q=next_pos(wp_q+1,wp_pe);
 		);
 		wp_n;
+	);
+
+	# Next node of a directional loop from dn_n, or -1 if there is none. Never creates anything.
+	dl_next(dn_n,dn_root,dn_dc)=(
+		dn_r=-1;
+		dn_l=i(#binary_tree_img,0,dn_n,0,left_child_pos);
+		dn_rt=i(#binary_tree_img,0,dn_n,0,right_child_pos);
+		if(dn_dc==left_child,dn_r=dn_l>0?dn_l:-1;);
+		if(dn_dc==right_child,dn_r=dn_rt>0?dn_rt:-1;);
+		if(dn_dc==random_child,
+			dn_r=v(0,1)?dn_rt:dn_l;
+			dn_r=dn_r>0?dn_r:-1;
+		);
+		if(dn_dc==two_child,
+			dn_r=(dn_l>0&&dn_rt>0)?(v(0,1)?dn_rt:dn_l):(dn_l>0?dn_l:(dn_rt>0?dn_rt:-1));
+		);
+		if(dn_dc==move_up_tree&&dn_n!=dn_root,dn_r=i(#binary_tree_img,0,dn_n,0,parent_pos););
+		dn_r;
 	);
 
 	if(expr_enable_mode,
@@ -792,6 +869,8 @@ eval "
 				start_of_expr=cursor+1;
 				end_of_expr=find(#str_img,expr_1,cursor+2,1);
 
+				loop_ctx();
+
 				set('rep_str2bin_struct_current_branch',current_branch);
 				set('rep_str2bin_struct_expr_start',start_of_expr);
 				set('rep_str2bin_struct_expr_length',end_of_expr-start_of_expr);
@@ -851,6 +930,7 @@ eval "
 				wk_node=step_node(current_branch,wk_root,i[#str_img,wk_np]);
 				# Frame: kind, statement, next path position, path node, end node, restore node (-1 = none)
 				I(#ctl_stack,ctl_sp)=[6,wk_stmt,next_pos(wk_np+1,wk_pe),wk_node,wk_end,wk_mode?-1:wk_origin];
+				I(#loop_ind_stack,ctl_sp)=[0,0];
 				++ctl_sp;
 				current_branch=wk_node;
 				cursor=wk_body+1;
@@ -860,6 +940,17 @@ eval "
 				cursor=i(#jump_table,wk_stmt,0,0,6);
 			);
 		):
+		# NEW: directional loop '@<0{skip}[...]' ('@>' '@.' '@:' '@^')
+		(current_char==move_to_var&&isin(i[#str_img,cursor+1],left_child,right_child,random_child,two_child,move_up_tree))?(
+			dl_stmt=cursor;
+			dl_mode=i(#jump_table,dl_stmt,0,0,4);
+			# Frame: kind, statement, remaining skips, last node reached, first-pass flag, restore node (-1 = none)
+			I(#ctl_stack,ctl_sp)=[7,dl_stmt,0,current_branch,1,dl_mode?-1:current_branch];
+			I(#loop_ind_stack,ctl_sp)=[-1,-1];
+			++ctl_sp;
+			# The ']' handler performs the first step
+			cursor=i(#jump_table,dl_stmt,0,0,3);
+		):
 		(current_char==move_to_var&&(at_mode=find([random_left_leaf,random_right_leaf,random_no_child,random_leaf],i[#str_img,cursor+1],0,1))!=-1)?(
 			# '@(' = 0, '@)' = 1, '@!' = 2, '@|' = 3. The mode is also the stack offset.
 			at_stmt=cursor;
@@ -868,6 +959,7 @@ eval "
 
 			at_pos>=i(#square_bracket_stack,square_bracket_level,0,0,1+at_mode)?(
 				I(#ctl_stack,ctl_sp)=[5,at_stmt,at_pos,current_branch,0,0]; # Channel 3 = origin node, restored at the end
+				I(#loop_ind_stack,ctl_sp)=[0,0];
 				++ctl_sp;
 				current_branch=i[#at_stack,at_pos];
 				cursor=i(#jump_table,at_stmt,0,0,2)+1;
@@ -917,6 +1009,7 @@ eval "
 		# NEW: do-while. Run the body first. The condition is tested by the ']' handler (frame kind 1).
 		(current_char==ctl_char_cond&&i[#str_img,cursor+1]==ctl_char_cond&&i(#jump_table,cursor,0,0,5)==1)?(
 			I(#ctl_stack,ctl_sp)=[1,cursor,0,0,0,0];
+			I(#loop_ind_stack,ctl_sp)=[0,0];
 			++ctl_sp;
 			cursor=i(#jump_table,cursor,0,0,2)+1;
 		):
@@ -966,6 +1059,7 @@ eval "
 				):
 				(ctl_true||ctl_body)?(
 					I(#ctl_stack,ctl_sp)=[ctl_new_kind,ctl_stmt,0,0,0,0];
+					I(#loop_ind_stack,ctl_sp)=[0,0];
 					++ctl_sp;
 					cursor=ctl_body+1;
 				):(
@@ -987,6 +1081,7 @@ eval "
 
 			ctl_n>0?(
 				I(#ctl_stack,ctl_sp)=[2,ctl_stmt,ctl_n,0,0,0];
+				I(#loop_ind_stack,ctl_sp)=[0,0];
 				++ctl_sp;
 				cursor=i(#jump_table,ctl_stmt,0,0,2)+1;
 			):(
@@ -1047,6 +1142,7 @@ eval "
 					i(#jump_table,frame_stmt,0,0,1)-i(#jump_table,frame_stmt,0,0,0)
 				);
 				(!isnan(ctl_val)&&ctl_val!=0)?(
+					bump_loop_ind(ctl_sp);
 					++ctl_sp; # Frame data is still in place, so just reopen it
 					cursor=i(#jump_table,frame_stmt,0,0,2)+1;
 				):(
@@ -1058,6 +1154,7 @@ eval "
 				frame_left=i(#ctl_stack,ctl_sp,0,0,2)-1;
 				frame_left>0?(
 					i(#ctl_stack,ctl_sp,0,0,2)=frame_left;
+					bump_loop_ind(ctl_sp);
 					++ctl_sp;
 					cursor=i(#jump_table,frame_stmt,0,0,2)+1;
 				):(
@@ -1073,6 +1170,7 @@ eval "
 					wk_node=step_node(i(#ctl_stack,ctl_sp,0,0,3),i[#square_bracket_stack,square_bracket_level],i[#str_img,wk_pos]);
 					i(#ctl_stack,ctl_sp,0,0,2)=next_pos(wk_pos+1,wk_pe);
 					i(#ctl_stack,ctl_sp,0,0,3)=wk_node;
+					bump_loop_ind(ctl_sp);
 					++ctl_sp; # Reopen the frame
 					current_branch=wk_node;
 					cursor=i(#jump_table,frame_stmt,0,0,2)+1;
@@ -1080,6 +1178,76 @@ eval "
 					# Walk done: mode 0 restores the start node, mode 1 goes to the end node
 					wk_rs=i(#ctl_stack,ctl_sp,0,0,5);
 					current_branch=wk_rs>=0?wk_rs:i(#ctl_stack,ctl_sp,0,0,4);
+					cursor=i(#jump_table,frame_stmt,0,0,6);
+				);
+			):
+			frame_kind==7?(
+				# Directional loop: find the next node that runs the body.
+				# The skip expression is evaluated at each ready node. If it gives n, that node and the
+				# next n-1 nodes are skipped, and the body runs at the node after them (no re-evaluation).
+				dl_n=i(#ctl_stack,ctl_sp,0,0,3);
+				dl_run=0;
+				dl_go=1;
+				while(dl_go,
+					dl_first=i(#ctl_stack,ctl_sp,0,0,4)==1;
+					# First pass: the start node itself is the first node. Afterwards, step normally.
+					dl_nx=dl_first?dl_n:dl_next(dl_n,i[#square_bracket_stack,square_bracket_level],i[#str_img,frame_stmt+1]);
+					if(dl_first,i(#ctl_stack,ctl_sp,0,0,4)=0;);
+
+					if(dl_nx<0,
+						dl_go=0;
+					,
+						dl_n=dl_nx;
+						++i(#loop_ind_stack,ctl_sp,0,0,0);
+
+						if(i(#ctl_stack,ctl_sp,0,0,2)>0,
+							# Still skipping
+							--i(#ctl_stack,ctl_sp,0,0,2);
+						,
+							if(i(#ctl_stack,ctl_sp,0,0,4)==2,
+								# A skip just ended: run here without re-evaluating
+								i(#ctl_stack,ctl_sp,0,0,4)=0;
+								dl_run=1;
+								dl_go=0;
+							,
+								# Ready node: evaluate the skip expression, if there is one
+								dl_skip=0;
+								if(i(#jump_table,frame_stmt,0,0,0),
+									++ctl_sp; # Reopen the frame so the expression sees this loop's indices
+									dl_val=ctl_eval(
+										dl_n,
+										i(#binary_tree_img,0,dl_n,0,direction_pos),
+										i[#square_bracket_stack,square_bracket_level],
+										i(#jump_table,frame_stmt,0,0,0),
+										i(#jump_table,frame_stmt,0,0,1)-i(#jump_table,frame_stmt,0,0,0)
+									);
+									--ctl_sp;
+									dl_skip=isnan(dl_val)?0:max(floor(dl_val),0);
+								);
+
+								if(dl_skip>0,
+									# Skip this node and dl_skip-1 more, then force a run
+									i(#ctl_stack,ctl_sp,0,0,2)=dl_skip-1;
+									i(#ctl_stack,ctl_sp,0,0,4)=2;
+								,
+									dl_run=1;
+									dl_go=0;
+								);
+							);
+						);
+					);
+				);
+				i(#ctl_stack,ctl_sp,0,0,3)=dl_n;
+
+				dl_run?(
+					current_branch=dl_n;
+					++ctl_sp; # Reopen the frame for the body
+					++i(#loop_ind_stack,ctl_sp-1,0,0,1);
+					cursor=i(#jump_table,frame_stmt,0,0,2)+1;
+				):(
+					# Finished: mode 0 restores the start node, mode 1 stays at the last node reached
+					dl_rs=i(#ctl_stack,ctl_sp,0,0,5);
+					current_branch=dl_rs>=0?dl_rs:dl_n;
 					cursor=i(#jump_table,frame_stmt,0,0,6);
 				);
 			):(
@@ -1096,6 +1264,7 @@ eval "
 			at_pos=min(i(#ctl_stack,ctl_sp-1,0,0,2)-1,da_size(#at_stack)-1);
 
 			at_pos>=i(#square_bracket_stack,square_bracket_level,0,0,1+at_mode)?(
+				bump_loop_ind(ctl_sp-1);
 				i(#ctl_stack,ctl_sp-1,0,0,2)=at_pos;
 				current_branch=i[#at_stack,at_pos];
 				cursor=i(#jump_table,at_stmt,0,0,2)+1;
@@ -1108,12 +1277,12 @@ eval "
 		(current_char==break_loop||current_char==continue_loop)?(
 			is_continue=current_char==continue_loop;
 
-			# Innermost enclosing while/count/at-all/path-walk loop: search the frame stack from the top
+			# Innermost enclosing while/count/at-all/path-walk/directional loop: search the frame stack from the top
 			brk_frame=-1;
 			for(brk_p=ctl_sp-1,brk_p>=0,--brk_p,
 				brk_kind=i(#ctl_stack,brk_p,0,0,0);
-				# CHANGED: kind 6 (path walk) is now a loop frame too
-				if(brk_kind==1||brk_kind==2||brk_kind==5||brk_kind==6,brk_frame=brk_p;break(););
+				# CHANGED: kinds 6 (path walk) and 7 (directional loop) are loop frames too
+				if(brk_kind==1||brk_kind==2||brk_kind==5||brk_kind==6||brk_kind==7,brk_frame=brk_p;break(););
 			);
 			brk_frame_pos=brk_frame>=0?i(#ctl_stack,brk_frame,0,0,1):-1;
 
@@ -1128,8 +1297,8 @@ eval "
 				while(ctl_sp>0&&i(#ctl_stack,ctl_sp-1,0,0,1)>brk_rep_pos,
 					--ctl_sp;
 					if(!i(#ctl_stack,ctl_sp,0,0,0),--square_bracket_level;);
-					# NEW: a mode 0 path walk being left restores its start node
-					if(i(#ctl_stack,ctl_sp,0,0,0)==6,
+					# NEW: a mode 0 path walk or directional loop being left restores its start node
+					if(i(#ctl_stack,ctl_sp,0,0,0)==6||i(#ctl_stack,ctl_sp,0,0,0)==7,
 						brk_rs2=i(#ctl_stack,ctl_sp,0,0,5);
 						if(brk_rs2>=0,current_branch=brk_rs2;);
 					);
@@ -1157,9 +1326,9 @@ eval "
 				# Leaving an at-all construct for good: restore the origin node
 				if(brk_is_atall&&!is_continue,current_branch=brk_origin;);
 
-				# NEW: leaving a mode 0 path walk for good: restore the start node.
+				# NEW: leaving a mode 0 path walk or directional loop for good: restore the start node.
 				# Mode 1 stays wherever the body left the current node.
-				if(i(#ctl_stack,brk_frame,0,0,0)==6&&!is_continue,
+				if((i(#ctl_stack,brk_frame,0,0,0)==6||i(#ctl_stack,brk_frame,0,0,0)==7)&&!is_continue,
 					brk_rs=i(#ctl_stack,brk_frame,0,0,5);
 					if(brk_rs>=0,current_branch=brk_rs;);
 				);
@@ -1264,7 +1433,7 @@ eval "
 	i[#binary_tree_img,0]=max_depth+1; # Set the very first unused pixel to the maximum depth found during creation to enable O(1) retrieval
 	"
 
-rm[-267--258,-256--1]
+rm[-268--258,-256--1]
 
 if $2
 	split c,-4,2
@@ -1289,6 +1458,12 @@ if $rep_str2bin_struct_current_branch!=$rep_str2bin_struct_subroot
 	rep_str2bin_struct_sibling_idx={i(#-257,0,i(#-257,0,$rep_str2bin_struct_current_branch,0,0),0,2-$rep_str2bin_struct_direction)}
 fi
 res_str.=hassibling()={$rep_str2bin_struct_sibling_idx>0};
+
+# Loop indices. Only defined inside a loop.
+if $rep_str2bin_struct_in_loop
+	res_str.=x_ind()=$rep_str2bin_struct_x_ind;
+	res_str.=X_ind()=$rep_str2bin_struct_X_ind;
+fi
 
 # Structural queries (available even when vector_size is 0)
 res_str.=idx()=$rep_str2bin_struct_current_branch;
@@ -1393,6 +1568,7 @@ _rep_str2bin_struct_prepass:
 #  10 = path walk body of '@?1' (closed by ']' and then needs ';').
 #       The body of '@?0' uses kind 1, since it needs no ';'.
 #  11 = do-while body '??[' (closed by ']', which is followed by '{cond}')
+#  12 = directional loop body '@<0{skip}[' (closed by ']', no ';')
 
 # Table channels, set at the position of the '?' or '#' that starts a statement:
 #   0 = first char of condition/count expression
@@ -1421,6 +1597,10 @@ _rep_str2bin_struct_prepass:
 #   For a do-while statement '??[...]{cond}', set at the position of its first '?':
 #     0/1 = condition start / closing '}', 2 = body '[', 3 = body ']',
 #     5 = 1 (do-while marker), 6 = index where execution resumes
+
+#   For a directional loop '@<' '@>' '@.' '@:' '@^', set at the position of its '@':
+#     0/1 = skip expression start / closing '}' (0 if none), 2 = body '[', 3 = body ']',
+#     4 = mode (0 = restore start node, 1 = stay at last node), 6 = resume index
 
 eval "
 	const str_len=whd#-3;
@@ -1536,6 +1716,27 @@ eval "
 				i(#-1,stmt,0,0,6)=q+1;
 				p=q;
 			);
+			ignore_num=0;
+		):
+		# NEW: directional loop '@<0{skip}[...]' ('@>' '@.' '@:' '@^')
+		(c==char_match&&isin(i[#-3,p+1],_'<',_'>',_'.',_':',_'^'))?(
+			stmt=p;
+			dl_mode=i[#-3,p+2]-_'0';
+			if(dl_mode!=0&&dl_mode!=1,run('error dirloop_expect_mode'););
+			i(#-1,stmt,0,0,4)=dl_mode;
+			q=skip_to(p+3);
+			if(i[#-3,q]==B1P0,
+				e=find(#-3,B1P1,q+1,1);
+				if(e<0,run('error missing_bracket_det'););
+				i(#-1,stmt,0,0,0)=q+1;
+				i(#-1,stmt,0,0,1)=e;
+				q=skip_to(e+1);
+			);
+			if(i[#-3,q]!=B0P0,run('error dirloop_expect_body'););
+			i(#-1,stmt,0,0,2)=q;
+			I(#-2,sp)=[12,stmt];
+			++sp;
+			p=q;
 			ignore_num=0;
 		):
 		c==B1P0?(
@@ -1675,6 +1876,11 @@ eval "
 				i(#-1,stmt,0,0,1)=e;   # Condition end ('}')
 				i(#-1,stmt,0,0,6)=e+1; # Resume after the condition
 				p=e;
+			):
+			# NEW: end of a directional loop body (no ';' needed)
+			kind==12?(
+				i(#-1,stmt,0,0,3)=p;
+				i(#-1,stmt,0,0,6)=p+1;
 			):
 			kind>=5?(
 				run('error mismatched_bracket_det');0;
