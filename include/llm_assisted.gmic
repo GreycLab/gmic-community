@@ -817,6 +817,168 @@ fx_cosmic_nebula :
     +- 150 max. 0 b. 20 *. 0.4 + c 0,255 => $nm
   }
 
+#@gui Paint Background : fx_paint_background, fx_paint_background(0)*
+#@gui : Description = note{"<span color="#EE5500"><b>Description:</b></span> \
+# Generates a painted-wall / oil-sky style background (cloudy pigment layers, impasto, splatters).
+#@gui : "}, sep = separator()
+#@gui : Seed = int(0,0,100000)
+#@gui : sep = separator()
+#@gui : note = note("<small><span color="#EE5500"><b>Pigment Layer:</b></span></small>")
+#@gui : Structure scale (%) = float(35,5,100)
+#@gui : Detail = int(5,1,8)
+#@gui : Turbulence (%) = float(8,0,50)
+#@gui : Stroke angle = float(-8,-180,180)
+#@gui : Stroke length = float(3,1,12)
+#@gui : Sky gradient (%) = float(55,0,100)
+#@gui : Dry-brush streaks (%) = float(35,0,100)
+#@gui : sep = separator()
+#@gui : note = note("<small><span color="#EE5500"><b>Impasto & Splatters:</b></span></small>")
+#@gui : Impasto (%) = float(22,0,100)
+#@gui : Edge roughness (%) = float(60,0,100)
+#@gui : Splatters (%) = float(40,0,100)
+#@gui : Splatter size = int(3,1,10)
+#@gui : Accent splashes (%) = float(15,0,100)
+#@gui : sep = separator()
+#@gui : note = note("<small><span color="#EE5500"><b>Surface & Finish:</b></span></small>")
+#@gui : Relief (%) = float(10,0,100)
+#@gui : Canvas grain (%) = float(10,0,100)
+#@gui : Softness (%) = float(20,0,100)
+#@gui : sep = separator()
+#@gui : note = note("<small><span color="#EE5500"><b>Palette:</b></span></small>")
+#@gui : Color 1 (dark pigment) = color(105,152,200)
+#@gui : Color 2 (light pigment) = color(200,222,236)
+#@gui : Color 3 (cream) = color(240,231,214)
+#@gui : Color 4 (ochre) = color(203,162,112)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/10/27</i>.</small>")
+
+# Fractal (fBm) noise in [0,1], appended as a new image.
+# Each layer/octave has its own random seed (derived from pbg_seed), so changing
+# one parameter does not reshuffle the whole composition.
+_fx_paint_background_fbm : # width,height,wavelength,anisotropy,octaves,persistence,angle,layer_id
+  $1,$2,1,1,0
+  M:=max($1,$2)
+  amp=1
+  repeat $5 {
+    srand {$_pbg_seed*7919+$8*131+$>}
+    {max(2,ceil($1/($M*$3*$4/2^$>)))},{max(2,ceil($2/($M*$3/$4/2^$>)))},1,1,0
+    rand. -1,1
+    r. $1,$2,1,1,5
+    *. $amp
+    +[-2,-1]
+    amp:=$amp*$6
+  }
+  n. 0,1
+  if $7 rotate. $7,2,3,{[$1,$2]/2} fi
+
+fx_paint_background : # seed,scale,detail,turbulence,angle,length,sky,drybrush,impasto,roughness,splatters,splatter_size,accent,relief,grain,colors(4x3)
+  _pbg_seed=$1
+  foreach {
+    nm={n} W,H,M:=w,h,max(w,h) rm
+    scale:=$2%
+    persistence:=min(0.8,0.4+0.04*$3)
+
+    # [0] = warp field (domain warping gives the 'smeared brush' look).
+    _$0_fbm $W,$H,{$scale*0.45},1,4,0.5,0,1
+    _$0_fbm $W,$H,{$scale*0.45},1,4,0.5,0,2
+    a[-2,-1] c
+    f. "(i - 0.5)*2*$M*$4%"
+
+    # [1] = large-scale pigment field.
+    _$0_fbm $W,$H,$scale,$6,$3,$persistence,$5,3
+    warp. [0],1,2,1
+    equalize. 1024,0,1
+    f. "(1 - $7%)*i + $7%*(y/(h - 1)*0.9 + (i - 0.5)*0.4 + 0.05)"
+
+    # [2] = dry-brush streaks.
+    _$0_fbm $W,$H,{$scale*0.05},{$6*3},2,0.6,$5,4
+    warp. [0],1,1,1
+
+    # [3] = ragged-edge noise (small scale), [4] = impasto noise.
+    _$0_fbm $W,$H,{$scale*0.04},1,4,0.6,0,5
+    _$0_fbm $W,$H,{$scale*0.8},{max(1,$6*0.6)},3,0.5,$5,6
+    warp. [0],1,2,1
+    equalize. 1024,0,1
+    +f[3] "(i - 0.5)*$10%*1.1*(1 - 0.8*$16%)"
+    +[4,-1]
+
+    # [5] = splatter noise. [6] = accent noise.
+    _$0_fbm $W,$H,{0.004+0.003*$12},1,2,0.6,0,7
+    equalize. 1024,0,1
+    _$0_fbm $W,$H,{$scale*0.7},{max(1,$6*0.5)},3,0.5,$5,8
+    warp. [0],1,2,1
+    equalize. 1024,0,1
+    +f[3] "(i - 0.5)*$10%*0.9*(1 - 0.8*$16%)"
+    +[6,-1]
+
+    # [7] = canvas grain.
+    srand {$_pbg_seed*7919+999}
+    $W,$H,1,1,0
+    rand. 0,1
+    b. 0.5
+    n. 0,1
+
+    # Feature image channels: 0=pigment 1=streaks 2=ragged 3=impasto 4=splatter 5=accent 6=grain
+    rm[0] a c
+
+    # [1] = 4 channels: R,G,B + height.
+    $W,$H,1,4
+    f[1] "
+      begin(
+        P = [ ${17-28} ];
+        sm = $16%;
+        we = 0.03 + 0.4*sm;
+        S(a,b,v) = (tt = cut((v - a)/(b - a),0,1); tt*tt*(3 - 2*tt));
+        thr = 1 - $9%;
+        tha = 1 - $13%;
+        ths = 1 - $11%*0.35;
+      );
+      vb = i(#0,x,y,0,0);
+      vs = i(#0,x,y,0,1);
+      vr = i(#0,x,y,0,2);
+      vn = i(#0,x,y,0,3);
+      vp = i(#0,x,y,0,4);
+      va = i(#0,x,y,0,5);
+      vg = i(#0,x,y,0,6);
+      c3 = min(c,2);
+      q = cut(vb + (vs - 0.5)*$8%*0.25*(1 - 0.7*sm) + (vr - 0.5)*0.012*$3,0,1)*3;
+      k = min(int(q),2);
+      f = q - k;
+      f = f*f*(3 - 2*f);
+      col = P[3*k + c3] + (P[3*k + 3 + c3] - P[3*k + c3])*f;
+      mb = S(thr - we/2,thr + we/2,vn);
+      mab = S(tha - we/2,tha + we/2,va);
+      M = mb*((0.45 + 0.55*S(0.2,0.8,vr))*(1 - sm) + sm);
+      glaze = S(thr - 0.3 - 0.3*sm,thr,vn)*(0.28 + 0.3*sm)*(0.5 + vs);
+      MA = mab*((0.2 + 0.8*S(0.3,0.7,vr))*(1 - sm) + sm)*0.7;
+      ed = 4*mb*(1 - mb) + 0.7*4*mab*(1 - mab);
+      reg = 0.3 + 0.7*(1 - S(0,0.3,abs(vn - thr)));
+      SP = S(ths,ths + 0.015 + 0.1*sm,vp)*reg*(1 - 0.85*M);
+      Wc = (P[6 + c3]*0.3 + 255*0.7)*(0.93 + 0.07*vr);
+      col = col*(1 + (vs - 0.5)*$8%*0.35*(1 - 0.7*sm));
+      col+=(P[c3]*0.9 - col)*MA;
+      col+=(Wc - col)*cut(M*0.92 + glaze*(1 - M),0,1);
+      col+=(Wc - col)*SP;
+      col = 255 - (255 - col)*(1 + sm*0.6*ed);
+      cg = col*(1 + (vg - 0.5)*$15%*0.4);
+      cd = 255 - (255 - col)*(1 + (vg - 0.5)*$15%*0.8);
+      col = cg + (cd - cg)*sm;
+      hh = 0.5*M*(0.4 + 1.2*vr)*(1 - 0.9*sm) + 0.12*vb + 0.35*MA + 0.15*vs + 0.6*SP + 0.3*vg*$15%;
+      c==3?hh:col"
+    rm[0]
+
+    # Relief lighting.
+    +channels[0] 3,3
+    b[1] {$M*0.0012}
+    g[1] xy
+    *[1,2] {$14%*5*$M/1000}
+    +[1,2]
+    *[1] 0.7071
+    +[1] 1
+    channels[0] 0,2
+    * c 0,255 => $nm
+  }
+
 #@gui _<b>Testing</b>
 #@gui <i>Rajasegar Chandiran</i>
 #@gui Hexagon Grid : fx_hexagon_grid, fx_hexagon_grid(1)
