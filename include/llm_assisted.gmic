@@ -4,8 +4,8 @@
 #  File        : llm_assisted.gmic
 #                ( G'MIC commands file )
 #
-#  Description : Set of G'MIC commands and filters that have been
-#                assisted by LLMs.
+#  Description : Set of G'MIC commands and filters that have written
+#                with assistance from LLMs (and polished afterwards)
 #
 #  Copyright   : David Tschumperle
 #                ( http://tschumperle.users.greyc.fr/ )
@@ -980,6 +980,110 @@ fx_paint_background :
     channels[0] 0,2
     * c 0,255 => $nm
   }
+
+#@gui Perspective Water Waves : fx_perspective_water_waves, fx_perspective_water_waves(1)
+#@gui : Description = note{"<span color="#EE5500"><b>Description:</b></span> \
+# Procedural rendering of a choppy water surface, in perspective.
+#@gui : "}, sep = separator()
+#@gui : note = note("<span color="#EE5500"><b>Camera:</b></span>")
+#@gui : Horizon Height = float(0.4,0,3)
+#@gui : Focal = float(1,0.2,4)
+#@gui : sep = separator()
+#@gui : note = note("<span color="#EE5500"><b>Waves:</b></span>")
+#@gui : Number Of Waves = int(96,8,300)
+#@gui : Min Wavelength = float(0.02,0.002,0.5)
+#@gui : Max Wavelength = float(0.25,0.02,2)
+#@gui : Spectrum Exponent = float(1.3,0.5,2.5)
+#@gui : Choppiness = float(0.35,0,1.5)
+#@gui : Direction Spread (deg.) = float(57,0,180)
+#@gui : Main Direction (deg.) = float(0,-180,180)
+#@gui : Time = float(0,0,1000)
+#@gui : sep = separator()
+#@gui : note = note("<span color="#EE5500"><b>Light:</b></span>")
+#@gui : Sun Azimuth (deg.) = float(0,-180,180)
+#@gui : Sun Elevation (deg.) = float(20,1,89)
+#@gui : Sun Intensity = float(0.6,0,5)
+#@gui : Sun Glossiness = float(200,5,2000)
+#@gui : sep = separator()
+#@gui : note = note("<span color="#EE5500"><b>Colors:</b></span>")
+#@gui : Deep Color = color(3,35,50)
+#@gui : Shallow Color = color(15,105,125)
+#@gui : Sky (Horizon) = color(170,215,225)
+#@gui : Sky (Zenith) = color(40,110,140)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/10/28</i>.</small>")
+fx_perspective_water_waves :
+  horizon_height,focal,nb_waves,min_wavelength,max_wavelength,spectrum_exponent,choppiness,direction_spread,\
+    main_direction,time,sun_azimuth,sun_elevation,sun_intensity,sun_glossiness,deep_r,deep_g,deep_b,shallow_r,\
+    shallow_g,shallow_b,sky_horizon_r,sky_horizon_g,sky_horizon_b,sky_zenith_r,sky_zenith_g,sky_zenith_b=${1-26}
+
+  to_rgb
+  f ":begin(
+        const nw = max(1,round($nb_waves));
+        const wlmin = $min_wavelength;
+        const wlmax = $max_wavelength;
+        const p1 = $spectrum_exponent - 1;
+        const amp0 = $choppiness*sqrt(2/nw);
+        const spr = $direction_spread°;
+        const th0 = $main_direction°;
+        const tt = $time;
+        const lx = sin($sun_azimuth°)*cos($sun_elevation°);
+        const ly = sin($sun_elevation°);
+        const lz = cos($sun_azimuth°)*cos($sun_elevation°);
+        Cd = [ $deep_r,$deep_g,$deep_b ]/255;
+        Cs = [ $shallow_r,$shallow_g,$shallow_b ]/255;
+        Ch = [ $sky_horizon_r,$sky_horizon_g,$sky_horizon_b ]/255;
+        Cz = [ $sky_zenith_r,$sky_zenith_g,$sky_zenith_b ]/255;
+        Csun = [ 1,0.97,0.9 ];
+        c1 = abs(sin(1.7)*43758.5453)%1;
+        c2 = abs(sin(4.1)*24634.6345)%1;
+      );
+
+      sy = (y + 0.5)/h + $horizon_height;
+      Z = $focal/sy;
+      X = (x + 0.5 - 0.5*w)/(h*sy);
+      dX = 1/(h*sy);
+      dZ = $focal/(h*sy*sy);
+      hx = hz = 0;
+      for (n = 0, n<nw, ++n,
+        r1 = abs(sin(n*12.9898)*43758.5453)%1;
+        r2 = abs(sin(n*39.3468)*24634.6345)%1;
+        r3 = abs(sin(n*73.1561)*31415.9265)%1;
+        r4 = abs(sin(n*26.6511)*12345.6789)%1;
+        u = (c1 + n*0.7548776662 + 0.1*r1)%1;
+        v = (c2 + n*0.5698402910 + 0.1*r2)%1;
+        lam = wlmin*(wlmax/wlmin)^u;
+        d = v<0.5?sqrt(2*v) - 1:1 - sqrt(2*(1 - v));
+        th = th0 + spr*d;
+        kk = 2*pi/lam;
+        ox = sin(th);
+        oz = cos(th);
+        wt = cut((0.5 - (abs(ox)*dX + abs(oz)*dZ)/lam)/0.35, 0, 1);
+        sl = amp0*(lam/wlmax)^p1*wt*(0.5 + r3);
+        ar = kk*(ox*X + oz*Z) + 2*pi*r4 - sqrt(9.81*kk)*tt;
+        cs = cos(ar);
+        hx += sl*ox*cs; hz += sl*oz*cs;
+      );
+
+      nn = sqrt(1 + hx*hx + hz*hz);
+      nx = -hx/nn; ny = 1/nn; nz = -hz/nn;
+      vn = sqrt(X*X + 1 + Z*Z);
+      vx = -X/vn; vy = 1/vn; vz = -Z/vn;
+      nv = max(nx*vx + ny*vy + nz*vz, 0.02);
+      rx = 2*nv*nx - vx; ry = 2*nv*ny - vy; rz = 2*nv*nz - vz;
+      rs = cut(rx*lx + ry*ly + rz*lz, 0, 1);
+      tz = cut(ry, 0, 1)^0.5;
+      sky = Ch*(1 - tz) + Cz*tz;
+      g = cut($sun_intensity, 0, 1)*rs^12;
+      sky = sky*(1 - g) + Csun*0.9*g;
+      oc = cut(-4*ry, 0, 1);
+      sky = sky*(1 - oc) + Cd*oc;
+      F = 0.02 + 0.98*(1 - nv)^5;
+      dl = cut(nx*lx + ny*ly + nz*lz, 0, 1);
+      body = Cd + (Cs - Cd)*cut(0.5 + 0.8*(dl - ly), 0, 1);
+      sp = $sun_intensity*rs^$sun_glossiness;
+      255*(body*(1 - F) + sky*F + Csun*sp)"
+  c 0,255
 
 #@gui _<b>Testing</b>
 #@gui <i>Rajasegar Chandiran</i>
