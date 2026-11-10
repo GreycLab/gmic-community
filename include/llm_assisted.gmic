@@ -399,16 +399,20 @@ _fx_page_curl :
 # Renders a lens flare effect (code variation of the GEGL <i>gegl:lens-flare</i> operation.)
 #@gui : "}, sep = separator()
 #@gui : Position = point(50,50,0,1)
-#@gui : Dominant color = color(255,38,43)
+#@gui : Dominant Color = color(255,38,43)
 #@gui : Size (%) = float(100,10,400)
 #@gui : Intensity (%) = float(100,0,200)
-#@gui : Blending mode = choice(0,"Addition","Dodge","Hard Light","Lighten","Normal","Screen")
+#@gui : Aperture Shape = choice(5,"Circle","Triangle","Square","Pentagon","Hexagon","Heptagon","Octagon")
+#@gui : Aperture Rotation (deg) = float(0,-180,180)
+#@gui : Blade Roundness (%) = float(10,0,100)
+#@gui : Same Area as Circle = bool(1)
+#@gui : Blending Mode = choice(0,"Addition","Dodge","Hard Light","Lighten","Normal","Screen")
 #@gui : Opacity (%) = float(100,0,100)
 #@gui : sep = separator()
-#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/10/10</i>.</small>")
+#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/10/10</i>.</small>")
 __fx_lens_flare :
-  posX,posY,colR,colG,colB,size,intensity,opacity=${1-7},$9
-  blending_mode=${"arg0 $8,addition,dodge,hardlight,lighten,normal,screen"}
+  posX,posY,colR,colG,colB,size,intensity,shape,rot,brd,eqa,opacity=${1-11},$13
+  blending_mode=${"arg0 $12,addition,dodge,hardlight,lighten,normal,screen"}
 
 fx_lens_flare :
   __$0 $*
@@ -428,6 +432,19 @@ fx_lens_flare :
         const sz3 = W*0.1796875;
         const sz4 = W*0.3359375;
         const sz5 = W*0.084375;
+
+        # Aperture shape.
+        const poly = $shape>0;
+        const nb = $shape + 2;
+        const sec = 2*pi/nb;
+        const hp = pi/nb;
+        const ch = cos(hp);
+        const rot0 = $rot*pi/180;
+        const rd = $brd/100;
+        # Factor giving the polygon the same area as the circle (if requested).
+        const kn = if($eqa, sqrt(nb*sin(2*pi/nb)/(2*pi)), 1);
+        # Lower bound of (polygonal distance)/(euclidean distance), used for early rejection.
+        const fmin = if(poly, (1 - rd)*kn + rd, 1);
 
         rt = [ 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4 ];
         rs = [ 0.027, 0.01, 0.005, 0.031, 0.015, 0.037, 0.022, 0.025, 0.058, 0.017,
@@ -489,17 +506,27 @@ fx_lens_flare :
         pr<1?(acc*=1 - (1 - pr)*rc[12 + c]);
 
         for (k = 0, k<19, ++k,
-          rr = sqrt((x - int(rk[k]*dx + xh))^2 + (y - int(rk[k]*dy + yh))^2);
           sz = W*rs[k];
-          ty = rt[k];
-          cc = rc[3*(k + 5) + c];
-          if (ty==1,
-            (pr = (sz - rr)/sz; if (pr>0, acc*=1 - pr*pr*cc)),
-            if (ty==2,
-              (pr = (sz - rr)/(sz*0.15); if (pr>0, acc*=1 - min(pr,1)*cc)),
-              if (ty==3,
-                (pr = (sz - rr)/(sz*0.12); if (pr>0, (if (pr>1, pr = 1 - pr*0.12); acc*=1 - pr*cc))),
-                (pr = abs((rr - sz)/(sz*0.04)); if (pr<1, acc*=1 - (1 - pr)*cc)))));
+          ddx = x - int(rk[k]*dx + xh);
+          ddy = y - int(rk[k]*dy + yh);
+          rr = sqrt(ddx^2 + ddy^2);
+          # Early rejection: pixels too far from the ghost have no contribution.
+          if (rr<sz*1.05/fmin,
+            if (poly,
+              a = atan2(ddy,ddx) - rot0 - if(rk[k]<0,pi,0);
+              m = a - sec*floor(a/sec);
+              rr = (1 - rd)*kn*rr*cos(m - hp)/ch + rd*rr;
+            );
+            ty = rt[k];
+            cc = rc[3*(k + 5) + c];
+            if (ty==1,
+              (pr = (sz - rr)/sz; if (pr>0, acc*=1 - pr*pr*cc)),
+              if (ty==2,
+                (pr = (sz - rr)/(sz*0.15); if (pr>0, acc*=1 - min(pr,1)*cc)),
+                if (ty==3,
+                  (pr = (sz - rr)/(sz*0.12); if (pr>0, (if (pr>1, pr = 1 - pr*0.12); acc*=1 - pr*cc))),
+                  (pr = abs((rr - sz)/(sz*0.04)); if (pr<1, acc*=1 - (1 - pr)*cc)))));
+          );
         );
         min(255,$intensity*(1 - acc)*255%)
       ):i"
