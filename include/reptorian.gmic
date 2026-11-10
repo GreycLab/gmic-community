@@ -4738,67 +4738,26 @@ else
 fi
 
 k[0]
-#@cli rep_val2order: _map2img={ -1=Remove | 0=F | 1=T | 2=keep_both },_additional_image={ 0=n/a | 1=value | 2=count | 3=value+count},_value={ 0=scalar | 1=vector },_status={ 0=n/a | 1=order | 2=value | 3=count | 4=size_of_order },_has_high_cardinality_image(s)={ 0=F | 1=T }
+#@cli rep_val2order: _map2img={ -1=Remove | 0=n/a | 1=T | 2=Keep Both },_additional_image={ 0=n/a | 1=value | 2=count | 3=value+count},_value={ 0=scalar | 1=vector },_status={ 0=n/a | 1=size_of_order }
 #@cli : This commands can change images to order of appearance representation(s), and provide information based on order.
-#@cli : Default values: '_map2img=1','_additional_image=1','_value=1','_status=0','_has_high_cardinality_image(s)=max_whds(imgs)>sqr(2048)'
+#@cli : Note: Code has been created by Reptorian, only optimization toward order assignment was done by Claude.
+#@cli : Default values: '_map2img=1','_additional_image=1','_value=1','_status=0'
 rep_val2order:
+check isint(${1=1},-1,2)&&isint(${2=0},0,3)&&isbool(${3=1})&&isbool(${4=0})
 
-####################################################################
-# This algorithm can be parallelized with the following technique:
-# Pass 1:
-# - 1 ) Create a new image of 2 channels which is relative bucket id+pos. This is required for mapping back.
-# - 2 ) Use technique found in _rep_colors_freqstat, but write hash+bucket used to map back.
-# - 3 ) Create palette from merged dictionary of Init Thread 0 bucket. Order them. Somehow map it back to the bcket.
-# - 4 ) You'd have to write into bucket information so that the order can be retrieved via O(1) look up.
-# Pass 2:
-# Use the modified bucket to retrieve order information if needed
-# ##################################################################
-
-if !l?1:same(expr('!s#x',l),1)
+if same([${1-2},$4],0)||!l?1:same(expr('!s#x',l),1)
 	return
 fi
 
-check isint(isint(${1=1},-1,2)&&${2=1},0,3)&&isbool(${3=1})&&isint(${4=0},0,4)
-skip "${5=}"
-
-if narg($5)
-	HC=$5
-	check isbool($HC)
-else
-	if $3
-		HC:=max(expr('whd#x',l))>sqr(2048)
-	else
-		HC:=max(expr('whds#x',l))>sqr(2048)
-	fi
-fi
-
-status_mode=$4
-
-if same([$1,$2,$4],0)
-	status_mode=1
-fi
-
-if $status_mode status=
+if $4 status=
 else status=${}
 fi
 
-use_count,fill_mode,ui,M,F:=$2>1||$status_mode==3,$1>0||$status_mode==1,$2||$status_mode==2||$status_mode==3,l>1,!$1
-process_mode={$use_count||$fill_mode}
-uvcm,add_mode_3:=(isin($4,2,3)?$4-1),$2==3
-mode={$2|$uvcm}
-cross,Q,U:=$2<3?($mode==3),2+!($2-1),$ui&&!$2
-
-if $fill_mode
-	ef=fill
-else
-	ef=eval
-fi
-
 if isint($^,0)
-	if same([${1-3}],0)&&$status_mode
+	if same([${1-3}],0)&&$4
 		e[0] "Count the number of unique colors."
 	else
-		if $1>0||$2==1||$2==3||$3==1||$3==2
+		if $1>0||isin($2,1,3)||isin($3,1,2)
 			e[0] "Extract order information."
 		else
 			e[0] "Extract count by order."
@@ -4806,236 +4765,710 @@ if isint($^,0)
 	fi
 fi
 
+seed_range_0,seed_range_1,seed_diff={V=[0x1001,0xffff];[V,abs(V[0]-V[1])]}
+
+if $3
+	str_num_of_pixels,str_s=whd#0,"s#0,1"
+else
+	str_num_of_pixels,str_s=whds#0,"1,s#0"
+fi
+
+m __$0_init_vars:"
+	num_of_pixels,cpus_to_use,mt_mode,bitshift_factor,hash_table_buckets_per_threads,init_bucket_size,secondary_init_bucket_size,bit_mask,seed_0,seed_1,S,SH,coords_mode,L0_process,L0_process_img:=\"
+		num_of_pixels="$str_num_of_pixels";
+		cpus_to_use=cut(num_of_pixels>>16,1,"$_cpus");
+		mt_mode=cpus_to_use>1;
+		effective_pixels_per_threads=num_of_pixels/sqrt(cpus_to_use);
+		bitshift_factor=cut((effective_pixels_per_threads>0x40000)+(log2(effective_pixels_per_threads)>>1),3,16);
+		hash_table_buckets_per_threads=1<<bitshift_factor;
+		bit_mask=hash_table_buckets_per_threads-1;
+		seed_0=v($seed_range_0,$seed_range_1);
+		seed_1=$seed_range_0+((seed_0-$seed_range_0+v(1,$seed_diff))%($seed_diff+1));
+		init_bucket_size=1<<cut(ceil(log2(sqrt(num_of_pixels)/16)),1,7);
+		secondary_init_bucket_size=cut(1<<cut(ceil(log2(sqrt(num_of_pixels))/2),1,7),1,num_of_pixels);
+		if(mt_mode&&(num_of_pixels>$dim_limit),run('DIMENSION_IMG<=(2^25)==F'));
+		coords_mode=mt_mode&&(num_of_pixels>$count_limit);
+		L0_process=$assign_order_into_img&&$mt_mode;
+		L0_process_img=L0_process+2;
+		num_of_pixels,cpus_to_use,mt_mode,bitshift_factor,hash_table_buckets_per_threads,init_bucket_size,secondary_init_bucket_size,bit_mask,seed_0,seed_1,"$str_s",coords_mode,L0_process,L0_process_img;
+	\"
+	"
+
+dim_limit,count_limit,internal_bit_mask,vector_mode,assign_order_into_img,mode,i_mode,utilize_count:=(1<<25)+1,(1<<24)-[0,1],$3,$1>0,$2,bool($2)+1,$2>1
+output_count,process_mode,utilize_index:=$utilize_count||$4,bool($assign_order_into_img|[$utilize_count,$mode])
+additional_values,bucket_start_point:=$utilize_index+$assign_order_into_img+$utilize_count+1,$utilize_index+($mode==2)+($assign_order_into_img&&!$mode)
+F={$1==2?(V=2;0;):isbool($1)?(V=[!$1,2];0;):(V=[0,1,2];0;);V;}
+mF={isbool($1)?($1?(V=0;0;):(V=[1,2];0;)):$1<0?(V=[0,1,2];0;):(V=2;0;);V;}
+
 foreach {
-	if !s
-		if $status_mode
-			if $status_mode==4 status.=${S}0
-			else status.=${S}nan
-			fi
-			S=,
-			continue
+	if $3?whds<=1:whd<=1
+		L={$3?whds:whd}
+
+		if $4
+			status.=$sep$L
+			sep=,
 		fi
+
+		if $L
+			if $2
+				if $2&1 [0]
+				elif $2 (1)
+				fi
+				if $2==3 (1) a[-2,-1] c fi
+			fi
+			l[0] {
+				if $1
+					if $1>0 (0) fi
+					if $1<1 rm[0] fi
+				fi
+			}
+		else
+			if $2 0 fi
+			if $1<0 rm[0] fi
+		fi
+
+		continue
 	fi
 
-	dict_size,bit_mask:=P=$3?whd:whds;(1<<(cut(ceil(log2(max(($HC?P:sqrt(P))/2,1)))+1,5,16)))-[0,1]
+	# Set up important variables
 
-	100%,100%,100%,{$3?1:s},"begin(
-			const M=(1<<16)-1;
-			const seed="{v(0xffff,0xffffff)}";
+	__$0_init_vars
+
+	# Create Hashmap
+	100%,100%,100%,$SH,"
+		begin(
 			const bit_mask=$bit_mask;
-			const multiplier=31*seed;
+			const S=$S;
+			const seed_1=$seed_0;
+			const seed_2=$seed_1;
 
-			$3&&s#0>1?(
-				hash(v)=(
-					hash_value=0;
+			init()=hash_value=0;
 
-					repeat(size(v),p,
-						hash_value=xor(((hash_value<<1)-hash_value)*seed,C=v[p];isint(C)?C:C*M);
-						hash_value&=bit_mask;
-					);
-
-					hash_value+2;
-				);
-
-				process()=hash(I#-1);
+			S==1?(
+				const Q=xor(2654435761,0xc8cb*seed_1)|2147483649;
+				const max_mult=max(Q,seed_2,1);
+				const mod_factor=1<<int(log2((1<<53)/max_mult));
+				const M=mod_factor-1;
+				hash(v)=(v*Q+seed_2)&M;
+				color()=c=[i#0]%mod_factor;
 			):(
-				const bitshift_factor=4;
+				const Q=xor(2654435761,seed_1)|2147483649;
+				const max_mult=max(Q,seed_2,1);
+				const mod_factor=1<<int(log2((1<<53)/max_mult));
+				const M=mod_factor-1;
+				hash(v)=(v*Q+seed_2)&M;
+				color()=c=[I#0]%mod_factor;
+			);
 
-				n_start(n)=n>bit_mask?xor(n<<1,seed):n&bit_mask;
-
-				hash_value(n)=(
-					N=n_start(n);
-					hash_value=0;
-					while(N,
-						hash_value=(hash_value*multiplier+N)&bit_mask;
-						N>>=bitshift_factor;
-					);
-					hash_value+2;
+			hash_color()=(
+				repeat(S,p,
+					hash_value=xor((hash_value&M)*seed_2,hash(c[p]));
 				);
-				process()=hash_value(i#-1);
+				hash_value&=bit_mask;
 			);
 		);
-		process();
-		"
+		color();
+		init();
+		hash_color();
+		hash_value;"
 
-	0x$dict_size
+	if $L0_process
+		100%,100%,100%,100%
+	fi
 
-	if $ui
+	# Image to use for processing all the other images on the list
+
+	+rep_mt_f32v_map $num_of_pixels,$cpus_to_use,0
+
+	# Create hash_table buckets and reference image
+
+	0x{$cpus_to_use*$hash_table_buckets_per_threads}
+
+	if $mt_mode
+		$hash_table_buckets_per_threads,$cpus_to_use
+	elif $mode
 		0
 	fi
 
-	$ef[1] >"
-		begin(
-			table_size=vector(#$dict_size);
-
-			const S=$3?s#0:1;
-			const use_external=$ui;
-			const use_count=$use_count;
+	eval[$L0_process_img] :"begin(
+			const S=$S;
 			const mode=$mode;
-			const fill_image=$fill_mode;
-			const internal_dict_size=S+(fill_image||mode>1);
-			const find_size_of_order=$status_mode==4;
+			const mt_mode=$mt_mode;
+			const process_mode=$process_mode;
+			const assign_order_into_img=$assign_order_into_img;
+			const vector_mode=$vector_mode;
+			const B=$init_bucket_size;
+			const T=$secondary_init_bucket_size;
+			const N=$num_of_pixels;
+			const HTB=$hash_table_buckets_per_threads;
+			const size_of_order_to_status=$4;
+			const target_img=k-1;
 
-			$3?(
-				img_val()=I#0;
-			):(
-				img_val()=i#0;
+			if(vector_mode
+			,img_val()=I[#0,P];
+			,img_val()=[i[#0,P]];
 			);
 
-			fill_image?(
-				return_value()=id;
-			):(
-				return_value()=i;
+			if(assign_order_into_img
+			,return_value()=i[#target_img,P]=id;
+			,return_value()=0;
 			);
 
-			const E=arg0(mode,S,S,1,S+1); # E is for External Out
-			$process_mode?(
-				const dec_ids=internal_dict_size-1;
-				const use_id=fill_image||mode>1;
+			mt_mode?(
+				const utilize_index=$utilize_index;
+				const utilize_count=$utilize_count;
+				const additional_values=$additional_values;
+				const bucket_start_point=$bucket_start_point;
+				const internal_hash_table_width_size=additional_values+S;
+				const secondary_hash_row_idx=internal_hash_table_width_size-1;
+				const secondary_hash_relative_pos=secondary_hash_row_idx-bucket_start_point;
+				const coords_mode=$coords_mode;
+				const mode_3=mode==3;
 
-				mode==3?(
-					external_process_unique()=(
-						if(count==h(#-1),
-							resize(#-1,E,cut(h(#-1)<<1,8,whds),1,1,-1);
-						);
-						copy(i(#-1,0,id=count++,0,0),[img_val,1]);
-					);
-					internal_process_unique()=copy(i[#i,mH],[img_val,id]);
-					external_process_found()=++i(#-1,S,id,0,0);
-				):
-				mode==2?(
-					external_process_unique()=(
-						if(count==h(#-1),
-							resize(#-1,E,cut(h(#-1)<<1,8,whds),1,1,-1);
-						);
-						i[#-1,id=count++]=1;
-					);
-					internal_process_unique()=copy(i[#i,mH],[img_val,id]);
-					external_process_found()=++i[#-1,id];
-				):(
-					if(mode||fill_image
-					,ext_inside_mode()=id=count++;
-					,ext_inside_mode()=count++;
-					);
+				if(coords_mode
+				,const P_off=1<<24;
+				,const P_off=0;
+				);
 
-					external_process_unique()=(
-						if(count==h(#-1),
-							resize(#-1,E,cut(h(#-1)<<1,8,whds),1,1,-1);
-						);
-						copy(i(#-1,0,ext_inside_mode(),0,0),img_val);
-					);
+				if(utilize_count,
+					const count_row_idx=1+(mode_3?S);
+					const count_relative_pos=secondary_hash_row_idx-count_row_idx;
+				);
 
-					fill_image?(
-						internal_process_unique()=copy(i[#i,mH],[img_val,id]);
+				if(assign_order_into_img,
+					count=0;
+					const order_row_idx=mode?1+S+utilize_count:1;
+					const found_order_pos=order_row_idx-bucket_start_point;
+					const order_relative_pos=secondary_hash_row_idx-order_row_idx;
+				);
+
+				if(utilize_index,
+					const index_relative_pos=secondary_hash_row_idx;
+				);
+
+				if(bucket_start_point
+				,hash_table_bucket_resize_cond()=hash_table_ins_pos>wh(#hash_table_ind);
+				,hash_table_bucket_resize_cond()=hash_table_ins_pos==wh(#hash_table_ind);
+				);
+
+				resize_hash_table_ind_img()=if(hash_table_bucket_resize_cond(),
+					new_size=max(h(#hash_table_ind)<<1,B);
+					resize(#hash_table_ind,internal_hash_table_width_size,new_size,1,1,-1);
+				);
+
+				const lc=S-1;
+				const seed_1=$seed_0;
+				const seed_2=$seed_1;
+
+				const R=xor(2654435761,(S==1?0xc8cb:1)*seed_2)|2147483649;
+				const max_mult=max(R,seed_1,1);
+				const mod_factor=1<<int(log2((1<<53)/max_mult));
+				const M=mod_factor-1;
+				hash(v)=(v*R+seed_1)&M;
+
+				hash_color(color_var)=(
+					color_to_hash=color_var%mod_factor;
+					hash_value=0;
+					repeat(S,p,
+						hash_value=xor((hash_value&M)*seed_1,hash(color_to_hash[lc-p]));
+					);
+					hash_value&0xffffff;
+				);
+
+				process_mode?(
+					process_current_color_and_perform_action()=hash_table_ins_pos>bucket_start_point&&(pos=find(#hash_table_ind,current_color,hash_table_ins_pos-internal_hash_table_width_size,-internal_hash_table_width_size))!=-1?(
+						if(utilize_count,
+							if(mode_3
+							,++i[#hash_table_ind,pos+S];
+							,++i[#hash_table_ind,pos-1];
+							);
+						);
+						if(assign_order_into_img,
+							id=i[#hash_table_ind,pos+found_order_pos];
+						);
 					):(
-						internal_process_unique()=copy(i[#i,mH],img_val);
+						resize_hash_table_ind_img();
+						copy(i[#hash_table_ind,hash_table_ins_pos],current_color);
+
+						secondary_hash_pos=hash_table_ins_pos+secondary_hash_relative_pos;
+						i[#hash_table_ind,secondary_hash_pos]=hash_color(current_color);
+
+						if(utilize_index,i[#hash_table_ind,secondary_hash_pos-index_relative_pos]=P-P_off;);
+
+						if(utilize_count,
+							++i[#hash_table_ind,secondary_hash_pos-count_relative_pos];
+						);
+
+						if(assign_order_into_img,
+							i[#hash_table_ind,secondary_hash_pos-order_relative_pos]=id=count++;
+						);
+
+						++i(#-1,key,x);
+
+						hash_table_ins_pos_list[key]+=internal_hash_table_width_size;
 					);
-
-					external_process_found()=0;
-				);
-
-				process_current_color_and_perform_action()=same_as_prev?(
-					external_process_found();
-				):
-				H&&(pos=find(#i,img_val,mH-internal_dict_size,-internal_dict_size))!=-1?(
-					if(use_id,id=i[#i,pos+dec_ids];);
-					external_process_found();
 				):(
-					if(H==h(#i),
-						new_size=max(h(#i)<<1,8);
-						resize(#i,internal_dict_size,new_size,1,1,-1);
+					process_current_color_and_perform_action()=hash_table_ins_pos==bucket_start_point||find(#hash_table_ind,current_color,hash_table_ins_pos-internal_hash_table_width_size,-internal_hash_table_width_size)==-1?(
+						resize_hash_table_ind_img();
+						copy(i[#hash_table_ind,hash_table_ins_pos],current_color);
+						secondary_hash_pos=hash_table_ins_pos+secondary_hash_relative_pos;
+						i[#hash_table_ind,secondary_hash_pos]=hash_color(current_color);
+						if(utilize_index,i[#hash_table_ind,secondary_hash_pos-index_relative_pos]=P-P_off;);
+						++i(#-1,key,x);
+						hash_table_ins_pos_list[key]+=internal_hash_table_width_size;
 					);
-					external_process_unique();
-					internal_process_unique();
-					++table_size[K];
 				);
 			):(
-				mode?(
-					internal_process()=(
-						if(count==h(#-1),
-							resize(#-1,S,cut(h(#-1)<<1,8,whds),1,1,-1);
+				const bucket_start_point=0;
+				const internal_hash_table_width_size=S+process_mode;
+				const E=arg0(mode,0,S,1,S+1);
+
+				count=0;
+
+				resize_filled_pal()=if(count==h(#-1),resize(#-1,E,cut(h(#-1)<<1,T,N),1,1,-1););
+
+				resize_hash_table_ind_img()=(
+					if(hash_table_ins_pos==wh(#hash_table_ind),
+						new_size=max(h(#hash_table_ind)<<1,B);
+						resize(#hash_table_ind,internal_hash_table_width_size,new_size,1,1,0);
+					);
+				);
+
+				process_mode?(
+					const dec_internal_hash_table_width_size=internal_hash_table_width_size-1;
+
+					mode==3?(
+						external_process_unique()=(
+							resize_filled_pal();
+							copy(i(#-1,0,id=count++,0,0),[current_color,1]);
 						);
-						copy(i(#-1,0,count++,0,0),img_val);
+
+						internal_process_unique()=copy(i[#hash_table_ind,hash_table_ins_pos],[current_color,id]);
+						external_process_found()=++i(#-1,S,id,0,0);
+					):
+					mode==2?(
+						external_process_unique()=(
+							resize_filled_pal();
+							i[#-1,id=count++]=1;
+						);
+
+						internal_process_unique()=copy(i[#hash_table_ind,hash_table_ins_pos],[current_color,id]);
+						external_process_found()=++i[#-1,id];
+					):(
+
+						assign_order_into_img?(
+							ext_inside_mode()=id=count++;
+							internal_process_unique()=copy(i[#hash_table_ind,hash_table_ins_pos],[current_color,id]);
+						):(
+							ext_inside_mode()=count++;
+							internal_process_unique()=copy(i[#hash_table_ind,hash_table_ins_pos],current_color);
+						);
+
+						mode?(
+							external_process_unique()=(
+								resize_filled_pal();
+								copy(i(#-1,0,ext_inside_mode(),0,0),current_color);
+							);
+							0;
+						):(
+							external_process_unique()=ext_inside_mode();
+							0;
+						);
+
+						external_process_found()=0;
 					);
-				):
-				find_size_of_order?(
-					internal_process()=++count;
+
+					process_current_color_and_perform_action()=hash_table_ins_pos&&(pos=find(#hash_table_ind,current_color,hash_table_ins_pos-internal_hash_table_width_size,-internal_hash_table_width_size))!=-1?(
+						id=i[#hash_table_ind,pos+dec_internal_hash_table_width_size];
+						external_process_found();
+					):(
+						resize_hash_table_ind_img();
+						external_process_unique();
+						internal_process_unique();
+						hash_table_ins_pos_list[key]+=internal_hash_table_width_size;
+					);
 				):(
-					internal_process()=0;
-				);
-
-				process_current_color_and_perform_action()=same_as_prev?0:(!H||find(#i,img_val,mH-internal_dict_size,-internal_dict_size)==-1)?(
-					if(H==h(#i),
-						new_size=max(H<<1,8);
-						resize(#i,internal_dict_size,new_size,1,1,-1);
+					mode?(
+						internal_process()=(
+							resize_filled_pal();
+							copy(i(#-1,0,count++,0,0),current_color);
+						);
+					):(
+						internal_process()=++count;
 					);
-					copy(i[#i,mH],img_val);
-					internal_process();
-					++table_size[K];
-				);
-			);
 
-			old_val=img_val()+1;
-			pos=count=id=0;
+					process_current_color_and_perform_action()=!hash_table_ins_pos||find(#hash_table_ind,current_color,hash_table_ins_pos-internal_hash_table_width_size,-internal_hash_table_width_size)==-1?(
+						resize_hash_table_ind_img();
+						copy(i[#hash_table_ind,hash_table_ins_pos],current_color);
+						internal_process();
+						hash_table_ins_pos_list[key]+=internal_hash_table_width_size;
+					);
+
+				);
+			)
 		);
-		K=i-2;
-		H=table_size[K];
-		mH=H*internal_dict_size;
-		img_val=img_val();
-		same_as_prev=old_val==img_val;
-		process_current_color_and_perform_action();
-		old_val=img_val;
-		return_value();
+		hash_table_ins_pos_list=vector(#HTB,bucket_start_point);
+		offset=HTB*x+k+1;
+
+		O=J(-1);
+		P=O[0]<<24|O[1];
+		Q=i0<<24|i1;
+
+		do(
+			current_color=img_val();
+			key=i[#1,P];
+			hash_table_ind=key+offset;
+			hash_table_ins_pos=hash_table_ins_pos_list[key];
+			process_current_color_and_perform_action();
+			return_value();
+		,++P<Q);
+
 		end(
-			if(find_size_of_order,set('size_of_order',count););
-			if(use_external,
-				resize(#-1,E,count,1,1,-1);
-				run('permute. yzcx');
+			mt_mode?(
+				if(utilize_count,
+					set('count_row_idx',count_row_idx);
+				);
+				set('initial_internal_hash_table_width_size',internal_hash_table_width_size);
+			):(
+				if(mode,resize(#-1,E,count,1,1,-1););
+				if(size_of_order_to_status,set('count',count););
 			);
 		);
+		_0;
 		"
 
-	rm[2-{2+$bit_mask}]
+	if $mt_mode
 
-	if $cross
-		s. c,-{s-1}
-		__$0_push_vc_status
-		rm[$Q]
-	elif $status_mode
-		if $status_mode==4
-			status.=${S}$size_of_order
-		elif $status_mode==1
-			status.=\"{crop(#1)}\"
-		elif $add_mode_3
-			s. c,-{s-1}
-			__$0_push_vc_status
-			a[-2,-1] c
-		elif $status_mode==3
-			status.=${S}\"{crop(#-1)}\"
+		if $assign_order_into_img
+			if $1==1 rm[0] L0_process_img-=1 fi
 		else
-			status.=${S}\"${-rep_status_image_data[-1]}\"
+			rm[{$1+1}-$L0_process_img]
+			L0_process_img=$1
 		fi
 
-		if $U rm. fi
-	fi
+		HTB,HTF,ref_img,process_image_idx,cpus_to_use:=$L0_process_img+[1,$hash_table_buckets_per_threads],l-1,l,cut(is#-1>>13,1,min($_cpus,$hash_table_buckets_per_threads))
 
-	if $1>=0
-		if $1 name[1] {0,n} fi
-		if isbool($1) rm[$F] fi
+		# Per-thread unique counts (row t of ref_img summed) -> size of the id->order LUT
+		nt=0
+		nmax=0
+		lut_img=0
+		if $assign_order_into_img
+			nt={h#$ref_img}
+			nmax={m=0;for(t=0,t<h#$ref_img,++t,m=max(m,sum(crop(#$ref_img,0,t,0,0,w#$ref_img,1,1,1))));m}
+		fi
+
+		$cpus_to_use,1,1,1,"
+			px=x;max_num=0;
+			while(px<w#-1,
+				max_number_of_possible_colors=sum(crop(#-1,px,0,0,0,1,h#-1,1,1));
+				if(max_number_of_possible_colors>max_num,
+					max_num=max_number_of_possible_colors;
+				);
+				px+=w;
+			);
+			max_num;
+			"
+
+		capm,secondary_hash_table_buckets_per_threads,bit_mask:=iM,(1<<cut(ceil(log2(sqrt(iM)))+1,4,13))-[0,1]
+		secondary_hash_table_size={$cpus_to_use*$secondary_hash_table_buckets_per_threads}
+		grq_size={$capm*$hash_table_buckets_per_threads}
+
+		0x$secondary_hash_table_size
+
+		if $assign_order_into_img
+			$nmax,$nt,1,1,0
+			lut_img:=l-1
+		fi
+
+		eval[$process_image_idx] :"begin(
+				const S=$S;
+				const T=k+1;
+				const HTB=$HTB;
+				const HTF=$HTF+1;
+				const utilize_count=$utilize_count;
+				const assign_order_into_img=$assign_order_into_img;
+				const bucket_start_point=$bucket_start_point;
+				const ref_img=$ref_img;
+				const levels=h#ref_img;
+				const offset_bucket_size=$hash_table_buckets_per_threads;
+				const initial_internal_hash_table_width_size=$initial_internal_hash_table_width_size;
+				const secondary_hash_table_width_size=S+assign_order_into_img+utilize_count;
+				const hash_pos=initial_internal_hash_table_width_size-1;
+				const bit_mask=$bit_mask;
+				const B=min($init_bucket_size,64);
+				const process_mode=$process_mode;
+				const utilize_count_limit=iM#ref_img>$count_limit;
+				const calc_total=$4||utilize_count_limit;
+				const keep_color=$2&1;
+				const out_count_row=1+keep_color*S;
+				const out_bucket_idx_row=out_count_row+utilize_count;
+				const out_bucket_pos_row=out_bucket_idx_row+1;
+				const final_first_bucket_collection_width_size=(assign_order_into_img||$2)?out_bucket_idx_row+2*assign_order_into_img:0;
+				const lut_img=$lut_img;
+				const nmax=$nmax;
+				const order_row_idx=$mode?1+S+utilize_count:1;
+
+				if(utilize_count_limit,
+					const count_limit=$count_limit;
+				);
+
+				if(assign_order_into_img,
+					const secondary_order_row_idx=S;
+				);
+
+				if(utilize_count,
+					const count_row_idx=$count_row_idx;
+					const secondary_count_row_idx=secondary_hash_table_width_size-1;
+				);
+
+				if(calc_total,
+					total_count=0;
+				);
+
+				current_color=vector(#S);
+			);
+			img_ind_of_start_of_secondary_hash_table=$secondary_hash_table_buckets_per_threads*x+T;
+			for(current_bucket=x+HTB,current_bucket<HTF,current_bucket+=w,
+				bucket_id=current_bucket-HTB;
+
+				new_bucket_pos=bucket_ref_pos=current_level=current_bucket_count=0;
+
+				secondary_insert_positions_list=vector(#$secondary_hash_table_buckets_per_threads,0);
+
+				count_per_current_level=i(#ref_img,bucket_id,current_level);
+
+				repeat(count_per_current_level,current_bucket_count,
+					copy(current_color,i[#current_bucket,bucket_ref_pos+bucket_start_point],S);
+
+					secondary_hash_pos=bucket_ref_pos+hash_pos;
+					secondary_hash_table_key=i[#current_bucket,secondary_hash_pos]&bit_mask;
+					secondary_hash_table_ind=secondary_hash_table_key+img_ind_of_start_of_secondary_hash_table;
+
+					current_secondary_ins_pos=secondary_insert_positions_list[secondary_hash_table_key];
+
+					if(current_secondary_ins_pos==wh(#secondary_hash_table_ind),
+						new_size=max(B,h(#secondary_hash_table_ind)<<1);
+						resize(#secondary_hash_table_ind,secondary_hash_table_width_size,new_size,1,1,-1);
+					);
+
+					copy(i[#secondary_hash_table_ind,current_secondary_ins_pos],current_color,S);
+
+					if(assign_order_into_img,
+						i[#secondary_hash_table_ind,current_secondary_ins_pos+secondary_order_row_idx]=current_bucket_count;
+					);
+
+					if(utilize_count,
+						i[#secondary_hash_table_ind,current_secondary_ins_pos+secondary_count_row_idx]=new_bucket_pos+out_count_row;
+					);
+
+					secondary_insert_positions_list[secondary_hash_table_key]+=secondary_hash_table_width_size;
+
+					if(final_first_bucket_collection_width_size,
+						i[#current_bucket,new_bucket_pos]=i[#current_bucket,bucket_ref_pos];
+						if(utilize_count,
+							i[#current_bucket,new_bucket_pos+out_count_row]=i[#current_bucket,bucket_ref_pos+count_row_idx];
+						);
+						if(keep_color,
+							copy(i[#current_bucket,new_bucket_pos+1],current_color,S);
+						);
+						if(assign_order_into_img,
+							i[#current_bucket,new_bucket_pos+out_bucket_pos_row]=current_bucket_count;
+						);
+					);
+
+					new_bucket_pos+=final_first_bucket_collection_width_size;
+					bucket_ref_pos+=initial_internal_hash_table_width_size;
+				);
+
+				if(final_first_bucket_collection_width_size,
+					resize(#current_bucket,final_first_bucket_collection_width_size,current_bucket_count,1,1,-1);
+				);
+
+				offset_bucket=current_bucket+offset_bucket_size;
+				while(++current_level<levels,
+					count_per_current_level=i(#ref_img,bucket_id,current_level);
+					current_offset_bucket_pos=bucket_start_point;
+					lut_row=current_level*nmax;
+
+					repeat(count_per_current_level,p,
+						entry_pos=current_offset_bucket_pos-bucket_start_point;
+						copy(current_color,i[#offset_bucket,current_offset_bucket_pos],S);
+
+						secondary_hash_pos=current_offset_bucket_pos+hash_pos-bucket_start_point;
+						secondary_hash_table_key=i[#offset_bucket,secondary_hash_pos]&bit_mask;
+						secondary_hash_table_ind=secondary_hash_table_key+img_ind_of_start_of_secondary_hash_table;
+
+						current_secondary_ins_pos=secondary_insert_positions_list[secondary_hash_table_key];
+						color_pos=find(#secondary_hash_table_ind,current_color,current_secondary_ins_pos-secondary_hash_table_width_size,-secondary_hash_table_width_size);
+
+						process_mode?(
+							color_pos!=-1?(
+								if(utilize_count,
+									i[#current_bucket,i[#secondary_hash_table_ind,color_pos+secondary_count_row_idx]]+=i[#offset_bucket,current_offset_bucket_pos-bucket_start_point+count_row_idx];
+								);
+								if(assign_order_into_img,
+									i[#lut_img,lut_row+i[#offset_bucket,entry_pos+order_row_idx]]=i[#secondary_hash_table_ind,color_pos+secondary_order_row_idx]*offset_bucket_size+bucket_id;
+								);
+							):(
+								if(current_secondary_ins_pos==wh(#secondary_hash_table_ind),
+									new_size=max(B,h(#secondary_hash_table_ind)<<1);
+									resize(#secondary_hash_table_ind,secondary_hash_table_width_size,new_size,1,1,-1);
+								);
+								copy(i[#secondary_hash_table_ind,current_secondary_ins_pos],current_color,S);
+								secondary_insert_positions_list[secondary_hash_table_key]+=secondary_hash_table_width_size;
+
+								if(new_bucket_pos==wh(#current_bucket),
+									new_size=max(B,h(#current_bucket)<<1);
+									resize(#current_bucket,final_first_bucket_collection_width_size,new_size,1,1,-1);
+								);
+								if(keep_color,
+									copy(i[#current_bucket,new_bucket_pos+1],current_color,S);
+								);
+
+								i[#current_bucket,new_bucket_pos]=i[#offset_bucket,current_offset_bucket_pos-bucket_start_point];
+
+								if(utilize_count,
+									count_pos=new_bucket_pos+out_count_row;
+									i[#current_bucket,count_pos]=i[#offset_bucket,current_offset_bucket_pos-bucket_start_point+count_row_idx];
+									i[#secondary_hash_table_ind,current_secondary_ins_pos+secondary_count_row_idx]=count_pos;
+								);
+
+								if(assign_order_into_img,
+									i[#current_bucket,new_bucket_pos+out_bucket_pos_row]=current_bucket_count;
+									i[#secondary_hash_table_ind,current_secondary_ins_pos+secondary_order_row_idx]=current_bucket_count;
+									i[#lut_img,lut_row+i[#offset_bucket,entry_pos+order_row_idx]]=current_bucket_count*offset_bucket_size+bucket_id;
+								);
+
+								new_bucket_pos+=final_first_bucket_collection_width_size;
+								++current_bucket_count;
+							);
+						):(
+							if(color_pos==-1,
+								if(current_secondary_ins_pos==wh(#secondary_hash_table_ind),
+									new_size=max(B,h(#secondary_hash_table_ind)<<1);
+									resize(#secondary_hash_table_ind,secondary_hash_table_width_size,new_size,1,1,-1);
+								);
+								copy(i[#secondary_hash_table_ind,current_secondary_ins_pos],current_color,S);
+								secondary_insert_positions_list[secondary_hash_table_key]+=secondary_hash_table_width_size;
+								if($2,
+									current_bucket_dimension=wh(#current_bucket);
+									if(new_bucket_pos==current_bucket_dimension,
+										new_size=max(B,h(#current_bucket)<<1);
+										resize(#current_bucket,final_first_bucket_collection_width_size,new_size,1,1,-1);
+									);
+									copy(i[#current_bucket,new_bucket_pos+1],current_color,S);
+									i[#current_bucket,new_bucket_pos]=i[#offset_bucket,current_offset_bucket_pos-bucket_start_point];
+									new_bucket_pos+=final_first_bucket_collection_width_size;
+								);
+								++current_bucket_count;
+							);
+						);
+
+						current_offset_bucket_pos+=initial_internal_hash_table_width_size;
+					);
+
+					offset_bucket+=offset_bucket_size;
+				);
+
+				if(final_first_bucket_collection_width_size&&current_bucket_count,
+					if(assign_order_into_img,
+						copy(i[#current_bucket,out_bucket_idx_row],[bucket_id],current_bucket_count,final_first_bucket_collection_width_size,0);
+					);
+					resize(#current_bucket,final_first_bucket_collection_width_size,current_bucket_count,1,1,-1);
+				);
+
+				if(calc_total,
+					total_count+=current_bucket_count;
+				);
+
+				if(utilize_count_limit,
+					if(total_count>count_limit,
+						run('error exc_col_lim');
+					);
+				);
+			);
+			end(
+				if($4,
+					merge(total_count,+);
+					set('total_count',total_count);
+				);
+			);
+			_0;
+			"
+
+		if $assign_order_into_img
+			# Keep only the LUT (created last); drop counter image, process image and secondary tables
+			rm[$ref_img--2]
+			lut_img=$ref_img
+
+			# Global-rank table: GRQ[rank_in_bucket*HB+bucket_id] = global order of appearance
+			$grq_size,1,1,1,0
+			grq_img:=l-1
+
+			+a[$HTB-$HTF] y
+			permute. yzcx
+			sort. +,x
+			eval. "begin(
+					const grq=$grq_img;
+					const HB=$hash_table_buckets_per_threads;
+					const bucket_id=w*(s-2);
+					const rank_idx=bucket_id+w;
+				);
+				i[#grq,i[#-1,rank_idx+x]*HB+i[#-1,bucket_id+x]]=x;
+				_0;
+				"
+			if $2 channels. 1,{$utilize_count+($2&1)*$S}
+			else rm.
+			fi
+
+			# Compose in table domain: LUT[thread,id] -> global order (nmax*nt entries, not pixels)
+			map[$lut_img] [$grq_img]
+
+			# Per-thread native gather. Thread 0 is already final (its local ids are the global order).
+			ord_img={$L0_process_img-1}
+			ow,oh,od,os:=w#$ord_img,h#$ord_img,d#$ord_img,s#$ord_img
+			nt={w#$L0_process_img}
+			resize[$ord_img] {whds#$ord_img},1,1,1,-1
+			repeat $nt-1 {
+				t={$>+1}
+				b0={O=I[#$L0_process_img,$t-1];O[0]<<24|O[1];}
+				b1={O=I[#$L0_process_img,$t];O[0]<<24|O[1];}
+				+crop[$ord_img] $b0,{$b1-1}
+				+crop[$lut_img] 0,$t,{$nmax-1},$t
+				map[-2] [-1]
+				rm[-1]
+				j[$ord_img] [-1],$b0
+				rm[-1]
+			}
+			resize[$ord_img] $ow,$oh,$od,$os,-1
+
+			rm[{$L0_process_img-2},$L0_process_img-{$2?-2:-1}]
+		elif $2
+			L0_process_img,HTF+=1
+			rm[$HTF--1]
+			a[$L0_process_img--1] y
+			permute. yzcx
+			sort. +,x
+			channels. 1,100%
+		fi
+
+		if $4
+			status.=$sep$total_count
+			sep=,
+		fi
 	else
-		rm[0,1]
-	fi
+		rm[$F--$i_mode]
 
-	S=,
+		if $mode permute. yzcx fi
+
+		if $4
+			status.=$sep$count
+			sep=,
+		fi
+	fi
 }
 
 u $status
-__rep_val2order_push_vc_status:
-if $status_mode==3
-	status.=${S}\"{crop(#-1)}\"
-else
-	status.=${S}\"${-rep_status_image_data[-2]}\"
-fi
 #@cli rep_cbsoo: eq. to 'rep_channels_overblur_overline_blur_sharpen'.
 rep_cbsoo: rep_channels_blur_sharpen_overblur_overline $*
 #@cli rep_channels_overblur_overline_blur_sharpen: method_a={ 0=blur | 1=sharpen | 2=overblur | 3=overline },0%<_effect_factor_a[%]<=100%,_multiplication_factor>0,_blending_mode,0<_blending_opacity[%]<=100%...
