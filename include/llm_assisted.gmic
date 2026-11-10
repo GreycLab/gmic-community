@@ -406,14 +406,15 @@ _fx_page_curl :
 #@gui : Aperture Shape = choice(5,"Circle","Triangle","Square","Pentagon","Hexagon","Heptagon","Octagon")
 #@gui : Aperture Rotation (deg) = float(0,-180,180)
 #@gui : Blade Roundness (%) = float(10,0,100)
-#@gui : Same Area as Circle = bool(1)
+#@gui : Same area as circle = bool(1)
+#@gui : Ghosts blurriness (%) = float(100,0,400)
 #@gui : Blending Mode = choice(0,"Addition","Dodge","Hard Light","Lighten","Normal","Screen")
 #@gui : Opacity (%) = float(100,0,100)
 #@gui : sep = separator()
 #@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/10/10</i>.</small>")
 __fx_lens_flare :
-  posX,posY,axisX,axisY,colR,colG,colB,size,intensity,shape,rot,brd,eqa,opacity=${1-13},$15
-  blending_mode=${"arg0 $14,addition,dodge,hardlight,lighten,normal,screen"}
+  posX,posY,axisX,axisY,colR,colG,colB,size,intensity,shape,rot,brd,eqa,blur,opacity=${1-14},$16
+  blending_mode=${"arg0 $15,addition,dodge,hardlight,lighten,normal,screen"}
 
 fx_lens_flare :
   __$0 $*
@@ -446,6 +447,10 @@ fx_lens_flare :
         const kn = if($eqa, sqrt(nb*sin(2*pi/nb)/(2*pi)), 1);
         # Lower bound of (polygonal distance)/(euclidean distance), used for early rejection.
         const fmin = if(poly, (1 - rd)*kn + rd, 1);
+        # Ghost edge blurriness (1 = original look). Clamped to avoid division by zero.
+        const bl = max($blur/100, 0.01);
+        # Ring ghosts (type 4) extend up to sz*(1 + 0.04*bl): used for early rejection.
+        const kb = 1 + 0.04*bl;
 
         rt = [ 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4 ];
         rs = [ 0.027, 0.01, 0.005, 0.031, 0.015, 0.037, 0.022, 0.025, 0.058, 0.017,
@@ -511,8 +516,7 @@ fx_lens_flare :
           ddx = x - int(rk[k]*dx + ax);
           ddy = y - int(rk[k]*dy + ay);
           rr = sqrt(ddx^2 + ddy^2);
-          # Early rejection: pixels too far from the ghost have no contribution.
-          if (rr<sz*1.05/fmin,
+          if (rr<sz*kb/fmin,
             if (poly,
               a = atan2(ddy,ddx) - rot0 - if(rk[k]<0,pi,0);
               m = a - sec*floor(a/sec);
@@ -523,10 +527,10 @@ fx_lens_flare :
             if (ty==1,
               (pr = (sz - rr)/sz; if (pr>0, acc*=1 - pr*pr*cc)),
               if (ty==2,
-                (pr = (sz - rr)/(sz*0.15); if (pr>0, acc*=1 - min(pr,1)*cc)),
+                (pr = (sz - rr)/(sz*0.15*bl); if (pr>0, acc*=1 - min(pr,1)*cc)),
                 if (ty==3,
-                  (pr = (sz - rr)/(sz*0.12); if (pr>0, (if (pr>1, pr = 1 - pr*0.12); acc*=1 - pr*cc))),
-                  (pr = abs((rr - sz)/(sz*0.04)); if (pr<1, acc*=1 - (1 - pr)*cc)))));
+                  (pr = (sz - rr)/(sz*0.12*bl); if (pr>0, (if (pr>1, pr = 1 - pr*0.12); acc*=1 - pr*cc))),
+                  (pr = abs((rr - sz)/(sz*0.04*bl)); if (pr<1, acc*=1 - (1 - pr)*cc)))));
           );
         );
         min(255,$intensity*(1 - acc)*255%)
