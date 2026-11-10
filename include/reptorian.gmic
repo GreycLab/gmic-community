@@ -3723,6 +3723,7 @@ foreach {
 		);
 
 		list_of_ins_pos=vector(#$hash_table_buckets_per_threads);
+		if(dpim_mode,local_count=0;);
 		offset=$hash_table_buckets_per_threads*x+k+1;
 
 		O=J(-1);
@@ -3750,7 +3751,8 @@ foreach {
 					copy(i[#door_pos,ins_pos],current_color);
 					additional_channel_pos=ins_pos+S;
 					dpim_mode?(
-						i[#0,P]=i[#door_pos,additional_channel_pos]=ins_pos?i[#door_pos,additional_channel_pos-vector_insertion_size]+1;
+						new_id=(mt_mode?local_count++:(ins_pos?i[#door_pos,additional_channel_pos-vector_insertion_size]+1));
+						i[#0,P]=i[#door_pos,additional_channel_pos]=new_id;
 					):(
 						chkfreq(i[#door_pos,additional_channel_pos]=1);
 					);
@@ -3826,10 +3828,16 @@ foreach {
 
 		first_thread_bucket_init,first_thread_bucket_id_endl,cpus_to_use,T,img_ref:=D=$process_image_idx+1;D,D+$hash_table_buckets_per_threads-1,cut(is#-1>>13,1,min($_cpus,$hash_table_buckets_per_threads)),l,l-1
 
+		nt,nmax,lut_pos_img,lut_bkt_img=0
+		if $process_image_idx==2
+			nt={h#$img_ref}
+			nmax={mx=0;for(row=0,row<$nt,++row,mx=max(mx,sum(crop(#$img_ref,0,row,0,0,w#$img_ref,1,1,1))));mx}
+		fi
+
 		$cpus_to_use,1,1,1,"
 			px=x;max_num=0;
 			while(px<w#-1,
-				max_number_of_possible_colors=sum(crop(#-1,px,0,0,0,h#-1,1,1,1));
+				max_number_of_possible_colors=sum(crop(#-1,px,0,0,0,1,h#-1,1,1));
 				if(max_number_of_possible_colors>max_num,
 					max_num=max_number_of_possible_colors;
 				);
@@ -3844,6 +3852,12 @@ foreach {
 
 		r[$process_image_idx] $cpus_to_use,1,1,{$highest_color_frequency_mode?$S+2:1},-1
 		0x$secondary_hash_table_size
+
+		if $process_image_idx==2
+			$nmax,$nt,1,1,0
+			$nmax,$nt,1,1,0
+			lut_pos_img,lut_bkt_img:=l-[2,1]
+		fi
 
 		$mt_cmd[$process_image_idx] :"
 			begin(
@@ -3877,6 +3891,12 @@ foreach {
 
 				const bit_mask=$bit_mask;
 				const B=min($init_bucket_size,64);
+
+				if(dpim_mode,
+					const lut_pos_img=$lut_pos_img;
+					const lut_bkt_img=$lut_bkt_img;
+					const nmax=$nmax;
+				);
 
 				if(count_color_mode,
 					total_color_count=0;
@@ -3921,6 +3941,8 @@ foreach {
 
 				current_bucket_ins_pos=current_level=current_bucket_pos=0;
 
+				if(dpim_mode,lut_row=0;);
+
 				secondary_insert_positions_list=vector(#$secondary_hash_table_buckets_per_threads,0);
 
 				count_per_current_level=i(#img_ref,bucket_id,current_level);
@@ -3949,6 +3971,9 @@ foreach {
 					):
 					dpim_mode?(
 						i[#secondary_hash_table_ind,current_secondary_ins_pos+S]=current_bucket_pos;
+						lut_idx=i[#current_bucket,current_bucket_ins_pos+S];
+						i[#lut_pos_img,lut_idx]=current_bucket_pos;
+						i[#lut_bkt_img,lut_idx]=bucket_id;
 					);
 
 					secondary_insert_positions_list[second_hash_table_key]+=hash2_pos;
@@ -3957,6 +3982,7 @@ foreach {
 
 				offset_bucket=current_bucket+offset_bucket_size;
 				while(++current_level<levels,
+					if(dpim_mode,lut_row=current_level*nmax;);
 					count_per_current_level=i(#img_ref,bucket_id,current_level);
 					current_offset_bucket_pos=0;
 
@@ -3976,7 +4002,9 @@ foreach {
 						include_found_color_mode?(
 							color_pos!=-1?(
 								dpim_mode?(
-									i[#offset_bucket,current_offset_bucket_pos+S]=i[#secondary_hash_table_ind,color_pos+S];
+									lut_idx=lut_row+i[#offset_bucket,current_offset_bucket_pos+S];
+									i[#lut_pos_img,lut_idx]=i[#secondary_hash_table_ind,color_pos+S];
+									i[#lut_bkt_img,lut_idx]=bucket_id;
 								):(
 									add_image?(
 										chkfreq(i[#current_bucket,i[#secondary_hash_table_ind,color_pos+S]]+=current_count_in_offset_bucket;);
@@ -4005,8 +4033,9 @@ foreach {
 								copy(i[#current_bucket,current_bucket_ins_pos],current_color,S);
 
 								dpim_mode?(
-									i[#offset_bucket,current_offset_bucket_pos+S]=current_bucket_pos;
-									i[#current_bucket,current_bucket_ins_pos+S]=current_bucket_pos;
+									lut_idx=lut_row+i[#offset_bucket,current_offset_bucket_pos+S];
+									i[#lut_pos_img,lut_idx]=current_bucket_pos;
+									i[#lut_bkt_img,lut_idx]=bucket_id;
 								):(
 									i[#current_bucket,current_bucket_ins_pos+S]=current_count_in_offset_bucket;
 								);
@@ -4100,37 +4129,32 @@ foreach {
 
 				if !$keep_palette name[0] ${} fi
 
-				rm[$process_image_idx,$T--1]
+				rm[$process_image_idx,$T--3]   # drops process image + secondary tables, keeps the 2 LUTs (last two)
+				rng_img,cnt_img,lut_pos_img,lut_bkt_img:=l-[4,3,2,1]
 
-				eval. >"begin(
-						const S=$S;
-						const W=S+1+!$keep_palette;
-						H=[0];
-					);
-					i&&H[0]?(copy(i[#x+2,S],H,i,W,0,-1););
-					H[0]+=i;
-					"
-				rm.
+				# exclusive prefix of merged bucket sizes, folded into the LUT in table space
+				+cumulate[$cnt_img] x
+				sub. [$cnt_img]
+				map[$lut_bkt_img] [-1]
+				add[$lut_pos_img] [$lut_bkt_img]
+				rm[$lut_bkt_img,-1]
 
-				eval. :"
-					O=J(-1);
-					P=O[0]<<24|O[1]-1;
-					Q=i0<<24|i1;
-					const S=$S;
-					offset_bucket=2+$hash_table_buckets_per_threads*x;
+				# native per-thread gather over each pixel range
+				ow,oh,od,os:=w#0,h#0,d#0,s#0
+				resize[0] {whds#0},1,1,1,-1
+				repeat $nt {
+					t=$>
+					b0={O=I[#$rng_img,max($t-1,0)];$t?(O[0]<<24|O[1]):0}
+					b1={O=I[#$rng_img,$t];O[0]<<24|O[1]}
+					+crop[0] $b0,{$b1-1}
+					+crop[$lut_pos_img] 0,$t,{$nmax-1},$t
+					map[-2] [-1]
+					rm[-1]
+					j[0] [-1],$b0
+					rm[-1]
+				}
+				resize[0] $ow,$oh,$od,$os,-1
 
-					x?(
-						while(++P<Q,
-							i[#0,P]=i(#i[#1,P]+2,S,i(#offset_bucket+i[#1,P],S,i[#0,P],0,0),0);
-						);
-					):(
-						while(++P<Q,
-							hash_bucket=i[#1,P];
-							i[#0,P]=i(#hash_bucket+2,S,i[#0,P],0,0);
-						);
-					);
-					_0;
-					"
 				if !$keep_palette k[0]
 				else
 					rm[1,{$hash_table_buckets_per_threads+2}--1]
