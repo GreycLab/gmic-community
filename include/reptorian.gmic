@@ -3804,9 +3804,17 @@ foreach {
 			nmax={max(expr('sum(crop(#-1,0,x,0,0,w#-1,1,1,1))',h#-1))}
 		fi
 
-		max_value_of_bucket={max(expr('sum(crop(#-1,x,0,0,0,1,h#-1,1,1))',w#-1))}
+		max_value_of_bucket,mean_value_of_bucket:=v=expr('sum(crop(#-1,x,0,0,0,1,h#-1,1,1))',w#-1);max(v),sum(v)/w#-1
 		secondary_hash_table_buckets_per_threads,bit_mask:=(1<<cut(ceil(log2(sqrt($max_value_of_bucket)))+1,4,13))-[0,1]
-		secondary_hash_table_size,secondary_hash_table_initial_bucket_size,t0_init_bucket:=$cpus_to_use*$secondary_hash_table_buckets_per_threads,1<<cut(ceil(log2(sqrt($max_value_of_bucket)/32)),2,13),1<<int(log2($max_value_of_bucket))
+		secondary_hash_table_size={$cpus_to_use*$secondary_hash_table_buckets_per_threads}
+
+		# Secondary: expected entries per secondary bucket (mean load / bucket count),
+		# plus ~2 sigma of Poisson spread, rounded up to a power of 2
+		secondary_hash_table_initial_bucket_size={lam=$mean_value_of_bucket/$secondary_hash_table_buckets_per_threads;1<<cut(ceil(log2(max(lam+2*sqrt(lam),1))),2,13)}
+
+		# Thread-0 merged bucket: expected largest bucket under uniform hashing (mean + 3 sigma),
+		# capped by the real maximum so one skewed bucket can't inflate everything
+		t0_init_bucket={mu=$mean_value_of_bucket;1<<ceil(log2(max(min($max_value_of_bucket,mu+3*sqrt(mu)),1)))}
 
 		r[$process_image_idx] $cpus_to_use,1,1,{$highest_color_frequency_mode?$S+2:1},-1
 		0x$secondary_hash_table_size
