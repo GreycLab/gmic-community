@@ -3799,26 +3799,14 @@ foreach {
 		first_thread_bucket_init,first_thread_bucket_id_endl,cpus_to_use,T,img_ref:=D=$process_image_idx+1;D,D+$hash_table_buckets_per_threads-1,cut(is#-1>>13,1,min($_cpus,$hash_table_buckets_per_threads)),l,l-1
 
 		if $process_image_idx==2
-			nt,nmax,lut_pos_img,lut_bkt_img=0
-			nt={h#$img_ref}
-			nmax={max(expr('sum(crop(#$img_ref,0,x,0,0,w#$img_ref,1,1,1))',$nt))}
+			nmax,lut_pos_img,lut_bkt_img=0
+			nt,capm:=h#-1,iM#-1
+			nmax={max(expr('sum(crop(#-1,0,x,0,0,w#-1,1,1,1))',h#-1))}
 		fi
 
-		$cpus_to_use,1,1,1,"
-			px=x;max_num=0;
-			while(px<w#-1,
-				max_number_of_possible_colors=sum(crop(#-1,px,0,0,0,1,h#-1,1,1));
-				if(max_number_of_possible_colors>max_num,
-					max_num=max_number_of_possible_colors;
-				);
-				px+=w;
-			);
-			max_num;
-			"
-
-		secondary_hash_table_buckets_per_threads,bit_mask:=(1<<cut(ceil(log2(sqrt(iM)))+1,4,13))-[0,1]
-		secondary_hash_table_size={$cpus_to_use*$secondary_hash_table_buckets_per_threads}
-		rm.
+		max_value_of_bucket={max(expr('sum(crop(#-1,x,0,0,0,1,h#-1,1,1))',w#-1))}
+		secondary_hash_table_buckets_per_threads,bit_mask:=(1<<cut(ceil(log2(sqrt($max_value_of_bucket)))+1,4,13))-[0,1]
+		secondary_hash_table_size,secondary_hash_table_initial_bucket_size,t0_init_bucket:=$cpus_to_use*$secondary_hash_table_buckets_per_threads,1<<cut(ceil(log2(sqrt($max_value_of_bucket)/32)),2,13),1<<int(log2($max_value_of_bucket))
 
 		r[$process_image_idx] $cpus_to_use,1,1,{$highest_color_frequency_mode?$S+2:1},-1
 		0x$secondary_hash_table_size
@@ -3851,7 +3839,7 @@ foreach {
 				const current_bucket_vector_size=hash2_pos+1;
 
 				const offset_2_bucket_start=$first_thread_bucket_init;
-				const end_of_first_thread_hash_table=$first_thread_bucket_id_endl;
+				const end_of_first_thread_hash_table=$first_thread_bucket_id_endl+1;
 
 				const T=$T;
 
@@ -3860,7 +3848,8 @@ foreach {
 				const levels=h#img_ref;
 
 				const bit_mask=$bit_mask;
-				const B=min($init_bucket_size,64);
+				const T0_bucket_size=$t0_init_bucket;
+				const init_secondary_bucket_size=$secondary_hash_table_initial_bucket_size;
 
 				if(dpim_mode,
 					const lut_pos_img=$lut_pos_img;
@@ -3898,9 +3887,9 @@ foreach {
 							);
 						);
 					);
-					color_collection_ok()=current_bucket<=end_of_first_thread_hash_table&&i[#mt_state_sync_img,0];
+					color_collection_ok()=current_bucket<end_of_first_thread_hash_table&&i[#mt_state_sync_img,0];
 				):(
-					color_collection_ok()=current_bucket<=end_of_first_thread_hash_table;
+					color_collection_ok()=current_bucket<end_of_first_thread_hash_table;
 				);
 
 				current_color=vector(#S);
@@ -3928,7 +3917,7 @@ foreach {
 
 					secondary_hash_table_dimension=wh(#secondary_hash_table_ind);
 					if(current_secondary_ins_pos==secondary_hash_table_dimension,
-						new_size=max(B,h(#secondary_hash_table_ind)<<1);
+						new_size=max(init_secondary_bucket_size,h(#secondary_hash_table_ind)<<1);
 						resize(#secondary_hash_table_ind,hash2_pos,new_size,1,1,-1);
 					);
 
@@ -3986,7 +3975,7 @@ foreach {
 								if(add_image,chkfreq(current_count_in_offset_bucket););
 								secondary_hash_table_dimension=wh(#secondary_hash_table_ind);
 								if(current_secondary_ins_pos==secondary_hash_table_dimension,
-									new_size=max(B,h(#secondary_hash_table_ind)<<1);
+									new_size=max(init_secondary_bucket_size,h(#secondary_hash_table_ind)<<1);
 									resize(#secondary_hash_table_ind,hash2_pos,new_size,1,1,-1);
 								);
 								copy(i[#secondary_hash_table_ind,current_secondary_ins_pos],current_color,S);
@@ -3997,7 +3986,7 @@ foreach {
 								secondary_insert_positions_list[second_hash_table_key]+=hash2_pos;
 								current_bucket_dimension=wh(#current_bucket);
 								if(current_bucket_ins_pos>=current_bucket_dimension,
-									new_size=max(B,h(#current_bucket)<<1);
+									new_size=max(T0_bucket_size,h(#current_bucket)<<1);
 									resize(#current_bucket,current_bucket_vector_size,new_size,1,1,-1);
 								);
 								copy(i[#current_bucket,current_bucket_ins_pos],current_color,S);
@@ -4017,7 +4006,7 @@ foreach {
 							if(color_pos==-1,
 								secondary_hash_table_dimension=wh(#secondary_hash_table_ind);
 								if(current_secondary_ins_pos==secondary_hash_table_dimension,
-									new_size=max(B,h(#secondary_hash_table_ind)<<1);
+									new_size=max(init_secondary_bucket_size,h(#secondary_hash_table_ind)<<1);
 									resize(#secondary_hash_table_ind,hash2_pos,new_size,1,1,-1);
 								);
 								copy(i[#secondary_hash_table_ind,current_secondary_ins_pos],current_color,S);
@@ -4025,7 +4014,7 @@ foreach {
 								if(!count_color_mode,
 									current_bucket_dimension=wh(#current_bucket);
 									if(current_bucket_ins_pos>=current_bucket_dimension,
-										new_size=max(B,h(#current_bucket)<<1);
+										new_size=max(T0_bucket_size,h(#current_bucket)<<1);
 										resize(#current_bucket,current_bucket_vector_size,new_size,1,1,-1);
 									);
 									copy(i[#current_bucket,current_bucket_ins_pos],current_color,S);
