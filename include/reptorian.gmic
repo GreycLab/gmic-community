@@ -3800,7 +3800,7 @@ foreach {
 
 		if $process_image_idx==2
 			nmax,lut_pos_img,lut_bkt_img=0
-			nt,capm:=h#-1,iM#-1
+			nt={h#-1}
 			nmax={max(expr('sum(crop(#-1,0,x,0,0,w#-1,1,1,1))',h#-1))}
 		fi
 
@@ -4765,7 +4765,7 @@ else
 fi
 
 m __$0_init_vars:"
-	num_of_pixels,cpus_to_use,mt_mode,bitshift_factor,hash_table_buckets_per_threads,init_bucket_size,secondary_init_bucket_size,bit_mask,seed_0,seed_1,S,SH,coords_mode,L0_process,L0_process_img:=\"
+	num_of_pixels,cpus_to_use,mt_mode,bitshift_factor,hash_table_buckets_per_threads,init_bucket_size,bit_mask,seed_0,seed_1,S,SH,coords_mode,L0_process,L0_process_img:=\"
 		num_of_pixels="$str_num_of_pixels";
 		cpus_to_use=cut(num_of_pixels>>16,1,"$_cpus");
 		mt_mode=cpus_to_use>1;
@@ -4776,12 +4776,11 @@ m __$0_init_vars:"
 		seed_0=v($seed_range_0,$seed_range_1);
 		seed_1=$seed_range_0+((seed_0-$seed_range_0+v(1,$seed_diff))%($seed_diff+1));
 		init_bucket_size=1<<cut(ceil(log2(sqrt(num_of_pixels)/16)),1,7);
-		secondary_init_bucket_size=cut(1<<cut(ceil(log2(sqrt(num_of_pixels))/2),1,7),1,num_of_pixels);
 		if(mt_mode&&(num_of_pixels>$dim_limit),run('DIMENSION_IMG<=(2^25)==F'));
 		coords_mode=mt_mode&&(num_of_pixels>$count_limit);
 		L0_process=$assign_order_into_img&&$mt_mode;
 		L0_process_img=L0_process+2;
-		num_of_pixels,cpus_to_use,mt_mode,bitshift_factor,hash_table_buckets_per_threads,init_bucket_size,secondary_init_bucket_size,bit_mask,seed_0,seed_1,"$str_s",coords_mode,L0_process,L0_process_img;
+		num_of_pixels,cpus_to_use,mt_mode,bitshift_factor,hash_table_buckets_per_threads,init_bucket_size,bit_mask,seed_0,seed_1,"$str_s",coords_mode,L0_process,L0_process_img;
 	\"
 	"
 
@@ -4889,7 +4888,6 @@ foreach {
 			const assign_order_into_img=$assign_order_into_img;
 			const vector_mode=$vector_mode;
 			const B=$init_bucket_size;
-			const T=$secondary_init_bucket_size;
 			const N=$num_of_pixels;
 			const HTB=$hash_table_buckets_per_threads;
 			const size_of_order_to_status=$4;
@@ -5013,6 +5011,7 @@ foreach {
 				const bucket_start_point=0;
 				const internal_hash_table_width_size=S+process_mode;
 				const E=arg0(mode,0,S,1,S+1);
+				const T=cut(1<<cut(ceil(log2(sqrt(N))/2),1,7),1,N);
 
 				count=0;
 
@@ -5141,9 +5140,8 @@ foreach {
 		HTB,HTF,ref_img,process_image_idx,cpus_to_use:=$L0_process_img+[1,$hash_table_buckets_per_threads],l-1,l,cut(is#-1>>13,1,min($_cpus,$hash_table_buckets_per_threads))
 
 		# Per-thread unique counts (row t of ref_img summed) -> size of the id->order LUT
-		nt,nmax,lut_img=0
 		if $assign_order_into_img
-			nt={h#$ref_img}
+			nt,nmax,lut_img:=h#$ref_img,0,0
 			nmax={max(expr('sum(crop(#$ref_img,0,x,0,0,w#$ref_img,1,1,1))',$nt))}
 		fi
 
@@ -5160,6 +5158,16 @@ foreach {
 			"
 
 		capm,secondary_hash_table_buckets_per_threads,bit_mask:=iM,(1<<cut(ceil(log2(sqrt(iM)))+1,4,13))-[0,1]
+		mean_value_of_bucket={ia#$ref_img*h#$ref_img}
+
+		# Secondary: expected entries per secondary bucket (mean load / bucket count),
+		# plus ~2 sigma of Poisson spread, rounded up to a power of 2
+		secondary_hash_table_initial_bucket_size={lam=$mean_value_of_bucket/$secondary_hash_table_buckets_per_threads;1<<cut(ceil(log2(max(lam+2*sqrt(lam),1))),2,13)}
+
+		# Thread-0 merged bucket: expected largest bucket under uniform hashing (mean + 3 sigma),
+		# capped by the real maximum so one skewed bucket can't inflate everything
+		t0_init_bucket={mu=$mean_value_of_bucket;1<<ceil(log2(max(min($capm,mu+3*sqrt(mu)),1)))}
+
 		secondary_hash_table_size={$cpus_to_use*$secondary_hash_table_buckets_per_threads}
 		grq_size={$capm*$hash_table_buckets_per_threads}
 
@@ -5185,7 +5193,8 @@ foreach {
 				const secondary_hash_table_width_size=S+assign_order_into_img+utilize_count;
 				const hash_pos=initial_internal_hash_table_width_size-1;
 				const bit_mask=$bit_mask;
-				const B=min($init_bucket_size,64);
+				const B=$secondary_hash_table_initial_bucket_size;  # CHANGED (was min($init_bucket_size,64))
+				const T0_bucket_size=$t0_init_bucket;               # CHANGED (new)
 				const process_mode=$process_mode;
 				const utilize_count_limit=iM#ref_img>$count_limit;
 				const calc_total=$4||utilize_count_limit;
@@ -5308,7 +5317,7 @@ foreach {
 								secondary_insert_positions_list[secondary_hash_table_key]+=secondary_hash_table_width_size;
 
 								if(new_bucket_pos==wh(#current_bucket),
-									new_size=max(B,h(#current_bucket)<<1);
+									new_size=max(T0_bucket_size,h(#current_bucket)<<1);  # CHANGED (was B)
 									resize(#current_bucket,final_first_bucket_collection_width_size,new_size,1,1,-1);
 								);
 								if(keep_color,
@@ -5343,7 +5352,7 @@ foreach {
 								if($2,
 									current_bucket_dimension=wh(#current_bucket);
 									if(new_bucket_pos==current_bucket_dimension,
-										new_size=max(B,h(#current_bucket)<<1);
+										new_size=max(T0_bucket_size,h(#current_bucket)<<1);  # CHANGED (was B)
 										resize(#current_bucket,final_first_bucket_collection_width_size,new_size,1,1,-1);
 									);
 									copy(i[#current_bucket,new_bucket_pos+1],current_color,S);
