@@ -3356,49 +3356,49 @@ eval.. >"begin(
 	end(da_freeze(#-1););
 	"
 rm..
-#@cli rep_dpim: _additional_output={ 0=count_status | 1=palette },_vector={ 0=false | 1=true},_ordered={ 0=unordered | 1=ordered }
+#@cli rep_dpim: _additional_output={ 0=count_status | 1=palette | 2=palette+freq (freq_first) },_vector={ 0=false | 1=true},_ordered={ 0=unordered | 1=ordered }
 #@cli : Decompose image into index, and into palette (if requested)
 #@cli : Note: Code was done by Reptorian, but only the order assignment was optimized by Claude.
 #@cli : Default values: '_additional_output=1'
 rep_dpim:
-check isbool(${1=1})&&isbool(${2=1})&&isbool(${3=0})
+check isint(${1=1},0,2)&&isbool(${2=1})&&isbool(${3=0})
 
 if isint($^,0)
-	e[0] "Decompose image"$?" into indexed map"{`"
-		$1?(
-			message_out=', and palette';
-			0;
-		):(
-			message_out=', count as status';
-			0;
-		);
-		message_out;
-	"`}.
+    e[0] "Decompose image"$?" into indexed map"{`"
+        $1?(
+            message_out=', and palette';
+            0;
+        ):(
+            message_out=', count as status';
+            0;
+        );
+        message_out;
+    "`}.
 fi
 
 if $3
-	rep_val2order 1,$1,$2,{!$1}
+    rep_val2order 1,$1,$2,{!$1}
 else
-	s={!$2}
+    s={!$2}
 
-	if $s
-		if l>1
-			m __$0_d:"$""=d"
-			m __$0_s:"$""=s"
-			__$0_d {expr('d#(x+1)',l-1)}
-			__$0_s {expr('s#(x+1)',l-1)}
-			um __$0_d,__$0_s
-		fi
+    if $s
+        if l>1
+            m __$0_d:"$""=d"
+            m __$0_s:"$""=s"
+            __$0_d {expr('d#(x+1)',l-1)}
+            __$0_s {expr('s#(x+1)',l-1)}
+            um __$0_d,__$0_s
+        fi
 
-		d0,s0:=d#0,s#0
-		foreach { r 100%,100%,{d*s},1,-1 }
-	fi
+        d0,s0:=d#0,s#0
+        foreach { r 100%,100%,{d*s},1,-1 }
+    fi
 
-	_rep_colors_inform_r @$1
+    _rep_colors_inform_r @$1
 
-	if $s
-		foreach[0--1:{1+$1}] { r 100%,100%,${d$>},${s$>},-1 }
-	fi
+    if $s
+        foreach[0--1:{1+($1>0)}] { r 100%,100%,${d$>},${s$>},-1 }
+    fi
 fi
 #@cli rep_count_colors : _count_until={ 0:None | >0:Max number of counted colors }
 #@cli : Count number of distinct colors in selected images until it reaches the specified max number of counted colors.
@@ -3421,92 +3421,94 @@ m0,m1="median-cut","k-means"
 s0,s1,s2="",", sorted by increasing norm",", sorted by decreasing occurrence"
 
 if !$1
-	s={$#>1?$-1:1}
-	check isint($s,0,2)
+    s={$#>1?$-1:1}
+    check isint($s,0,2)
 
-	e[0--3] "Estimate full colormap for image$?"${s$s}"."
+    e[0--3] "Estimate full colormap for image$?"${s$s}"."
 
-	c={$s==2}
+    c={$s==2}
 
-	_rep_colors_inform_r -$c
+    _rep_colors_inform_r -$c
 
-	if $c
-		# Sort by decreasing occurrence
+    if $c
+        # Sort by decreasing occurrence
 
-		foreach {
-			s c,-{s-1}
-			rv
-			a y
-			sort -,x
-			rows 1
-		}
-	elif $s
-		# Sort by increasing norm
+        foreach {
+            s c,-{s-1}
+            rv
+            a y
+            sort -,x
+            rows 1
+        }
+    elif $s
+        # Sort by increasing norm
 
-		foreach {
-			+norm
-			rv
-			a c
-			sort +,x
-			channels 1,100%
-		}
-	fi
+        foreach {
+            +norm
+            rv
+            a c
+            sort +,x
+            channels 1,100%
+        }
+    fi
 else
-	if $#==4
-		alg_swap,method,sort=${2--1}
+    if $#==4
+        alg_swap,method,sort=${2--1}
 
-		if same('$alg_swap','-')||same('$alg_swap','_')
-			alg_swap=$1
-		fi
-	else
-		method,sort=${2--1}
-		alg_swap=3
-	fi
+        if same('$alg_swap','-')||same('$alg_swap','_')
+            alg_swap=$1
+        fi
+    else
+        method,sort=${2--1}
+        alg_swap=3
+    fi
 
-	check isint($alg_swap,0)||isbool($method)||isint($sort,0,2)
+    check isint($alg_swap,0)||isbool($method)||isint($sort,0,2)
 
-	e[0--3] "Estimate colormap with $1 entries for image$?, by "${m$method}" method"${s$sort}"."
+    e[0--3] "Estimate colormap with $1 entries for image$?, by "${m$method}" method"${s$sort}"."
 
-	_rep_colors_inform_r $1,$method,$alg_swap,{$sort==2}
+    _rep_colors_inform_r $1,$method,$alg_swap,{$sort==2}
 
-	if $sort==1
-		foreach {
-			# Sort by increasing norm
-			+norm
-			rv
-			a c
-			sort +,x
-			channels 1,100%
-		}
-	fi
+    if $sort==1
+        foreach {
+            # Sort by increasing norm
+            +norm
+            rv
+            a c
+            sort +,x
+            channels 1,100%
+        }
+    fi
 fi
-#@cli rep_uniq_cols: preserve_frequency={ 0=false | 1=true }
+#@cli rep_uniq_cols: preserve_frequency={ 0=false | 1=true (color/freq-second)| 2=true (freq-first/color) }
 #@cli : Find all colors, with the option to preserve frequency
 rep_uniq_cols:
-check isbool($1)&&$#==1
+check isint($1,0,2)&&$#==1
 if isint($^,0) e[0] "Extract unique colormap "{`$1?('with\ histogram\ ')`}"for images"$?. fi
-_rep_colors_inform_r -$1
+_rep_colors_inform_r -$1 # Let -2 be input 2 for $1
 #@cli rep_mode: fill_with_mode_color={ 0=false | 1=true }
 #@cli : Fill image with the most common color.
 #@cli : Note: Mode images are named with the frequency of the mode color. So that meta data is usable.
 rep_mode:
 check isbool($1)&&$#==1
 e[0] "Extract most common color for images"$?.
-_rep_colors_inform_r {$1-3}
+_rep_colors_inform_r {$1-4} # Shifted to account for above, ignore this
 _rep_colors_inform_r:
 skip ${2=0},${3=0},${4=0}
 original_status=${}
 
 if same(('$1')[0],'@')
-	keep_palette={a=s2v(('$1')[1,size('$1')-1]);}
-	check isbool($keep_palette)
+	dpim_mode_arg={a=s2v(('$1')[1,size('$1')-1]);}
+	check isint($dpim_mode_arg,0,2)
+	keep_palette,dpim_freq:=$dpim_mode_arg>0,$dpim_mode_arg==2
+	freq_first=$dpim_freq
 	mt_cmd,highest_color_frequency_mode,col_frq_mode,ins_frq_chan,process_image_idx,finalize_mode,add_image,until_count=eval,0,0,0,2,0,0,0
 elif same(('$1')[0],'~')
 	num_of_cols_lim={a=s2v(('$1')[1,size('$1')-1]);a?abs(a):inf}
 	check isint($num_of_cols_lim)
-	mt_cmd,highest_color_frequency_mode,col_frq_mode,ins_frq_chan,process_image_idx,finalize_mode,add_image,until_count=eval,0,0,0,1,2,{vector(#2,$num_of_cols_lim!=inf)}
+	mt_cmd,freq_first,dpim_freq,highest_color_frequency_mode,col_frq_mode,ins_frq_chan,process_image_idx,finalize_mode,add_image,until_count=eval,0,0,0,0,0,1,2,{vector(#2,$num_of_cols_lim!=inf)}
 else
-	col_frq_mode,finalize_mode,use_k_mean,until_count,process_image_idx,ins_frq_chan:=$1<0,$1>0,$2,0,0,$1==-1
+	col_frq_mode,finalize_mode,use_k_mean,until_count,dpim_freq,process_image_idx,ins_frq_chan,freq_first:=$1<0,$1>0,$2,0,0,0,$1<0&&$1>-3,$1==-2
 
 	if $finalize_mode
 		internal_sort=$4
@@ -3514,7 +3516,7 @@ else
 		md_div,col_frq_mode:=$int_frq_mode?1024:1024,$use_k_mean||$int_frq_mode||$internal_sort # Frequency-based version of median cut is initially more accurate.
 	fi
 
-	if $1<-1
+	if $1<-2
 		add_image,highest_color_frequency_mode=1
 		mt_cmd=fill
 	else
@@ -3539,7 +3541,7 @@ m __$0_init_vars:"
 		init_bucket_size=1<<cut(ceil(log2(sqrt(WHD)/32)),3,7);
 		cpus_to_use,mt_mode,bitshift_factor,hash_table_buckets_per_threads,bit_mask,s#0,$add_image,seed_0,seed_1,init_bucket_size;
 	\"
-	"{`$highest_color_frequency_mode?($1==-2?(v=('od:=w,h,d');0):(v=('od=1,1,1');0);v);`}
+	"{`$highest_color_frequency_mode?($1==-3?(v=('od:=w,h,d');0):(v=('od=1,1,1');0);v);`}
 
 foreach {
 	if whd<=1
@@ -3547,7 +3549,9 @@ foreach {
 			res.=$sep{whd}
 			sep=,
 		elif $ins_frq_chan&&whd
-			(1) a c
+			(1)
+			if $freq_first rv fi
+			a c
 		fi
 
 		continue
@@ -3590,6 +3594,7 @@ foreach {
 	fi
 
 	# Find Unique Colors or Frequency of Colors per dynamic num of threads
+	# Entry layout: [color,count] normally, [count,color] when freq_first is set.
 
 	eval[2] :"
 		begin(
@@ -3601,10 +3606,14 @@ foreach {
 			const color_count_mode=return_only_count||(!mt_mode&&dpim_mode);
 			const calc_max_freq_num_mode=!mt_mode&&$highest_color_frequency_mode;
 			const col_frq_mode=$col_frq_mode;
+			const dfq=$dpim_freq;
 			const include_found_color_mode=dpim_mode||col_frq_mode;
-			const vector_insertion_size=S+include_found_color_mode+mt_mode;
-			const hash2_pos=S+include_found_color_mode;
+			const vector_insertion_size=S+include_found_color_mode+dfq+mt_mode;
+			const hash2_pos=S+include_found_color_mode+dfq;
 			const B=$init_bucket_size;
+			const c_off=$freq_first;
+			const f_off=c_off?0:S;
+			const cnt_shift=c_off?-1:S;
 
 			if(mt_mode,
 				const lc=S-1;
@@ -3706,24 +3715,26 @@ foreach {
 				key=i[#1,P];
 				door_pos=key+offset;
 				ins_pos=list_of_ins_pos[key];
-				i(#-1,key,x)&&(additional_channel_pos=find(#door_pos,current_color,ins_pos-vector_insertion_size,-vector_insertion_size))!=-1?(
-					additional_channel_pos+=S;
+				i(#-1,key,x)&&(found_color_pos=find(#door_pos,current_color,ins_pos-vector_insertion_size+c_off,-vector_insertion_size))!=-1?(
 					dpim_mode?(
-						i[#0,P]=i[#door_pos,additional_channel_pos];
+						i[#0,P]=i[#door_pos,found_color_pos+S];
+						if(dfq,++i[#door_pos,found_color_pos+cnt_shift];);
 					):(
-						chkfreq(++i[#door_pos,additional_channel_pos]);
+						chkfreq(++i[#door_pos,found_color_pos+cnt_shift]);
 					);
 				):(
 					if(ins_pos==wh(#door_pos),
 						new_size=max(B,h(#door_pos)<<1);
 						resize(#door_pos,vector_insertion_size,new_size,1,1,-1);
 					);
-					copy(i[#door_pos,ins_pos],current_color);
-					additional_channel_pos=ins_pos+S;
+					copy(i[#door_pos,ins_pos+c_off],current_color);
 					dpim_mode?(
-						new_id=(mt_mode?local_count++:(ins_pos?i[#door_pos,additional_channel_pos-vector_insertion_size]+1));
-						i[#0,P]=i[#door_pos,additional_channel_pos]=new_id;
+						id_pos=ins_pos+S+c_off;
+						new_id=(mt_mode?local_count++:(ins_pos?i[#door_pos,id_pos-vector_insertion_size]+1));
+						i[#0,P]=i[#door_pos,id_pos]=new_id;
+						if(dfq,i[#door_pos,ins_pos+f_off]=1;);
 					):(
+						additional_channel_pos=ins_pos+f_off;
 						chkfreq(i[#door_pos,additional_channel_pos]=1);
 					);
 					if(mt_mode,i[#door_pos,ins_pos+hash2_pos]=hash_color(current_color););
@@ -3841,9 +3852,13 @@ foreach {
 				);
 
 				const col_frq_mode=$col_frq_mode;
+				const dfq=$dpim_freq;
 				const include_found_color_mode=dpim_mode||col_frq_mode;
-				const hash2_pos=S+include_found_color_mode;
+				const hash2_pos=S+include_found_color_mode+dfq;
 				const current_bucket_vector_size=hash2_pos+1;
+				const c_off=$freq_first;
+				const f_off=c_off?0:S;
+				const id_off=S+c_off;
 
 				const offset_2_bucket_start=$first_thread_bucket_init;
 				const end_of_first_thread_hash_table=$first_thread_bucket_id_endl+1;
@@ -3914,7 +3929,7 @@ foreach {
 				count_per_current_level=i(#img_ref,bucket_id,current_level);
 
 				repeat(count_per_current_level,current_bucket_pos,
-					copy(current_color,i[#current_bucket,current_bucket_ins_pos],S);
+					copy(current_color,i[#current_bucket,current_bucket_ins_pos+c_off],S);
 
 					secondary_hash_pos=current_bucket_ins_pos+hash2_pos;
 					second_hash_table_key=i[#current_bucket,secondary_hash_pos]&bit_mask;
@@ -3931,13 +3946,13 @@ foreach {
 					copy(i[#secondary_hash_table_ind,current_secondary_ins_pos],current_color,S);
 
 					col_frq_mode?(
-						color_count_pos=current_bucket_ins_pos+S;
+						color_count_pos=current_bucket_ins_pos+f_off;
 						if(calc_max_freq_num_mode,chkfreq(i[#current_bucket,color_count_pos]););
 						i[#secondary_hash_table_ind,current_secondary_ins_pos+S]=color_count_pos;
 					):
 					dpim_mode?(
 						i[#secondary_hash_table_ind,current_secondary_ins_pos+S]=current_bucket_pos;
-						lut_idx=i[#current_bucket,current_bucket_ins_pos+S];
+						lut_idx=i[#current_bucket,current_bucket_ins_pos+id_off];
 						i[#lut_pos_img,lut_idx]=current_bucket_pos;
 						i[#lut_bkt_img,lut_idx]=bucket_id;
 					);
@@ -3953,9 +3968,9 @@ foreach {
 					current_offset_bucket_pos=0;
 
 					repeat(count_per_current_level,
-						copy(current_color,i[#offset_bucket,current_offset_bucket_pos],S);
-						if(col_frq_mode,
-							current_count_in_offset_bucket=i[#offset_bucket,current_offset_bucket_pos+S];
+						copy(current_color,i[#offset_bucket,current_offset_bucket_pos+c_off],S);
+						if(col_frq_mode||dfq,
+							current_count_in_offset_bucket=i[#offset_bucket,current_offset_bucket_pos+f_off];
 						);
 
 						offset_hash_pos=current_offset_bucket_pos+hash2_pos;
@@ -3968,9 +3983,10 @@ foreach {
 						include_found_color_mode?(
 							color_pos!=-1?(
 								dpim_mode?(
-									lut_idx=lut_row+i[#offset_bucket,current_offset_bucket_pos+S];
+									lut_idx=lut_row+i[#offset_bucket,current_offset_bucket_pos+id_off];
 									i[#lut_pos_img,lut_idx]=i[#secondary_hash_table_ind,color_pos+S];
 									i[#lut_bkt_img,lut_idx]=bucket_id;
+									if(dfq,i[#current_bucket,i[#secondary_hash_table_ind,color_pos+S]*current_bucket_vector_size+f_off]+=current_count_in_offset_bucket;);
 								):(
 									add_image?(
 										chkfreq(i[#current_bucket,i[#secondary_hash_table_ind,color_pos+S]]+=current_count_in_offset_bucket;);
@@ -3988,7 +4004,7 @@ foreach {
 								copy(i[#secondary_hash_table_ind,current_secondary_ins_pos],current_color,S);
 								if(dpim_mode
 								,i[#secondary_hash_table_ind,current_secondary_ins_pos+S]=current_bucket_pos;
-								,i[#secondary_hash_table_ind,current_secondary_ins_pos+S]=current_bucket_ins_pos+S;
+								,i[#secondary_hash_table_ind,current_secondary_ins_pos+S]=current_bucket_ins_pos+f_off;
 								);
 								secondary_insert_positions_list[second_hash_table_key]+=hash2_pos;
 								current_bucket_dimension=wh(#current_bucket);
@@ -3996,14 +4012,15 @@ foreach {
 									new_size=max(T0_bucket_size,h(#current_bucket)<<1);
 									resize(#current_bucket,current_bucket_vector_size,new_size,1,1,-1);
 								);
-								copy(i[#current_bucket,current_bucket_ins_pos],current_color,S);
+								copy(i[#current_bucket,current_bucket_ins_pos+c_off],current_color);
 
 								dpim_mode?(
-									lut_idx=lut_row+i[#offset_bucket,current_offset_bucket_pos+S];
+									lut_idx=lut_row+i[#offset_bucket,current_offset_bucket_pos+id_off];
 									i[#lut_pos_img,lut_idx]=current_bucket_pos;
 									i[#lut_bkt_img,lut_idx]=bucket_id;
+									if(dfq,i[#current_bucket,current_bucket_ins_pos+f_off]=current_count_in_offset_bucket;);
 								):(
-									i[#current_bucket,current_bucket_ins_pos+S]=current_count_in_offset_bucket;
+									i[#current_bucket,current_bucket_ins_pos+f_off]=current_count_in_offset_bucket;
 								);
 
 								current_bucket_ins_pos+=current_bucket_vector_size;
@@ -4125,7 +4142,7 @@ foreach {
 				else
 					rm[1,{$hash_table_buckets_per_threads+2}--1]
 					a[1--1] y
-					crop. 0,{$S-1}
+					crop. 0,{$S-1+$dpim_freq}
 					permute. yzcx
 				fi
 			else
@@ -4197,24 +4214,27 @@ foreach {
 				rm[2]
 				if !$keep_palette name[0] ${} fi
 
+				id_off={$S+$freq_first}
+
 				eval. >"begin(
 						const S=$S;
-						const W=S+1;
+						const D=$id_off;
+						const W=S+1+$dpim_freq;
 						const K=$keep_palette;
 						H=[0];
 					);
 					X=x+2;
-					i&&H[0]?(copy(i[#X,S],H,i,W,0,-1););
+					i&&H[0]?(copy(i[#X,D],H,i,W,0,-1););
 					if(K,resize(#X,W,i,1,1,-1););
 					H[0]+=i;
 					"
 
-				f[0] i(#i#1+2,$S,i)
+				f[0] i(#i#1+2,$id_off,i)
 
 				if $keep_palette
 					rm[1,-1]
 					a[1--1] y
-					crop. 0,{$S-1}
+					crop. 0,{$S-1+$dpim_freq}
 					permute. yzcx
 				else k[0]
 				fi
@@ -4224,7 +4244,7 @@ foreach {
 				sep=,
 			fi
 		elif $highest_color_frequency_mode
-			if $1==-2
+			if $1==-3
 				k[0]
 				f [${}]
 			else
@@ -4249,7 +4269,7 @@ foreach {
 }
 
 if $process_image_idx==1 u $res
-else u $old_status
+else u $original_status
 fi
 ___rep_colors_inform_r_reduce_colors:
 # Median-cut
