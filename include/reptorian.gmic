@@ -3364,41 +3364,41 @@ rep_dpim:
 check isint(${1=1},0,2)&&isbool(${2=1})&&isbool(${3=0})
 
 if isint($^,0)
-	e[0] "Decompose image"$?" into indexed map"{`"
-		$1?(
-			message_out=', and palette';
-			0;
-		):(
-			message_out=', count as status';
-			0;
-		);
-		message_out;
-	"`}.
+    e[0] "Decompose image"$?" into indexed map"{`"
+        $1?(
+            message_out=', and palette';
+            0;
+        ):(
+            message_out=', count as status';
+            0;
+        );
+        message_out;
+    "`}.
 fi
 
 if $3
-    rep_val2order 1,$1,$2,{!$1}
+    rep_val2order 1,{$1==2?4:$1},$2,{!$1}
 else
-	s={!$2}
+    s={!$2}
 
-	if $s
-		if l>1
-			m __$0_d:"$""=d"
-			m __$0_s:"$""=s"
-			__$0_d {expr('d#(x+1)',l-1)}
-			__$0_s {expr('s#(x+1)',l-1)}
-			um __$0_d,__$0_s
-		fi
+    if $s
+        if l>1
+            m __$0_d:"$""=d"
+            m __$0_s:"$""=s"
+            __$0_d {expr('d#(x+1)',l-1)}
+            __$0_s {expr('s#(x+1)',l-1)}
+            um __$0_d,__$0_s
+        fi
 
-		d0,s0:=d#0,s#0
-		foreach { r 100%,100%,{d*s},1,-1 }
-	fi
+        d0,s0:=d#0,s#0
+        foreach { r 100%,100%,{d*s},1,-1 }
+    fi
 
-	_rep_colors_inform_r @$1
+    _rep_colors_inform_r @$1
 
-	if $s
-		foreach[0--1:{1+($1>0)}] { r 100%,100%,${d$>},${s$>},-1 }
-	fi
+    if $s
+        foreach[0--1:{1+($1>0)}] { r 100%,100%,${d$>},${s$>},-1 }
+    fi
 fi
 #@cli rep_count_colors : _count_until={ 0:None | >0:Max number of counted colors }
 #@cli : Count number of distinct colors in selected images until it reaches the specified max number of counted colors.
@@ -4483,12 +4483,15 @@ eval[0] "begin(
 rm[0,1]
 sort -,x
 channels 1,100%
-#@cli rep_val2order: _map2img={ -1=Remove | 0=n/a | 1=T | 2=Keep Both },_additional_image={ 0=n/a | 1=value | 2=count | 3=value+count},_value={ 0=scalar | 1=vector },_status={ 0=n/a | 1=size_of_order }
+#@cli rep_val2order: _map2img={ -1=Remove | 0=n/a | 1=T | 2=Keep Both },_additional_image={ 0=n/a | 1=value | 2=count | 3=value+count | 4=count+value (freq_first) },_value={ 0=scalar | 1=vector },_status={ 0=n/a | 1=size_of_order }
 #@cli : This commands can change images to order of appearance representation(s), and provide information based on order.
 #@cli : Note: Code has been created by Reptorian, only optimization toward order assignment was done by Claude.
 #@cli : Default values: '_map2img=1','_additional_image=1','_value=1','_status=0'
 rep_val2order:
-check isint(${1=1},-1,2)&&isint(${2=0},0,3)&&isbool(${3=1})&&isbool(${4=0})
+check isint(${1=1},-1,2)&&isint(${2=0},0,4)&&isbool(${3=1})&&isbool(${4=0})
+
+# '4' behaves like '3' internally, only the palette layout changes to [count,value].
+freq_first,amode:=ff=$2==4;ff,ff?3:$2
 
 if same([${1-2},$4],0)||!l?1:same(expr('!s#x',l),1)
 	return
@@ -4502,7 +4505,7 @@ if isint($^,0)
 	if same([${1-3}],0)&&$4
 		e[0] "Count the number of unique colors."
 	else
-		if $1>0||isin($2,1,3)||isin($3,1,2)
+		if $1>0||isin($amode,1,3)||isin($3,1,2)
 			e[0] "Extract order information."
 		else
 			e[0] "Extract count by order."
@@ -4538,7 +4541,7 @@ m __$0_init_vars:"
 	\"
 	"
 
-dim_limit,count_limit,internal_bit_mask,vector_mode,assign_order_into_img,mode,i_mode,utilize_count:=(1<<25)+1,(1<<24)-[0,1],$3,$1>0,$2,bool($2)+1,$2>1
+dim_limit,count_limit,internal_bit_mask,vector_mode,assign_order_into_img,mode,i_mode,utilize_count:=(1<<25)+1,(1<<24)-[0,1],$3,$1>0,$amode,bool($amode)+1,$amode>1
 output_count,process_mode,utilize_index:=$utilize_count||$4,bool($assign_order_into_img|[$utilize_count,$mode])
 additional_values,bucket_start_point:=$utilize_index+$assign_order_into_img+$utilize_count+1,$utilize_index+($mode==2)+($assign_order_into_img&&!$mode)
 rm_col_imgs={$1&1?(v=[0,1];0;):(v=[1];0;);v;}
@@ -4553,11 +4556,15 @@ foreach {
 		fi
 
 		if $L
-			if $2
-				if $2&1 [0]
-				elif $2 (1)
+			if $amode
+				if $freq_first
+					(1) [0] a[-2,-1] c
+				else
+					if $amode&1 [0]
+					elif $amode (1)
+					fi
+					if $amode==3 (1) a[-2,-1] c fi
 				fi
-				if $2==3 (1) a[-2,-1] c fi
 			fi
 			l[0] {
 				if $1
@@ -4566,7 +4573,7 @@ foreach {
 				fi
 			}
 		else
-			if $2 0 fi
+			if $amode 0 fi
 			if $1<0 rm[0] fi
 		fi
 
@@ -4645,6 +4652,7 @@ foreach {
 			const HTB=$hash_table_buckets_per_threads;
 			const size_of_order_to_status=$4;
 			const target_img=k-1;
+			const freq_first=$freq_first;
 
 			if(vector_mode
 			,img_val()=I[#0,P];
@@ -4781,13 +4789,23 @@ foreach {
 					const dec_internal_hash_table_width_size=internal_hash_table_width_size-1;
 
 					mode==3?(
-						external_process_unique()=(
-							resize_filled_pal();
-							copy(i(#-1,0,id=count++,0,0),[current_color,1]);
+						freq_first?(
+							external_process_unique()=(
+								resize_filled_pal();
+								copy(i(#-1,0,id=count++,0,0),[1,current_color]);
+							);
+
+							external_process_found()=++i(#-1,0,id,0,0);
+						):(
+							external_process_unique()=(
+								resize_filled_pal();
+								copy(i(#-1,0,id=count++,0,0),[current_color,1]);
+							);
+
+							external_process_found()=++i(#-1,S,id,0,0);
 						);
 
 						internal_process_unique()=copy(i[#hash_table_ind,hash_table_ins_pos],[current_color,id]);
-						external_process_found()=++i(#-1,S,id,0,0);
 					):
 					mode==2?(
 						external_process_unique()=(
@@ -4951,11 +4969,13 @@ foreach {
 				const process_mode=$process_mode;
 				const utilize_count_limit=iM#ref_img>$count_limit;
 				const calc_total=$4||utilize_count_limit;
-				const keep_color=$2&1;
-				const out_count_row=1+keep_color*S;
-				const out_bucket_idx_row=out_count_row+utilize_count;
+				const keep_color=$amode&1;
+				const freq_first=$freq_first;
+				const color_row=1+freq_first;
+				const out_count_row=freq_first?1:1+keep_color*S;
+				const out_bucket_idx_row=1+keep_color*S+utilize_count;
 				const out_bucket_pos_row=out_bucket_idx_row+1;
-				const final_first_bucket_collection_width_size=(assign_order_into_img||$2)?out_bucket_idx_row+2*assign_order_into_img:0;
+				const final_first_bucket_collection_width_size=(assign_order_into_img||$amode)?out_bucket_idx_row+2*assign_order_into_img:0;
 				const lut_img=$lut_img;
 				const nmax=$nmax;
 				const order_row_idx=$mode?1+S+utilize_count:1;
@@ -5021,7 +5041,7 @@ foreach {
 							i[#current_bucket,new_bucket_pos+out_count_row]=i[#current_bucket,bucket_ref_pos+count_row_idx];
 						);
 						if(keep_color,
-							copy(i[#current_bucket,new_bucket_pos+1],current_color,S);
+							copy(i[#current_bucket,new_bucket_pos+color_row],current_color,S);
 						);
 						if(assign_order_into_img,
 							i[#current_bucket,new_bucket_pos+out_bucket_pos_row]=current_bucket_count;
@@ -5074,7 +5094,7 @@ foreach {
 									resize(#current_bucket,final_first_bucket_collection_width_size,new_size,1,1,-1);
 								);
 								if(keep_color,
-									copy(i[#current_bucket,new_bucket_pos+1],current_color,S);
+									copy(i[#current_bucket,new_bucket_pos+color_row],current_color,S);
 								);
 
 								i[#current_bucket,new_bucket_pos]=i[#offset_bucket,current_offset_bucket_pos-bucket_start_point];
@@ -5102,13 +5122,13 @@ foreach {
 								);
 								copy(i[#secondary_hash_table_ind,current_secondary_ins_pos],current_color,S);
 								secondary_insert_positions_list[secondary_hash_table_key]+=secondary_hash_table_width_size;
-								if($2,
+								if($amode,
 									current_bucket_dimension=wh(#current_bucket);
 									if(new_bucket_pos==current_bucket_dimension,
 										new_size=max(T0_bucket_size,h(#current_bucket)<<1);  # CHANGED (was B)
 										resize(#current_bucket,final_first_bucket_collection_width_size,new_size,1,1,-1);
 									);
-									copy(i[#current_bucket,new_bucket_pos+1],current_color,S);
+									copy(i[#current_bucket,new_bucket_pos+color_row],current_color,S);
 									i[#current_bucket,new_bucket_pos]=i[#offset_bucket,current_offset_bucket_pos-bucket_start_point];
 									new_bucket_pos+=final_first_bucket_collection_width_size;
 								);
@@ -5169,7 +5189,7 @@ foreach {
 				i[#grq,i[#-1,rank_idx+x]*HB+i[#-1,bucket_id+x]]=x;
 				_0;
 				"
-			if $2 channels. 1,{$utilize_count+($2&1)*$S}
+			if $amode channels. 1,{$utilize_count+($amode&1)*$S}
 			else rm.
 			fi
 
@@ -5193,9 +5213,9 @@ foreach {
 				rm[-1]
 			}
 			resize[$ord_img] $ow,$oh,$od,$os,-1
-			rm[{$L0_process_img-2},$L0_process_img-{$2?-2:-1}]
+			rm[{$L0_process_img-2},$L0_process_img-{$amode?-2:-1}]
 			name[0] $orig_name
-		elif $2
+		elif $amode
 			L0_process_img,HTF+=1
 			rm[$HTF--1]
 			a[$L0_process_img--1] y
