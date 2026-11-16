@@ -12,7 +12,7 @@
 7. It is not necessary to use `{}` around an expression evaluated as part of a control statement that evaluates to a Boolean. E.g., you can write `if round(x)>=pi` directly, rather than `if {round(x)>=pi}`.
 8. When assigning a value to a variable that requires a calculation, best use `var:=` rather than `var={...}`. E.g., `x:=round(pi)` is preferable.
 9. In recent versions of G'MIC, the `endl` command no longer exists; it has been replaced by `done` (or `}`, which is equivalent).
-10. Use command shortcuts when needed (e.g. `r` for `resize`, `c` for `cut`, `n` for `normalize`, `s` for `split`, etc.)
+10. Use command shortcuts when needed (e.g. `r` for `resize`, `f` for `fill`, `c` for `cut`, `n` for `normalize`, `s` for `split`, etc.)
 
 ## Mathematical expressions
 11. When you specify mathematical expressions enclosed in double quotes (e.g. while using the `fill` and `eval` commands), you are allowed to write expressions across multiple lines and include spaces between operators. Use these features to make your code clearer and more readable.
@@ -32,3 +32,4 @@
 ~~~
 where `YYYY/MM/DD` must be replaced by the date of the day.
 15.  Do not include a `Random Seed` parameter for the filter unless you are certain that the rendering displayed in the preview window will be roughly the same as the final rendering once the filter is applied.
+16. When defining a `choice()` parameter, if the default choice is the first item, you don't need to specify a `0` as the first argument.
