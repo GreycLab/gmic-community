@@ -1,6 +1,6 @@
 # A Reminder of Best Practices for Coding G'MIC Filters
 
-## General syntax
+## General rules
 1. Use English for the names of filters, parameters, variables, and comments in the code.
 2. Use two spaces for each level of indentation.
 
