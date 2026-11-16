@@ -97,10 +97,18 @@
 #@cli :   @({...} = Same, for every node missing a left child.
 #@cli :   @){...} = Same, for every node missing a right child.
 #@cli :   @|{...} = Same, for every node missing either child.
-#@cli :       The set of nodes is fixed when the construct starts, so children created by the
-#@cli :       body are not visited. Inside {...} only nodes of the local subtree are used.
-#@cli :       The current node is restored afterwards. '=' leaves the construct, ',' continues
-#@cli :       with the next node. Nodes are visited in internal stack order, not by index.
+#@cli :   Optional parameters, between the type character and '{':   @!\>1{...}
+#@cli :     \> = Visit the nodes from left to right. < = from right to left (subtree preorder).
+#@cli :         Without it, nodes are visited in internal stack order.
+#@cli :     0/1 = 0 (default): restore the starting node afterwards. 1: end at the last visited node.
+#@cli :         '=' with 1 stays wherever the body left the current node.
+#@cli :   The set of nodes is fixed when the construct starts, so children created by the
+#@cli :   body are not visited. A node that qualified at the start is still visited, even if
+#@cli :   the body gave it children before its turn. Inside {...} only nodes of the local
+#@cli :   subtree are used. '=' leaves the construct, ',' continues with the next node.
+#@cli :   (Unordered: if the body creates children on members that are not visited yet, the
+#@cli :   internal stack is reshuffled and the visiting order/count may differ. Use \> or <
+#@cli :   when the body does that.)
 #@cli :
 #@cli : Path walks (the path is NOT an expression, and nothing is ever created):
 #@cli :   @?0{path}[...]  = Check once that 'path' (only ^ < > ~ + - * allowed) leads to existing
@@ -226,6 +234,12 @@
 #@cli :   X_ind() = Return how many times the body of the innermost enclosing loop has been
 #@cli :              executed so far, minus 1. Differs from x_ind() only when a skip count is used.
 #@cli :              Error outside a loop.
+#@cli :
+#@cli :   loop_size() = Return how many passes the innermost enclosing loop makes at most, when
+#@cli :              that is known ahead of time: N{...}, N...`, #{n}[...], path walks (@?0/@?1),
+#@cli :              at-all constructs and @^0/@^1 loops without {skip}. '=' can cut a loop short.
+#@cli :              Returns nan when it is not known ahead of time (?? loops, @<, @>, @., @:
+#@cli :              loops, and @^ loops with {skip}). Error outside a loop.
 #@cli :
 #@cli :   For this implementation, all G'MIC JIT expressions are supported.
 #@cli :
@@ -361,7 +375,7 @@ eval "
 		++i(#loop_ind_stack,bl_sp,0,0,1);
 	);
 
-	# Find the innermost enclosing loop (control frame or repeat) and hand its indices to __rep_str2bin_struct_expr
+	# Find the innermost enclosing loop (control frame or repeat) and hand its indices and size to __rep_str2bin_struct_expr
 	loop_ctx()=(
 		lc_sp=-1;
 		for(lc_p=ctl_sp-1,lc_p>=0,--lc_p,
@@ -372,18 +386,50 @@ eval "
 		lc_rpos=repeat_level>-1?i(#repeat_bucket,repeat_pos,0,0,0):-1;
 		lc_x=nan;
 		lc_X=nan;
+		lc_sz=nan;
 		if(lc_rpos>lc_fpos,
 			lc_x=i(#repeat_bucket,repeat_pos,0,0,3)-i(#repeat_bucket,repeat_pos,0,0,4);
 			lc_X=lc_x;
+			lc_sz=i(#repeat_bucket,repeat_pos,0,0,3);
 		,
 			if(lc_sp>=0,
 				lc_x=i(#loop_ind_stack,lc_sp,0,0,0);
 				lc_X=i(#loop_ind_stack,lc_sp,0,0,1);
+				lc_fk=i(#ctl_stack,lc_sp,0,0,0);
+
+				# '#{n}[...]': total count is kept in channel 3
+				if(lc_fk==2,lc_sz=i(#ctl_stack,lc_sp,0,0,3););
+
+				# At-all: size of the node set, fixed at the start
+				if(lc_fk==5,lc_sz=i(#ctl_stack,lc_sp,0,0,4););
+
+				# Path walk: one pass per step of the path
+				if(lc_fk==6,
+					lc_cnt=0;
+					for(lc_q=i(#jump_table,lc_fpos,0,0,0),lc_q<i(#jump_table,lc_fpos,0,0,1),++lc_q,
+						if(!isin(i[#str_img,lc_q],skip_char_0,skip_char_1,skip_char_2),++lc_cnt;);
+					);
+					lc_sz=lc_cnt;
+				);
+
+				# '@^' without {skip}: the chain of ancestors is fixed, so its length is known.
+				# Passes done so far (x_ind) + nodes still to come (depth below the subtree root) + the current one.
+				# The subtree root is the one of the loop's own context: count the local '[' frames below the loop frame.
+				if(lc_fk==7&&i[#str_img,lc_fpos+1]==move_up_tree&&!i(#jump_table,lc_fpos,0,0,0),
+					lc_lvl=0;
+					for(lc_p=0,lc_p<lc_sp,++lc_p,
+						if(!i(#ctl_stack,lc_p,0,0,0),++lc_lvl;);
+					);
+					lc_root=i(#square_bracket_stack,lc_lvl,0,0,0);
+					lc_cur=i(#ctl_stack,lc_sp,0,0,3);
+					lc_sz=lc_x+i(#binary_tree_img,0,lc_cur,0,depth_pos)-i(#binary_tree_img,0,lc_root,0,depth_pos)+1;
+				);
 			);
 		);
 		set('rep_str2bin_struct_in_loop',lc_rpos>=0||lc_fpos>=0);
 		set('rep_str2bin_struct_x_ind',lc_x);
 		set('rep_str2bin_struct_X_ind',lc_X);
+		set('rep_str2bin_struct_loop_size',lc_sz);
 	);
 
 	# Evaluate a scalar expression (control flow condition or count) at a given node
@@ -470,6 +516,55 @@ eval "
 		);
 		if(dn_dc==move_up_tree&&dn_n!=dn_root,dn_r=i(#binary_tree_img,0,dn_n,0,parent_pos););
 		dn_r;
+	);
+
+	# Ordered at-all helpers. Nodes with index >= as_snap were created after the construct started
+	# and are treated as nonexistent, so the node set is fixed.
+	# Preorder successor inside the subtree of as_root. as_fd = side visited first (0 = left, 1 = right).
+	# Returns -1 at the end.
+	ao_succ(as_n,as_root,as_fd,as_snap)=(
+		as_a=i(#binary_tree_img,0,as_n,0,1+as_fd);
+		as_b=i(#binary_tree_img,0,as_n,0,2-as_fd);
+		as_a=(as_a>0&&as_a<as_snap)?as_a:0;
+		as_b=(as_b>0&&as_b<as_snap)?as_b:0;
+		as_r=as_a>0?as_a:(as_b>0?as_b:-1);
+		as_x=as_n;
+		while(as_r<0&&as_x!=as_root,
+			as_p=i(#binary_tree_img,0,as_x,0,parent_pos);
+			if(i(#binary_tree_img,0,as_x,0,direction_pos)==as_fd,
+				as_s=i(#binary_tree_img,0,as_p,0,2-as_fd);
+				if(as_s>0&&as_s<as_snap,as_r=as_s;);
+			);
+			as_x=as_p;
+		);
+		as_r;
+	);
+
+	# Did the node qualify at the start? ('(' = 0, ')' = 1, '!' = 2, '|' = 3)
+	ao_qual(aq_n,aq_m,aq_snap)=(
+		aq_l=i(#binary_tree_img,0,aq_n,0,left_child_pos);
+		aq_r=i(#binary_tree_img,0,aq_n,0,right_child_pos);
+		aq_l=aq_l>0&&aq_l<aq_snap;
+		aq_r=aq_r>0&&aq_r<aq_snap;
+		aq_m==0?!aq_l:(aq_m==1?!aq_r:(aq_m==2?(!aq_l&&!aq_r):!(aq_l&&aq_r)));
+	);
+
+	# Next member of the set strictly after an_n, or -1
+	ao_next(an_n,an_root,an_fd,an_m,an_snap)=(
+		an_x=ao_succ(an_n,an_root,an_fd,an_snap);
+		while(an_x>=0&&!ao_qual(an_x,an_m,an_snap),an_x=ao_succ(an_x,an_root,an_fd,an_snap););
+		an_x;
+	);
+
+	# First member of the set (root included), or -1
+	ao_first(af_root,af_fd,af_m,af_snap)=ao_qual(af_root,af_m,af_snap)?af_root:ao_next(af_root,af_root,af_fd,af_m,af_snap);
+
+	# Size of the set
+	ao_count(ac_root,ac_m,ac_snap)=(
+		ac_c=0;
+		ac_x=ao_first(ac_root,0,ac_m,ac_snap);
+		while(ac_x>=0,++ac_c;ac_x=ao_next(ac_x,ac_root,0,ac_m,ac_snap););
+		ac_c;
 	);
 
 	if(expr_enable_mode,
@@ -953,18 +1048,37 @@ eval "
 		):
 		(current_char==move_to_var&&(at_mode=find([random_left_leaf,random_right_leaf,random_no_child,random_leaf],i[#str_img,cursor+1],0,1))!=-1)?(
 			# '@(' = 0, '@)' = 1, '@!' = 2, '@|' = 3. The mode is also the stack offset.
+			# Frame: kind, statement, position (unordered) or current node (ordered), origin node,
+			#        loop size, last visited node (unordered) or node count at the start (ordered)
 			at_stmt=cursor;
 			at_stack=no_left_child_stack+at_mode;
-			at_pos=da_size(#at_stack)-1;
+			at_ord=i(#jump_table,at_stmt,0,0,4); # 0 = unordered, 1 = '>', 2 = '<'
+			at_root=i[#square_bracket_stack,square_bracket_level];
+			at_lo=i(#square_bracket_stack,square_bracket_level,0,0,1+at_mode);
 
-			at_pos>=i(#square_bracket_stack,square_bracket_level,0,0,1+at_mode)?(
-				I(#ctl_stack,ctl_sp)=[5,at_stmt,at_pos,current_branch,0,0]; # Channel 3 = origin node, restored at the end
-				I(#loop_ind_stack,ctl_sp)=[0,0];
-				++ctl_sp;
-				current_branch=i[#at_stack,at_pos];
-				cursor=i(#jump_table,at_stmt,0,0,2)+1;
+			at_ord?(
+				at_snap=da_size(#binary_tree_img);
+				at_first=ao_first(at_root,at_ord==2,at_mode,at_snap);
+				at_first>=0?(
+					I(#ctl_stack,ctl_sp)=[5,at_stmt,at_first,current_branch,ao_count(at_root,at_mode,at_snap),at_snap];
+					I(#loop_ind_stack,ctl_sp)=[0,0];
+					++ctl_sp;
+					current_branch=at_first;
+					cursor=i(#jump_table,at_stmt,0,0,2)+1;
+				):(
+					cursor=i(#jump_table,at_stmt,0,0,6);
+				);
 			):(
-				cursor=i(#jump_table,at_stmt,0,0,6);
+				at_pos=da_size(#at_stack)-1;
+				at_pos>=at_lo?(
+					I(#ctl_stack,ctl_sp)=[5,at_stmt,at_pos,current_branch,at_pos-at_lo+1,i[#at_stack,at_pos]];
+					I(#loop_ind_stack,ctl_sp)=[0,0];
+					++ctl_sp;
+					current_branch=i[#at_stack,at_pos];
+					cursor=i(#jump_table,at_stmt,0,0,2)+1;
+				):(
+					cursor=i(#jump_table,at_stmt,0,0,6);
+				);
 			);
 		):
 		current_char==move_to_var?(
@@ -1080,7 +1194,8 @@ eval "
 			ctl_n=isnan(ctl_val)?0:floor(ctl_val);
 
 			ctl_n>0?(
-				I(#ctl_stack,ctl_sp)=[2,ctl_stmt,ctl_n,0,0,0];
+				# Channel 3 keeps the total count for loop_size()
+				I(#ctl_stack,ctl_sp)=[2,ctl_stmt,ctl_n,ctl_n,0,0];
 				I(#loop_ind_stack,ctl_sp)=[0,0];
 				++ctl_sp;
 				cursor=i(#jump_table,ctl_stmt,0,0,2)+1;
@@ -1259,17 +1374,30 @@ eval "
 			at_stmt=i(#ctl_stack,ctl_sp-1,0,0,1);
 			at_mode=find([random_left_leaf,random_right_leaf,random_no_child,random_leaf],i[#str_img,at_stmt+1],0,1);
 			at_stack=no_left_child_stack+at_mode;
+			at_ord=i(#jump_table,at_stmt,0,0,4);
+			at_nx=-1;
 
-			# Go one position down. The stack may have shrunk during the body, so clamp.
-			at_pos=min(i(#ctl_stack,ctl_sp-1,0,0,2)-1,da_size(#at_stack)-1);
+			at_ord?(
+				# Ordered: next member of the fixed set after the node just visited
+				at_nx=ao_next(i(#ctl_stack,ctl_sp-1,0,0,2),i[#square_bracket_stack,square_bracket_level],at_ord==2,at_mode,i(#ctl_stack,ctl_sp-1,0,0,5));
+			):(
+				# Unordered: one position down. The stack may have shrunk during the body, so clamp.
+				at_pos=min(i(#ctl_stack,ctl_sp-1,0,0,2)-1,da_size(#at_stack)-1);
+				if(at_pos>=i(#square_bracket_stack,square_bracket_level,0,0,1+at_mode),
+					at_nx=i[#at_stack,at_pos];
+					i(#ctl_stack,ctl_sp-1,0,0,2)=at_pos;
+				);
+			);
 
-			at_pos>=i(#square_bracket_stack,square_bracket_level,0,0,1+at_mode)?(
+			at_nx>=0?(
 				bump_loop_ind(ctl_sp-1);
-				i(#ctl_stack,ctl_sp-1,0,0,2)=at_pos;
-				current_branch=i[#at_stack,at_pos];
+				if(at_ord,i(#ctl_stack,ctl_sp-1,0,0,2)=at_nx;);
+				if(!at_ord,i(#ctl_stack,ctl_sp-1,0,0,5)=at_nx;);
+				current_branch=at_nx;
 				cursor=i(#jump_table,at_stmt,0,0,2)+1;
 			):(
-				current_branch=i(#ctl_stack,ctl_sp-1,0,0,3);
+				# End mode 1: stay on the last visited node. Mode 0: back to the origin.
+				current_branch=i(#jump_table,at_stmt,0,0,5)?(at_ord?i(#ctl_stack,ctl_sp-1,0,0,2):i(#ctl_stack,ctl_sp-1,0,0,5)):i(#ctl_stack,ctl_sp-1,0,0,3);
 				--ctl_sp;
 				cursor=i(#jump_table,at_stmt,0,0,6);
 			);
@@ -1323,8 +1451,8 @@ eval "
 					if(!i(#ctl_stack,ctl_sp,0,0,0),--square_bracket_level;);
 				);
 
-				# Leaving an at-all construct for good: restore the origin node
-				if(brk_is_atall&&!is_continue,current_branch=brk_origin;);
+				# Leaving an at-all construct for good: restore the origin node (not with end mode 1)
+				if(brk_is_atall&&!is_continue&&!i(#jump_table,brk_frame_pos,0,0,5),current_branch=brk_origin;);
 
 				# NEW: leaving a mode 0 path walk or directional loop for good: restore the start node.
 				# Mode 1 stays wherever the body left the current node.
@@ -1459,10 +1587,12 @@ if $rep_str2bin_struct_current_branch!=$rep_str2bin_struct_subroot
 fi
 res_str.=hassibling()={$rep_str2bin_struct_sibling_idx>0};
 
-# Loop indices. Only defined inside a loop.
+# Loop indices and size. Only defined inside a loop.
+# loop_size() is nan when the size is not known ahead of time.
 if $rep_str2bin_struct_in_loop
 	res_str.=x_ind()=$rep_str2bin_struct_x_ind;
 	res_str.=X_ind()=$rep_str2bin_struct_X_ind;
+	res_str.=loop_size()=$rep_str2bin_struct_loop_size;
 fi
 
 # Structural queries (available even when vector_size is 0)
@@ -1587,6 +1717,8 @@ _rep_str2bin_struct_prepass:
 
 #   For an at-all statement, set at the position of its '@':
 #     2 = body '{', 3 = body '}', 6 = index where execution resumes after the '}'
+#     4 = order (0 = unordered stack order, 1 = '>' left to right, 2 = '<' right to left)
+#     5 = end mode (0 = restore the start node, 1 = end at the last visited node)
 
 #   For a path walk statement '@?0' / '@?1', set at the position of its '@':
 #     0 = first char of the path, 1 = index of the path's closing '}',
@@ -1661,10 +1793,20 @@ eval "
 			ignore_var=1;
 		):
 		(c==char_match&&isin(i[#-3,p+1],char_at_0,char_at_1,char_at_2,char_at_3))?(
-			# '@(' '@)' '@!' '@|': the body is code, so its '{' is matched like a repeat block
+			# '@(' '@)' '@!' '@|' with optional order ('>' or '<') and end mode ('0' or '1').
+			# The body is code, so its '{' is matched like a repeat block
 			stmt=p;
-			q=p+2;
-			while(q<str_len&&isin(i[#-3,q],skip_char_0,skip_char_1,skip_char_2),++q;);
+			q=skip_to(p+2);
+			ao_dir=ao_end=0;
+			if(i[#-3,q]==_'>',ao_dir=1;q=skip_to(q+1););
+			if(!ao_dir&&i[#-3,q]==_'<',ao_dir=2;q=skip_to(q+1););
+			if(is_num(i[#-3,q]),
+				ao_end=i[#-3,q]-_'0';
+				if(ao_end>1,run('error atall_inval_end_mode'););
+				q=skip_to(q+1);
+			);
+			i(#-1,stmt,0,0,4)=ao_dir;
+			i(#-1,stmt,0,0,5)=ao_end;
 			i[#-3,q]!=B1P0?(
 				run('error atall_expect_body');
 			);
