@@ -549,6 +549,184 @@ fx_lens_flare_preview :
 #@gui _<b>Patterns</b>
 #----------------------
 
+#@gui Liquid Marble : fx_liquid_marble, fx_liquid_marble_preview(1)
+#@gui : Description = note{"<span color="#EE5500"><b>Description:</b></span> \
+# Generate a random liquid marbling pattern, made of ink drops stirred by swirls and strokes.
+#@gui : "}, sep = separator()
+#@gui : Random Seed = ~int(0,0,9999)
+#@gui : Randomize Seed = button()
+#@gui : sep = separator()
+#@gui : note = note("<small><span color="#CC3300"><b>Drops:</b></span></small>")
+#@gui : Number of Ink Drops = ~int(12,1,100)
+#@gui : Drop Size (%) = ~float(22,1,60)
+#@gui : Interaction = ~choice("None","Attraction","Repulsion","Fusion")
+#@gui : Interaction Strength = ~float(50,0,100)
+#@gui : sep = separator()
+#@gui : note = note("<small><span color="#CC3300"><b>Deformations:</b></span></small>")
+#@gui : Flow Intensity = ~float(40,0,100)
+#@gui : Swirl = ~float(60,0,100)
+#@gui : Detail Scale = ~float(25,1,100)
+#@gui : sep = separator()
+#@gui : note = note("<small><span color="#CC3300"><b>Colors:</b></span></small>")
+#@gui : Color Palette = ~choice(1,"Ink","Ocean","Sunset","Rainbow","Pastel","Gold and Blue","Custom")
+#@gui : Custom Ink Color 1 = ~color(60,45,90)
+#@gui : Custom Ink Color 2 = ~color(220,170,60)
+#@gui : Paper Color = ~color(192,194,202)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/11/16</i>.</small>")
+__fx_liquid_marble :
+  seed,randomize_seed,nbd,dsz,imode,istr,flo,swi,det,palsel,r1,g1,b1,r2,g2,b2,pr,pg,pb=${1-19}
+  if $randomize_seed seed:=v(9999) fi
+
+fx_liquid_marble :
+  __$0 $*
+  nbo,amp,dsn,fb,rd,ist:=round(6+0.42*$flo),2*$flo%,$dsz%,4+0.4*$det,0.6+1.4*$det%,0.5*$istr%
+  foreach { nm={n}
+
+    # [1] = scalar parameters (read from the expressions below).
+    ($seed,$nbo,$nbd,$dsn,$swi,$amp,$imode,$ist,$fb,$pr,$pg,$pb,$rd)
+
+    # [2] = random parameters of the deformation operations.
+    $nbo,1,1,7
+    f. "
+      sd = i(#1,0,0,0,0);
+      hh = abs(sin(x*12.9898 + c*78.233 + sd*91.3137)) * 43758.5453;
+      hh - floor(hh)"
+
+    # [3] = ink drops (x,y,radius).
+    $nbd,1,1,3
+    f. "
+      sd = i(#1,0,0,0,0);
+      h0 = abs(sin(x*39.346 + c*11.135 + sd*57.7231 + 5.1)) * 24634.6345;
+      h0 = h0 - floor(h0);
+      (c==2) ? i(#1,3,0,0,0) * (0.6 + 0.8*h0) : h0*2.4 - 1.2"
+
+    # [4] = composed displacement field (normalized coordinates).
+    {w#0},{h#0},1,2
+    f. "
+      begin(
+        sc = max(w,h)/2;
+        nbo = i(#1,1,0,0,0);
+        swi = i(#1,4,0,0,0);
+        amp = i(#1,5,0,0,0)
+      );
+      ux = (x - w/2)/sc;
+      vx = (y - h/2)/sc;
+      for (k = 0, k<nbo, ++k,
+        tp = i(#2,k,0,0,0);
+        qx = i(#2,k,0,0,1)*2.4 - 1.2;
+        qy = i(#2,k,0,0,2)*2.4 - 1.2;
+        sgm = i(#2,k,0,0,3);
+        st = i(#2,k,0,0,4) - 0.5;
+        an = i(#2,k,0,0,5)*2*pi;
+        lg = 0.5 + 1.2*i(#2,k,0,0,6);
+        dx = ux - qx;
+        dy = vx - qy;
+        if (tp*100<swi,
+          sgm = 0.15 + 0.55*sgm;
+          th = st*7*amp*exp(-(dx*dx + dy*dy)/(sgm*sgm));
+          ca = cos(th);
+          sa = sin(th);
+          ux = qx + ca*dx - sa*dy;
+          vx = qy + sa*dx + ca*dy,
+          sgm = 0.04 + 0.2*sgm;
+          dn = -sin(an)*dx + cos(an)*dy;
+          dt = cos(an)*dx + sin(an)*dy;
+          mg = st*2.8*amp*exp(-dn*dn/(sgm*sgm))*exp(-dt*dt/(lg*lg));
+          ux -= mg*cos(an);
+          vx -= mg*sin(an)
+        )
+      );
+      [ux,vx]"
+
+    # [5] = ink palette.
+    if $palsel==0 (52,92,72^44,84,64^66,108,90)
+    elif $palsel==1 (16,30,70,12^52,120,180,30^96,160,190,60)
+    elif $palsel==2 (150,220,240,90^30,90,170,20^50,40,60,80)
+    elif $palsel==3 (220,240,240,40,30,140^40,140,220,170,60,60^40,40,60,200,220,200)
+    elif $palsel==4 (240,160,190,250^150,200,230,220^170,240,180,150)
+    elif $palsel==5 (20,200,10^40,160,20^100,60,60)
+    else ($r1,$r2^$g1,$g2^$b1,$b2)
+    fi
+
+    # [6] = final rendering.
+    {0,[w,h]},1,3,"
+      begin(
+        nbd = i(#1,2,0,0,0);
+        imode = i(#1,6,0,0,0);
+        ist = i(#1,7,0,0,0);
+        fb = i(#1,8,0,0,0);
+        sd = i(#1,0,0,0,0);
+        pr = i(#1,9,0,0,0);
+        pg = i(#1,10,0,0,0);
+        pb = i(#1,11,0,0,0);
+        rd = i(#1,12,0,0,0);
+        npal = w(#5)
+      );
+      ux = i(#4,x,y,0,0);
+      vx = i(#4,x,y,0,1);
+      cu = ux;
+      cv = vx;
+      for (o = 0, o<6, ++o,
+        fo = fb * 2^floor(o/2);
+        ro = rd * 0.75^floor(o/2);
+        hk = sin(o*17.31 + sd*23.17 + 1.7) * 9341.7;
+        ha = (hk - floor(hk)) * 2*pi;
+        hk = sin(o*31.7 + sd*47.3 + 3.1) * 7791.3;
+        hp = (hk - floor(hk)) * 2*pi;
+        hk = sin(o*53.9 + sd*11.9 + 0.7) * 5231.1;
+        hb = (hk - floor(hk)) * 2*pi;
+        ph = sin(fo*(cos(ha)*cu + sin(ha)*cv) + hp) * ro/fo;
+        ux += ph*cos(hb);
+        vx += ph*sin(hb)
+      );
+      if (imode==1 || imode==2,
+        du = 0;
+        dv = 0;
+        for (k = 0, k<nbd, ++k,
+          dx = ux - i(#3,k,0,0,0);
+          dy = vx - i(#3,k,0,0,1);
+          rk = i(#3,k,0,0,2);
+          g = exp(-(dx*dx + dy*dy)/(6*rk*rk));
+          du += dx*g;
+          dv += dy*g
+        );
+        sg = (imode==1) ? 1 : -1;
+        ux += sg*ist*du;
+        vx += sg*ist*dv
+      );
+      mn = 1e9;
+      km = 0;
+      phi = 0;
+      for (k = 0, k<nbd, ++k,
+        dx = ux - i(#3,k,0,0,0);
+        dy = vx - i(#3,k,0,0,1);
+        rk = i(#3,k,0,0,2);
+        d2 = (dx*dx + dy*dy)/(rk*rk);
+        if (d2<mn, mn = d2; km = k);
+        phi += 1/(d2 + 0.01)
+      );
+      m = (imode==3) ? 1/sqrt(phi) : sqrt(mn);
+      tt = m/0.85;
+      nb = floor(tt);
+      gg = 0.5 + 0.5*cos(2*pi*(tt - nb));
+      den = min(1,max(0,(gg - 0.25)/0.5));
+      den = den*den*(3 - 2*den);
+      idx = (nb + km)%npal;
+      fc = 1.1 - 0.3*den*den;
+      [ pr*(1 - den) + i(#5,idx,0,0,0)*fc*den,
+        pg*(1 - den) + i(#5,idx,0,0,1)*fc*den,
+        pb*(1 - den) + i(#5,idx,0,0,2)*fc*den ]"
+
+    k. b 0.04% noise 3 c 0,255 => $nm
+  }
+
+fx_liquid_marble_preview :
+  __fx_liquid_marble $*
+  fx_liquid_marble $*
+  u "{"$seed"}{0}{"$nbd"}{"$dsz"}{"$imode"}{"$istr"}_"{$imode?2:1}"{"$flo"}{"$swi"}{"$det"}{"$palsel"}"\
+    "{"$r1,$g1,$b1"}{"$r2,$g2,$b2"}{"$pr,$pg,$pb"}"
+
 #@gui Penrose Tiling : fx_penrose_tiling, fx_penrose_tiling_preview(0)
 #@gui : Description = note{"<span color=\"#EE5500\"><b>Description:</b></span> \
 # Generate Penrose tilings by Robinson-triangle deflation.
