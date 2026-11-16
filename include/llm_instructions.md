@@ -20,23 +20,29 @@
 13. In a mathematical expression, if you need to divide a term by `100` , use the `%` suffix instead of writing `/100`. E.g., write `x%` instead of `x/100`.
 
 ## Definition of filter parameters and GUI
-14. When defining the filter GUI, the three first lines after the filter definition itself must be:
+14. When defining a G'MIC-Qt filter, the main command name must begin with the prefix `fx_`, and if a command to generate the preview is required, it must have the same name followed by the suffix `_preview`.
+15. When defining the filter GUI, the three first lines after the filter definition itself must be:
 ~~~
 #@gui : Description = note{"<span color="#EE5500"><b>Description:</b></span> \
 # A one-line description of what the filter does. Keep it short and concise.
 #@gui : "}, sep = separator()
 ~~~
-15. When defining the filter GUI, the two last lines must be:
+16. When defining the filter GUI, the two last lines must be:
 ~~~
 #@gui : sep = separator()
 #@gui : note = note("<small>Author: <i>Author Name</i>.      Latest Update: <i>YYYY/MM/DD</i>.</small>")
 ~~~
 where `YYYY/MM/DD` must be replaced by the date of the day. There must be exactly 6 non-breaking spaces before `Latest Update:`.
-16. Parameter names must be capitalized as in an English title, following APA conventions
-17.  Do not include a `Random Seed` parameter for the filter unless you are certain that the rendering displayed in the preview window will be roughly the same as the final rendering once the filter is applied.
-18. When defining a `choice()` parameter, if the default choice is the first item, you don't need to specify a `0` as the first argument.
-19. If it might be useful to randomize a parameter so that the user can randomly explore the filter's parameter space, prefix the parameter name with `~`. E.g., `~color(255,255,255)`.
-20. If certain filter parameters share a common theme (such as "Colors" or "Geometry"), group them between two `separator()`, and add a group header note after the first separator, such as:
+17. Parameter names must be capitalized as in an English title, following APA conventions
+18.  Do not include a `Random Seed` parameter for the filter unless you are certain that the rendering displayed in the preview window will be roughly the same as the final rendering once the filter is applied.
+19. When defining a `choice()` parameter, if the default choice is the first item, you don't need to specify a `0` as the first argument.
+29. If it might be useful to randomize a parameter so that the user can randomly explore the filter's parameter space, prefix the parameter name with `~`. E.g., `~color(255,255,255)`.
+21. If certain filter parameters share a common theme (such as "Colors" or "Geometry"), group them between two `separator()`, and add a group header note after the first separator, such as:
 ~~~
 #@gui : note = note("<small><span color="#CC3300"><b>Colors:</b></span></small>")
 ~~~
+22. If a filter has more than 6 parameters, it is better to define variables for each of these parameters, for example with a line like this:
+~~~
+seed,randomize,nbd,dsz,imode,istr,flo,swi,det,palsel,r1,g1,b1,r2,g2,b2,pr,pg,pb=${1-19}
+~~~
+and then use the named variables in the code, rather than the function’s direct arguments (`$1`, `$2`, etc.).
