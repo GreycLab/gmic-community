@@ -18,13 +18,13 @@
 11. In a mathematical expression, if you need to divide a term by `100` , use the `%` suffix instead of writing `/100`. E.g., write `x%` instead of `x/100`.
 
 ## Definition of filter parameters and GUI
-12. When defining the filter GUI, the three first lines should always be:
+12. When defining the filter GUI, the three first lines after the filter definition itself must be:
 ~~~
 #@gui : Description = note{"<span color="#EE5500"><b>Description:</b></span> \
 # A one-line description of what the filter does. Keep it short and concise.
 #@gui : "}, sep = separator()
 ~~~
-13. When defining the filter GUI, the two last lines should always be:
+13. When defining the filter GUI, the two last lines must be:
 ~~~
 #@gui : sep = separator()
 #@gui : note = note("<small>Author: <i>Author Name</i>.      Latest Update: <i>YYYY/MM/DD</i>.</small>")
