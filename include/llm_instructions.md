@@ -35,3 +35,7 @@ where `YYYY/MM/DD` must be replaced by the date of the day.
 16.  Do not include a `Random Seed` parameter for the filter unless you are certain that the rendering displayed in the preview window will be roughly the same as the final rendering once the filter is applied.
 17. When defining a `choice()` parameter, if the default choice is the first item, you don't need to specify a `0` as the first argument.
 18. If it might be useful to randomize a parameter so that the user can randomly explore the filter's parameter space, prefix the parameter name with `~`. E.g., `~color(255,255,255)`.
+19. If certain filter parameters share a common theme (such as "Colors" or "Geometry"), group them between two `separator()`, and add a group header note after the first separator, such as:
+~~~
+#@gui : note = note("<small><span color="#CC3300"><b>Colors:</b></span></small>")
+~~~
