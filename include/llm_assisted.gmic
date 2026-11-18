@@ -702,6 +702,243 @@ fx_lens_flare_preview :
 #@gui _<b>Patterns</b>
 #----------------------
 
+#@gui Cracked Mud : fx_cracked_mud, fx_cracked_mud(0)
+#@gui : Description = note{"<span color="#EE5500"><b>Description:</b></span> \
+# Generates a realistic dried-mud texture with multi-scale cracks, curled plates and a grainy lit surface.
+#@gui : "}, sep = separator()
+#@gui : note = note("<small><span color="#CC3300"><b>Plates:</b></span></small>")
+#@gui : Plate Size (%) = ~float(14,3,50)
+#@gui : Irregularity (%) = ~float(30,0,80)
+#@gui : Plate Variation (%) = float(35,0,100)
+#@gui : sep = separator(), note = note("<small><span color="#CC3300"><b>Cracks:</b></span></small>")
+#@gui : Subdivision Levels = int(2,1,3)
+#@gui : Subdivision Density (%) = ~float(45,0,100)
+#@gui : Crack Width (%) = ~float(5.5,0.5,20)
+#@gui : Crack Width Variation (%) = float(60,0,100)
+#@gui : Crack Depth (%) = float(80,0,100)
+#@gui : Plate Curl (%) = float(50,0,100)
+#@gui : sep = separator(), note = note("<small><span color="#CC3300"><b>Surface:</b></span></small>")
+#@gui : Surface Roughness (%) = ~float(50,0,100)
+#@gui : Stain Contrast (%) = float(50,0,100)
+#@gui : sep = separator(), note = note("<small><span color="#CC3300"><b>Colors:</b></span></small>")
+#@gui : Plate Color = color(200,172,150)
+#@gui : Dust Color = color(228,205,182)
+#@gui : Crack Color = color(48,34,26)
+#@gui : sep = separator(), note = note("<small><span color="#CC3300"><b>Lighting:</b></span></small>")
+#@gui : Light Angle = float(60,0,360)
+#@gui : Light Elevation = float(35,10,80)
+#@gui : Shadow Strength (%) = float(60,0,100)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i>Author Name</i>.      Latest Update: <i>2026/11/18</i>.</small>")
+fx_cracked_mud :
+  ps,irr,pvar,lvl,dens,cw,cwv,dep,curl,rough,stain,pr,pg,pb,dr,dg,db,kr,kg,kb,ang,elev,ao=${1-23}
+  foreach { nm={n}
+
+    # Sizes in pixels, all relative to the image size and to the plate size.
+    mw,mh:=w,h rm
+    msz:=max($mw,$mh)*$ps%
+    hw0:=$cw%*$msz*0.5
+    hu:=2*$hw0
+    dd,cu,ro,cvv:=$dep%*$hu*1.5,$curl%*$hu*0.7,$rough%*$hu*0.25,$cwv%
+
+    # Multi-scale crack networks, merged with a max() into one 4-channel map
+    # (channel 0: crack profile, 1: proximity to cracks, 2: random value per plate,
+    # 3: proximity to the visible cracks, used as the "parent" of the next level).
+    $mw,$mh,1,4
+    repeat $lvl {
+      sz:=max($msz*0.42^$>,6)
+      wp:=$irr%*$sz
+      hw:=max($hw0*0.45^$>,0.6)
+      dn:=$>?$dens%:-1
+      $mw,$mh,1,1 _fx_cracked_mud_level[0,1] $sz,$wp,$hw,$cvv,$dn,1.3,$msz
+      max[0] [1] rm.
+    }
+
+    # Texture layers: large stains, medium-scale bumps, fine grain.
+    $mw,$mh _fx_cracked_mud_noise. {$msz*2},5
+    $mw,$mh _fx_cracked_mud_noise. {max($msz*0.05,4)},3
+    $mw,$mh,1,1,"u(-1,1)"
+    b. 0.7
+
+    # Height map (in pixels): crack floor, lifted plate rims, surface roughness.
+    $mw,$mh,1,1,"
+      k = i(#0,x,y,0,0);
+      p = i(#0,x,y,0,1);
+      -$dd*k + $cu*p*(1 - k) + $ro*(1 - k)*(0.6*i(#2,x,y,0,0) + 0.4*i(#3,x,y,0,0))"
+    b. 0.6
+
+    # Lighting parameters.
+    ldx:=cos($ang°)*cos($elev°)
+    ldy:=-sin($ang°)*cos($elev°)
+    ldz:=sin($elev°)
+    sdx:=cos($ang°)
+    sdy:=-sin($ang°)
+    te:=tan($elev°)
+    sstp:=2
+    nst:=max(1,ceil(min(($dd+$cu)/$te,64)/$sstp))
+    aoc:=$ao%
+    amb:=0.6-0.4*$ao%
+    stn:=$stain%
+    rgh:=$rough%
+    pvr:=$pvar%*0.6
+
+    # Final rendering: Lambertian shading + soft cast shadows + albedo
+    $mw,$mh,1,3,"
+      k = i(#0,x,y,0,0);
+      v = i(#0,x,y,0,2);
+      st = i(#1,x,y,0,0);
+      n2 = i(#2,x,y,0,0);
+      n3 = i(#3,x,y,0,0);
+      h0 = i(#4,x,y,0,0);
+      dhx = (i(#4,x + 1,y,0,0,0,1) - i(#4,x - 1,y,0,0,0,1))/2;
+      dhy = (i(#4,x,y + 1,0,0,0,1) - i(#4,x,y - 1,0,0,0,1))/2;
+      shade = cut(((-dhx*$ldx - dhy*$ldy + $ldz)/sqrt(1 + dhx^2 + dhy^2))/$ldz,0,2);
+      mx = 0;
+      for (tt = 1, tt<=$nst, ++tt,
+        hh = i(#4,x + $sdx*tt*$sstp,y + $sdy*tt*$sstp,0,0,1,1) - h0 - tt*$sstp*$te;
+        mx = max(mx,hh)
+      );
+      sh = cut(mx/1.5,0,1);
+      light = $amb + (1 - $amb)*shade*(1 - sh*$aoc);
+      pa = [ $pr,$pg,$pb ];
+      da = [ $dr,$dg,$db ];
+      ka = [ $kr,$kg,$kb ];
+      dm = cut(0.6*(1 + st)*$stn,0,1);
+      gf = 1 + 0.18*$rgh*(0.5*n3 + 0.5*n2);
+      vf = 1 + $pvr*(v - 0.5);
+      alb = (pa + (da - pa)*dm)*gf*vf;
+      kk = cut((k - 0.5)/0.4,0,1);
+      (alb + (ka - alb)*kk)*light"
+    k. c 0,255 => $nm
+  }
+
+# Fractal (multi-octave) value noise normalized to [-1,1], same size as the selected images.
+_fx_cracked_mud_noise : # scale,octaves
+  foreach {
+    nsc,noc=$*
+    nw,nh:=w,h
+    rm
+    $nw,$nh
+    repeat $noc {
+      ns:=max($nsc/2^$>,1.5)
+      {ceil($nw/$ns)+3},{ceil($nh/$ns)+3},1,1,"u(-1,1)"
+      r. $nw,$nh,1,1,5
+      *. {0.55^$>}
+      add[0] [1]
+      rm.
+    }
+    n -1,1
+  }
+
+# One level of crack network (warped jittered Voronoi, distance to cell edges = F2-F1).
+# Selected images: [0] = crack map of the previous levels (channel 3 = exp(-distance/scale)
+# to the visible cracks), [1] = blank image of the same size. Output: [0] unchanged and
+# [1] = 4 channels (crack profile, proximity to cracks, random value of the plate,
+# proximity to the visible cracks).
+# A negative density means that all edges are cracked (main level). Otherwise, each cell
+# flows towards a neighbor closer to the previous cracks, which groups the cells into
+# basins that all touch a previous crack. The new cracks are the outlines of a random
+# subset of basins, fading with the distance to the previous cracks: each of them
+# therefore starts from a previous crack and never forms an isolated closed cell.
+_fx_cracked_mud_level : # size,warp,halfwidth,variation,density,reach,scale
+  lsz,lwp,lhw,lwv,ldn,lrch,lsc=$*
+  lw,lh:=w,h
+  rm[1]
+
+  # [1]: warp fields (x, y) and width modulation.
+  ${lw},${lh}x3 _fx_cracked_mud_noise[1-3] {$lsz*1.5},5 a[1-3] c
+
+  # [2]: random jitter (x, y) and random value for each seed of the grid.
+  lgx,lgy:=ceil([$lw,$lh]/$lsz)+5
+  $lgx,$lgy,1,3 rand. 1
+
+  # [3]: seeds data = jitter x, jitter y, random value, distance to the previous cracks,
+  # offset (x, y) of the neighbor cell towards which the cell flows (0,0 for a basin root).
+  $lgx,$lgy,1,6,"
+    jx = i(#2,x,y,0,0,0,1);
+    jy = i(#2,x,y,0,1,0,1);
+    qx = (x - 2 + jx)*$lsz;
+    qy = (y - 2 + jy)*$lsz;
+    dself = -$lsc*log(max(i(#0,qx,qy,0,3,1,1),1e-9));
+    best = 0;
+    bdx = 0;
+    bdy = 0;
+    for (oy = -1, oy<=1, ++oy,
+      for (ox = -1, ox<=1, ++ox,
+        nx = x + ox;
+        ny = y + oy;
+        nqx = (nx - 2 + i(#2,nx,ny,0,0,0,1))*$lsz;
+        nqy = (ny - 2 + i(#2,nx,ny,0,1,0,1))*$lsz;
+        dnb = -$lsc*log(max(i(#0,nqx,nqy,0,3,1,1),1e-9));
+        dst = sqrt((nqx - qx)^2 + (nqy - qy)^2);
+        hs = abs(sin(x*12.9898 + y*78.233 + ox*37.719 + oy*17.351)*43758.5453);
+        hs = hs - floor(hs);
+        score = (dself - dnb)/max(dst,1e-3) + 0.5*hs;
+        if ((ox || oy) && dself>dnb && score>best, best = score; bdx = ox; bdy = oy)
+      )
+    );
+    [ jx,jy,i(#2,x,y,0,2,0,1),dself,bdx,bdy ]"
+  rm[2]
+
+  # [3]: basins data = id of the root cell, "basin is cracked" flag, random reach factor.
+  $lgx,$lgy,1,3,"
+    cx = x;
+    cy = y;
+    for (it = 0, it<24, ++it,
+      pdx = i(#2,cx,cy,0,4,0,1);
+      pdy = i(#2,cx,cy,0,5,0,1);
+      cx = cx + pdx;
+      cy = cy + pdy
+    );
+    h1 = abs(sin(cx*12.9898 + cy*78.233)*43758.5453);
+    h1 = h1 - floor(h1);
+    h2 = abs(sin(cx*39.3468 + cy*11.135)*24634.6345);
+    h2 = h2 - floor(h2);
+    [ cy*1024 + cx,h1<$ldn,0.6 + 0.8*h2 ]"
+
+  # [4]: final crack map of this level.
+  $lw,$lh,1,4,"
+    px = x + $lwp*i(#1,x,y,0,0,1,1);
+    py = y + $lwp*i(#1,x,y,0,1,1,1);
+    cx = floor(px/$lsz);
+    cy = floor(py/$lsz);
+    d1 = 1e9;
+    d2 = 1e9;
+    ia = 0;
+    ja = 0;
+    ib = 0;
+    jb = 0;
+    for (oy = -1, oy<=1, ++oy,
+      for (ox = -1, ox<=1, ++ox,
+        gx = cx + ox + 2;
+        gy = cy + oy + 2;
+        qx = (gx - 2 + i(#2,gx,gy,0,0,0,1))*$lsz;
+        qy = (gy - 2 + i(#2,gx,gy,0,1,0,1))*$lsz;
+        d = sqrt((px - qx)^2 + (py - qy)^2);
+        if (d<d1,
+          d2 = d1; ib = ia; jb = ja; d1 = d; ia = gx; ja = gy,
+          if (d<d2, d2 = d; ib = gx; jb = gy)
+        )
+      )
+    );
+    e = (d2 - d1)/2;
+    ra = i(#3,ia,ja,0,0,0,1);
+    rb = i(#3,ib,jb,0,0,0,1);
+    oa = i(#3,ia,ja,0,1,0,1);
+    ob = i(#3,ib,jb,0,1,0,1);
+    reach = $lrch*$lsz*max(oa*i(#3,ia,ja,0,2,0,1),ob*i(#3,ib,jb,0,2,0,1));
+    dpix = -$lsc*log(max(i(#0,x,y,0,3,1,1),1e-9));
+    s = $ldn<0?1:((ra!=rb && (oa || ob))?cut(1 - dpix/max(reach,1e-3),0,1):0);
+    m = i(#1,x,y,0,2,1,1);
+    hw = $lhw*sqrt(s)*max(1 + $lwv*m,0);
+    soft = max(1,0.25*hw);
+    k = cut((hw - e)/soft,0,1);
+    prox = s*exp(-max(e - hw,0)/(0.07*$lsz));
+    far = s>0.15?exp(-max(e - hw,0)/$lsc):0;
+    vo = $ldn<0?i(#2,ia,ja,0,2,0,1):0;
+    [ k,prox,vo,far ]"
+  rm[1-3]
+
 #@gui Liquid Marble : fx_liquid_marble, fx_liquid_marble_preview(1)
 #@gui : Description = note{"<span color="#EE5500"><b>Description:</b></span> \
 # Generate a random liquid marbling pattern, made of ink drops stirred by swirls and strokes.
