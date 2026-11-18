@@ -704,7 +704,7 @@ fx_lens_flare_preview :
 
 #@gui Cracked Mud : fx_cracked_mud, fx_cracked_mud(0)
 #@gui : Description = note{"<span color="#EE5500"><b>Description:</b></span> \
-# Generates a dried-mud texture with multi-scale cracks, curled plates and a grainy lit surface.
+# Generates a dried-mud texture with multi-scale cracks.
 #@gui : "}, sep = separator()
 #@gui : note = note("<small><span color="#CC3300"><b>Plates:</b></span></small>")
 #@gui : Plate Size (%) = ~float(14,3,50)
@@ -717,6 +717,9 @@ fx_lens_flare_preview :
 #@gui : Crack Width Variation (%) = float(60,0,100)
 #@gui : Crack Depth (%) = float(80,0,100)
 #@gui : Plate Curl (%) = float(50,0,100)
+#@gui : Secondary Angle Spread (°) = float(11,0,75)
+#@gui : Secondary Length (%) = float(100,10,300)
+#@gui : Secondary Branching (%) = float(50,0,250)
 #@gui : sep = separator(), note = note("<small><span color="#CC3300"><b>Surface:</b></span></small>")
 #@gui : Surface Roughness (%) = ~float(50,0,100)
 #@gui : Stain Contrast (%) = float(50,0,100)
@@ -729,9 +732,9 @@ fx_lens_flare_preview :
 #@gui : Light Elevation = float(35,10,80)
 #@gui : Shadow Strength (%) = float(60,0,100)
 #@gui : sep = separator()
-#@gui : note = note("<small>Author: <i>Author Name</i>.      Latest Update: <i>2026/11/18</i>.</small>")
+#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/11/18</i>.</small>")
 fx_cracked_mud :
-  ps,irr,pvar,lvl,dens,cw,cwv,dep,curl,rough,stain,pr,pg,pb,dr,dg,db,kr,kg,kb,kal,ang,elev,ao=${1-24}
+  ps,irr,pvar,lvl,dens,cw,cwv,dep,curl,asp,slen,sbr,rough,stain,pr,pg,pb,dr,dg,db,kr,kg,kb,kal,ang,elev,ao=${1-27}
   foreach { nm={n}
 
     # Sizes in pixels, all relative to the image size and to the plate size.
@@ -740,6 +743,9 @@ fx_cracked_mud :
     hw0:=$cw%*$msz*0.5
     hu:=2*$hw0
     dd,cu,ro,cvv:=$dep%*$hu*1.5,$curl%*$hu*0.7,$rough%*$hu*0.25,$cwv%
+    asr:=$asp°
+    lnf:=$slen%
+    brf:=$sbr%
 
     # Multi-scale crack networks, merged with a max() into one 4-channel map
     # (channel 0: crack profile, 1: proximity to cracks, 2: random value per plate,
@@ -754,7 +760,7 @@ fx_cracked_mud :
       if $>==0
         _fx_cracked_mud_level[0,1] $sz,$wp,$hw,$cvv,$dn,1.3,$msz
       else
-        _fx_cracked_mud_branch[0,1] $sz,$wp,$hw,$cvv,$dn,1.3,$msz
+        _fx_cracked_mud_branch[0,1] $sz,$wp,$hw,$cvv,$dn,$asr,$msz,$lnf,$brf
       fi
       max[0] [1] rm.
     }
@@ -835,6 +841,50 @@ _fx_cracked_mud_noise : # scale,octaves
     }
     n -1,1
   }
+
+# Primary cracks: warped jittered Voronoi, distance to cell edges = F2-F1.
+# Selected image: [0] = blank image of the right size, replaced by a 3-channel map
+# (crack profile, proximity to cracks, random value of the plate).
+_fx_cracked_mud_plates : # size,warp,halfwidth,variation
+  lsz,lwp,lhw,lwv=$*
+  lw,lh:=w,h
+  rm
+
+  # [0]: warp fields (x, y) and width modulation.
+  ${lw},${lh}x3 _fx_cracked_mud_noise {$lsz*1.5},5 a c
+
+  # [1]: random jitter (x, y) and random value for each seed of the grid.
+  lgx,lgy:=ceil([$lw,$lh]/$lsz)+5
+  $lgx,$lgy,1,3 rand. 1
+
+  # [2]: final crack map.
+  $lw,$lh,1,3,"
+    px = x + $lwp*i(#0,x,y,0,0,1,1);
+    py = y + $lwp*i(#0,x,y,0,1,1,1);
+    cx = floor(px/$lsz);
+    cy = floor(py/$lsz);
+    d1 = 1e9;
+    d2 = 1e9;
+    ia = 0;
+    ja = 0;
+    for (oy = -1, oy<=1, ++oy,
+      for (ox = -1, ox<=1, ++ox,
+        gx = cx + ox + 2;
+        gy = cy + oy + 2;
+        qx = (gx - 2 + i(#1,gx,gy,0,0,0,1))*$lsz;
+        qy = (gy - 2 + i(#1,gx,gy,0,1,0,1))*$lsz;
+        d = sqrt((px - qx)^2 + (py - qy)^2);
+        if (d<d1,
+          d2 = d1; d1 = d; ia = gx; ja = gy,
+          if (d<d2, d2 = d)
+        )
+      )
+    );
+    e = (d2 - d1)/2;
+    hw = $lhw*max(1 + $lwv*i(#0,x,y,0,2,1,1),0);
+    soft = max(1,0.25*hw);
+    [ cut((hw - e)/soft,0,1),exp(-max(e - hw,0)/(0.07*$lsz)),i(#1,ia,ja,0,2,0,1) ]"
+  rm[0,1]
 
 # One level of crack network (warped jittered Voronoi, distance to cell edges = F2-F1).
 # Selected images: [0] = crack map of the previous levels (channel 3 = exp(-distance/scale)
@@ -945,16 +995,16 @@ _fx_cracked_mud_level : # size,warp,halfwidth,variation,density,reach,scale
     [ k,prox,vo,far ]"
   rm[1-3]
 
-# Secondary / tertiary cracks by crack propagation (instead of Voronoi).
+# Secondary / tertiary cracks: lightning-like branching crack trees (instead of Voronoi).
 # Same interface as _fx_cracked_mud_level: selected images [0] = crack map of the previous
 # levels, [1] = blank image. Output: [0] unchanged, [1] = 4 channels (crack profile,
 # proximity to cracks, 0, proximity to the visible cracks).
-# Each "walker" starts on the edge of an existing crack, leaves it perpendicularly with a
-# smooth random curvature, is attracted by the normal of any other crack it approaches
-# (T junctions at ~90 degrees), or stops at a random length (dead end), while its width
-# decreases along the path.
+# Each tree starts on the edge of an existing crack, leaves it perpendicularly with a zigzag
+# path (direction re-drawn every few pixels) and emits side branches at random places, which
+# branch recursively (up to a given generation). A walker stops at a random length, or when it
+# touches a crack; when it approaches another crack, it is bent towards its normal.
 _fx_cracked_mud_branch : # size,warp,halfwidth,variation,density,reach,scale
-  bsz,bwp,bhw,bwv,bdn,brch,bsc=$*
+  bsz,bwp,bhw,bwv,bdn,basp,bsc,blf,bbf=$*
   bw,bh:=w,h
   rm[1]
 
@@ -966,20 +1016,26 @@ _fx_cracked_mud_branch : # size,warp,halfwidth,variation,density,reach,scale
 
   # Tunable constants.
   bds:=0.8
-  blm:=2*$bsz
+  blm:=2.5*$bsz*$blf
   bmst:=ceil($blm/$bds)+6
   brs:=0.3*$bsz
   brc:=0.4*$bsz
-  brst:=ceil($bhw*(1+$bwv))
+  brst:=ceil(max($bhw*(1+$bwv),0.55)*1.08+0.5)
   bir:=$bwp/$bsz
-  bkp:=0.2+0.8*$bir
-  bam:=0.12+0.6*$bir
-  bnw:=round(2.5*$bdn*$bw*$bh/$bsz^2)
+  bjg:=0.35+0.9*$bir
+  bsg:=max(0.2*$bsz,3)
+  bpb:=$bbf*$bds/(0.5*$bsz)
+  bmaxq:=150
+  bsp0:=0.15*$bsz
+  bgen:=3
+  bnw:=round(1.2*$bdn*$bw*$bh/$bsz^2)
 
-  # [3] = mask of the new cracks (drawn by the walkers), [4] = dummy image for fill.
+  # [3] = mask of the new cracks, [4] = queue of walkers (x,y,angle,length,width,generation,t0),
+  # [5] = dummy image for fill.
   $bw,$bh,1,1
+  $bmaxq,1,1,7
   1,1,1,1
-  fill[4] "
+  fill[5] "
     for (nk = 0, nk<$bnw, ++nk,
       ok = 0;
       sx = 0;
@@ -1001,69 +1057,95 @@ _fx_cracked_mud_branch : # size,warp,halfwidth,variation,density,reach,scale
         gl = max(sqrt(gx^2 + gy^2),1e-6);
         gx = gx/gl;
         gy = gy/gl;
-        th0 = atan2(gy,gx) + u(-0.2,0.2);
-        lp = $blm*u(0.25,1);
-        kap = u(-1,1)*$bkp/lp;
-        am = u(0.5,1.2)*$bam;
-        f1 = 2*pi/($bsz*u(0.5,1));
-        f2 = 2.3*f1;
-        p1 = u(2*pi);
-        p2 = u(2*pi);
-        fm = 2*pi/($bsz*u(0.4,0.9));
-        pm = u(2*pi);
-        px = sx - 1.5*gx;
-        py = sy - 1.5*gy;
-        tl = -1.5;
-        dm = 0;
-        alive = 1;
-        fin = -1;
-        rr = $bhw;
-        for (st = 0, alive && st<$bmst, ++st,
-          dcur = i(#1,px,py,0,0,1,1);
-          dm = max(dm,dcur);
-          tt = max(tl,0);
-          th = th0 + kap*tt + am*(0.6*sin(f1*tt + p1) + 0.4*sin(f2*tt + p2));
-          hx = cos(th);
-          hy = sin(th);
-          ret = (tl>3 && dcur<dm - 2 && dcur<$brc);
-          if (ret,
-            ggx = i(#2,px + 2,py,0,0,1,1) - i(#2,px - 2,py,0,0,1,1);
-            ggy = i(#2,px,py + 2,0,0,1,1) - i(#2,px,py - 2,0,0,1,1);
-            gl2 = max(sqrt(ggx^2 + ggy^2),1e-6);
-            wt = (1 - dcur/$brc)^2;
-            hx = hx*(1 - wt) - wt*ggx/gl2;
-            hy = hy*(1 - wt) - wt*ggy/gl2;
-            hl = max(sqrt(hx^2 + hy^2),1e-6);
-            hx = hx/hl;
-            hy = hy/hl
-          );
-          rr = $bhw*max(1 - 0.85*min(tt/lp,1)^1.5,0.1)*max(1 + $bwv*sin(fm*tt + pm),0.2);
-          soft = max(1,0.25*rr);
-          cxp = round(px);
-          cyp = round(py);
-          for (oy = -$brst, oy<=$brst, ++oy,
-            for (ox = -$brst, ox<=$brst, ++ox,
-              qx = cxp + ox;
-              qy = cyp + oy;
-              if (qx>=0 && qx<$bw && qy>=0 && qy<$bh,
-                vv = cut((rr - sqrt((qx - px)^2 + (qy - py)^2))/soft,0,1);
-                if (vv>i(#3,qx,qy,0,0), i(#3,qx,qy,0,0) = vv)
+        i(#4,0,0,0,0) = sx - 1.5*gx;
+        i(#4,0,0,0,1) = sy - 1.5*gy;
+        i(#4,0,0,0,2) = atan2(gy,gx) + u(-$basp,$basp);
+        i(#4,0,0,0,3) = $blm*u(0.3,1);
+        i(#4,0,0,0,4) = 1;
+        i(#4,0,0,0,5) = 0;
+        i(#4,0,0,0,6) = -1.5;
+        qn = 1;
+        for (qi = 0, qi<qn, ++qi,
+          px = i(#4,qi,0,0,0);
+          py = i(#4,qi,0,0,1);
+          th0 = i(#4,qi,0,0,2);
+          lp = i(#4,qi,0,0,3);
+          wf = i(#4,qi,0,0,4);
+          gen = i(#4,qi,0,0,5);
+          tl = i(#4,qi,0,0,6);
+          th = th0;
+          tgt = th0;
+          sgc = 0;
+          fm = 2*pi/($bsz*u(0.4,0.9));
+          pm = u(2*pi);
+          dm = i(#1,px,py,0,0,1,1);
+          alive = 1;
+          fin = -1;
+          rr = $bhw*wf;
+          for (st = 0, alive && st<$bmst, ++st,
+            dcur = i(#1,px,py,0,0,1,1);
+            dm = max(dm,dcur);
+            tt = max(tl,0);
+            if (sgc<=0,
+              tgt = th0 + u(-1,1)*$bjg;
+              sgc = ceil($bsg/$bds*u(0.6,1.4))
+            );
+            sgc = sgc - 1;
+            th0 = th0 + u(-0.04,0.04);
+            th = th + 0.45*(tgt - th) + u(-0.05,0.05);
+            hx = cos(th);
+            hy = sin(th);
+            ret = (tl>3 && dcur<dm - 2 && dcur<$brc);
+            if (ret,
+              ggx = i(#2,px + 2,py,0,0,1,1) - i(#2,px - 2,py,0,0,1,1);
+              ggy = i(#2,px,py + 2,0,0,1,1) - i(#2,px,py - 2,0,0,1,1);
+              gl2 = max(sqrt(ggx^2 + ggy^2),1e-6);
+              wt = (1 - dcur/$brc)^2;
+              hx = hx*(1 - wt) - wt*ggx/gl2;
+              hy = hy*(1 - wt) - wt*ggy/gl2;
+              hl = max(sqrt(hx^2 + hy^2),1e-6);
+              hx = hx/hl;
+              hy = hy/hl
+            );
+            rr = max($bhw*wf*max(1 - 0.7*min(tt/lp,1)^1.5,0.3)*max(1 + $bwv*sin(fm*tt + pm),0.3),0.55);
+            soft = max(1,0.25*rr);
+            cxp = round(px);
+            cyp = round(py);
+            for (oy = -$brst, oy<=$brst, ++oy,
+              for (ox = -$brst, ox<=$brst, ++ox,
+                qx = cxp + ox;
+                qy = cyp + oy;
+                if (qx>=0 && qx<$bw && qy>=0 && qy<$bh,
+                  vv = cut((rr - sqrt((qx - px)^2 + (qy - py)^2))/soft + 0.3,0,1);
+                  if (vv>i(#3,qx,qy,0,0), i(#3,qx,qy,0,0) = vv)
+                )
               )
-            )
-          );
-          px = px + $bds*hx;
-          py = py + $bds*hy;
-          tl = tl + $bds;
-          if (ret && i(#1,px,py,0,0,1,1)<0.8, alive = 0);
-          if (tl>lp, alive = 0);
-          if (px<-3 || px>$bw + 2 || py<-3 || py>$bh + 2, alive = 0);
-          if (fin>0, fin = fin - 1; if (fin==0, alive = 0));
-          if (fin<0 && tl>0.3*$bsz && i(#3,px + (rr + 2.5)*hx,py + (rr + 2.5)*hy,0,0,1,1)>0.6,
-            fin = ceil((rr + 3.5)/$bds))
+            );
+            if (tl>$bsp0 && gen<$bgen && qn<$bmaxq && u(1)<$bpb*0.6^gen,
+              sd = (u(1)<0.5)?-1:1;
+              i(#4,qn,0,0,0) = px;
+              i(#4,qn,0,0,1) = py;
+              i(#4,qn,0,0,2) = th + sd*u(0.4,1.1);
+              i(#4,qn,0,0,3) = lp*u(0.35,0.75);
+              i(#4,qn,0,0,4) = 0.8*min(rr/$bhw,1);
+              i(#4,qn,0,0,5) = gen + 1;
+              i(#4,qn,0,0,6) = 0;
+              qn = qn + 1
+            );
+            px = px + $bds*hx;
+            py = py + $bds*hy;
+            tl = tl + $bds;
+            if (tl>3 && i(#1,px,py,0,0,1,1)<0.8, alive = 0);
+            if (tl>lp, alive = 0);
+            if (px<-3 || px>$bw + 2 || py<-3 || py>$bh + 2, alive = 0);
+            if (fin>0, fin = fin - 1; if (fin==0, alive = 0));
+            if (fin<0 && tl>((gen>0)?(12 + 0.4*$bsz):(0.3*$bsz)) && i(#3,px + (rr + 2.5)*hx,py + (rr + 2.5)*hy,0,0,1,1)>0.6,
+              fin = ceil((rr + 3.5)/$bds))
+          )
         )
       )
     )"
-  rm[4]
+  rm[4,5]
 
   # [4] = distance to the new cracks.
   +lt[3] 0.25
