@@ -37,7 +37,7 @@ where `YYYY/MM/DD` is the date of the day. There must be exactly 6 non-breaking 
 18. Parameter names must be capitalized as in an English title, following APA conventions
 19.  Do not include a `Random Seed` parameter for the filter unless you are certain that the rendering displayed in the preview window will be roughly the same as the final rendering once the filter is applied.
 20. When defining a `choice()` parameter, if the default choice is the first item, you don't need to specify a `0` as the first argument.
-21. If it might be useful to randomize a parameter so that the user can randomly explore the filter's parameter space, prefix the parameter name with `~`. E.g., `~color(255,255,255)`.
+21. If it might be useful to randomize a parameter so that the user can randomly explore the filter's parameter space, prefix the parameter type with `~`. E.g., `Color = ~color(255,255,255)`.
 22. If certain filter parameters share a common theme (such as "Colors" or "Geometry"), group them between two `separator()`, and add a group header note after the first separator, such as:
 ~~~
 #@gui : note = note("<small><span color="#CC3300"><b>Colors:</b></span></small>")
