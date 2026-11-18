@@ -785,7 +785,7 @@ fx_cracked_mud :
     sdy:=-sin($ang°)
     te:=tan($elev°)
     sstp:=2
-    nst:=max(1,ceil(min(($dd+$cu)/$te,64)/$sstp))
+    nst:=$ao>0?max(1,ceil(min(($dd+$cu)/$te,64)/$sstp)):0
     aoc:=$ao%
     amb:=0.6-0.4*$ao%
     stn:=$stain%
@@ -885,50 +885,6 @@ _fx_cracked_mud_plates : # size,warp,halfwidth,variation
     [ cut((hw - e)/soft,0,1),exp(-max(e - hw,0)/(0.07*$lsz)),i(#1,ia,ja,0,2,0,1) ]"
   rm[0,1]
 
-# Primary cracks: warped jittered Voronoi, distance to cell edges = F2-F1.
-# Selected image: [0] = blank image of the right size, replaced by a 3-channel map
-# (crack profile, proximity to cracks, random value of the plate).
-_fx_cracked_mud_plates : # size,warp,halfwidth,variation
-  lsz,lwp,lhw,lwv=$*
-  lw,lh:=w,h
-  rm
-
-  # [0]: warp fields (x, y) and width modulation.
-  ${lw},${lh}x3 _fx_cracked_mud_noise {$lsz*1.5},5 a c
-
-  # [1]: random jitter (x, y) and random value for each seed of the grid.
-  lgx,lgy:=ceil([$lw,$lh]/$lsz)+5
-  $lgx,$lgy,1,3 rand. 1
-
-  # [2]: final crack map.
-  $lw,$lh,1,3,"
-    px = x + $lwp*i(#0,x,y,0,0,1,1);
-    py = y + $lwp*i(#0,x,y,0,1,1,1);
-    cx = floor(px/$lsz);
-    cy = floor(py/$lsz);
-    d1 = 1e9;
-    d2 = 1e9;
-    ia = 0;
-    ja = 0;
-    for (oy = -1, oy<=1, ++oy,
-      for (ox = -1, ox<=1, ++ox,
-        gx = cx + ox + 2;
-        gy = cy + oy + 2;
-        qx = (gx - 2 + i(#1,gx,gy,0,0,0,1))*$lsz;
-        qy = (gy - 2 + i(#1,gx,gy,0,1,0,1))*$lsz;
-        d = sqrt((px - qx)^2 + (py - qy)^2);
-        if (d<d1,
-          d2 = d1; d1 = d; ia = gx; ja = gy,
-          if (d<d2, d2 = d)
-        )
-      )
-    );
-    e = (d2 - d1)/2;
-    hw = $lhw*max(1 + $lwv*i(#0,x,y,0,2,1,1),0);
-    soft = max(1,0.25*hw);
-    [ cut((hw - e)/soft,0,1),exp(-max(e - hw,0)/(0.07*$lsz)),i(#1,ia,ja,0,2,0,1) ]"
-  rm[0,1]
-
 # Secondary / tertiary cracks: lightning-like branching crack trees (instead of Voronoi).
 # Same interface as _fx_cracked_mud_level: selected images [0] = crack map of the previous
 # levels, [1] = blank image. Output: [0] unchanged, [1] = 4 channels (crack profile,
@@ -954,7 +910,6 @@ _fx_cracked_mud_branch : # size,warp,halfwidth,variation,density,angle,length,br
   bmst:=ceil($blm/$bds)+6
   brs:=0.3*$bsz
   brc:=0.4*$bsz
-  brst:=ceil(max($bhw*(1+$bwv),0.55)*1.08+0.5)
   bir:=$bwp/$bsz
   bjg:=0.35+0.9*$bir
   bsg:=max(0.2*$bsz,3)
@@ -1045,8 +1000,9 @@ _fx_cracked_mud_branch : # size,warp,halfwidth,variation,density,angle,length,br
             soft = max(1,0.25*rr);
             cxp = round(px);
             cyp = round(py);
-            for (oy = -$brst, oy<=$brst, ++oy,
-              for (ox = -$brst, ox<=$brst, ++ox,
+            rds = ceil(rr + 0.3*soft);
+            for (oy = -rds, oy<=rds, ++oy,
+              for (ox = -rds, ox<=rds, ++ox,
                 qx = cxp + ox;
                 qy = cyp + oy;
                 if (qx>=0 && qx<$bw && qy>=0 && qy<$bh,
