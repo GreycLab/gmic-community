@@ -747,21 +747,20 @@ fx_cracked_mud :
     lnf:=$slen%
     brf:=$sbr%
 
-    # Multi-scale crack networks, merged with a max() into one 4-channel map
-    # (channel 0: crack profile, 1: proximity to cracks, 2: random value per plate,
-    # 3: proximity to the visible cracks, used as the "parent" of the next level).
-    $mw,$mh,1,4
-    repeat $lvl {
-      sz:=max($msz*0.42^$>,6)
+    # Primary cracks, then secondary (and tertiary) cracks, merged with max() into one
+    # 3-channel map (0: crack profile, 1: proximity to cracks, 2: random value per plate).
+    dn:=$dens%
+    sz:=max($msz,6)
+    wp:=$irr%*$sz
+    hw:=max($hw0,0.6)
+    $mw,$mh,1,1 _fx_cracked_mud_plates. $sz,$wp,$hw,$cvv
+    repeat $lvl-1 {
+      lv:=$>+1
+      sz:=max($msz*0.42^$lv,6)
       wp:=$irr%*$sz
-      hw:=max($hw0*0.45^$>,0.6)
-      dn:=$>?$dens%:-1
+      hw:=max($hw0*0.45^$lv,0.6)
       $mw,$mh,1,1
-      if $>==0
-        _fx_cracked_mud_level[0,1] $sz,$wp,$hw,$cvv,$dn,1.3,$msz
-      else
-        _fx_cracked_mud_branch[0,1] $sz,$wp,$hw,$cvv,$dn,$asr,$msz,$lnf,$brf
-      fi
+      _fx_cracked_mud_branch[0,1] $sz,$wp,$hw,$cvv,$dn,$asr,$lnf,$brf
       max[0] [1] rm.
     }
 
@@ -886,114 +885,49 @@ _fx_cracked_mud_plates : # size,warp,halfwidth,variation
     [ cut((hw - e)/soft,0,1),exp(-max(e - hw,0)/(0.07*$lsz)),i(#1,ia,ja,0,2,0,1) ]"
   rm[0,1]
 
-# One level of crack network (warped jittered Voronoi, distance to cell edges = F2-F1).
-# Selected images: [0] = crack map of the previous levels (channel 3 = exp(-distance/scale)
-# to the visible cracks), [1] = blank image of the same size. Output: [0] unchanged and
-# [1] = 4 channels (crack profile, proximity to cracks, random value of the plate,
-# proximity to the visible cracks).
-# A negative density means that all edges are cracked (main level). Otherwise, each cell
-# flows towards a neighbor closer to the previous cracks, which groups the cells into
-# basins that all touch a previous crack. The new cracks are the outlines of a random
-# subset of basins, fading with the distance to the previous cracks: each of them
-# therefore starts from a previous crack and never forms an isolated closed cell.
-_fx_cracked_mud_level : # size,warp,halfwidth,variation,density,reach,scale
-  lsz,lwp,lhw,lwv,ldn,lrch,lsc=$*
+# Primary cracks: warped jittered Voronoi, distance to cell edges = F2-F1.
+# Selected image: [0] = blank image of the right size, replaced by a 3-channel map
+# (crack profile, proximity to cracks, random value of the plate).
+_fx_cracked_mud_plates : # size,warp,halfwidth,variation
+  lsz,lwp,lhw,lwv=$*
   lw,lh:=w,h
-  rm[1]
+  rm
 
-  # [1]: warp fields (x, y) and width modulation.
-  ${lw},${lh}x3 _fx_cracked_mud_noise[1-3] {$lsz*1.5},5 a[1-3] c
+  # [0]: warp fields (x, y) and width modulation.
+  ${lw},${lh}x3 _fx_cracked_mud_noise {$lsz*1.5},5 a c
 
-  # [2]: random jitter (x, y) and random value for each seed of the grid.
+  # [1]: random jitter (x, y) and random value for each seed of the grid.
   lgx,lgy:=ceil([$lw,$lh]/$lsz)+5
   $lgx,$lgy,1,3 rand. 1
 
-  # [3]: seeds data = jitter x, jitter y, random value, distance to the previous cracks,
-  # offset (x, y) of the neighbor cell towards which the cell flows (0,0 for a basin root).
-  $lgx,$lgy,1,6,"
-    jx = i(#2,x,y,0,0,0,1);
-    jy = i(#2,x,y,0,1,0,1);
-    qx = (x - 2 + jx)*$lsz;
-    qy = (y - 2 + jy)*$lsz;
-    dself = -$lsc*log(max(i(#0,qx,qy,0,3,1,1),1e-9));
-    best = 0;
-    bdx = 0;
-    bdy = 0;
-    for (oy = -1, oy<=1, ++oy,
-      for (ox = -1, ox<=1, ++ox,
-        nx = x + ox;
-        ny = y + oy;
-        nqx = (nx - 2 + i(#2,nx,ny,0,0,0,1))*$lsz;
-        nqy = (ny - 2 + i(#2,nx,ny,0,1,0,1))*$lsz;
-        dnb = -$lsc*log(max(i(#0,nqx,nqy,0,3,1,1),1e-9));
-        dst = sqrt((nqx - qx)^2 + (nqy - qy)^2);
-        hs = abs(sin(x*12.9898 + y*78.233 + ox*37.719 + oy*17.351)*43758.5453);
-        hs = hs - floor(hs);
-        score = (dself - dnb)/max(dst,1e-3) + 0.5*hs;
-        if ((ox || oy) && dself>dnb && score>best, best = score; bdx = ox; bdy = oy)
-      )
-    );
-    [ jx,jy,i(#2,x,y,0,2,0,1),dself,bdx,bdy ]"
-  rm[2]
-
-  # [3]: basins data = id of the root cell, "basin is cracked" flag, random reach factor.
-  $lgx,$lgy,1,3,"
-    cx = x;
-    cy = y;
-    for (it = 0, it<24, ++it,
-      pdx = i(#2,cx,cy,0,4,0,1);
-      pdy = i(#2,cx,cy,0,5,0,1);
-      cx = cx + pdx;
-      cy = cy + pdy
-    );
-    h1 = abs(sin(cx*12.9898 + cy*78.233)*43758.5453);
-    h1 = h1 - floor(h1);
-    h2 = abs(sin(cx*39.3468 + cy*11.135)*24634.6345);
-    h2 = h2 - floor(h2);
-    [ cy*1024 + cx,h1<$ldn,0.6 + 0.8*h2 ]"
-
-  # [4]: final crack map of this level.
-  $lw,$lh,1,4,"
-    px = x + $lwp*i(#1,x,y,0,0,1,1);
-    py = y + $lwp*i(#1,x,y,0,1,1,1);
+  # [2]: final crack map.
+  $lw,$lh,1,3,"
+    px = x + $lwp*i(#0,x,y,0,0,1,1);
+    py = y + $lwp*i(#0,x,y,0,1,1,1);
     cx = floor(px/$lsz);
     cy = floor(py/$lsz);
     d1 = 1e9;
     d2 = 1e9;
     ia = 0;
     ja = 0;
-    ib = 0;
-    jb = 0;
     for (oy = -1, oy<=1, ++oy,
       for (ox = -1, ox<=1, ++ox,
         gx = cx + ox + 2;
         gy = cy + oy + 2;
-        qx = (gx - 2 + i(#2,gx,gy,0,0,0,1))*$lsz;
-        qy = (gy - 2 + i(#2,gx,gy,0,1,0,1))*$lsz;
+        qx = (gx - 2 + i(#1,gx,gy,0,0,0,1))*$lsz;
+        qy = (gy - 2 + i(#1,gx,gy,0,1,0,1))*$lsz;
         d = sqrt((px - qx)^2 + (py - qy)^2);
         if (d<d1,
-          d2 = d1; ib = ia; jb = ja; d1 = d; ia = gx; ja = gy,
-          if (d<d2, d2 = d; ib = gx; jb = gy)
+          d2 = d1; d1 = d; ia = gx; ja = gy,
+          if (d<d2, d2 = d)
         )
       )
     );
     e = (d2 - d1)/2;
-    ra = i(#3,ia,ja,0,0,0,1);
-    rb = i(#3,ib,jb,0,0,0,1);
-    oa = i(#3,ia,ja,0,1,0,1);
-    ob = i(#3,ib,jb,0,1,0,1);
-    reach = $lrch*$lsz*max(oa*i(#3,ia,ja,0,2,0,1),ob*i(#3,ib,jb,0,2,0,1));
-    dpix = -$lsc*log(max(i(#0,x,y,0,3,1,1),1e-9));
-    s = $ldn<0?1:((ra!=rb && (oa || ob))?cut(1 - dpix/max(reach,1e-3),0,1):0);
-    m = i(#1,x,y,0,2,1,1);
-    hw = $lhw*sqrt(s)*max(1 + $lwv*m,0);
+    hw = $lhw*max(1 + $lwv*i(#0,x,y,0,2,1,1),0);
     soft = max(1,0.25*hw);
-    k = cut((hw - e)/soft,0,1);
-    prox = s*exp(-max(e - hw,0)/(0.07*$lsz));
-    far = s>0.15?exp(-max(e - hw,0)/$lsc):0;
-    vo = $ldn<0?i(#2,ia,ja,0,2,0,1):0;
-    [ k,prox,vo,far ]"
-  rm[1-3]
+    [ cut((hw - e)/soft,0,1),exp(-max(e - hw,0)/(0.07*$lsz)),i(#1,ia,ja,0,2,0,1) ]"
+  rm[0,1]
 
 # Secondary / tertiary cracks: lightning-like branching crack trees (instead of Voronoi).
 # Same interface as _fx_cracked_mud_level: selected images [0] = crack map of the previous
@@ -1003,8 +937,8 @@ _fx_cracked_mud_level : # size,warp,halfwidth,variation,density,reach,scale
 # path (direction re-drawn every few pixels) and emits side branches at random places, which
 # branch recursively (up to a given generation). A walker stops at a random length, or when it
 # touches a crack; when it approaches another crack, it is bent towards its normal.
-_fx_cracked_mud_branch : # size,warp,halfwidth,variation,density,reach,scale
-  bsz,bwp,bhw,bwv,bdn,basp,bsc,blf,bbf=$*
+_fx_cracked_mud_branch : # size,warp,halfwidth,variation,density,angle,length,branching
+  bsz,bwp,bhw,bwv,bdn,basp,blf,bbf=$*
   bw,bh:=w,h
   rm[1]
 
@@ -1152,11 +1086,12 @@ _fx_cracked_mud_branch : # size,warp,halfwidth,variation,density,reach,scale
   distance[4] 0
 
   # [5] = output: crack profile, proximity to cracks, 0, proximity to the visible cracks.
-  $bw,$bh,1,4,"
+  $bw,$bh,1,3,"
     k = i(#3,x,y,0,0);
     dn = i(#4,x,y,0,0);
-    c==0?k:(c==1?exp(-dn/(0.07*$bsz)):(c==2?0:exp(-dn/$bsc)))"
+    c==0?k:(c==1?exp(-dn/(0.07*$bsz)):0)"
   rm[1-4]
+
 
 #@gui Liquid Marble : fx_liquid_marble, fx_liquid_marble_preview(1)
 #@gui : Description = note{"<span color="#EE5500"><b>Description:</b></span> \
