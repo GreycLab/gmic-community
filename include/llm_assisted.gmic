@@ -1053,6 +1053,143 @@ _fx_cracked_mud_branch : # size,warp,halfwidth,variation,density,angle,length,br
     c==0?k:(c==1?exp(-dn/(0.07*$bsz)):0)"
   rm[1-4]
 
+#@gui Interference Waves : fx_interference_waves, fx_interference_waves(0)
+#@gui : Description = note{"<span color="#EE5500"><b>Description:</b></span> \
+# Generate wave interference patterns from several point sources.
+#@gui : "}, sep = separator()
+#@gui : note = note("<small><span color="#CC3300"><b>Sources:</b></span></small>")
+#@gui : Source 1 = point(49,43,1,1)
+#@gui : Source 2 = point(29,65,1,1)
+#@gui : Source 3 = point(70,25,-1,1)
+#@gui : Source 4 = point(20,25,-1,1)
+#@gui : Source 5 = point(75,70,-1,1)
+#@gui : Source 6 = point(50,85,-1,1)
+#@gui : Source 7 = point(85,45,-1,1)
+#@gui : Source 8 = point(10,50,-1,1)
+#@gui : sep = separator(), note = note("<small><span color="#CC3300"><b>Waves:</b></span></small>")
+#@gui : Frequency = ~float(50,0,100)
+#@gui : Frequency Variation = ~float(0,0,50)
+#@gui : Phase Shift = ~float(0,0,360)
+#@gui : Interference Type = ~choice(1,"Additive","Multiplicative")
+#@gui : Sharpness = ~float(2,0,10)
+#@gui : sep = separator(), note = note("<small><span color="#CC3300"><b>Shape:</b></span></small>")
+#@gui : Squareness = ~float(0,0,100)
+#@gui : Aspect Ratio = ~float(1,1,10)
+#@gui : Orientation = ~float(0,0,180)
+#@gui : sep = separator(), note = note("<small><span color="#CC3300"><b>Colors:</b></span></small>")
+#@gui : Palette = ~choice("Three Colors","Rainbow","Grayscale")
+#@gui : Color 1 = ~color(30,60,220)
+#@gui : Color 2 = ~color(255,210,0)
+#@gui : Color 3 = ~color(60,230,150)
+#@gui : Color Cycles = ~float(0.35,0,6)
+#@gui : Color Variation = ~float(1.2,0,6)
+#@gui : sep = separator(), note = note("<small><span color="#CC3300"><b>Lighting:</b></span></small>")
+#@gui : Relief = ~float(1,0,5)
+#@gui : Light Angle = ~float(135,0,360)
+#@gui : Shininess = ~float(30,1,100)
+#@gui : Specular = ~float(0.8,0,2)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/11/20</i>.</small>")
+fx_interference_waves :
+  x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8,freq,fvar,pshift,itype,sharp,sqr,ratio,orient,\
+  pal,r1,g1,b1,r2,g2,b2,r3,g3,b3,ccyc,cvar,relief,lang,shin,spec=${1-40}
+  freq:=0.5*600^($freq/100)
+  foreach {
+    wd,ht:=w,h
+
+    # Compute the interference field (channel 0) and the mean source distance (channel 1).
+    $wd,$ht,1,2,"
+      begin(
+        sc = max(w,h);
+        P = [ $x1,$y1, $x2,$y2, $x3,$y3, $x4,$y4, $x5,$y5, $x6,$y6, $x7,$y7, $x8,$y8 ];
+        ph = vector(#8);
+        fq = vector(#8);
+        cnt = 0;
+        for (k = 0, k<8, ++k,
+          ph[k] = $pshift°*k;
+          fq[k] = $freq*(1 + (k&1?1:-1)*$fvar%);
+          if (!isnan(P[2*k]) && !isnan(P[2*k+1]), ++cnt);
+        );
+        cnt = max(cnt,1);
+        ca = cos($orient°);
+        sa = sin($orient°);
+        pp = $sqr<100?2/(1 - $sqr%):0;
+      );
+      X = x/sc;
+      Y = y/sc;
+      acc = $itype?1:0;
+      rd = 0;
+      for (k = 0, k<8, ++k,
+        if (!isnan(P[2*k]) && !isnan(P[2*k+1]),
+          dx = X - P[2*k]%*w/sc;
+          dy = Y - P[2*k+1]%*h/sc;
+          u = (dx*ca + dy*sa)/$ratio;
+          v = -dx*sa + dy*ca;
+          m = max(abs(u),abs(v));
+          dist = pp==2?sqrt(u^2 + v^2):pp==0||m==0?m:m*((abs(u)/m)^pp + (abs(v)/m)^pp)^(1/pp);
+          val = cos(2*pi*fq[k]*dist + ph[k]);
+          acc = $itype?acc*val:acc+val;
+          rd += dist;
+        );
+      );
+      acc = $itype?sign(acc)*abs(acc)^(1/cnt):acc/cnt;
+      sh = $sharp;
+      acc = sh>0?tanh(sh*acc)/tanh(sh):acc;
+      [ acc, rd/cnt ]
+    "
+    rm[0]
+
+    # Colorize and shade the field.
+    $wd,$ht,1,3,"
+      begin(
+        sc = max(w,h);
+        C = [ $r1,$g1,$b1, $r2,$g2,$b2, $r3,$g3,$b3 ];
+        ang = $lang°;
+        Lx = cos(ang)*cos(pi/4);
+        Ly = -sin(ang)*cos(pi/4);
+        Lz = sin(pi/4);
+        Hx = Lx;
+        Hy = Ly;
+        Hz = Lz + 1;
+        hn = sqrt(Hx^2 + Hy^2 + Hz^2);
+        Hx /= hn; Hy /= hn; Hz /= hn;
+        K = sc/(2*pi*$freq);
+      );
+      fld = i(#0,x,y,0,0);
+      gx = (i(#0,x+1,y,0,0,0,1) - i(#0,x-1,y,0,0,0,1))/2;
+      gy = (i(#0,x,y+1,0,0,0,1) - i(#0,x,y-1,0,0,0,1))/2;
+      nx = -$relief*gx*K;
+      ny = -$relief*gy*K;
+      nn = sqrt(nx^2 + ny^2 + 1);
+      nx /= nn; ny /= nn; nz = 1/nn;
+      diff = max(0,nx*Lx + ny*Ly + nz*Lz);
+      shade = 0.35 + 0.9*diff;
+      sp = 255*$spec*max(0,nx*Hx + ny*Hy + nz*Hz)^$shin;
+
+      t = $ccyc*(0.5 + 0.5*fld) + $cvar*i(#0,x,y,0,1);
+      if ($pal==0,
+        t -= floor(t);
+        q = 3*t;
+        sg = int(q);
+        fr = q - sg;
+        fr = fr*fr*(3 - 2*fr);
+        n1 = sg==2?0:sg+1;
+        cr = C[3*sg]*(1-fr) + C[3*n1]*fr;
+        cg = C[3*sg+1]*(1-fr) + C[3*n1+1]*fr;
+        cb = C[3*sg+2]*(1-fr) + C[3*n1+2]*fr;
+      ,
+        if ($pal==1,
+          cr = 127.5 + 127.5*cos(2*pi*t);
+          cg = 127.5 + 127.5*cos(2*pi*(t-1/3));
+          cb = 127.5 + 127.5*cos(2*pi*(t-2/3));
+        ,
+          cr = cg = cb = 255*(0.5 + 0.5*fld);
+        );
+      );
+      [ cr*shade + sp, cg*shade + sp, cb*shade + sp ]
+    "
+    rm[0] c 0,255
+  }
 
 #@gui Liquid Marble : fx_liquid_marble, fx_liquid_marble_preview(1)
 #@gui : Description = note{"<span color="#EE5500"><b>Description:</b></span> \
