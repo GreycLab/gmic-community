@@ -2060,6 +2060,114 @@ fx_perspective_water_waves :
       255*(body*(1 - F) + sky*F + Csun*sp)"
   c 0,255
 
+#@gui Water Caustics : fx_water_caustics,fx_water_caustics(1)
+#@gui : Description = note{"<span color="#EE5500"><b>Description:</b></span> \
+# Procedural caustics of light on a pool bottom, seen from above.
+#@gui : "}, sep = separator()
+#@gui : note = note("<small><span color="#CC3300"><b>Geometry:</b></span></small>")
+#@gui : Cell Size = ~float(11,3,50)
+#@gui : Distortion = ~float(35,0,100)
+#@gui : Roughness = ~float(50,0,100)
+#@gui : Random Seed = ~int(0,0,65535)
+#@gui : sep = separator()
+#@gui : note = note("<small><span color="#CC3300"><b>Light:</b></span></small>")
+#@gui : Connectivity = ~float(85,10,100)
+#@gui : Fine Detail = ~float(50,0,100)
+#@gui : Line Width = ~float(5,0.5,30)
+#@gui : Sharpness = ~float(1.5,0.5,5)
+#@gui : sep = separator()
+#@gui : note = note("<small><span color="#CC3300"><b>Colors:</b></span></small>")
+#@gui : Water Color = color(0,115,185)
+#@gui : Light Color = color(200,245,255)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i>Author Name</i>.      Latest Update: <i>2026/11/20</i>.</small>")
+fx_water_caustics:
+  csz,dst,rgh,seed,cnn,fin,lwd,shp,r1,g1,b1,r2,g2,b2=${1-14}
+  foreach {
+    to_gray
+    f "
+      cell = $csz%;
+      dist = $dst%;
+      rough = $rgh%;
+      conn = $cnn%;
+      fine = $fin%;
+      lwid = $lwd%;
+      sz = max(w,h);
+      px = x/sz;
+      py = y/sz;
+      nw = 8;
+      ng = 12;
+      amp = 2*dist*cell/sqrt(nw);
+      dxw = dyw = msum = gsum = 0;
+      for (n = 0, n<nw, ++n,
+        a1 = abs(frac(sin(n*12.9898 + $seed*78.233)*43758.5453));
+        a2 = abs(frac(sin(n*39.3468 + $seed*11.135)*24634.6345));
+        a3 = abs(frac(sin(n*73.1561 + $seed*53.719)*35471.9267));
+        ang = a1*360°;
+        k = 2*pi/cell*(0.25 + 0.4*a2);
+        wv = sin(k*(cos(ang)*px + sin(ang)*py) + a3*360°);
+        dxw += amp*cos(ang)*wv;
+        dyw += amp*sin(ang)*wv;
+        msum += wv
+      );
+      for (n = 0, n<ng, ++n,
+        a1 = abs(frac(sin(n*21.7123 + $seed*17.431)*43758.5453));
+        a2 = abs(frac(sin(n*47.3109 + $seed*91.157)*24634.6345));
+        a3 = abs(frac(sin(n*83.9531 + $seed*29.873)*35471.9267));
+        ang = a1*360°;
+        k = 2*pi/cell*(1.5 + 2.5*a2);
+        amg = 0.8*rough/(sqrt(ng)*k);
+        wv = sin(k*(cos(ang)*px + sin(ang)*py) + a3*360°);
+        dxw += amg*cos(ang)*wv;
+        dyw += amg*sin(ang)*wv;
+        gsum += wv
+      );
+      mlow = msum/sqrt(nw/2);
+      grn = gsum/sqrt(ng/2);
+      qx = px + dxw;
+      qy = py + dyw;
+      res = 0;
+      for (o = 0, o<2, ++o,
+        sc = (o==0?1:2.1);
+        gx = qx*sc/cell;
+        gy = qy*sc/cell;
+        ix0 = floor(gx);
+        iy0 = floor(gy);
+        f1 = f2 = 9;
+        id1 = id2 = 0;
+        for (dy = -1, dy<=1, ++dy,
+          for (dx = -1, dx<=1, ++dx,
+            ix = ix0 + dx;
+            iy = iy0 + dy;
+            hx = abs(frac(sin(ix*127.1 + iy*311.7 + $seed*74.7 + o*19.17)*43758.5453));
+            hy = abs(frac(sin(ix*269.5 + iy*183.3 + $seed*31.3 + o*7.31)*24634.6345));
+            cid = abs(frac(sin((hx + 1.7*hy)*417.3)*43758.5453));
+            dd = sqrt(sqr(ix + hx - gx) + sqr(iy + hy - gy));
+            m1 = dd<f1;
+            m2 = dd<f2;
+            id2 = m1*id1 + (m2 - m1)*cid + (1 - m2)*id2;
+            id1 = m1*cid + (1 - m1)*id1;
+            f2 = min(f2,max(f1,dd));
+            f1 = min(f1,dd)
+          )
+        );
+        eid = abs(frac(sin((id1 + id2)*91.3 + id1*id2*57.1)*43758.5453));
+        ekeep = cut((eid - 1 + conn)*5 + 1,0,1);
+        ewid = lwid*(0.6 + 0.8*eid);
+        lv = (ewid/(f2 - f1 + ewid))^$shp;
+        res += (o==0?1:fine)*lv*ekeep*(0.5 + 0.5*eid)
+      );
+      gmod = cut(1 + 0.6*rough*grn,0.4,1.5);
+      bg = 0.1*cut(0.5 + 0.4*mlow,0,1);
+      cut(bg + res*gmod*cut(0.8 + 0.5*mlow,0.35,1.2),0,1)
+    "
+    to_rgb
+    f "
+      v = i;
+      c==0?$r1 + ($r2 - $r1)*v:c==1?$g1 + ($g2 - $g1)*v:$b1 + ($b2 - $b1)*v
+    "
+  }
+
 #@gui _<b>Testing</b>
 #@gui <i>Rajasegar Chandiran</i>
 #@gui Hexagon Grid : fx_hexagon_grid, fx_hexagon_grid(1)
