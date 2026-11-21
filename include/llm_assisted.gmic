@@ -2060,6 +2060,122 @@ fx_perspective_water_waves :
       255*(body*(1 - F) + sky*F + Csun*sp)"
   c 0,255
 
+#@gui Water Caustics : fx_water_caustics,fx_water_caustics(0)
+#@gui : Description = note{"<span color="#EE5500"><b>Description:</b></span> \
+# Render the network of bright light lines typical of water caustics.
+#@gui : "}, sep = separator()
+#@gui : Cell Size = ~float(45,10,250)
+#@gui : Distortion = ~float(0.8,0.2,4)
+#@gui : Fine Detail = ~float(30,0,100)
+#@gui : Time = ~float(0,0,100)
+#@gui : Quality = choice{0,"Draft","Normal","High (Slower)"}
+#@gui : sep = separator(), note = note("<small><span color="#CC3300"><b>Rendering:</b></span></small>")
+#@gui : Line Softness = ~float(0.6,0,3)
+#@gui : Warp Amplitude = ~float(30,0,100)
+#@gui : Warp Smoothness = ~float(20,0,100)
+#@gui : Contrast = ~float(50,0,100)
+#@gui : Glow = ~float(25,0,100)
+#@gui : sep = separator(), note = note("<small><span color="#CC3300"><b>Colors:</b></span></small>")
+#@gui : Water Color = color(0,140,200)
+#@gui : Light Color = color(225,255,255)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i>David Tschumperlé</i>.      Latest Update: <i>2026/11/21</i>.</small>")
+fx_water_caustics :
+  csz,dst,det,tm,qlt,soft,wam,wsm,ctr,glo,wr,wg,wb,lr,lg,lb=$*
+  srand 0
+  foreach {
+    iw,ih:=w,h
+
+    # Caustics as the density of light rays refracted by a random water surface.
+    _fx_water_caustics_density $csz,$dst,$det,$tm,$iw,$ih,{1+$qlt}
+    rm[0] c 0%,99.7% n 0,1
+
+    # Random smooth warping of the rendered caustics, to break the regularity of the lines.
+    if $wam>0
+      $iw,$ih,1,2 rand. -1,1
+      blur. {0.01*$wsm*$csz}
+      /. {sqrt(iv)}
+      *. {0.01*$wam*0.3*$csz}
+      warp[0] [1],1,1,1
+      rm.
+    fi
+    +blur. {0.5*$csz}
+    *. $glo%
+    blur[0] $soft
+    add[0,1]
+    n 0,1
+    ^. {0.2+0.9*$ctr%}
+
+    # Colorization (deep water -> water color -> light color).
+    $iw,$ih,1,3,"
+      v = i(#-1,x,y);
+      t1 = min(v/0.1,1);
+      t2 = min(max(v - 0.1,0)/0.4,1);
+      W = [ $wr,$wg,$wb ];
+      L = [ $lr,$lg,$lb ];
+      D = 0.8*W;
+      D + (W - D)*t1 + (L - W)*t2"
+    rm[0]
+  }
+
+# Accumulate the impacts of light rays refracted by a sum of random plane waves (photon splatting).
+_fx_water_caustics_density :
+  csz,dst,det,tm,iw,ih,ss=$*
+  nbw=64
+  m:=ceil(1.5*$csz)
+
+  # Random wave parameters (one column per wave: direction, wavelength, phase, speed).
+  $nbw,1,1,4 rand. 0,1
+
+  # Wave parameters: wave vector (kx,ky), curvature amplitude and phase.
+  $nbw,1,1,4,"
+    th = pi*(x + 0.9*(i(#-1,x,0,0,0) - 0.5))/w;
+    oct = i(#-1,x,0,0,1) - 0.5 + 2*$det%*max(0,i(#-1,x,0,0,1) - 0.35);
+    k = 2*pi/$csz*2^oct;
+    q = $dst*sqrt(2/w)*2^(-0.5*max(0,oct));
+    ph = 2*pi*i(#-1,x,0,0,2) + $tm*(0.3 + 0.7*i(#-1,x,0,0,3));
+    [ k*cos(th), k*sin(th), q, ph ]"
+  rm[-2]
+
+  # Landing positions of the rays, from a regular grid of starting points (padded and oversampled).
+  sw:=($iw+2*$m)*$ss
+  sh:=($ih+2*$m)*$ss
+  $sw,$sh,1,2,"
+    px = x/$ss - $m;
+    py = y/$ss - $m;
+    dx = 0;
+    dy = 0;
+    for (j = 0, j<w#-1, ++j,
+      kx = i(#-1,j,0,0,0);
+      ky = i(#-1,j,0,0,1);
+      s = i(#-1,j,0,0,2)*sin(kx*px + ky*py + i(#-1,j,0,0,3))/(kx*kx + ky*ky);
+      dx -= kx*s;
+      dy -= ky*s;
+    );
+    [ px + dx, py + dy ]"
+  rm[-2]
+
+  # Bilinear accumulation of the rays in the final image.
+  $iw,$ih,1,1,0
+  f[-1] "begin(
+    for (yy = 0, yy<h#-2, ++yy,
+      for (xx = 0, xx<w#-2, ++xx,
+        u = i(#-2,xx,yy,0,0) - 0.5;
+        v = i(#-2,xx,yy,0,1) - 0.5;
+        iu = int(floor(u));
+        iv = int(floor(v));
+        fu = u - iu;
+        fv = v - iv;
+        i(iu,iv,0,0) += (1 - fu)*(1 - fv);
+        i(iu + 1,iv,0,0) += fu*(1 - fv);
+        i(iu,iv + 1,0,0) += (1 - fu)*fv;
+        i(iu + 1,iv + 1,0,0) += fu*fv;
+      )
+    )
+  );
+  i"
+  rm[-2]
+
 #@gui _<b>Testing</b>
 #@gui <i>Rajasegar Chandiran</i>
 #@gui Hexagon Grid : fx_hexagon_grid, fx_hexagon_grid(1)
