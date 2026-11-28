@@ -1183,6 +1183,129 @@ foreach {
 }
 
 
+#@gui Iris 2 : pr_iris2,pr_iris2_gui
+#@gui : Description = note{"<span color="#EE5500"><b>Description:</b></span> \
+# Renders a 2048 x 2048 pupil and iris texture.
+#@gui : "}, sep = separator()
+#~ #@gui : Resolution = int(800,800,2048)
+#@gui : Details* = ~float(3,0,10)
+#@gui : Pupil Height = float(0.4,0,1)
+#@gui : Pupil Width = float(0.4,0,1)
+#@gui : Dilation = ~float(0,-2,2)
+#@gui : Inner Ring Height = float(.4,0,1)
+#@gui : Inner Ring Width = float(.4,0,1)
+#@gui : Inner Ring Thickness = ~float(3,1,10)
+#@gui : Inner Ring Opacity = ~float(.5,0,1)
+#@gui : Defects = ~float(0,0,1)
+#@gui : Outer Ring Thickness = ~float(100,0,200)
+#@gui : Seed (0:Random) = int(0,0,999999)
+#@gui : Center = ~color(66,66,0)
+#@gui : Middle = ~color(30,150,150)
+#@gui : Outer = ~color(0,57,83)
+#@gui : Inner Ring = ~color(255,100,0)
+#@gui : sep = separator()
+#@gui : note = note("<small>Author: <i>Prawnsushi</i>.\
+# Latest Update: <i>2026/02/19</i>.</small>")
+#@gui : sep = separator()
+#@gui : Description = note{" \
+# \n <span color="#EE5500">Details</span> : Settings above 5 will also change iris style.
+#@gui : "}, sep = separator()
+pr_iris2_gui :
+pr_iris2 ${1--1}
+
+
+#@cli pr_iris2 : _resolution,_double_res,_iris_lines_width,_pupil_height,_pupil_width,_fire_ring_height,\
+# _fire_ring_width,_defect_width,_ring_width,_seed,_colorA1,...,_colorA3,_colorB1,..,_colorB3,_colorC1,..,_colorC3,_variation
+#@cli : WORK IN PROGRESS : Draws an eye's iris and pupil in a new image
+#@cli : Default value: 'resolution=800', 'double_res=0', 'iris_lines_size=10', 'Pupil_height=0.4', 'pupil_width=0.4', 'defect_width=120', 'ring_width=80', 'seed=0' 'colorA=100,100,0', 'colorB=30,150,200', 'colorC=255,150,0','variation=20'
+#@cli : $ pr_iris 800,1
+#@cli : pr_iris 800,,10,0.8,0.1,100,30,777
+#@cli : pr_iris 800,1,10,0.3,0.3,10,120,0,0,100,250,0,100,100,255,200,0,100
+pr_iris2 :
+det,puph,pupw,dil,innerh,innerw,innert,fopac,def,ring,seed,ra,ga,ba,rb,gb,bb,rc,gc,bc,rd,gd,bd=${1--1}
+res=2048
+
+foreach {
+  $res,$res,1,4,0
+  wh=255,255,255 bk=0,0,0
+  r,th:=(w*0.5)-10,20
+  innerh,innerw*=50
+  l. {
+  circle 50%,50%,31%,1,$rc,$gc,$bc,255
+  ellipse 50%,50%,{[1.5*$r*$pupw,1.5*$r*$puph]},0,1,$rb,$gb,$bb,255
+  ellipse 50%,50%,{[1.2*$r*$pupw,1.2*$r*$puph]},0,1,$ra,$ga,$ba,255
+  foreach {
+    repeat max($det,2) pr_deform 100,$seed,{6*$%},2,1,2 done blur_radial .7% pr_deform 10 
+  }
+  if $det 
+	if $det>5
+      +pr_deform[0] 4,{$seed+1},{.5*$det},1,3,3 spread. {max(.2*$det,1.5)}  sh. 3 gaussian. 50%  n. 0,255 rm.
+    else
+     +pr_deform[0] 4,{$seed+1},{2+$det},1,1,3 spread. {max(.5*$det,1.5)}  sh. 3 gaussian. 50%  n. 0,255 rm.
+    fi
+  fi
+  blend[-1,0] alpha,.9
+  mul. 3
+  blend[-1,0] divide,.2
+
+  ####### Defect
+
+  if $def 
+    +pr_deform[0] {14*$def},{$seed+1},{2+$def},1,3,3  luminance. to_rgba.
+    flower. {[0.5,80,0,u(150)]}
+    spread. {max(.5*$def,1.5)}  sh. 3 gaussian. 50%  n. 0,255 rm.
+    blend subtract,{min(.5,$def)}
+  fi
+  # subtract  exclusion value softburn softdodge
+  
+  ######## Inner Ring
+  if $fopac
+    .,.,1,4,$bk,0 .
+    l.. { ellipse. 50%,50%,$innerw%,$innerh%,0,1,{[$rd,$gd,$bd,255]}
+        sh. 3 ellipse. 50%,50%,{$innerw-$innert}%,{$innerh-$innert}%,0,1,$bk rm. }
+    l.  { ellipse. 50%,50%,{$innerw+$innert}%,{$innerh+$innert}%,0,1,{1.1*[$rd,$gd,$bd,255]}
+        sh. 3 ellipse. 50%,50%,{$innerw-$innert}%,{$innerh-$innert}%,0,1,$bk rm. }
+
+    blend[-1,-2] alpha
+    pr_deform. 40,$seed,3,1,1,3 
+    blur_radial. 1.6%
+    pr_deform. 4,$seed,1,1,1,3 
+    sharpen. 1000 
+    blend alpha,$fopac
+  fi
+
+  ####### Pupil
+  .,.,.,.,$bk,0
+  sh. 3
+  ellipse. 50%,50%,{[$r*$pupw,$r*$puph]},0,1,$wh
+  rm.
+  repeat 2 {
+  N:=$>+1 
+  flower. {[$N*0.5,$N*80,0,u(150)]}
+  }
+  blur_radial. 1.4% 
+  blend alpha
+  if $dil spherize 60%,$dil,2%,50%,50%,1,0,2 fi
+  
+  ######## Outer ring
+
+  if $ring
+    .,.,1,4,$bk,0
+    l. {
+      circle 50%,50%,{$r+10},1,$wh
+      circle 50%,50%,{$r-$ring},1,$wh,0 b {$ring*0.2}
+      sh 0,2 negate. rm.
+      pr_deform. 2,$seed,6,0 blend grainmerge,.2
+      }
+    blend[0,-1] alpha
+  fi
+  sh 3 fc. $bk circle. 50%,50%,$r,1,$wh erode. {$ring*0.2} b. 5 mul. 12 n. 0,255  rm.
+  c 0,255
+  }
+  k.
+}
+
+
 #@cli pr_dcm8 : _strength,_interpolation
 #@cli : Quickly pixelizes an image.
 #@cli : Interpolation can be { -1:none (memory content) | 0:none | 1:nearest | 2:average | 3:linear | 4=grid | 5=bicubic | 6=lanczos }.
